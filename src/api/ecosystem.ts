@@ -4,6 +4,7 @@ import { apiRoutes } from '../config/apiRoutes';
 import { getFromLocalStorage } from './Auth';
 import { storageKeys } from '../config/CommonConstant';
 import { getHeaderConfigs } from '../config/GetHeaderConfigs';
+import Cookies from 'universal-cookie';
 
 interface CreateEcosystemPayload {
 	name: string;
@@ -21,6 +22,8 @@ export interface GetEndorsementListParameter {
 	type: string;
 	status: string;
 }
+
+const cookies = new Cookies()
 
 export const createEcosystems = async (dataPayload: CreateEcosystemPayload) => {
 	const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
@@ -62,11 +65,11 @@ export const updateEcosystem = async (dataPayload: CreateEcosystemPayload) => {
 	}
 };
 
-export const getEcosystems = async (orgId: string, pageNumber?: number, pageSize?: number, search = '') => {
+export const getEcosystems = async (orgId: string, token?: string, pageNumber?: number, pageSize?: number, search = '') => {
 	const url = `${apiRoutes.Ecosystem.root}/${orgId}`;
 	const axiosPayload = {
 		url,
-		config: await getHeaderConfigs(),
+		config: await getHeaderConfigs(token),
 	};
 
 	try {

@@ -8,7 +8,38 @@ import DisplayUser from '../components/Profile/DisplayUser';
 import DisplayProfileImg from '../components/Profile/DisplayProfileImg';
 import { pathRoutes } from '../config/pathRoutes.js';
 import SignOutButton from '../components/SignOutButton/index';
-import AgentHealth from '../commonComponents/AgentHealth';
+import { apiRoutes } from '../config/apiRoutes';
+import { getHeaderConfigs } from '../config/GetHeaderConfigs';
+import { decryptCookie } from '../api/Auth';
+import { storageKeys } from '../config/CommonConstant';
+import { envConfig } from '../config/envConfig';
+import API from '../config/ssrAPI';
+import type { Organisation } from '../components/organization/interfaces';
+
+const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
+const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
+const token = Astro.cookies.get('session').value as string;
+
+let activeOrg: Organisation;
+
+const orgResponse = await API({
+	token,
+	url: `${apiRoutes.organizations.getAll}?pageNumber=1&pageSize=10&search=`,
+	method: 'GET',
+});
+if (orgId) {
+	activeOrg = orgResponse?.organizations?.find(
+		(org: { id: number }) => org.id === Number(orgId),
+	) as Organisation;
+} else {
+	activeOrg = orgResponse?.organizations && orgResponse?.organizations[0];
+}
+
+const agentResponse = await API({
+	token,
+	url: `${apiRoutes.organizations.root}/${activeOrg?.id}${apiRoutes.Agent.checkAgentHealth}`,
+	method: 'GET',
+});
 
 ---
 
@@ -64,36 +95,31 @@ import AgentHealth from '../commonComponents/AgentHealth';
 
 			<div class="flex items-center">
 				<div class="hidden sm:block mr-5">
-					<AgentHealth client:visible />
+					<div class="pr-4">
+						{
+							agentResponse?.isInitialized ? (
+								<div class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+									<div class="w-2 h-2 mr-1 bg-green-500 rounded-full" />
+									SSI Agent is up and running
+								</div>
+							) : (
+								<span class="inline-flex items-center bg-red-100 text-red-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
+									<span class="w-2 h-2 mr-1 bg-red-500 rounded-full" />
+									SSI Agent is not running
+								</span>
+							)
+						}
+					</div>
 				</div>
 				<div class="hidden sm:block mr-5">
-					<OrgDropDwon client:visible />
+					<OrgDropDwon
+						activeOrg={activeOrg}
+						orgList={orgResponse?.organizations
+							? orgResponse?.organizations
+							: []}
+						client:visible
+					/>
 				</div>
-
-				<!-- Search mobile -->
-
-				<!-- <button
-					id="toggleSidebarMobileSearch"
-					type="button"
-					class="p-2 text-gray-500 rounded-lg lg:hidden hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
-				> -->
-					<!-- <span class="sr-only">Search</span> -->
-
-					<!-- Search icon -->
-					<!-- <svg
-						class="w-6 h-6"
-						fill="currentColor"
-						viewBox="0 0 20 20"
-						xmlns="http://www.w3.org/2000/svg"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-							clip-rule="evenodd"></path>
-					</svg> -->
-				<!-- </button> -->
-
-				<!-- Dropdown menu -->
 				<div
 					id="dropdownNavbar"
 					class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600"
@@ -153,7 +179,7 @@ import AgentHealth from '../commonComponents/AgentHealth';
 				</button> -->
 				<!-- Dropdown menu -->
 				<div
-					class="z-20 z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
+					class="z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
 					id="notification-dropdown"
 				>
 					<div
@@ -410,27 +436,30 @@ import AgentHealth from '../commonComponents/AgentHealth';
 					type="button"
 					data-dropdown-toggle="apps-dropdown"
 					class="p-2 text-gray-500 rounded-lg sm:flex hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700"
-					
 				>
-					<span class="sr-only">View </span>
-					<!-- Icon -->		
-					<svg 
-					xmlns="http://www.w3.org/2000/svg" 
-					width="22" 
-					height="22" 
-					fill="none" 
-					viewBox="0 0 30 30">  
-					<path stroke="#6B7280" 
-					stroke-linecap="round" 
-					stroke-linejoin="round" 
-					stroke-width="2.5" 
-					d="M14 2.219c2.289 0 4.484.814 6.102 2.265C21.721 5.934 22.63 7.9 22.63 9.95c0 3.173.711 5.548 1.634 7.295 1.178 2.232 1.768 3.347 1.735 3.602-.038.298-.087.38-.33.553-.208.15-1.242.15-3.31.15H5.64c-2.068 0-3.102 0-3.31-.15-.243-.173-.291-.255-.33-.553-.032-.255.557-1.37 1.735-3.602.923-1.747 1.634-4.122 1.634-7.295 0-2.05.91-4.017 2.528-5.467C9.516 3.034 11.71 2.219 14 2.219Zm0 0v.003M9.771 26.383a6.35 6.35 0 0 0 4.235 1.614 6.35 6.35 0 0 0 4.235-1.614"
-					/></svg>
+					<span class="sr-only">View</span>
+					<!-- Icon -->
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="22"
+						height="22"
+						fill="none"
+						viewBox="0 0 30 30"
+					>
+						<path
+							stroke="#6B7280"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2.5"
+							d="M14 2.219c2.289 0 4.484.814 6.102 2.265C21.721 5.934 22.63 7.9 22.63 9.95c0 3.173.711 5.548 1.634 7.295 1.178 2.232 1.768 3.347 1.735 3.602-.038.298-.087.38-.33.553-.208.15-1.242.15-3.31.15H5.64c-2.068 0-3.102 0-3.31-.15-.243-.173-.291-.255-.33-.553-.032-.255.557-1.37 1.735-3.602.923-1.747 1.634-4.122 1.634-7.295 0-2.05.91-4.017 2.528-5.467C9.516 3.034 11.71 2.219 14 2.219Zm0 0v.003M9.771 26.383a6.35 6.35 0 0 0 4.235 1.614 6.35 6.35 0 0 0 4.235-1.614"
+						></path></svg
+					>
 				</button>
 				<!-- Dropdown menu -->
 				<div
-					class="z-20 z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:bg-gray-700 dark:divide-gray-600"
-					id="apps-dropdown">
+					class="z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:bg-gray-700 dark:divide-gray-600"
+					id="apps-dropdown"
+				>
 				</div>
 
 				<ColorModeSwitcher />
@@ -445,8 +474,8 @@ import AgentHealth from '../commonComponents/AgentHealth';
 							aria-expanded="false"
 							data-dropdown-toggle="dropdown-2"
 						>
-							<span class="sr-only">Open user menu</span>				
-							<DisplayProfileImg client:load/>
+							<span class="sr-only">Open user menu</span>
+							<DisplayProfileImg client:load />
 						</button>
 					</div>
 					<!-- Dropdown menu -->

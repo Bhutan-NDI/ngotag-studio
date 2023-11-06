@@ -26,9 +26,10 @@ const initialPageState = {
   total: 100,
 };
 
-const EcosystemList = () => {
+const EcosystemList = ({ list }: any) => {
+  console.log(45456, list)
   const [openModal, setOpenModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState<boolean>(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(initialPageState);
@@ -40,7 +41,7 @@ const EcosystemList = () => {
   };
   const [searchText, setSearchText] = useState("");
 
-  const [ecosystemList, setEcosystemList] = useState<Array<IEcosystem> | null>(null)
+  const [ecosystemList, setEcosystemList] = useState<Array<IEcosystem> | null>(list)
   const [isEcosystemData, setIsEcosystemData] = useState<ICheckEcosystem>()
 
   const createOrganizationModel = () => {
@@ -81,7 +82,9 @@ const EcosystemList = () => {
         fetchEcosystems()
       }, 1000)
     } else {
-      fetchEcosystems()
+      // if(list && list.length === 0){
+        fetchEcosystems()
+      // }
     }
 
     return () => clearTimeout(getData)

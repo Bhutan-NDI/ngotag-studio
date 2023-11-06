@@ -14,7 +14,7 @@ import RoleViewButton from '../RoleViewButton';
 import SearchInput from '../SearchInput';
 import { getOrganizations } from '../../api/organization';
 import { pathRoutes } from '../../config/pathRoutes';
-import { setToLocalStorage } from '../../api/Auth';
+import { setToCookies, setToLocalStorage } from '../../api/Auth';
 import { EmptyListMessage } from '../EmptyListComponent';
 import CustomSpinner from '../CustomSpinner';
 import CreateEcosystemOrgModal from '../CreateEcosystemOrgModal';
@@ -112,10 +112,12 @@ const OrganizationsList = () => {
   const redirectOrgDashboard = async (activeOrg: Organisation) => {
 
     await setToLocalStorage(storageKeys.ORG_ID, activeOrg.id.toString());
+    await setToCookies(storageKeys.ORG_ID, activeOrg.id.toString());
     const roles: string[] = activeOrg?.userOrgRoles.map(role => role.orgRole.name)
     activeOrg.roles = roles
 
     await setToLocalStorage(storageKeys.ORG_ROLES, roles.toString());
+    await setToCookies(storageKeys.ORG_ROLES, roles.toString());
     window.location.href = pathRoutes.organizations.dashboard
   }
 

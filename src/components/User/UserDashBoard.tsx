@@ -14,7 +14,7 @@ import {
 	getUserInvitations,
 } from '../../api/invitations';
 import { pathRoutes } from '../../config/pathRoutes';
-import { getFromLocalStorage, setToLocalStorage } from '../../api/Auth';
+import { getFromLocalStorage, setToCookies, setToLocalStorage } from '../../api/Auth';
 import { dateConversion } from '../../utils/DateConversion';
 import DateTooltip from '../Tooltip';
 
@@ -154,6 +154,7 @@ const UserDashBoard = () => {
 
 	const goToOrgDashboard = async (orgId: number, roles: string[]) => {
 		await setToLocalStorage(storageKeys.ORG_ID, orgId.toString());
+		await setToCookies(storageKeys.ORG_ID, orgId.toString());
 		window.location.href = pathRoutes.organizations.dashboard;
 	};
 

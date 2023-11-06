@@ -1,71 +1,17 @@
-import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
-import { getFromLocalStorage, removeFromLocalStorage, setToLocalStorage } from '../../api/Auth';
-import { useEffect, useState } from 'react';
-
-import type { AxiosResponse } from 'axios';
 import { BiChevronDown } from "react-icons/bi";
-import CustomAvatar from '../Avatar'
-import type { Organisation } from './interfaces'
-import { getOrganizations } from '../../api/organization';
-import { pathRoutes } from '../../config/pathRoutes';
+import CustomAvatar from '../Avatar/index.tsx'
+import OrgList from '../../commonComponents/OrgSelectionOption/OrgList.tsx'
+import React from "react";
+import { Organisation } from "./interfaces/index.ts";
 
-const OrgDropDown = () => {
-	const [orgList, setOrgList] = useState<Organisation[]>([]);
-	const [activeOrg, setactiveOrg] = useState<Organisation | null>(null)
+interface IProps {
+	activeOrg: Organisation,
+	orgList: Organisation[]
+}
 
-	useEffect(() => {
-		getAllorgs()
-	}, []);
-
-	const getAllorgs = async () => {
-		const response = await getOrganizations(1, 10, '');
-		const { data } = response as AxiosResponse;
-		if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-			setOrgList(data?.data?.organizations);
-			setActiveOrg(data?.data?.organizations)
-		}
-	};
-
-	const goToOrgDashboard = async (org: Organisation) => {
-		await removeFromLocalStorage(storageKeys.ECOSYSTEM_ID)
-		await removeFromLocalStorage(storageKeys.ECOSYSTEM_ROLE)
-		await removeFromLocalStorage(storageKeys.ORG_DETAILS)
-
-		await setOrgRoleDetails(org)
-		window.location.href = pathRoutes.organizations.dashboard;
-	};
-
-	const setOrgRoleDetails = async (org: Organisation) => {
-
-		await setToLocalStorage(storageKeys.ORG_ID, org.id.toString());
-		const roles: string[] = org?.userOrgRoles.map(role => role.orgRole.name)
-
-		await setToLocalStorage(storageKeys.ORG_ROLES, roles.toString());
-	}
-
-	const setActiveOrg = async (organizations: Organisation[]) => {
-
-		let activeOrg: Organisation | null = null
-
-		const orgId = await getFromLocalStorage(storageKeys.ORG_ID)
-
-		if (orgId) {
-			activeOrg = organizations?.find(org => org.id === Number(orgId)) as Organisation
-			setactiveOrg(activeOrg || null)
-		} else {
-			activeOrg = organizations && organizations[0]
-			setactiveOrg(activeOrg || null)
-
-		}
-
-		if (activeOrg) {
-			await setOrgRoleDetails(activeOrg)
-		}
-	}
-
+const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
 	const redirectToCreateOrgModal = () => {
 		window.location.href = '/organizations?orgModal=true';
-
 	}
 
 	return (
@@ -77,25 +23,21 @@ const OrgDropDown = () => {
 				className="text-primary-700 text-lg h-10 bg-primary-100 hover:!bg-primary-200 dark:bg-primary-700 cursor-pointer focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium 
 					rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:hover:bg-primary-700 dark:focus:ring-blue-800"
 			>
-
-				<>
-					{
-						activeOrg
-							? <>
-								{activeOrg.logoUrl ? (
-									<CustomAvatar size="20" src={activeOrg?.logoUrl} round />
-								) : (
-									<CustomAvatar size="20" name={activeOrg?.name} round />
-								)}
-								<text className="ml-2 text-primary-700 dark:text-white">{activeOrg?.name.length > 20 ? activeOrg?.name.substring(0,20) + '...' : activeOrg?.name}</text>
-							</>
-							:
-							<text className='text-primary-700 dark:text-white'>
-								Select organization
-							</text>
-					}
-				</>
-
+				{
+					activeOrg
+						? <>
+							{activeOrg.logoUrl ? (
+								<CustomAvatar size="20" src={activeOrg?.logoUrl} round />
+							) : (
+								<CustomAvatar size="20" name={activeOrg?.name} round />
+							)}
+							<text className="ml-2 text-primary-700 dark:text-white">{activeOrg?.name.length > 20 ? activeOrg?.name.substring(0, 20) + '...' : activeOrg?.name}</text>
+						</>
+						:
+						<text className='text-primary-700 dark:text-white'>
+							Select organization
+						</text>
+				}
 				<BiChevronDown size={25} color='primary-700' className=' text-primary-700 dark:text-white' />
 			</div>
 			<div
@@ -111,19 +53,8 @@ const OrgDropDown = () => {
 							const roles: string[] = org.userOrgRoles.map(role => role.orgRole.name)
 							org.roles = roles
 							return (
-								<li key={org?.id} onClick={() => goToOrgDashboard(org)}>
-									<a
-										href="#"
-										className="flex items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-									>
-										{org.logoUrl ? (
-											<CustomAvatar className='dark:text-white' size="25" src={org?.logoUrl} round />
-										) : (
-											<CustomAvatar className='dark:text-white' size="25" name={org?.name} round />
-										)}
-
-										<span className="ml-3 text-base font-bold text-gray-500 dark:text-white">{org?.name}</span>
-									</a>
+								<li key={org?.id}>
+									<OrgList item={org} />
 								</li>
 							)
 						})

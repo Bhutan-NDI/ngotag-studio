@@ -3,14 +3,31 @@ import LayoutSidebar from '../../app/LayoutSidebar.astro';
 import { checkUserSession } from '../../utils/check-session';
 import { pathRoutes } from '../../config/pathRoutes';
 import EcosystemList from '../../components/Ecosystem/EcosystemList';
+import { getEcosystems } from '../../api/ecosystem';
+import { storageKeys } from '../../config/CommonConstant';
+import { decryptCookie, getFromCookies } from '../../api/Auth';
+import { getHeaderConfigs } from '../../config/GetHeaderConfigs';
+import { envConfig } from '../../config/envConfig';
+import { apiRoutes } from '../../config/apiRoutes';
+import API from '../../config/ssrAPI';
 
 const response = await checkUserSession(Astro.cookies);
-const route: string = pathRoutes.auth.sinIn
+const route: string = pathRoutes.auth.sinIn;
 if (!response) {
 	return Astro.redirect(route);
 }
+const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
+const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
+const token = Astro.cookies.get('session').value as string;
+
+const ecosystemList = await API({
+	url: `${apiRoutes.Ecosystem.root}/${orgId}`,
+	method: "GET",
+	token
+});
+console.log(4343, ecosystemList)
 ---
 
 <LayoutSidebar>
-	<EcosystemList client:visible />
+	<EcosystemList list={ecosystemList ? ecosystemList : []} client:visible />
 </LayoutSidebar>
