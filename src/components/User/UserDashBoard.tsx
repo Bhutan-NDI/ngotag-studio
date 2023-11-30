@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { AlertComponent } from '../AlertComponent';
 import type { AxiosResponse } from 'axios';
@@ -17,6 +17,7 @@ import { pathRoutes } from '../../config/pathRoutes';
 import { getFromLocalStorage, setToCookies, setToLocalStorage } from '../../api/Auth';
 import { dateConversion } from '../../utils/DateConversion';
 import DateTooltip from '../Tooltip';
+import { Roles } from '../../utils/enums/roles';
 
 const initialPageState = {
 	pageNumber: 1,
@@ -145,16 +146,31 @@ const UserDashBoard = () => {
 			await getAllEcosystemInvitations();
 		}
 	};
-	useEffect(() => {
-		getAllInvitations();
+
+	const getAllResponses = async () => {
+		const role = await getFromLocalStorage(storageKeys.ORG_ROLES)
+		if (role === Roles.OWNER) {
+			checkOrgId();
+		}
 		getAllOrganizations();
+		getAllInvitations();
 		getUserRecentActivity();
-		checkOrgId();
+	}
+
+	useEffect(() => {
+		getAllResponses()
 	}, []);
 
 	const goToOrgDashboard = async (orgId: number, roles: string[]) => {
 		await setToLocalStorage(storageKeys.ORG_ID, orgId.toString());
-		await setToCookies(storageKeys.ORG_ID, orgId.toString());
+		await fetch('/api/auth/cookie', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify([{key: storageKeys.ORG_ID, value: orgId}]),
+        });
+		// await setToCookies(storageKeys.ORG_ID, orgId.toString());
 		window.location.href = pathRoutes.organizations.dashboard;
 	};
 
@@ -197,7 +213,8 @@ const UserDashBoard = () => {
 							);
 							org.roles = roles;
 							return (
-								<div
+								<button
+									className='block w-full'
 									key={org?.id}
 									onClick={() => goToOrgDashboard(org?.id, org?.roles)}
 								>
@@ -225,7 +242,7 @@ const UserDashBoard = () => {
 											{org?.name}
 										</span>
 									</a>
-								</div>
+								</button>
 							);
 						})}
 

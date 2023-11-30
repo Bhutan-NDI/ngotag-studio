@@ -9,6 +9,7 @@ interface IProps {
 }
 
 const API = async ({ token, url, method, payload }: IProps) => {
+    console.log(65636, token, url, method, payload)
 	try {
         const config = {
             ...(await getHeaderConfigs(token)),
@@ -24,7 +25,7 @@ const API = async ({ token, url, method, payload }: IProps) => {
         // console.log(76765, res)
     
         const { data } = (await res.json()) || {};
-        // console.log(34123, data);
+        console.log(34123, data);
         return data;
     } catch(err){
         console.error("ERROR::", err)

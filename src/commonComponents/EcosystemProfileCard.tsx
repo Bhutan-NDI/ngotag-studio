@@ -22,7 +22,6 @@ const EcosystemProfileCard = () => {
         try {
             const id = await getFromLocalStorage(storageKeys.ORG_ID);
             const ecosystemId = ecoId || await getFromLocalStorage(storageKeys.ECOSYSTEM_ID);
-            console.log(4561, id)
             if (id) {
                 const response = await getEcosystems(id);
                 setLoading(false)
@@ -30,7 +29,6 @@ const EcosystemProfileCard = () => {
                 if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
                     setEcosystemList(data?.data)
                     const ecosystemData = data?.data?.find((item: { id: string }) => item.id === ecosystemId);
-                    console.log(4545, ecosystemData)
                     if (ecosystemData) {
                         setEcosystemId(ecosystemData?.id)
                         const ecosystemOrg =
@@ -118,22 +116,22 @@ const EcosystemProfileCard = () => {
                                 }
                             </select>
                         }
-                        <a href={pathRoutes.ecosystem.dashboard} className='flex text-primary-700 dark:text-secondary-700 text-sm font-medium underline-offset-4 hover:underline'>
+                        <a href={pathRoutes?.ecosystem?.dashboard} className='flex text-primary-700 dark:text-secondary-700 text-sm font-medium underline-offset-4 hover:underline'>
                             Go to Dashboard
-                            <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className='h-4 w-4 text-primary-700 dark:text-secondary-700 ml-1'>
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"></path>
-                            </svg>
                         </a>
                     </div>
 
                 </div>
             ) : !ecosystemDetails && loading ? (
-                <CustomSpinner />
+                <div className='flex justify-center'>
+                    <CustomSpinner />
+                </div>
             ) :
                 <EmptyListMessage
                     message={'No Ecosystem'}
-                    description={'Get started by creating a new Ecosystem'}
+                    description={'You are not a part of any Ecosystem'}
                     buttonContent={''}
+                    noExtraHeight={true}
                     svgComponent={<svg className='pr-2 mr-1' xmlns="http://www.w3.org/2000/svg" width="24" height="15" fill="none" viewBox="0 0 24 24">
                         <path fill="#fff" d="M21.89 9.89h-7.78V2.11a2.11 2.11 0 1 0-4.22 0v7.78H2.11a2.11 2.11 0 1 0 0 4.22h7.78v7.78a2.11 2.11 0 1 0 4.22 0v-7.78h7.78a2.11 2.11 0 1 0 0-4.22Z" />
                     </svg>} />

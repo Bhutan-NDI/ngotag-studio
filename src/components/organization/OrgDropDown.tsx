@@ -1,13 +1,36 @@
+"use client"
+
 import { BiChevronDown } from "react-icons/bi";
-import CustomAvatar from '../Avatar/index.tsx'
-import OrgList from '../../commonComponents/OrgSelectionOption/OrgList.tsx'
+import CustomAvatar from '../Avatar'
+import OrgList from '../../commonComponents/OrgSelectionOption/OrgList'
 import React from "react";
-import { Organisation } from "./interfaces/index.ts";
+import type { Organisation } from "./interfaces";
+import { getFromLocalStorage } from "../../api/Auth.js";
+import { storageKeys } from "../../config/CommonConstant.js";
 
 interface IProps {
 	activeOrg: Organisation,
 	orgList: Organisation[]
 }
+// const setActiveOrg = async (organizations: Organisation[]) => {
+
+// 	let activeOrg: Organisation | null = null
+
+// 	const orgId = await getFromLocalStorage(storageKeys.ORG_ID)
+
+// 	if (orgId) {
+// 		activeOrg = organizations?.find(org => org.id === String(orgId)) as Organisation
+// 		setactiveOrg(activeOrg || null)
+// 	} else {
+// 		activeOrg = organizations && organizations[0]
+// 		setactiveOrg(activeOrg || null)
+
+// 	}
+
+// 	if (activeOrg) {
+// 		await setOrgRoleDetails(activeOrg)
+// 	}
+// }
 
 const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
 	const redirectToCreateOrgModal = () => {
@@ -55,6 +78,20 @@ const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
 							return (
 								<li key={org?.id}>
 									<OrgList item={org} />
+									{/* <button className='w-full' onClick={() => goToOrgDashboard(org)}>
+										<a
+											href="#"
+											className="flex items-center w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+										>
+											{org.logoUrl ? (
+												<CustomAvatar className='shrink-0 dark:text-white' size="25" src={org?.logoUrl} round />
+											) : (
+												<CustomAvatar className='shrink-0 dark:text-white' size="25" name={org?.name} round />
+											)}
+
+											<span className="ml-3 text-base text-start font-bold text-gray-500 dark:text-white">{org?.name}</span>
+										</a>
+									</button> */}
 								</li>
 							)
 						})

@@ -4,14 +4,13 @@ import { apiRoutes } from '../config/apiRoutes';
 import { getFromLocalStorage } from './Auth';
 import { storageKeys } from '../config/CommonConstant';
 import { getHeaderConfigs } from '../config/GetHeaderConfigs';
-import Cookies from 'universal-cookie';
 
 interface CreateEcosystemPayload {
 	name: string;
 	description: string;
 	logo: string;
 	tags?: string;
-	userId: number;
+	userId: string;
 	autoEndorsement: boolean;
 }
 
@@ -23,8 +22,6 @@ export interface GetEndorsementListParameter {
 	type: string;
 	status: string;
 }
-
-const cookies = new Cookies()
 
 export const createEcosystems = async (dataPayload: CreateEcosystemPayload) => {
 	const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
@@ -108,7 +105,7 @@ export const getEndorsementList = async (
 export const createSchemaRequest = async (
 	data: object,
 	endorsementId: string,
-	orgId: number,
+	orgId: string,
 ) => {
 	const url = `${apiRoutes.Ecosystem.root}/${endorsementId}/${orgId}${apiRoutes.Ecosystem.endorsements.createSchemaRequest}`;
 	const payload = data;
@@ -129,7 +126,7 @@ export const createSchemaRequest = async (
 export const createCredDefRequest = async (
 	data: object,
 	ecosystemId: string,
-	orgId: number,
+	orgId: string,
 ) => {
 	const url = `${apiRoutes.Ecosystem.root}/${ecosystemId}/${orgId}${apiRoutes.Ecosystem.endorsements.createCredDefRequest}`;
 	const payload = data;

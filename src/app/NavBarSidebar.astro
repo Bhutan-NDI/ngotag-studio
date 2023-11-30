@@ -1,24 +1,36 @@
 ---
-/* eslint max-lines: 'off' */
+"use client"
 
 import { asset } from '../lib/data.js';
 import ColorModeSwitcher from '../components/ColorModeSwitcher.astro';
-import OrgDropDwon from '../components/organization/OrgDropDown';
+import OrgDropDown from '../components/organization/OrgDropDown';
 import DisplayUser from '../components/Profile/DisplayUser';
 import DisplayProfileImg from '../components/Profile/DisplayProfileImg';
 import { pathRoutes } from '../config/pathRoutes.js';
 import SignOutButton from '../components/SignOutButton/index';
 import { apiRoutes } from '../config/apiRoutes';
 import { getHeaderConfigs } from '../config/GetHeaderConfigs';
-import { decryptCookie } from '../api/Auth';
+import { getFromCookies } from '../api/Auth';
 import { storageKeys } from '../config/CommonConstant';
-import { envConfig } from '../config/envConfig';
-import API from '../config/ssrAPI';
 import type { Organisation } from '../components/organization/interfaces';
+import { RolePermissions } from '../config/permissions';
+import API from '../config/ssrApiConfig';
 
-const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
-const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
-const token = Astro.cookies.get('session').value as string;
+// const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
+// const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
+// const token = Astro.cookies.get('session').value as string;
+const { hideOrgAgent } = Astro.props;
+
+const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
+const token = getFromCookies(Astro.cookies, "session");
+
+const role = getFromCookies(Astro.cookies, 'role');
+
+console.log("COOKIES DATA::::", orgId, token, role)
+
+const permittedPages = RolePermissions.find(
+	(item) => item.role === role,
+)?.pages;
 
 let activeOrg: Organisation;
 
@@ -27,9 +39,12 @@ const orgResponse = await API({
 	url: `${apiRoutes.organizations.getAll}?pageNumber=1&pageSize=10&search=`,
 	method: 'GET',
 });
+
+// console.log(765765, orgResponse);
+
 if (orgId) {
 	activeOrg = orgResponse?.organizations?.find(
-		(org: { id: number }) => org.id === Number(orgId),
+		(org: { id: string }) => org.id === orgId,
 	) as Organisation;
 } else {
 	activeOrg = orgResponse?.organizations && orgResponse?.organizations[0];
@@ -40,7 +55,6 @@ const agentResponse = await API({
 	url: `${apiRoutes.organizations.root}/${activeOrg?.id}${apiRoutes.Agent.checkAgentHealth}`,
 	method: 'GET',
 });
-
 ---
 
 <nav
@@ -49,38 +63,48 @@ const agentResponse = await API({
 	<div class="px-3 py-3 lg:px-5 lg:pl-3">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center justify-start">
-				<button
-					id="toggleSidebarMobile"
-					aria-expanded="true"
-					aria-controls="sidebar"
-					class="p-2 text-gray-600 rounded cursor-pointer lg:hidden hover:text-gray-900 hover:bg-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700 focus:ring-2 focus:ring-gray-100 dark:focus:ring-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+				{
+					!hideOrgAgent && (
+						<button
+							id="toggleSidebarMobile"
+							aria-expanded="true"
+							aria-controls="sidebar"
+							class="p-2 text-gray-600 rounded cursor-pointer lg:hidden hover:text-gray-900 hover:bg-gray-100 focus:bg-gray-100 dark:focus:bg-gray-700 focus:ring-2 focus:ring-gray-100 dark:focus:ring-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+						>
+							<svg
+								id="toggleSidebarMobileHamburger"
+								class="w-6 h-6"
+								fill="currentColor"
+								viewBox="0 0 20 20"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+							<svg
+								id="toggleSidebarMobileClose"
+								class="hidden w-6 h-6"
+								fill="currentColor"
+								viewBox="0 0 20 20"
+								xmlns="http://www.w3.org/2000/svg"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+						</button>
+					)
+				}
+				<a
+					href={(permittedPages && permittedPages[0]) ||
+						pathRoutes.users.dashboard}
+					class="flex ml-2 md:mr-24"
 				>
-					<svg
-						id="toggleSidebarMobileHamburger"
-						class="w-6 h-6"
-						fill="currentColor"
-						viewBox="0 0 20 20"
-						xmlns="http://www.w3.org/2000/svg"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-							clip-rule="evenodd"></path>
-					</svg>
-					<svg
-						id="toggleSidebarMobileClose"
-						class="hidden w-6 h-6"
-						fill="currentColor"
-						viewBox="0 0 20 20"
-						xmlns="http://www.w3.org/2000/svg"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-							clip-rule="evenodd"></path>
-					</svg>
-				</button>
-				<a href={pathRoutes.users.dashboard} class="flex ml-2 md:mr-24">
 					<img
 						src="/images/CREDEBL_ICON.png"
 						class="h-8 mr-3"
@@ -93,25 +117,39 @@ const agentResponse = await API({
 				</a>
 			</div>
 
-			<div class="flex items-center">
-				<div class="hidden sm:block mr-5">
-					<div class="pr-4">
-						{
-							agentResponse?.isInitialized ? (
-								<div class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
-									<div class="w-2 h-2 mr-1 bg-green-500 rounded-full" />
-									SSI Agent is up and running
+			<div class="flex items-center ml-auto">
+				{
+					!hideOrgAgent && (
+						<>
+							<div class="hidden sm:block mr-5">
+								<div class="pr-4">
+									{agentResponse?.isInitialized ? (
+										<div class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
+											<div class="w-2 h-2 mr-1 bg-green-500 rounded-full" />
+											SSI Agent is up and running
+										</div>
+									) : (
+										<span class="inline-flex items-center bg-red-100 text-red-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
+											<span class="w-2 h-2 mr-1 bg-red-500 rounded-full" />
+											SSI Agent is not running
+										</span>
+									)}
 								</div>
-							) : (
-								<span class="inline-flex items-center bg-red-100 text-red-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
-									<span class="w-2 h-2 mr-1 bg-red-500 rounded-full" />
-									SSI Agent is not running
-								</span>
-							)
-						}
-					</div>
-				</div>
-				<div class="hidden sm:block mr-5">
+							</div>
+							<div class="hidden sm:block mr-5">
+								<OrgDropDown
+									activeOrg={activeOrg}
+									orgList={
+										orgResponse?.organizations ? orgResponse?.organizations : []
+									}
+									client:load
+								/>
+							</div>
+						</>
+					)
+				}
+
+				<!-- <div class="hidden sm:block mr-5">
 					<OrgDropDwon
 						activeOrg={activeOrg}
 						orgList={orgResponse?.organizations
@@ -119,7 +157,7 @@ const agentResponse = await API({
 							: []}
 						client:visible
 					/>
-				</div>
+				</div> -->
 				<div
 					id="dropdownNavbar"
 					class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600"
@@ -128,35 +166,40 @@ const agentResponse = await API({
 						class="py-2 text-sm text-gray-700 dark:text-gray-400"
 						aria-labelledby="dropdownNavbarButton"
 					>
-						<li>
-							<a
-								href="#"
-								class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-								>Dashboard</a
-							>
-						</li>
-						<li>
-							<a
-								href="#"
-								class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-								>Settings</a
-							>
-						</li>
-						<li>
-							<a
-								href="#"
-								class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-								>Earnings</a
-							>
-						</li>
-					</ul>
-					<div class="py-2">
-						<a
-							href="#"
-							class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-400 dark:hover:text-white"
-							>Sign out</a
+						<ul
+							class="py-2 text-sm text-gray-700 dark:text-gray-400"
+							aria-labelledby="dropdownNavbarButton"
 						>
-					</div>
+							<li>
+								<a
+									href="#"
+									class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+									>Dashboard</a
+								>
+							</li>
+							<li>
+								<a
+									href="#"
+									class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+									>Settings</a
+								>
+							</li>
+							<li>
+								<a
+									href="#"
+									class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
+									>Earnings</a
+								>
+							</li>
+						</ul>
+						<div class="py-2">
+							<a
+								href="#"
+								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 dark:text-gray-400 dark:hover:text-white"
+								>Sign out</a
+							>
+						</div>
+					</ul>
 				</div>
 
 				<!-- Notifications -->
@@ -182,6 +225,10 @@ const agentResponse = await API({
 					class="z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
 					id="notification-dropdown"
 				>
+					<!-- <div
+				    class="z-20 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
+						id="notification-dropdown"
+					> -->
 					<div
 						class="block px-4 py-2 text-base font-medium text-center text-gray-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-500"
 					>
@@ -441,19 +488,19 @@ const agentResponse = await API({
 					<!-- Icon -->
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
-						width="22"
-						height="22"
+						width="24"
+						height="24"
 						fill="none"
-						viewBox="0 0 30 30"
+						viewBox="0 0 24 24"
 					>
 						<path
 							stroke="#6B7280"
 							stroke-linecap="round"
 							stroke-linejoin="round"
-							stroke-width="2.5"
-							d="M14 2.219c2.289 0 4.484.814 6.102 2.265C21.721 5.934 22.63 7.9 22.63 9.95c0 3.173.711 5.548 1.634 7.295 1.178 2.232 1.768 3.347 1.735 3.602-.038.298-.087.38-.33.553-.208.15-1.242.15-3.31.15H5.64c-2.068 0-3.102 0-3.31-.15-.243-.173-.291-.255-.33-.553-.032-.255.557-1.37 1.735-3.602.923-1.747 1.634-4.122 1.634-7.295 0-2.05.91-4.017 2.528-5.467C9.516 3.034 11.71 2.219 14 2.219Zm0 0v.003M9.771 26.383a6.35 6.35 0 0 0 4.235 1.614 6.35 6.35 0 0 0 4.235-1.614"
-						></path></svg
-					>
+							stroke-width="1.5"
+							d="M20.047 16.473c-1.204-1.473-2.053-2.223-2.053-6.285 0-3.72-1.9-5.044-3.463-5.688a.835.835 0 0 1-.466-.495C13.79 3.072 13.022 2.25 12 2.25s-1.791.823-2.063 1.756a.827.827 0 0 1-.466.494c-1.565.645-3.463 1.965-3.463 5.688-.002 4.062-.852 4.812-2.056 6.285-.499.61-.062 1.527.81 1.527h14.48c.867 0 1.301-.92.805-1.527ZM15 18v.75a3 3 0 0 1-6 0V18"
+						></path>
+					</svg>
 				</button>
 				<!-- Dropdown menu -->
 				<div
@@ -461,42 +508,42 @@ const agentResponse = await API({
 					id="apps-dropdown"
 				>
 				</div>
+			</div>
 
-				<ColorModeSwitcher />
+			<ColorModeSwitcher />
 
-				<!-- Profile -->
-				<div class="flex items-center ml-3">
-					<div>
-						<button
-							type="button"
-							class="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
-							id="user-menu-button-2"
-							aria-expanded="false"
-							data-dropdown-toggle="dropdown-2"
-						>
-							<span class="sr-only">Open user menu</span>
-							<DisplayProfileImg client:load />
-						</button>
-					</div>
-					<!-- Dropdown menu -->
-					<div
-						class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-700 dark:divide-gray-600"
-						id="dropdown-2"
+			<!-- Profile -->
+			<div class="flex items-center ml-3">
+				<div>
+					<button
+						type="button"
+						class="flex text-sm bg-gray-800 rounded-full focus:ring-4 focus:ring-gray-300 dark:focus:ring-gray-600"
+						id="user-menu-button-2"
+						aria-expanded="false"
+						data-dropdown-toggle="dropdown-2"
 					>
-						<DisplayUser client:load />
-						<ul class="py-1" role="none">
-							<li>
-								<a
-									href={pathRoutes.users.profile}
-									class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white"
-									role="menuitem">Profile</a
-								>
-							</li>
-							<li>
-								<SignOutButton client:load />
-							</li>
-						</ul>
-					</div>
+						<span class="sr-only">Open user menu</span>
+						<DisplayProfileImg client:load />
+					</button>
+				</div>
+				<!-- Dropdown menu -->
+				<div
+					class="z-50 hidden my-4 text-base list-none bg-white divide-y divide-gray-100 rounded shadow dark:bg-gray-700 dark:divide-gray-600"
+					id="dropdown-2"
+				>
+					<DisplayUser client:load />
+					<ul class="py-1" role="none">
+						<li>
+							<a
+								href={pathRoutes.users.profile}
+								class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-white"
+								role="menuitem">Profile</a
+							>
+						</li>
+						<li>
+							<SignOutButton client:load />
+						</li>
+					</ul>
 				</div>
 			</div>
 		</div>

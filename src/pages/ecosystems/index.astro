@@ -9,14 +9,15 @@ import { decryptCookie, getFromCookies } from '../../api/Auth';
 import { getHeaderConfigs } from '../../config/GetHeaderConfigs';
 import { envConfig } from '../../config/envConfig';
 import { apiRoutes } from '../../config/apiRoutes';
-import API from '../../config/ssrAPI';
+import API from '../../config/ssrAPIConfig';
 
-const response = await checkUserSession(Astro.cookies);
-const route: string = pathRoutes.auth.sinIn;
-if (!response) {
-	return Astro.redirect(route);
+const response = await checkUserSession({cookies: Astro.cookies, currentPath: Astro.url.pathname});
+const route: string = pathRoutes.auth.sinIn
+if (!response.authorized) {
+	return Astro.redirect(response.redirect);
 }
 const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
+console.log(78676, orgIdCookie)
 const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
 const token = Astro.cookies.get('session').value as string;
 
@@ -28,6 +29,6 @@ const ecosystemList = await API({
 console.log(4343, ecosystemList)
 ---
 
-<LayoutSidebar>
+<LayoutSidebar notFoundPage={!response.permitted}>
 	<EcosystemList list={ecosystemList ? ecosystemList : []} client:visible />
 </LayoutSidebar>

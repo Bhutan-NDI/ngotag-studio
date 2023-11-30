@@ -4,7 +4,7 @@ import { apiRoutes } from '../config/apiRoutes';
 import { envConfig } from '../config/envConfig';
 import { storageKeys } from '../config/CommonConstant';
 import type { AddPassword } from '../components/Profile/interfaces';
-import Cookies from 'universal-cookie';
+import type { AstroCookies } from 'astro';
 
 export interface UserSignUpData {
 	email: string;
@@ -25,8 +25,6 @@ export interface EmailVerifyData {
 	verificationCode: string;
 	email: string;
 }
-
-const cookies = new Cookies();
 
 export const sendVerificationMail = async (payload: UserSignUpData) => {
 	const details = {
@@ -204,29 +202,45 @@ export const getFromLocalStorage = async (key: string) => {
 	return convertedValue;
 };
 
+export const setToCookies = (
+	cookies: AstroCookies | any,
+	key: string,
+	value: any,
+	option?: { [key: string]: any },
+    from?: "ssr" | "csr",
+) => {
+    console.log(12112, cookies, key, value)
+	if (!value?.trim()) {
+		return;
+	}
+	const convertedValue = encryptData(value);
+	// Set HttpOnly, Secure, and SameSite attributes in the options
+	const updatedOption: { [key: string]: any } = {
+		...option,
+		httpOnly: true,
+		secure: true, // Set to true if using HTTPS
+		sameSite: 'Strict',
+		path: '/',
+	};
+    if(from === "csr"){
+        const [cookies1, setCookies] = cookies([key])
+        console.log(35345, cookies1)
+        setCookies(key, convertedValue as string, updatedOption)
+    } else {
+        console.log(3242322)
+        cookies.set(key, convertedValue as string, updatedOption);
+    }
+
+	return true;
+};
+
+export const getFromCookies = (cookies: AstroCookies, key: string) => {
+	const value = cookies.get(key).value;
+	const convertedValue = value ? decryptData(value) : '';
+	return convertedValue;
+};
+
 export const removeFromLocalStorage = async (key: string) => {
 	await localStorage.removeItem(key);
-	return true;
-};
-
-export const setToCookies = async (key: string, value: any) => {
-	const convertedValue = encryptData(value);
-	cookies.set(key, convertedValue as string, { path: '/' });
-	return true;
-};
-
-export const getFromCookies = async (key: string) => {
-	const value = await cookies.get(key);
-	const convertedValue = value ? await decryptData(value) : '';
-	return convertedValue;
-};
-
-export const decryptCookie = async (value: string) => {
-	const convertedValue = value ? await decryptData(value) : '';
-	return convertedValue;
-};
-
-export const removeFromCookies = async (key: string) => {
-	await cookies.remove(key);
 	return true;
 };

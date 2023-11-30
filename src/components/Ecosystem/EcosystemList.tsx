@@ -23,6 +23,7 @@ import CreateEcosystemOrgModal from '../CreateEcosystemOrgModal';
 import { getEcosystems } from '../../api/ecosystem';
 import type { IEcosystem } from './interfaces';
 import { checkEcosystem, type ICheckEcosystem } from '../../config/ecosystem';
+import React from 'react';
 
 const initialPageState = {
   pageNumber: 1,

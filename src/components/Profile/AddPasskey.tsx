@@ -20,13 +20,18 @@ import type {
 	VerifyRegistrationObjInterface,
 } from './interfaces';
 import type { AxiosError, AxiosResponse } from 'axios';
+import { AlertComponent } from '../AlertComponent';
 
-const AddPasskey = () => {
+interface IResponseMessages {type: "error" | "success", message: string}
+
+const AddPasskey = ({ responseMessages }: { responseMessages: (value: IResponseMessages) => IResponseMessages }) => {
 	const [fidoError, setFidoError] = useState('');
 	const [fidoLoader, setFidoLoader] = useState(true);
 	const [OrgUserEmail, setOrgUserEmail] = useState<string>('');
 	const [deviceList, setDeviceList] = useState<IDeviceData[]>([]);
 	const [addSuccess, setAddSuccess] = useState<string | null>(null);
+	const [editSuccess, setEditSuccess] = useState<string | null>(null);
+	const [editFailure, setEditFailure] = useState<string | null>(null);
 	const [addfailure, setAddFailure] = useState<string | null>(null);
 	const [disableFlag, setDisableFlag] = useState<boolean>(false);
 
@@ -198,8 +203,8 @@ const AddPasskey = () => {
 					</Alert>
 				</div>
 			)}
-			<div className="page-container relative h-full flex flex-auto flex-col py-3 sm:py-4">
-				<div className="container mx-auto bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700">
+			<div className="page-container relative h-full flex flex-auto flex-col p-3 sm:p-4">
+				<div className="w-full mx-auto bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700">
 					<div className="px-6 py-6">
 						{fidoLoader ? (
 							<div className="flex items-center justify-center mb-4">
@@ -217,16 +222,36 @@ const AddPasskey = () => {
 										</p>
 									</div>
 
+									{(editSuccess || editFailure) && (
+										<AlertComponent
+										message={editSuccess ?? editFailure}
+										type={editSuccess ? 'success' : 'error'}
+										onAlertClose={() => {
+											setEditSuccess(null);
+											setEditFailure(null);
+										}}
+									/>
+									)}
+
 									{deviceList &&
 										deviceList.length > 0 &&
-										deviceList.map((element, key) => (
-											<DeviceDetails
+										deviceList.map((element) => (
+											<div key={element['credentialId']}>
+												<DeviceDetails
 												deviceFriendlyName={element['deviceFriendlyName']}
 												createDateTime={element['createDateTime']}
 												credentialID={element['credentialId']}
 												refreshList={userDeviceDetails}
 												disableRevoke={disableFlag}
+												responseMessages={(value) => {
+													if (value.type === 'success') {
+													  setEditSuccess(value.message);
+													} else {
+													  setEditFailure(value.message);
+													}
+												  }}
 											/>
+												</div>
 										))}
 
 									<div>

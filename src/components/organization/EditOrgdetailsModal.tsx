@@ -4,13 +4,12 @@ import { Avatar, Button, Label, Modal } from 'flowbite-react';
 import { Field, Form, Formik, FormikHelpers } from 'formik';
 import { IMG_MAX_HEIGHT, IMG_MAX_WIDTH, apiStatusCodes, imageSizeAccepted} from '../../config/CommonConstant'
 import { calculateSize, dataURItoBlob } from "../../utils/CompressImage";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import { AlertComponent } from "../AlertComponent";
 import type { AxiosResponse } from 'axios';
 import { updateOrganization } from "../../api/organization";
 import type { Organisation } from "./interfaces";
-import React from "react";
 import defaultUserIcon from '../../../public/images/person_FILL1_wght400_GRAD0_opsz24.svg'
 
 interface Values {
@@ -315,17 +314,13 @@ const EditOrgdetailsModal = (props: EditOrgdetailsModalProps) => {
                                         formikHandlers.setFieldTouched(
                                             'name',
                                             true,
+                                            false
                                         );
 
                                         if (value.length > 50) {
                                             formikHandlers.setFieldError(
                                                 'name',
                                                 'Organization name must be at most 50 characters',
-                                            );
-                                        } else {
-                                            formikHandlers.setFieldError(
-                                                'name',
-                                                undefined,
                                             );
                                         }
                                     }}
