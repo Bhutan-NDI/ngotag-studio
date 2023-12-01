@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, Pagination } from 'flowbite-react';
-import { ChangeEvent, useEffect, useState } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
 import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
 
 import { AlertComponent } from '../AlertComponent';
@@ -23,7 +23,6 @@ import CreateEcosystemOrgModal from '../CreateEcosystemOrgModal';
 import { getEcosystems } from '../../api/ecosystem';
 import type { IEcosystem } from './interfaces';
 import { checkEcosystem, type ICheckEcosystem } from '../../config/ecosystem';
-import React from 'react';
 
 const initialPageState = {
   pageNumber: 1,
@@ -34,7 +33,7 @@ const initialPageState = {
 const EcosystemList = ({ list }: any) => {
   console.log(45456, list)
   const [openModal, setOpenModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPageState);
@@ -85,7 +84,7 @@ const EcosystemList = ({ list }: any) => {
     setLoading(false);
   };
 
-  //This useEffect is called when the searchText changes
+  // This useEffect is called when the searchText changes
   useEffect(() => {
     let getData: NodeJS.Timeout;
 
@@ -94,7 +93,9 @@ const EcosystemList = ({ list }: any) => {
         fetchEcosystems();
       }, 1000);
     } else {
-      fetchEcosystems();
+      if (!(ecosystemList && ecosystemList.length > 0)) {
+        fetchEcosystems();
+      }
     }
 
     return () => clearTimeout(getData);

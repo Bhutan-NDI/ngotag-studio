@@ -18,6 +18,7 @@ import { setToCookies, setToLocalStorage } from '../../api/Auth';
 import { EmptyListMessage } from '../EmptyListComponent';
 import CustomSpinner from '../CustomSpinner';
 import CreateEcosystemOrgModal from '../CreateEcosystemOrgModal';
+import setCookies from '../../utils/set-cookies';
 
 const initialPageState = {
   pageNumber: 1,
@@ -112,12 +113,14 @@ const OrganizationsList = () => {
   const redirectOrgDashboard = async (activeOrg: Organisation) => {
 
     await setToLocalStorage(storageKeys.ORG_ID, activeOrg.id.toString());
-    await setToCookies(storageKeys.ORG_ID, activeOrg.id.toString());
     const roles: string[] = activeOrg?.userOrgRoles.map(role => role.orgRole.name)
     activeOrg.roles = roles
-
+    
     await setToLocalStorage(storageKeys.ORG_ROLES, roles.toString());
-    await setToCookies(storageKeys.ORG_ROLES, roles.toString());
+    await setCookies([
+      { key: storageKeys.ORG_ID, value: activeOrg.id.toString()},
+      { key: storageKeys.ORG_ROLES, value: roles.toString()}
+    ]);
     window.location.href = pathRoutes.organizations.dashboard
   }
 

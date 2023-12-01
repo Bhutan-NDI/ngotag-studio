@@ -3,6 +3,7 @@ import { getSupabaseClient } from '../supabase';
 import { getFromCookies } from '../api/Auth';
 import { pathRoutes } from '../config/pathRoutes';
 import { RolePermissions } from '../config/permissions';
+import { storageKeys } from '../config/CommonConstant';
 
 interface IProps {
 	cookies: AstroCookies;
@@ -19,7 +20,7 @@ export const checkUserSession = async ({
 	cookies,
 	currentPath,
 }: IProps): Promise<IOutput> => {
-	const sessionCookie = getFromCookies(cookies, 'session');
+	const sessionCookie = getFromCookies(cookies, storageKeys.SESSION);
 
 	if (!sessionCookie) {
 		return {

@@ -207,12 +207,7 @@ export const setToCookies = (
 	key: string,
 	value: any,
 	option?: { [key: string]: any },
-    from?: "ssr" | "csr",
 ) => {
-    console.log(12112, cookies, key, value)
-	if (!value?.trim()) {
-		return;
-	}
 	const convertedValue = encryptData(value);
 	// Set HttpOnly, Secure, and SameSite attributes in the options
 	const updatedOption: { [key: string]: any } = {
@@ -222,14 +217,8 @@ export const setToCookies = (
 		sameSite: 'Strict',
 		path: '/',
 	};
-    if(from === "csr"){
-        const [cookies1, setCookies] = cookies([key])
-        console.log(35345, cookies1)
-        setCookies(key, convertedValue as string, updatedOption)
-    } else {
-        console.log(3242322)
-        cookies.set(key, convertedValue as string, updatedOption);
-    }
+
+	cookies.set(key, convertedValue as string, updatedOption);
 
 	return true;
 };

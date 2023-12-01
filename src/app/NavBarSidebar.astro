@@ -1,6 +1,4 @@
 ---
-"use client"
-
 import { asset } from '../lib/data.js';
 import ColorModeSwitcher from '../components/ColorModeSwitcher.astro';
 import OrgDropDown from '../components/organization/OrgDropDown';
@@ -9,24 +7,18 @@ import DisplayProfileImg from '../components/Profile/DisplayProfileImg';
 import { pathRoutes } from '../config/pathRoutes.js';
 import SignOutButton from '../components/SignOutButton/index';
 import { apiRoutes } from '../config/apiRoutes';
-import { getHeaderConfigs } from '../config/GetHeaderConfigs';
 import { getFromCookies } from '../api/Auth';
 import { storageKeys } from '../config/CommonConstant';
 import type { Organisation } from '../components/organization/interfaces';
 import { RolePermissions } from '../config/permissions';
 import API from '../config/ssrApiConfig';
-
-// const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
-// const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
-// const token = Astro.cookies.get('session').value as string;
 const { hideOrgAgent } = Astro.props;
 
 const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
-const token = getFromCookies(Astro.cookies, "session");
-
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
 const role = getFromCookies(Astro.cookies, 'role');
 
-console.log("COOKIES DATA::::", orgId, token, role)
+console.log('COOKIES DATA ON NAVBAR::::', orgId, token, role);
 
 const permittedPages = RolePermissions.find(
 	(item) => item.role === role,
@@ -39,8 +31,6 @@ const orgResponse = await API({
 	url: `${apiRoutes.organizations.getAll}?pageNumber=1&pageSize=10&search=`,
 	method: 'GET',
 });
-
-// console.log(765765, orgResponse);
 
 if (orgId) {
 	activeOrg = orgResponse?.organizations?.find(
@@ -117,12 +107,12 @@ const agentResponse = await API({
 				</a>
 			</div>
 
-			<div class="flex items-center ml-auto">
+			<div class="flex items-center ml-auto gap-4">
 				{
 					!hideOrgAgent && (
 						<>
-							<div class="hidden sm:block mr-5">
-								<div class="pr-4">
+							<div class="hidden sm:block">
+								<div class="">
 									{agentResponse?.isInitialized ? (
 										<div class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
 											<div class="w-2 h-2 mr-1 bg-green-500 rounded-full" />
@@ -136,7 +126,7 @@ const agentResponse = await API({
 									)}
 								</div>
 							</div>
-							<div class="hidden sm:block mr-5">
+							<div class="hidden sm:block">
 								<OrgDropDown
 									activeOrg={activeOrg}
 									orgList={
@@ -148,16 +138,6 @@ const agentResponse = await API({
 						</>
 					)
 				}
-
-				<!-- <div class="hidden sm:block mr-5">
-					<OrgDropDwon
-						activeOrg={activeOrg}
-						orgList={orgResponse?.organizations
-							? orgResponse?.organizations
-							: []}
-						client:visible
-					/>
-				</div> -->
 				<div
 					id="dropdownNavbar"
 					class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700 dark:divide-gray-600"
@@ -201,34 +181,10 @@ const agentResponse = await API({
 						</div>
 					</ul>
 				</div>
-
-				<!-- Notifications -->
-				<!-- <button
-					type="button"
-					data-dropdown-toggle="notification-dropdown"
-					class="p-2 text-gray-500 rounded-lg hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700"
-				>
-					<span class="sr-only">View notifications</span> -->
-				<!-- Bell icon -->
-				<!-- <svg
-						class="w-6 h-6"
-						fill="currentColor"
-						viewBox="0 0 20 20"
-						xmlns="http://www.w3.org/2000/svg"
-						><path
-							d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"
-						></path></svg
-					>
-				</button> -->
-				<!-- Dropdown menu -->
 				<div
 					class="z-50 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
 					id="notification-dropdown"
 				>
-					<!-- <div
-				    class="z-20 hidden max-w-sm my-4 overflow-hidden text-base list-none bg-white divide-y divide-gray-100 rounded shadow-lg dark:divide-gray-600 dark:bg-gray-700"
-						id="notification-dropdown"
-					> -->
 					<div
 						class="block px-4 py-2 text-base font-medium text-center text-gray-500 bg-gray-50 dark:bg-gray-700 dark:text-gray-500"
 					>

@@ -9,6 +9,7 @@ import { pathRoutes } from '../config/pathRoutes';
 import API from '../config/ssrApiConfig';
 import { checkUserSession } from '../utils/check-session';
 import ErrorNotFound from '../modules/ErrorNotFound.astro';
+import { storageKeys } from '../config/CommonConstant';
 
 const role = getFromCookies(Astro.cookies, "role")
 const response = await checkUserSession({
@@ -20,7 +21,7 @@ if (!response.authorized) {
 	return Astro.redirect(response.redirect);
 }
 
-const token = getFromCookies(Astro.cookies, 'session');
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
 const fetchPlatformAddminSetting = await API({
 	url: `${apiRoutes.users.platformSettings}`,
 	token,

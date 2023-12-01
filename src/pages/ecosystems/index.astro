@@ -3,23 +3,19 @@ import LayoutSidebar from '../../app/LayoutSidebar.astro';
 import { checkUserSession } from '../../utils/check-session';
 import { pathRoutes } from '../../config/pathRoutes';
 import EcosystemList from '../../components/Ecosystem/EcosystemList';
-import { getEcosystems } from '../../api/ecosystem';
 import { storageKeys } from '../../config/CommonConstant';
-import { decryptCookie, getFromCookies } from '../../api/Auth';
-import { getHeaderConfigs } from '../../config/GetHeaderConfigs';
-import { envConfig } from '../../config/envConfig';
+import { getFromCookies } from '../../api/Auth';
 import { apiRoutes } from '../../config/apiRoutes';
-import API from '../../config/ssrAPIConfig';
+import API from '../../config/ssrApiConfig';
 
 const response = await checkUserSession({cookies: Astro.cookies, currentPath: Astro.url.pathname});
 const route: string = pathRoutes.auth.sinIn
 if (!response.authorized) {
 	return Astro.redirect(response.redirect);
 }
-const orgIdCookie = Astro.cookies.get(storageKeys.ORG_ID).value;
-console.log(78676, orgIdCookie)
-const orgId: string = orgIdCookie ? await decryptCookie(orgIdCookie) : '';
-const token = Astro.cookies.get('session').value as string;
+
+const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
 
 const ecosystemList = await API({
 	url: `${apiRoutes.Ecosystem.root}/${orgId}`,

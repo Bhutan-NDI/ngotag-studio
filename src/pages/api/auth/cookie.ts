@@ -1,20 +1,18 @@
 import type { APIRoute } from 'astro';
-import { pathRoutes } from '../../../config/pathRoutes';
 import { setToCookies } from '../../../api/Auth';
+import { pathRoutes } from '../../../config/pathRoutes';
 
 export const post: APIRoute = async ({ request, cookies, redirect }) => {
-	const payload = await request.json();
+	/* Get body from request */
+	const body = await request.json();
 
-	try {
-		if (payload && Array.isArray(payload)) {
-			payload.forEach((item) => {
-				setToCookies(cookies, item.key + 'CCCVVV', item.value as string);
+	body &&
+		body.length > 0 &&
+		body.forEach((item) => {
+			setToCookies(cookies, item.key, item?.value as string, {
+				path: '/',
 			});
-			console.log(92323, payload);
-		}
-	} catch (err) {
-		console.error('Unable to set data with invalid format');
-	}
+		});
 
-	// return redirect(pathRoutes.users.dashboard);
+	return redirect("/");
 };
