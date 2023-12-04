@@ -1,6 +1,5 @@
 import type { APIRoute } from 'astro';
-import { setToCookies } from '../../../api/Auth';
-import { pathRoutes } from '../../../config/pathRoutes';
+import { removeFromCookies } from '../../../api/Auth';
 
 export const post: APIRoute = async ({ request, cookies, redirect }) => {
 	/* Get body from request */
@@ -9,7 +8,7 @@ export const post: APIRoute = async ({ request, cookies, redirect }) => {
 	body &&
 		body.length > 0 &&
 		body.forEach((item) => {
-			setToCookies(cookies, item.key, item?.value as string, {
+			removeFromCookies(cookies, item.key, {
 				path: '/',
 			});
 		});

@@ -6,7 +6,7 @@ import { removeFromLocalStorage, setToLocalStorage } from '../../api/Auth';
 import { storageKeys } from '../../config/CommonConstant';
 import { pathRoutes } from '../../config/pathRoutes';
 import CustomAvatar from '../../components/Avatar';
-import setCookies from '../../utils/set-cookies'
+import { setCookie } from '../../utils/cookies'
 
 const OrgList = ({ item }: any) => {
     const goToOrgDashboard = async (org: Organisation) => {
@@ -18,10 +18,10 @@ const OrgList = ({ item }: any) => {
         window.location.href = pathRoutes.organizations.dashboard;
     };
 
-    const setOrgRoleDetails = async (org: Organisation) => {        
+    const setOrgRoleDetails = async (org: Organisation) => {
         await setToLocalStorage(storageKeys.ORG_ID, org.id.toString());
-        await setCookies([{key: storageKeys.ORG_ID, value: org.id}])
-        
+        await setCookie([{ key: storageKeys.ORG_ID, value: org.id }])
+
         const roles: string[] = org?.userOrgRoles.map(role => role.orgRole.name)
         await setToLocalStorage(storageKeys.ORG_ROLES, roles.toString());
     }

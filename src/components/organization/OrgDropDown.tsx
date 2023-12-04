@@ -6,7 +6,7 @@ import OrgList from '../../commonComponents/OrgSelectionOption/OrgList'
 import React, { useEffect } from "react";
 import type { Organisation } from "./interfaces";
 import { storageKeys } from "../../config/CommonConstant.js";
-import setCookies from "../../utils/set-cookies";
+import { setCookie } from "../../utils/cookies";
 
 interface IProps {
 	activeOrg: Organisation,
@@ -19,7 +19,7 @@ const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
 	}
 
 	useEffect(() => {
-		setCookies([{key: storageKeys.ORG_ID, value: activeOrg?.id}])
+		setCookie([{ key: storageKeys.ORG_ID, value: activeOrg?.id }])
 	}, [activeOrg])
 
 	return (
