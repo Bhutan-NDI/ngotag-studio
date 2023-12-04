@@ -1,5 +1,6 @@
 import { removeFromLocalStorage } from "../../api/Auth"
 import { storageKeys } from "../../config/CommonConstant"
+import { removeCookie } from "../../utils/cookies"
 
 const SignOutButton = () => {
 
@@ -13,13 +14,21 @@ const SignOutButton = () => {
         await removeFromLocalStorage(storageKeys.ECOSYSTEM_ROLE)
         await removeFromLocalStorage(storageKeys.USER_PROFILE)
 
+        
+        removeCookie(storageKeys.TOKEN)
+        removeCookie(storageKeys.USER_EMAIL)
+        removeCookie(storageKeys.ORG_ID)
+        removeCookie(storageKeys.ORG_ROLES)
+        removeCookie(storageKeys.ECOSYSTEM_ID)
+        removeCookie(storageKeys.ECOSYSTEM_ROLE)
+        removeCookie(storageKeys.USER_PROFILE)
+        
         const response = await fetch('/api/auth/signout', {
             method: "GET",
             headers: {
                 "Content-Type": "application/json",
             }
         });
-
         if (response.redirected) {
             window.location.assign(response.url);
         }

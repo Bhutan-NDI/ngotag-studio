@@ -235,7 +235,7 @@ export const setToCookies = (
 		return;
 	}
 
-    const convertedValue = encryptData(value) as string;
+    const convertedValue = encryptData(value);
     // Set HttpOnly, Secure, and SameSite attributes in the options
     const updatedOption: { [key: string]: any } = {
         ...option,
@@ -257,6 +257,6 @@ export const getFromCookies = (cookies: AstroCookies, key: string) => {
 };
 
 export const removeFromCookies = async (cookies: AstroCookies, key: string, option?: { [key: string]: any}) => {
-    await cookies.delete(key, option);
+    cookies.delete(key, option);
     return true;
 };
