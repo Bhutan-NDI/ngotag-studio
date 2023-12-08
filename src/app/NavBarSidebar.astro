@@ -15,10 +15,10 @@ import API from '../config/ssrApiConfig';
 const { hideOrgAgent } = Astro.props;
 
 const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
-const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION) || "";
 const role = getFromCookies(Astro.cookies, 'role');
 
-console.log('COOKIES DATA ON NAVBAR::::', orgId, token, role);
+console.log(7876531, 'SELECTED ORGID, ROLE::', orgId, ' | ', role);
 
 const permittedPages = RolePermissions.find(
 	(item) => item.role === role,
@@ -33,12 +33,14 @@ const orgResponse = await API({
 });
 
 if (orgId) {
-	activeOrg = orgResponse?.organizations?.find(
+	activeOrg = (await orgResponse?.organizations?.find(
 		(org: { id: string }) => org.id === orgId,
-	) as Organisation;
+	)) as Organisation;
 } else {
-	activeOrg = orgResponse?.organizations && orgResponse?.organizations[0];
+	activeOrg =
+		(await orgResponse?.organizations) && orgResponse?.organizations[0];
 }
+
 
 const agentResponse = await API({
 	token,
@@ -116,24 +118,28 @@ const agentResponse = await API({
 									{agentResponse?.isInitialized ? (
 										<div class="inline-flex items-center bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-green-900 dark:text-green-300">
 											<div class="w-2 h-2 mr-1 bg-green-500 rounded-full" />
-											SSI Agent is up and running
+											Wallet Agent is up and running
 										</div>
 									) : (
 										<span class="inline-flex items-center bg-red-100 text-red-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded-full dark:bg-red-900 dark:text-red-300">
 											<span class="w-2 h-2 mr-1 bg-red-500 rounded-full" />
-											SSI Agent is not running
+											Wallet Agent is not running
 										</span>
 									)}
 								</div>
 							</div>
 							<div class="hidden sm:block">
-								<OrgDropDown
-									activeOrg={activeOrg}
-									orgList={
-										orgResponse?.organizations ? orgResponse?.organizations : []
-									}
-									client:load
-								/>
+								{activeOrg && Object.keys(activeOrg).length > 0 && (
+									<OrgDropDown
+										activeOrg={activeOrg}
+										orgList={
+											orgResponse?.organizations
+												? orgResponse?.organizations
+												: []
+										}
+										client:load
+									/>
+								)}
 							</div>
 						</>
 					)

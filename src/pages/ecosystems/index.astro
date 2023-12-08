@@ -14,15 +14,14 @@ if (!response.authorized) {
 	return Astro.redirect(response.redirect);
 }
 
-const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
-const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
+const orgId = await getFromCookies(Astro.cookies, storageKeys.ORG_ID);
+const token = await getFromCookies(Astro.cookies, storageKeys.SESSION);
 
 const ecosystemList = await API({
 	url: `${apiRoutes.Ecosystem.root}/${orgId}`,
 	method: "GET",
 	token
 });
-console.log(4343, ecosystemList)
 ---
 
 <LayoutSidebar notFoundPage={!response.permitted}>

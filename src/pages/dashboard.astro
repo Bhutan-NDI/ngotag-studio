@@ -1,17 +1,81 @@
 ---
+import { getFromCookies } from '../api/Auth';
 import LayoutSidebar from '../app/LayoutSidebar.astro';
 import UserDashBoard from '../components/User/UserDashBoard';
+import { storageKeys } from '../config/CommonConstant';
+import { apiRoutes } from '../config/apiRoutes';
 import { pathRoutes } from '../config/pathRoutes';
+import API from '../config/ssrApiConfig';
 import { checkUserSession } from '../utils/check-session';
 
-const response = await checkUserSession({cookies: Astro.cookies, currentPath: Astro.url.pathname});
-const route: string = pathRoutes.auth.sinIn
+const response = await checkUserSession({
+	cookies: Astro.cookies,
+	currentPath: Astro.url.pathname,
+});
+const route: string = pathRoutes.auth.sinIn;
 if (!response.authorized) {
 	return Astro.redirect(response.redirect);
 }
 
+const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
+const activityLimit = 5;
+
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION);
+
+const orgList = await API({
+	url: `${apiRoutes.organizations.getAll}?pageNumber=1&pageSize=100&search=`,
+	method: 'GET',
+	token,
+});
+
+const activities = await API({
+	url: `${apiRoutes.users.recentActivity}?limit=${activityLimit}`,
+	method: 'GET',
+	token,
+});
+
+const ecosystemInvite = await API({
+	url: `${apiRoutes.Ecosystem.root}/${orgId}${apiRoutes.Ecosystem.usersInvitation}?pageNumber=1&pageSize=1&search=`,
+	method: 'GET',
+	token,
+});
+
+let organizationInviteMessage = null;
+
+const orgInvitations = await API({
+	url: `${apiRoutes.users.invitations}?pageNumber=1&pageSize=&search=`,
+	method: 'GET',
+	token,
+});
+
+if (orgInvitations && orgInvitations.length > 0) {
+	organizationInviteMessage = `You have received invitations to join organization`;
+}
+
+let ecosystemInviteMessage = null;
+
+const invitationPendingList =
+	ecosystemInvite && ecosystemInvite.length > 0 &&
+	ecosystemInvite?.filter((invitation: { status: string }) => {
+		return invitation.status === 'pending';
+	});
+
+if (invitationPendingList && invitationPendingList.length > 0) {
+	ecosystemInviteMessage = `You have received invitation to join ecosystem `;
+}
+
+const organizationList =
+	orgList?.organizations &&
+	orgList?.organizations?.length > 0 &&
+	orgList?.organizations?.slice(0, 3);
 ---
 
 <LayoutSidebar notFoundPage={!response.permitted}>
-	<UserDashBoard client:load/>	
+	<UserDashBoard
+		orgList={organizationList || []}
+		userActivites={activities}
+		ecosystemInviteMessage={ecosystemInviteMessage}
+		organizationInviteMessage={organizationInviteMessage}
+		client:load
+	/>
 </LayoutSidebar>

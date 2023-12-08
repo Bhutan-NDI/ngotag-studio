@@ -8,9 +8,14 @@ interface IProps {
 	payload?: any;
 }
 
+interface IHeaders {
+	'Content-Type': string
+	Authorization?: string
+}
+
 const API = async ({ token, url, method, payload }: IProps) => {
 	try {
-		const headers = {
+		const headers: IHeaders = {
 			'Content-Type': 'application/json',
 		}
 		if(token) {
@@ -21,14 +26,16 @@ const API = async ({ token, url, method, payload }: IProps) => {
 			method,
 			body: JSON.stringify(payload),
 		};
-		// console.log("CONFIG::", config)
-		const baseURL = globalThis.baseUrl || envConfig.PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
+		const baseURL = globalThis?.baseUrl || envConfig.PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL;
 		const apiURL = baseURL + url;
-		const res = await fetch(apiURL, {
-			...config,
-		});	
-		const { data } = (await res.json()) || {};
-		return data;
+		const res = await fetch(apiURL, config);	
+		const data = await res.json();
+
+		if(data?.data){
+			return data?.data;
+		} 
+
+		return data
 	} catch (err) {
 		console.error('ERROR::', err);
 		return err;

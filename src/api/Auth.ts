@@ -190,41 +190,7 @@ export const decryptData = (value: any): string => {
 	return originalValue;
 };
 
-export const setToLocalStorage = async (key: string, value: any) =>{
-    // If passed value is object then checked empty object
-	if (typeof value === 'object' && Boolean(Object.keys(value).length <= 0)) {
-		return;
-	}
-
-	// If passed value is string then checked if value is falsy
-	if (typeof value === 'string' && !value?.trim()) {
-		return;
-	}
-
-    const convertedValue = await encryptData(value)
-    const setValue = await localStorage.setItem(key, convertedValue as string)
-    return true
-}
-
-export const getFromLocalStorage = async (key: string) => {
-	const value = await localStorage.getItem(key);
-	const convertedValue = value ? await decryptData(value) : '';
-	return convertedValue;
-};
-
-
-export const removeFromLocalStorage = async (key: string) => {
-    await localStorage.removeItem(key);
-	return true;
-};
-
-export const setToCookies = (
-    cookies: AstroCookies,
-    key: string,
-    value: any,
-    option?: { [key: string]: any },
-) => {
-
+export const setToLocalStorage = async (key: string, value: any) => {
 	// If passed value is object then checked empty object
 	if (typeof value === 'object' && Boolean(Object.keys(value).length <= 0)) {
 		return;
@@ -235,28 +201,69 @@ export const setToCookies = (
 		return;
 	}
 
-    const convertedValue = encryptData(value);
-    // Set HttpOnly, Secure, and SameSite attributes in the options
-    const updatedOption: { [key: string]: any } = {
-        ...option,
-        httpOnly: true,
-        secure: true, // Set to true if using HTTPS
-        sameSite: 'Strict',
-        path: '/',
-    };
+	const convertedValue = await encryptData(value);
+	const setValue = await localStorage.setItem(key, convertedValue as string);
+	return true;
+};
 
-    cookies.set(key, convertedValue, updatedOption);
+export const getFromLocalStorage = async (key: string) => {
+	const value = await localStorage.getItem(key);
+	const convertedValue = value ? await decryptData(value) : '';
+	return convertedValue;
+};
 
-    return true;
+export const removeFromLocalStorage = async (key: string) => {
+	await localStorage.removeItem(key);
+	return true;
+};
+
+export const setToCookies = (
+	cookies: AstroCookies,
+	key: string,
+	value: any,
+	option?: { [key: string]: any },
+) => {
+	// If passed value is object then checked empty object
+	if (typeof value === 'object' && Boolean(Object.keys(value).length <= 0)) {
+		return;
+	}
+
+	// If passed value is string then checked if value is falsy
+	if (typeof value === 'string' && !value?.trim()) {
+		return;
+	}
+
+	if (cookies.has(key)) {
+		// TODO document why this block is empty
+		cookies.delete(key);
+	}
+
+	const convertedValue = encryptData(value);
+	// Set HttpOnly, Secure, and SameSite attributes in the options
+	const updatedOption: { [key: string]: any } = {
+		...option,
+		httpOnly: true,
+		secure: true, // Set to true if using HTTPS
+		sameSite: 'Strict',
+		path: '/'
+		};
+
+	cookies.set(key, convertedValue, updatedOption);
+
+	return true;
 };
 
 export const getFromCookies = (cookies: AstroCookies, key: string) => {
-    const value = cookies.get(key).value;
-    const convertedValue = value ? decryptData(value) : '';
-    return convertedValue;
+	const value = cookies.get(key).value;
+	const convertedValue = value ? decryptData(value) : '';
+	return convertedValue;
 };
 
-export const removeFromCookies = async (cookies: AstroCookies, key: string, option?: { [key: string]: any}) => {
-    cookies.delete(key, option);
-    return true;
+export const removeFromCookies = async (
+	cookies: AstroCookies,
+	key: string,
+	option?: { [key: string]: any },
+) => {
+	cookies.delete(key, option);
+	return true;
 };

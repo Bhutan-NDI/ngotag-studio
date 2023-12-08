@@ -1,16 +1,49 @@
 ---
 import LayoutSidebar from '../../app/LayoutSidebar.astro';
-import OrganizationsList from '../../components/organization/OrganizationsList'
+import OrganizationsList from '../../components/organization/OrganizationsList';
 import { checkUserSession } from '../../utils/check-session';
 import { pathRoutes } from '../../config/pathRoutes';
+import { getFromCookies, setToCookies } from '../../api/Auth';
+import { storageKeys } from '../../config/CommonConstant';
+import type { Organisation } from '../../components/organization/interfaces';
+import API from '../../config/ssrApiConfig';
+import { apiRoutes } from '../../config/apiRoutes';
 
-const response = await checkUserSession({cookies: Astro.cookies, currentPath: Astro.url.pathname});
-const route: string = pathRoutes.auth.sinIn
+const response = await checkUserSession({
+	cookies: Astro.cookies,
+	currentPath: Astro.url.pathname,
+});
+const route: string = pathRoutes.auth.sinIn;
 if (!response.authorized) {
 	return Astro.redirect(response.redirect);
 }
+
+const orgId = getFromCookies(Astro.cookies, storageKeys.ORG_ID);
+const token = getFromCookies(Astro.cookies, storageKeys.SESSION) || '';
+const role = getFromCookies(Astro.cookies, 'role');
+
+let activeOrg: Organisation;
+
+const orgResponse = await API({
+	token,
+	url: `${apiRoutes.organizations.getAll}?pageNumber=1&pageSize=10&search=`,
+	method: 'GET',
+});
+
+if (orgId) {
+	activeOrg = (await orgResponse?.organizations?.find(
+		(org: { id: string }) => org.id === orgId,
+	)) as Organisation;
+} else {
+	activeOrg =
+		(await orgResponse?.organizations) && orgResponse?.organizations[0];
+}
+
+await setToCookies(Astro.cookies, storageKeys.ORG_ID, activeOrg?.id);
+
+const orgList = orgResponse?.organizations && orgResponse?.organizations.length > 0 ? orgResponse?.organizations : []
 ---
 
 <LayoutSidebar notFoundPage={!response.permitted}>
-	<OrganizationsList client:visible />
+	<OrganizationsList orgList={orgList} client:visible />
 </LayoutSidebar>

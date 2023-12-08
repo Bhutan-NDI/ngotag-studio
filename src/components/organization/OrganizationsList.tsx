@@ -26,9 +26,13 @@ const initialPageState = {
   total: 100,
 };
 
-const OrganizationsList = () => {
+interface IProps {
+  orgList: Organisation[]
+}
+
+const OrganizationsList = ({orgList}: IProps) => {
   const [openModal, setOpenModal] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState<boolean>(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(initialPageState);
@@ -40,7 +44,7 @@ const OrganizationsList = () => {
   };
   const [searchText, setSearchText] = useState("");
 
-  const [organizationsList, setOrganizationList] = useState<Array<Organisation> | null>(null)
+  const [organizationsList, setOrganizationList] = useState<Array<Organisation> | null>(orgList)
 
   const props = { openModal, setOpenModal };
 

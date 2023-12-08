@@ -14,10 +14,11 @@ import {
 	getUserInvitations,
 } from '../../api/invitations';
 import { pathRoutes } from '../../config/pathRoutes';
-import { getFromLocalStorage, setToCookies, setToLocalStorage } from '../../api/Auth';
+import { getFromLocalStorage, setToLocalStorage } from '../../api/Auth';
 import { dateConversion } from '../../utils/DateConversion';
 import DateTooltip from '../Tooltip';
 import { Roles } from '../../utils/enums/roles';
+import { setCookie } from '../../utils/cookies'
 
 const initialPageState = {
 	pageNumber: 1,
@@ -25,18 +26,23 @@ const initialPageState = {
 	total: 0,
 };
 
-const UserDashBoard = () => {
-	const [message, setMessage] = useState<string | null>(null);
-	const [ecoMessage, setEcoMessage] = useState<string | null>(null);
+interface IProps {
+	orgList: Organisation[]
+	userActivites: UserActivity[]
+	ecosystemInviteMessage: string | null
+	organizationInviteMessage: string | null
+}
+
+const UserDashBoard = ({ orgList, userActivites, ecosystemInviteMessage, organizationInviteMessage }: IProps) => {
+	const [message, setMessage] = useState<string | null>(organizationInviteMessage);
+	const [ecoMessage, setEcoMessage] = useState<string | null>(ecosystemInviteMessage);
 	const [viewButton, setViewButton] = useState<boolean>(false);
 	const [error, setError] = useState<string | null>(null);
 	const [currentPage, setCurrentPage] = useState(initialPageState);
 	const [loading, setLoading] = useState<boolean>(false);
 	const [organizationsList, setOrganizationList] =
-		useState<Array<Organisation> | null>(null);
-	const [activityList, setActivityList] = useState<Array<UserActivity> | null>(
-		null,
-	);
+		useState<Array<Organisation> | null>(orgList);
+	const [activityList, setActivityList] = useState<Array<UserActivity> | null>(userActivites);
 
 	const getAllInvitations = async () => {
 		setLoading(true);
@@ -161,16 +167,9 @@ const UserDashBoard = () => {
 		getAllResponses()
 	}, []);
 
-	const goToOrgDashboard = async (orgId: number, roles: string[]) => {
+	const goToOrgDashboard = async (orgId: string, roles: string[]) => {
 		await setToLocalStorage(storageKeys.ORG_ID, orgId.toString());
-		await fetch('/api/auth/cookie', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify([{key: storageKeys.ORG_ID, value: orgId}]),
-        });
-		// await setToCookies(storageKeys.ORG_ID, orgId.toString());
+		setCookie([{ key: storageKeys.ORG_ID, value: orgId }]);
 		window.location.href = pathRoutes.organizations.dashboard;
 	};
 
@@ -298,7 +297,7 @@ const UserDashBoard = () => {
 							</div>
 						)}
 					</div>
-					{activityList ? (
+					{activityList && activityList.length > 0 ? (
 						<ol className="relative border-l pl-8 border-gray-200 dark:border-gray-700">
 							{activityList.map((activity) => (
 								<li className="mb-10 ml-4" key={activity.id}>

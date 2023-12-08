@@ -27,11 +27,8 @@ const OrgList = ({ item }: any) => {
     }
     return (
         <button
-            className="flex items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white"
-            onClick={() => {
-                console.log("ORG ITEM CLICKED::::", item)
-                goToOrgDashboard(item)
-            }}
+            className="flex items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white w-full"
+            onClick={() => goToOrgDashboard(item)}
         >
             {item.logoUrl ? (
                 <CustomAvatar className='dark:text-white' size="25" src={item?.logoUrl} round />

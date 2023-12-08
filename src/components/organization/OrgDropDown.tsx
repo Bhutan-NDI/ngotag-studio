@@ -3,10 +3,11 @@
 import { BiChevronDown } from "react-icons/bi";
 import CustomAvatar from '../Avatar'
 import OrgList from '../../commonComponents/OrgSelectionOption/OrgList'
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import type { Organisation } from "./interfaces";
 import { storageKeys } from "../../config/CommonConstant.js";
 import { setCookie } from "../../utils/cookies";
+import { getFromLocalStorage } from "../../api/Auth";
 
 interface IProps {
 	activeOrg: Organisation,
@@ -14,13 +15,24 @@ interface IProps {
 }
 
 const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
+	const [activeOrganization, setActiveOrganization] = useState<Organisation>(activeOrg)
 	const redirectToCreateOrgModal = () => {
 		window.location.href = '/organizations?orgModal=true';
 	}
 
+	const getOrgId = async (activeOrg: Organisation) => {
+		const localOrgId = await getFromLocalStorage(storageKeys.ORG_ID)
+		const activeOrgId = localOrgId === activeOrg?.id ? activeOrg?.id : localOrgId
+		const selectedOrg = orgList && orgList.length > 0 && orgList.find((item) => item.id === activeOrgId)
+		if (selectedOrg) {
+			setActiveOrganization(selectedOrg)
+		}
+		await setCookie([{ key: storageKeys.ORG_ID, value: activeOrgId }])
+	}
+
 	useEffect(() => {
-		setCookie([{ key: storageKeys.ORG_ID, value: activeOrg?.id }])
-	}, [activeOrg])
+		getOrgId(activeOrg)
+	}, [activeOrg, orgList])
 
 	return (
 		<>
@@ -32,14 +44,14 @@ const OrgDropDown = ({ activeOrg, orgList }: IProps) => {
 					rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:hover:bg-primary-700 dark:focus:ring-blue-800"
 			>
 				{
-					activeOrg
+					activeOrganization
 						? <>
-							{activeOrg.logoUrl ? (
-								<CustomAvatar size="20" src={activeOrg?.logoUrl} round />
+							{activeOrganization.logoUrl ? (
+								<CustomAvatar size="20" src={activeOrganization?.logoUrl} round />
 							) : (
-								<CustomAvatar size="20" name={activeOrg?.name} round />
+								<CustomAvatar size="20" name={activeOrganization?.name} round />
 							)}
-							<text className="ml-2 text-primary-700 dark:text-white">{activeOrg?.name.length > 20 ? activeOrg?.name.substring(0, 20) + '...' : activeOrg?.name}</text>
+							<text className="ml-2 text-primary-700 dark:text-white">{activeOrganization?.name.length > 20 ? activeOrganization?.name.substring(0, 20) + '...' : activeOrganization?.name}</text>
 						</>
 						:
 						<text className='text-primary-700 dark:text-white'>
