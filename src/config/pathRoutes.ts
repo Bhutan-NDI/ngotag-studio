@@ -11,6 +11,7 @@ export const pathRoutes = {
 		fetchUsers: '/users',
 		connectionList: '/connections',
 		platformSetting: '/platform-settings',
+		subscription: '/subscription'
 	},
 	organizations: {
 		root: '/organizations',
