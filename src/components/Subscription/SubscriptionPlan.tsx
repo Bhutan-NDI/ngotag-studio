@@ -1,89 +1,72 @@
-'use strict';
+'use client';
 
-import React, {
-	useCallback,
-	useMemo,
-	useRef,
-	useState,
-	StrictMode,
-} from 'react';
-import { createRoot } from 'react-dom/client';
-import { AgGridReact } from 'ag-grid-react';
-import 'ag-grid-enterprise';
-import 'ag-grid-community/styles/ag-grid.css';
-import 'ag-grid-community/styles/ag-theme-quartz.css';
-import {
-	ColDef,
-	ColGroupDef,
-	GridApi,
-	GridOptions,
-	GridReadyEvent,
-	createGrid,
-} from 'ag-grid-community';
-// import { IOlympicData } from './interfaces';
-export interface IOlympicData {
-  athlete: string;
-  age: number;
-  country: string;
-  year: number;
-  date: string;
-  sport: string;
-  gold: number;
-  silver: number;
-  bronze: number;
-  total: number;
-}
+import { Table } from 'flowbite-react';
+import React, { useState } from 'react';
 const SubscriptionPlan = () => {
-	const containerStyle = useMemo(() => ({ width: '100%', height: '100%' }), []);
-	const gridStyle = useMemo(() => ({ height: '100%', width: '100%' }), []);
-	const [rowData, setRowData] = useState<IOlympicData[]>();
-	const [columnDefs, setColumnDefs] = useState<ColDef[]>([
-		{ field: 'country', rowGroup: true, hide: true },
-		{ field: 'year', rowGroup: true, hide: true },
-		{ field: 'athlete' },
-		{ field: 'sport' },
-		{ field: 'gold' },
-		{ field: 'silver' },
-		{ field: 'bronze' },
-	]);
-	const defaultColDef = useMemo<ColDef>(() => {
-		return {
-			flex: 1,
-			minWidth: 100,
-		};
-	}, []);
-	const autoGroupColumnDef = useMemo<ColDef>(() => {
-		return {
-			minWidth: 200,
-		};
-	}, []);
+	const [isSecondTableOpen, setIsSecondTableOpen] = useState(false);
 
-	const onGridReady = useCallback((params: GridReadyEvent) => {
-		fetch('https://www.ag-grid.com/example-assets/olympic-winners.json')
-			.then((resp) => resp.json())
-			.then((data: IOlympicData[]) => setRowData(data));
-	}, []);
-
+	const handleSecondTableClick = () => {
+		console.log('Second table opened');
+		setIsSecondTableOpen(!isSecondTableOpen);
+		// You can add your logic to handle the opening of the second table
+		// For example, you can fetch data for the second table here.
+	};
 	return (
-		<StrictMode>
-			<p>idjiudfniufnj</p>
-			<div style={containerStyle}>
-				<div style={gridStyle} className={'ag-theme-quartz'}>
-					<>
-					{console.log("rowData11",rowData)
-					}
-					</>
-					<AgGridReact<IOlympicData>
-						rowData={rowData}
-						columnDefs={columnDefs}
-						defaultColDef={defaultColDef}
-						autoGroupColumnDef={autoGroupColumnDef}
-						onGridReady={onGridReady}
-					/>
-				</div>
-			</div>
-		</StrictMode>
+		<div className="overflow-x-auto p-8">
+			<Table>
+				<Table.Head>
+					{/* <Table.HeadCell></Table.HeadCell> */}
+					<Table.HeadCell>Plan</Table.HeadCell>
+					<Table.HeadCell>Validity</Table.HeadCell>
+					<Table.HeadCell>Start Date</Table.HeadCell>
+					<Table.HeadCell>End Date</Table.HeadCell>
+					<Table.HeadCell>Action</Table.HeadCell>
+					<Table.HeadCell>
+						<span className="sr-only">Edit</span>
+					</Table.HeadCell>
+				</Table.Head>
+				<Table.Body className="divide-y">
+					<Table.Row className="bg-white dark:border-gray-700 dark:bg-gray-800">
+						<Table.Cell
+							onClick={() => {
+								handleSecondTableClick();
+							}}
+							className="whitespace-nowrap font-medium text-gray-900 dark:text-white"
+						>
+							<span>{'>'}</span>
+							<span className="pl-2">Free</span>
+						</Table.Cell>
+						<Table.Cell>1 month</Table.Cell>
+						<Table.Cell>01/02/2024</Table.Cell>
+						<Table.Cell>01/03/2024</Table.Cell>
+						<Table.Cell>
+							<a
+								href="#"
+								className="font-medium text-cyan-600 hover:underline dark:text-cyan-500"
+							>
+								Upgrade
+							</a>
+						</Table.Cell>
+					</Table.Row>
+				</Table.Body>
+			</Table>
+			{isSecondTableOpen && (
+				<Table>
+					<Table.Head>
+						<Table.HeadCell></Table.HeadCell>
+
+						<Table.HeadCell>Plan</Table.HeadCell>
+						<Table.HeadCell>Validity</Table.HeadCell>
+						<Table.HeadCell>Start Date</Table.HeadCell>
+						<Table.HeadCell>End Date</Table.HeadCell>
+						<Table.HeadCell>Action</Table.HeadCell>
+						<Table.HeadCell>
+							<span className="sr-only">Edit</span>
+						</Table.HeadCell>
+					</Table.Head>{' '}
+				</Table>
+			)}
+		</div>
 	);
 };
-
-export default SubscriptionPlan
+export default SubscriptionPlan;
