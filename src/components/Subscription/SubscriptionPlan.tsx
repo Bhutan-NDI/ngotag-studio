@@ -84,7 +84,7 @@ const SubscriptionPlan = () => {
 				id="connection-list"
 			>
 				<h1 className="ml-1 mr-auto text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">
-					Connections
+					Current Subscription
 				</h1>
 			</div>
 			<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-500 rounded-sm w-full">
@@ -250,7 +250,7 @@ const SubscriptionPlan = () => {
 									memberHeader.map((header) => {
 										return (
 											<th className="w-1/5 md:w-1/4 lg:w-1/5 text-start m-4 p-2">
-												<span className='ml-4'>{header.columnName}</span>
+												<span className="ml-4">{header.columnName}</span>
 											</th>
 										);
 									})}
@@ -264,7 +264,7 @@ const SubscriptionPlan = () => {
 											<span className="ml-8">{feat.orgName}</span>
 										</td>
 										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-start">
-										<span className="ml-6">{feat.planType}</span>
+											<span className="ml-6">{feat.planType}</span>
 										</td>
 									</tr>
 								);
