@@ -89,12 +89,12 @@ const SubscriptionPlan = () => {
 			</div>
 			<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-500 rounded-sm w-full">
 				<table className="rounded-none w-full table-auto">
-					<thead className="rounded-none bg-gray-200 p-4">
+					<thead className="rounded-none bg-gray-100 p-4">
 						<tr className="">
 							{firstTableHeader &&
 								firstTableHeader.map((header) => {
 									return (
-										<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2">
+										<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2 text-gray-700 font-medium">
 											{header}
 										</th>
 									);
@@ -110,7 +110,7 @@ const SubscriptionPlan = () => {
 											onClick={() => handleSecondTableClick()}
 											className="whitespace-nowrap font-medium text-gray-900 dark:text-white w-1/5 md:w-1/4 lg:w-1/5 p-2 text-center"
 										>
-											<div className="flex items-center">
+											<div className="flex items-center text-gray-700">
 												<span>
 													{isSecondTableOpen ? (
 														<svg
@@ -149,13 +149,13 @@ const SubscriptionPlan = () => {
 												<p className="w-full">{subscription.plan}</p>
 											</div>
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
 											{subscription.validity}
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center text-gray-700">
 											{subscription.startDate}
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
 											{subscription.endDate}
 										</td>
 										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center p-2">
@@ -190,7 +190,7 @@ const SubscriptionPlan = () => {
 				{isSecondTableOpen && (
 					<div className="mx-10">
 						<table className="rounded-none w-full table-auto">
-							<thead className="rounded-none ounded-none bg-gray-200 p-4">
+							<thead className="rounded-none ounded-none bg-gray-100 p-4">
 								<tr>
 									{secondTableHeader &&
 										secondTableHeader.map((header) => {
@@ -205,17 +205,17 @@ const SubscriptionPlan = () => {
 							<tbody className="divide-y">
 								{data.map((feat) => {
 									return (
-										<tr className="bg-white dark:border-gray-700 dark:bg-gray-800">
+										<tr className="bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700" >
 											<td className="whitespace-nowrap font-medium text-gray-900 dark:text-white w-1/5 md:w-1/4 lg:w-1/5  m-4 p-2 text-start">
-												<span className="ml-8">{feat.feature}</span>
+												<span className="ml-8 text-gray-700">{feat.feature}</span>
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
 												{feat.total}
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
 												{feat.used}
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
 												{feat.remaining}
 											</td>
 											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center">
@@ -244,12 +244,12 @@ const SubscriptionPlan = () => {
 
 				<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-500 rounded-sm w-full">
 					<table className="rounded-none w-full table-auto">
-						<thead className="rounded-none ounded-none bg-gray-200 p-4">
+						<thead className="rounded-none ounded-none bg-gray-100 p-4">
 							<tr>
 								{memberHeader &&
 									memberHeader.map((header) => {
 										return (
-											<th className="w-1/5 md:w-1/4 lg:w-1/5 text-start m-4 p-2">
+											<th className="w-1/5 md:w-1/4 lg:w-1/5 text-start m-4 p-2 text-gray-700 font-medium">
 												<span className="ml-4">{header.columnName}</span>
 											</th>
 										);
