@@ -87,14 +87,14 @@ const SubscriptionPlan = () => {
 					Current Subscription
 				</h1>
 			</div>
-			<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-500 rounded-sm w-full">
+			<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-800 rounded-sm w-full">
 				<table className="rounded-none w-full table-auto">
-					<thead className="rounded-none bg-gray-100 p-4">
+					<thead className="rounded-none bg-gray-100 p-4 dark:bg-gray-700 text-gray-500 dark:text-white">
 						<tr className="">
 							{firstTableHeader &&
 								firstTableHeader.map((header) => {
 									return (
-										<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2 text-gray-700 font-medium">
+										<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2 text-gray-700 font-medium text-gray-500 dark:text-white">
 											{header}
 										</th>
 									);
@@ -110,7 +110,7 @@ const SubscriptionPlan = () => {
 											onClick={() => handleSecondTableClick()}
 											className="whitespace-nowrap font-medium text-gray-900 dark:text-white w-1/5 md:w-1/4 lg:w-1/5 p-2 text-center"
 										>
-											<div className="flex items-center text-gray-700">
+											<div className="flex items-center text-gray-700 dark:text-white">
 												<span>
 													{isSecondTableOpen ? (
 														<svg
@@ -146,19 +146,19 @@ const SubscriptionPlan = () => {
 														</svg>
 													)}
 												</span>
-												<p className="w-full">{subscription.plan}</p>
+												<p className="w-full text-gray-700 dark:text-white">{subscription.plan}</p>
 											</div>
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700 dark:text-white">
 											{subscription.validity}
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center text-gray-700">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5  text-center text-gray-700 dark:text-white">
 											{subscription.startDate}
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700 dark:text-white">
 											{subscription.endDate}
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center p-2">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center p-2 text-gray-700 dark:text-white">
 											<div className="flex justify-center">
 												<button
 													id="upgrade"
@@ -190,12 +190,12 @@ const SubscriptionPlan = () => {
 				{isSecondTableOpen && (
 					<div className="mx-10">
 						<table className="rounded-none w-full table-auto">
-							<thead className="rounded-none ounded-none bg-gray-100 p-4">
+							<thead className="rounded-none ounded-none bg-gray-100 p-4  dark:bg-gray-700 text-gray-500 dark:text-white">
 								<tr>
 									{secondTableHeader &&
 										secondTableHeader.map((header) => {
 											return (
-												<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2">
+												<th className="w-1/5 md:w-1/4 lg:w-1/5 text-center m-4 p-2 text-gray-500 dark:text-white">
 													{header}
 												</th>
 											);
@@ -205,17 +205,17 @@ const SubscriptionPlan = () => {
 							<tbody className="divide-y">
 								{data.map((feat) => {
 									return (
-										<tr className="bg-white dark:border-gray-700 dark:bg-gray-800 text-gray-700" >
+										<tr className="bg-white dark:border-gray-700 dark:bg-gray-800  text-gray-700 dark:text-white" >
 											<td className="whitespace-nowrap font-medium text-gray-900 dark:text-white w-1/5 md:w-1/4 lg:w-1/5  m-4 p-2 text-start">
-												<span className="ml-8 text-gray-700">{feat.feature}</span>
+												<span className="ml-8 text-gray-700 dark:text-white">{feat.feature}</span>
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center  text-gray-700 dark:text-white">
 												{feat.total}
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center  text-gray-700 dark:text-white">
 												{feat.used}
 											</td>
-											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center text-gray-700">
+											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center  text-gray-700 dark:text-white">
 												{feat.remaining}
 											</td>
 											<td className="w-1/5 md:w-1/4 lg:w-1/5 text-center">
@@ -237,19 +237,19 @@ const SubscriptionPlan = () => {
 					className="flex items-center justify-between mb-4"
 					id="issued-credentials-list"
 				>
-					<h1 className="ml-1 text-xl font-semibold text-gray-900 sm:text-2xl dark:text-white">
+					<h1 className="ml-1 text-xl font-semibold bg-none text-gray-900 sm:text-2xl dark:text-white">
 						Member organizations
 					</h1>
 				</div>
 
-				<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-500 rounded-sm w-full">
+				<div className="overflow-x-auto p-3 mb-4 bg-white dark:bg-gray-800 rounded-sm w-full">
 					<table className="rounded-none w-full table-auto">
-						<thead className="rounded-none ounded-none bg-gray-100 p-4">
+						<thead className="rounded-none ounded-none bg-gray-100 p-4 text-gray-500 dark:text-white dark:bg-gray-700">
 							<tr>
 								{memberHeader &&
 									memberHeader.map((header) => {
 										return (
-											<th className="w-1/5 md:w-1/4 lg:w-1/5 text-start m-4 p-2 text-gray-700 font-medium">
+											<th className="w-1/5 md:w-1/4 lg:w-1/5 text-start m-4 p-2 font-medium text-gray-500 dark:text-white">
 												<span className="ml-4">{header.columnName}</span>
 											</th>
 										);
@@ -260,10 +260,10 @@ const SubscriptionPlan = () => {
 							{memberTableData.map((feat) => {
 								return (
 									<tr className="bg-white dark:border-gray-700 dark:bg-gray-800">
-										<td className="whitespace-nowrap font-medium text-gray-900 dark:text-white w-1/5 md:w-1/4 lg:w-1/5  m-4 p-2 text-start">
+										<td className="whitespace-nowrap font-medium text-gray-700 dark:text-white w-1/5 md:w-1/4 lg:w-1/5  m-4 p-2 text-start">
 											<span className="ml-8">{feat.orgName}</span>
 										</td>
-										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-start">
+										<td className="w-1/5 md:w-1/4 lg:w-1/5 text-start text-gray-700 dark:text-white">
 											<span className="ml-6">{feat.planType}</span>
 										</td>
 									</tr>
