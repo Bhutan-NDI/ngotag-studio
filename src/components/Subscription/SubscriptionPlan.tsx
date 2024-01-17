@@ -12,6 +12,9 @@ const SubscriptionPlan = () => {
 		console.log('Second table opened');
 		setIsSecondTableOpen(!isSecondTableOpen);
 	};
+	const goToPlans = ()=>{
+		window.location.href= '/subscription/plans'
+	}
 	const firstTableHeader = [
 		'Plan',
 		'Validity',
@@ -163,7 +166,7 @@ const SubscriptionPlan = () => {
 												<button
 													id="upgrade"
 													// isProcessing={''}
-													// onClick={() => props.registerWithPasskey(true)}
+													onClick={() => goToPlans()}
 													className="text-base hover:!bg-primary-800 py-1 px-2 space-x-2 flex font-medium text-white bg-primary-700 rounded-lg hover:bg-primary-800 focus:ring-2 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800 flex justify-center items-center text-center rounded-md"
 												>
 													<svg
