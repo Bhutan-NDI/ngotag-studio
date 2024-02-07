@@ -2,9 +2,8 @@
 import pkg from '../../package.json' assert { type: 'json' };
 import HelmetHead from '../components/HelmetHead';
 import { url } from '../lib/data.js';
-
+import PricingPage from '../components/Subscription/PricingPageComponent'
 import { SITE_TITLE } from './constants.js';
-
 const { class: clazz, metaData } = Astro.props;
 
 const baseUrl = process.env.PUBLIC_BASE_URL || import.meta.env.PUBLIC_BASE_URL;
@@ -41,6 +40,10 @@ const supabaseKey =
 				document.documentElement.classList.remove('dark');
 			}
 		</script>
+		<script
+		async
+		src="https://js.stripe.com/v3/pricing-table.js">
+	  </script>
 	</head>
 
 	<body
@@ -53,7 +56,7 @@ const supabaseKey =
 			'dark:bg-[#111827]',
 		]}
 	>
-		<slot />
+			<slot />
 		<script>
 			import 'flowbite';
 			import 'flowbite/dist/datepicker.js';
@@ -89,5 +92,5 @@ const supabaseKey =
 				background: #9a9a9a;
 			}
 		</style>
-	</body>
+			</body>
 </html>
