@@ -8,11 +8,9 @@
             "memory": 2048,
             "portMappings": [
                 {
-                    "name": "frontend_ui-8085-tcp",
                     "containerPort": 8085,
                     "hostPort": 8085,
-                    "protocol": "tcp",
-                    "appProtocol": "http"
+                    "protocol": "tcp"
                 }
             ],
             "essential": true,
