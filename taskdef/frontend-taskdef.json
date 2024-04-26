@@ -3,35 +3,49 @@
     "containerDefinitions": [
         {
             "name": "frontend-ui",
-            "image": "%REPOSITORY_URI%:FRONTEND_v_%BUILD_NUMBER%",
-            "cpu": 154,
-            "memory": 307,
+            "image": "%REPOSITORY_URI%:FRONTEND_V_%BUILD_NUMBER%",
+            "cpu": 1024,
+            "memory": 2048,
             "portMappings": [
                 {
+                    "name": "frontend_ui-8085-tcp",
                     "containerPort": 8085,
-                    "hostPort": 0,
-                    "protocol": "tcp"
+                    "hostPort": 8085,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
                 }
             ],
             "essential": true,
             "environment": [],
             "environmentFiles": [
                 {
-                    "value": "arn:aws:s3:::credebl2.0/ui.env",
+                    "value": "arn:aws:s3:::env-devbucket/frontend_ui.env",
                     "type": "s3"
                 }
             ],
             "mountPoints": [],
             "volumesFrom": [],
-            "ulimits": []
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-create-group": "true",
+                    "awslogs-group": "/ecs/DEV-FRONTEND_UI_TASKDEF",
+                    "awslogs-region": "ap-southeast-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            }
         }
+        
     ],
    
-    "executionRoleArn": "arn:aws:iam::668004263903:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::id:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
     "placementConstraints": [],
     "requiresCompatibilities": [
-        "EC2"
+        "FARGATE"
     ],
-    "cpu": "154",
-    "memory": "307"
+    "cpu": "1024",
+    "memory": "2048"
 }
