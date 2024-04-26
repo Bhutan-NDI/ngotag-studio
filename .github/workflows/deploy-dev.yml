@@ -40,6 +40,20 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Create .env file
+        run: |
+         echo "PUBLIC_BASE_URL=${{ secrets.PUBLIC_BASE_URL }}" > .env
+         echo "PUBLIC_CRYPTO_PRIVATE_KEY=${{ secrets.PUBLIC_CRYPTO_PRIVATE_KEY }}" >> .env
+         echo "PUBLIC_PLATFORM_NAME=${{ secrets.PUBLIC_PLATFORM_NAME }}" >> .env
+         echo "PUBLIC_PLATFORM_LOGO=${{ secrets.PUBLIC_PLATFORM_LOGO }}" >> .env
+         echo "PUBLIC_POWERED_BY=${{ secrets.PUBLIC_POWERED_BY }}" >> .env
+         echo "PUBLIC_PLATFORM_WEB_URL=${{ secrets.PUBLIC_PLATFORM_WEB_URL }}" >> .env
+         echo "PUBLIC_POWERED_BY_URL=${{ secrets.PUBLIC_POWERED_BY_URL }}" >> .env
+         echo "PUBLIC_PLATFORM_SUPPORT_EMAIL=${{ secrets.PUBLIC_PLATFORM_SUPPORT_EMAIL }}" >> .env
+         echo "PUBLIC_SHOW_NAME_AS_LOGO=${{ secrets.PUBLIC_SHOW_NAME_AS_LOGO }}" >> .env
+         echo "PUBLIC_ALLOW_DOMAIN=${{ secrets.PUBLIC_ALLOW_DOMAIN }}" >> .env
+        
+
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}

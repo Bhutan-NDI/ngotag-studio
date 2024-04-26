@@ -1,5 +1,5 @@
 {
-    "family": "FRONTEND_UI_TASKDEF",
+    "family": "DEV-FRONTEND_UI_TASKDEF",
     "containerDefinitions": [
         {
             "name": "frontend-ui",
