@@ -2,7 +2,7 @@
     "family": "DEV-FRONTEND_UI_TASKDEF",
     "containerDefinitions": [
         {
-            "name": "frontend-ui",
+            "name": "frontend_ui",
             "image": "%REPOSITORY_URI%:FRONTEND_V_%BUILD_NUMBER%",
             "cpu": 1024,
             "memory": 2048,
