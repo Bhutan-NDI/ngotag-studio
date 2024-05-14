@@ -15,12 +15,7 @@
             ],
             "essential": true,
             "environment": [],
-            "environmentFiles": [
-                {
-                    "value": "arn:aws:s3:::env-devbucket/frontend_ui.env",
-                    "type": "s3"
-                }
-            ],
+            "environmentFiles": [],
             "mountPoints": [],
             "volumesFrom": [],
             "ulimits": [],
