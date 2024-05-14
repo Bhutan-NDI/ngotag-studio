@@ -1,5 +1,5 @@
 {
-    "family": "DEV-FRONTEND_UI_TASKDEF",
+    "family": "	QA-FRONTEND_UI_TASKDEF",
     "containerDefinitions": [
         {
             "name": "frontend_ui",
@@ -28,7 +28,7 @@
                 "logDriver": "awslogs",
                 "options": {
                     "awslogs-create-group": "true",
-                    "awslogs-group": "/ecs/DEV-FRONTEND_UI_TASKDEF",
+                    "awslogs-group": "/ecs/	QA-FRONTEND_UI_TASKDEF",
                     "awslogs-region": "ap-southeast-1",
                     "awslogs-stream-prefix": "ecs"
                 },
