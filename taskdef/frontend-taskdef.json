@@ -7,10 +7,12 @@
             "cpu": 1024,
             "memory": 2048,
             "portMappings": [
-                {
+                { 
+									  "name": "frontend-port",
                     "containerPort": 8085,
                     "hostPort": 8085,
-                    "protocol": "tcp"
+                    "protocol": "tcp",
+                    "appProtocol": "http"
                 }
             ],
             "essential": true,
