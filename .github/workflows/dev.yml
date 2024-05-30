@@ -1,4 +1,4 @@
-name: Build and Deploy Node.js App to ECS
+name: Build and Deploy App to ECS
 
 on:
   push:
