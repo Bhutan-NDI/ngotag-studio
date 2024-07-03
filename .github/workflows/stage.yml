@@ -39,16 +39,16 @@ jobs:
 
       - name: Create .env file
         run: |
-         echo "PUBLIC_BASE_URL=${{ secrets.QA_PUBLIC_BASE_URL }}" > .env
-         echo "PUBLIC_CRYPTO_PRIVATE_KEY=${{ secrets.QA_PUBLIC_CRYPTO_PRIVATE_KEY }}" >> .env
+         echo "PUBLIC_BASE_URL=${{ secrets.STAGE_PUBLIC_BASE_URL }}" > .env
+         echo "PUBLIC_CRYPTO_PRIVATE_KEY=${{ secrets.STAGE_PUBLIC_CRYPTO_PRIVATE_KEY }}" >> .env
          echo "PUBLIC_PLATFORM_NAME=${{ secrets.PUBLIC_PLATFORM_NAME }}" >> .env
-         echo "PUBLIC_PLATFORM_LOGO=${{ secrets.QA_PUBLIC_PLATFORM_LOGO }}" >> .env
+         echo "PUBLIC_PLATFORM_LOGO=${{ secrets.STAGE_PUBLIC_PLATFORM_LOGO }}" >> .env
          echo "PUBLIC_POWERED_BY=${{ secrets.PUBLIC_POWERED_BY }}" >> .env
-         echo "PUBLIC_PLATFORM_WEB_URL=${{ secrets.QA_PUBLIC_PLATFORM_WEB_URL }}" >> .env
+         echo "STAGE_PUBLIC_PLATFORM_WEB_URL=${{ secrets.STAGE_PUBLIC_PLATFORM_WEB_URL }}" >> .env
          echo "PUBLIC_POWERED_BY_URL=${{ secrets.PUBLIC_POWERED_BY_URL }}" >> .env
          echo "PUBLIC_PLATFORM_SUPPORT_EMAIL=${{ secrets.PUBLIC_PLATFORM_SUPPORT_EMAIL }}" >> .env
          echo "PUBLIC_SHOW_NAME_AS_LOGO=${{ secrets.PUBLIC_SHOW_NAME_AS_LOGO }}" >> .env
-         echo "PUBLIC_ALLOW_DOMAIN=${{ secrets.QA_PUBLIC_ALLOW_DOMAIN }}" >> .env
+         echo "PUBLIC_ALLOW_DOMAIN=${{ secrets.STAGE_PUBLIC_ALLOW_DOMAIN }}" >> .env
         
 
       - name: Build, tag, and push image to Amazon ECR

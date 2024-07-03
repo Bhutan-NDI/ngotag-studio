@@ -1,14 +1,15 @@
 ---
 import LayoutCommon from '../app/LayoutCommon.astro';
 import PublicNavbar from '../commonComponents/PublicNavbar.astro';
+import SignInUser from '../components/Authentication/SignInUser';
 import { envConfig } from '../config/envConfig';
-const cookie = Astro.cookies.get("platform-data").value;
+const cookie = Astro.cookies.get("platform-data")?.value;
 const env = import.meta.env || process.env;
 
 ---
 
 <LayoutCommon>
-	<div class="flex flex-col min-h-screen bg-white dark:bg-gray-900 -z-10">
+	<!-- <div class="flex flex-col min-h-screen bg-white dark:bg-gray-900 -z-10">
 		<header>
 			<PublicNavbar limitedWidth={true} />
 		</header>
@@ -1298,5 +1299,7 @@ const env = import.meta.env || process.env;
 				</div>
 			</footer>
 		</main>
-	</div>
+	</div> -->
+	<SignInUser client:visible/>
 </LayoutCommon>
+
