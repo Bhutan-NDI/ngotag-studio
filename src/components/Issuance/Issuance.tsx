@@ -1,12 +1,11 @@
-'use client';
 
 import * as Yup from 'yup';
 
 import { Alert, Button, Card } from 'flowbite-react';
 import { Field, FieldArray, Form, Formik } from 'formik';
-import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
-import { getFromLocalStorage, removeFromLocalStorage, setToLocalStorage } from '../../api/Auth';
-import React, { useEffect, useState } from 'react';
+import { apiStatusCodes, CREDENTIAL_CONTEXT_VALUE, storageKeys, proofPurpose } from '../../config/CommonConstant';
+import { getFromLocalStorage, removeFromLocalStorage } from '../../api/Auth';
+import { useEffect, useState } from 'react';
 import BackButton from '../../commonComponents/backbutton';
 import type { AxiosResponse } from 'axios';
 import BreadCrumbs from '../BreadCrumbs';
@@ -15,13 +14,17 @@ import { issueCredential } from '../../api/issuance';
 import { pathRoutes } from '../../config/pathRoutes';
 import { AlertComponent } from '../AlertComponent';
 import type {
-	Attribute,
+	IAttribute,
 	DataTypeAttributes,
 	IssuanceFormPayload,
 	SchemaDetails,
 	SelectedUsers,
+	W3cSchemaDetails,
 } from './interface';
 import SummaryCard from '../../commonComponents/SummaryCard';
+import React from 'react';
+import { getOrganizationById } from '../../api/organization';
+import { DidMethod, CredentialType, SchemaTypeValue, ProofType } from '../../common/enums';
 
 const IssueCred = () => {
 	const [schemaLoader, setSchemaLoader] = useState<boolean>(true);
@@ -32,36 +35,107 @@ const IssueCred = () => {
 		schemaId: '',
 		credDefId: '',
 	});
+	const [w3cSchemaDetails, setW3CSchemaDetails] = useState<W3cSchemaDetails>({
+		schemaName: '',
+		version: '',
+		schemaId: '',
+		w3cAttributes:[],
+		issuerDid:''
+	});
 	const [issuanceFormPayload, setIssuanceFormPayload] = useState<
 		IssuanceFormPayload[]
 	>([]);
 	const [issuanceLoader, setIssuanceLoader] = useState<boolean>(false);
 	const [failure, setFailure] = useState<string | null>(null);
 	const [schemaAttributesDetails, setSchemaAttributesDetails] = useState<
-		Attribute[]
+	IAttribute[]
 	>([]);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [w3cSchema, setW3CSchema]= useState<boolean>(false);
+	const [credentialType, setCredentialType] = useState<CredentialType>();
+	const [schemaType, setSchemaType] = useState<SchemaTypeValue>();
+	const [orgDid, setOrgDid]= useState<string>('');
 
-	useEffect(() => {
-		getSchemaAndUsers();
-		getSchemaDetails();
-		return () => setUserLoader(false);
-	}, []);
+  useEffect(() => {
+       fetchOrganizationDetails();
+    return () => setUserLoader(false);
+  }, []); 
 
-	const getSchemaAndUsers = async () => {
-		const credDefId = await getFromLocalStorage(storageKeys.CRED_DEF_ID);
-		const schemaId = await getFromLocalStorage(storageKeys.SCHEMA_ID);
-		const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+	const fetchOrganizationDetails = async () => {
+		try{
+			const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+			if (!orgId) return;
+			const response = await getOrganizationById(orgId);
+			const { data } = response as AxiosResponse;
+			if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+				const did = data?.data?.org_agents?.[0]?.orgDid;
+				
+				if (did?.includes(DidMethod.POLYGON)) {
+					setW3CSchema(true);
+					setCredentialType(CredentialType.JSONLD);
+					setSchemaType(SchemaTypeValue.POLYGON)
+					await getSchemaAndUsers(true)
+					setOrgDid(did);
+				}
+				else if (did?.includes(DidMethod.KEY) || did?.includes(DidMethod.WEB)) {
+					setW3CSchema(true);
+					setSchemaType(SchemaTypeValue.NO_LEDGER)
+					setCredentialType(CredentialType.JSONLD);
+					await getSchemaAndUsers(true)
+					setOrgDid(did);
+				}
+				else if (did?.includes(DidMethod.INDY)) {
+					setW3CSchema(false);
+					setCredentialType(CredentialType.INDY);	
+					await getSchemaAndUsers(false)
+				}
+			}
+		} catch(error){
+			console.log('Error in getSchemaAndUsers:', error);
+			setFailure('Error fetching schema and users');
+		}
+		
+	};
+	const getSchemaAndUsers = async (w3cSchema: boolean) => {
+		try {
+			if (!w3cSchema) {
+				const credDefId = await getFromLocalStorage(storageKeys.CRED_DEF_ID);
+				const schemaId = await getFromLocalStorage(storageKeys.SCHEMA_ID);
+				const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+	
+				createSchemaPayload(schemaId, credDefId);
+				setUserLoader(true);
+				const selectedUsers = await getSelectedUsers();
+				const attributes = await getSchemaDetails(w3cSchema);
+				if (attributes && attributes?.length) {
+					createIssuanceForm(selectedUsers, attributes, credDefId, orgId);
+				} else {
+					setFailure('Attributes are not available');
+				}
+			}
+			if (w3cSchema) {
+				const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+				const getW3cSchemaDetails = await getFromLocalStorage(storageKeys.W3C_SCHEMA_DETAILS);		
+				const parsedW3cSchemaDetails = JSON.parse(getW3cSchemaDetails);
 
-		createSchemaPayload(schemaId, credDefId);
-		setUserLoader(true);
-		const selectedUsers = await getSelectedUsers();
-		const attributes = await getSchemaDetails();
-		if (attributes && attributes?.length) {
-			createIssuanceForm(selectedUsers, attributes, credDefId, orgId);
-		} else {
-			setFailure('Attributes are not available');
+				const schemaId = parsedW3cSchemaDetails?.schemaId;
+				createW3cSchemaPayload(schemaId, parsedW3cSchemaDetails);
+				
+				setUserLoader(true);
+				const selectedUsers = await getSelectedUsers();
+
+				const attributes = parsedW3cSchemaDetails?.attributes;
+				
+				if (attributes && attributes?.length) {
+					createW3cIssuanceForm(selectedUsers, attributes, orgId);
+				} else {
+					setFailure('Attributes are not available');
+				}
+			}
+		} catch (error) {
+			console.error('Error in getSchemaAndUsers:', error);
+			setFailure('Error fetching schema and users');
 		}
 	};
 
@@ -70,22 +144,21 @@ const IssueCred = () => {
 		attributes: DataTypeAttributes[],
 		credDefId: string,
 		orgId: string,
-	) => {
-		
+     	) => {
 		const credentialData = selectedUsers.map((user) => {
 			const attributesArray = attributes.map((attr) => ({
 				name: attr.attributeName,
 				value: '',
-				dataType: attr?.schemaDataType,				
-				isRequired: attr.isRequired
+				dataType: attr?.schemaDataType,
+				isRequired: attr.isRequired,
 			}));
-	
+
 			return {
 				connectionId: user.connectionId,
 				attributes: attributesArray,
 			};
 		});
-	
+
 		const issuancePayload = {
 			credentialData,
 			credentialDefinitionId: credDefId,
@@ -95,54 +168,99 @@ const IssueCred = () => {
 		setIssuanceFormPayload(issuancePayload);
 		setUserLoader(false);
 	};
-	
+
+	const createW3cIssuanceForm = (
+		selectedUsers: SelectedUsers[],
+		attributes: DataTypeAttributes[],
+		orgId: string,
+     	) => {
+		const credentialData =  selectedUsers.map((user) => {
+			
+			const attributesArray = attributes.length > 0 && attributes.map((attr) => ({
+				name: attr.attributeName,
+				value: '',
+				dataType: attr?.schemaDataType,
+				isRequired: attr.isRequired,
+			}));
+
+			return {
+				connectionId: user.connectionId,
+				attributes: attributesArray,
+			};
+		});
+
+		const issuancePayload = {
+			credentialData,
+			orgId,
+		};
+
+		setIssuanceFormPayload(issuancePayload);
+		setUserLoader(false);
+	};
+
 	const createAttributeValidationSchema = (
 		name: string,
 		value: string,
-		isRequired: boolean
+		isRequired: boolean,
 	) => {
-		let attributeSchema = Yup.string();;
+		let attributeSchema = Yup.string();
 
 		if (name) {
 			name = name
 				.split('_')
-				.map(item => item.charAt(0).toUpperCase() + item.slice(1))
+				.map((item) => item.charAt(0).toUpperCase() + item.slice(1))
 				.join(' ');
 		}
-	
+
 		if (isRequired) {
 			if (!value) {
 				attributeSchema = Yup.string().required(`${name} is required`);
 			}
 		}
-		
+
 		return Yup.object().shape({
 			value: attributeSchema,
 		});
 	};
 
 	const validationSchema = Yup.object().shape({
-        credentialData: Yup.array().of(
-            Yup.object().shape({
+		credentialData: Yup.array().of(
+			Yup.object().shape({
 				attributes: Yup.array().of(
-                    Yup.lazy((attr) => {						
-						return createAttributeValidationSchema(attr?.name, attr?.value, attr?.isRequired)
+					Yup.lazy((attr) => {
+						return createAttributeValidationSchema(
+							attr?.name,
+							attr?.value,
+							attr?.isRequired,
+						);
 					}),
-                ),
-            }),
-        ),
-    });
+				),
+			}),
+		),
+	});
 
-
-	const getSchemaDetails = async (): Promise<DataTypeAttributes[] | null> => {
-		const schemaAttributes = await getFromLocalStorage(storageKeys.SCHEMA_ATTR);
-
-		const parsedSchemaAttributes = JSON.parse(schemaAttributes) || [];
-		
-		setSchemaAttributesDetails(parsedSchemaAttributes?.attribute);
-
-		return parsedSchemaAttributes.attribute;
-	};
+	const getSchemaDetails = async (w3cSchema: boolean) => {
+		try {
+		  if (!w3cSchema) {
+			const schemaAttributes = await getFromLocalStorage(storageKeys.SCHEMA_ATTR);
+	  
+			let parsedSchemaAttributes = [];
+			if (schemaAttributes) {
+			  try {
+				parsedSchemaAttributes = JSON.parse(schemaAttributes);
+			  } catch (e) {
+			  }
+			}
+			setSchemaAttributesDetails(parsedSchemaAttributes?.attribute);
+			return parsedSchemaAttributes?.attribute || null;
+		  }
+	  
+		} catch (error) {
+		  console.error('Error in getSchemaAndUsers:', error);
+		  setFailure('Error fetching schema and users');
+		}
+		return null;
+	  };
 
 	const createSchemaPayload = async (schemaId: string, credDefId: string) => {
 		if (schemaId) {
@@ -154,36 +272,107 @@ const IssueCred = () => {
 			setSchemaLoader(false);
 		}
 	};
+	const createW3cSchemaPayload = async (schemaId: string, parsedW3cSchemaDetails: any) => {
+		if (schemaId) {
 
-	const getSelectedUsers = async (): Promise<SelectedUsers[]> => {
-		const selectedUsers = await getFromLocalStorage(storageKeys.SELECTED_USER);
-		return JSON.parse(selectedUsers);
+			if (parsedW3cSchemaDetails) {
+				setW3CSchemaDetails(parsedW3cSchemaDetails);
+				
+				setSchemaLoader(false);
+
+			}
+		}
 	};
 
-	const handleSubmit = async (values: IssuanceFormPayload) => {
-		const issuancePayload = {
-            credentialData: values.credentialData.map(item => {
-				return {
-					...item,
-					attributes: item.attributes.map(attr => ({
-						name: attr.name,
-						value: attr.value.toString()
-					}))
-				}
-			}),
-            credentialDefinitionId: values.credentialDefinitionId,
-            orgId: values.orgId
-        };
+const getSelectedUsers = async (): Promise<SelectedUsers[]> => {
+		try {
+		  const selectedUsers = await getFromLocalStorage(storageKeys.SELECTED_USER);
+		  if (!selectedUsers) {
+			return [];
+		  }
+		  return JSON.parse(selectedUsers);
+		} catch (error) {
+		  console.error("Error parsing selectedUsers:", error);
+		  return [];
+		}
+	  };
 
+
+	const handleSubmit = async (values: IssuanceFormPayload) => {
+	
+		let issuancePayload;
+	
+		if (!w3cSchema) { 
+			issuancePayload = {
+				credentialData: values.credentialData.map((item) => {				
+					return {
+						...item,
+						attributes: item?.attributes?.map((attr) => ({
+							name: attr.name,
+							value: attr.value.toString(),
+						})),
+					};
+				}),
+				
+				credentialDefinitionId: values.credentialDefinitionId, 
+				orgId: values.orgId,
+			};
+		} 
+		if(w3cSchema) { 
+			issuancePayload = {
+				credentialData: values?.credentialData.map((item) => {
+					return {
+						connectionId: item.connectionId,
+						credential: {
+							"@context": [
+								CREDENTIAL_CONTEXT_VALUE,
+								w3cSchemaDetails.schemaId
+							],
+							"type": [
+								"VerifiableCredential",
+								w3cSchemaDetails.schemaName
+							],
+							issuer: {
+								"id": orgDid
+							},
+							issuanceDate: new Date().toISOString(),
+							//FIXME: Logic for passing default value as 0 for empty value of number dataType attributes.
+							credentialSubject: item?.attributes?.reduce((acc, attr) => {
+								
+								if (attr.dataType === 'number' && (attr.value === '' || attr.value === null)) {
+									
+									acc[attr.name] = 0;
+								} else if (attr.dataType === 'string' && attr.value === '') {
+								
+									acc[attr.name] = '';
+								} else if (attr.value !== null) {
+									
+									acc[attr.name] = attr.value;
+								}
+								return acc;
+							}, {}),
+						},
+
+						options: {
+							proofType: schemaType=== SchemaTypeValue.POLYGON ? ProofType.polygon : ProofType.no_ledger,
+							proofPurpose: proofPurpose
+						}
+					};
+				}),
+				orgId: values.orgId,
+			};
+			
+			}
+		
 		const convertedAttributesValues = {
 			...issuancePayload,
 		};
-	
+
 		setIssuanceLoader(true);
-		const issueCredRes = await issueCredential(convertedAttributesValues);
+		const issueCredRes = await issueCredential(convertedAttributesValues, credentialType);
 	
 		const { data } = issueCredRes as AxiosResponse;
-	
+
 		if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
 			setSuccess(data?.message);
 			window.location.href = `${pathRoutes.organizations.issuedCredentials}`;
@@ -194,7 +383,7 @@ const IssueCred = () => {
 			setIssuanceLoader(false);
 		}
 	};
-	
+
 	return (
 		<div className="px-4 pt-2">
 			<div className="mb-4 col-span-full xl:mb-2">
@@ -214,15 +403,27 @@ const IssueCred = () => {
 					Issuance
 				</h1>
 			</div>
-			{!schemaLoader && (
-				<SummaryCard
-					schemaId={schemaDetails.schemaId}
-					schemaName={schemaDetails.schemaName}
-					version={schemaDetails.version}
-					credDefId={schemaDetails.credDefId}
-					hideCredDefId={false}
-				/>
-			)}
+			
+  {!schemaLoader && !w3cSchema ? (
+                                
+								<SummaryCard
+                                    schemaName={schemaDetails.schemaName}
+                                    schemaId={schemaDetails.schemaId}
+                                    version={schemaDetails.version}
+                                    credDefId={schemaDetails.credDefId}
+					                hideCredDefId={false}
+
+                                />
+                            ) : (
+                                <SummaryCard
+                                    schemaName={w3cSchemaDetails.schemaName}
+                                    schemaId={w3cSchemaDetails.schemaId}
+                                    version={w3cSchemaDetails.version}
+					                hideCredDefId={false}
+
+                                />
+                            )}
+
 			{userLoader ? (
 				<div className="flex items-center justify-center mb-4">
 					<CustomSpinner />
@@ -237,7 +438,7 @@ const IssueCred = () => {
 							validationSchema={validationSchema}
 							onSubmit={handleSubmit}
 						>
-							{({ values, errors, touched, isValid }) => (
+							{({ values, errors, touched }) => (
 								<Form>
 									{failure && (
 										<div className="pt-1 pb-1">
@@ -248,155 +449,151 @@ const IssueCred = () => {
 											</Alert>
 										</div>
 									)}
-									<FieldArray name="issuanceFormPayload">
+									<FieldArray name="credentialData">
 										{(arrayHelpers) => (
 											<>
-												{values?.credentialData.map((user, index) => (
-													<div key={user.connectionId}>
-														<Card
-															className="my-5"
-															style={{
-																maxWidth: '100%',
-																maxHeight: '100%',
-																overflow: 'auto',
-															}}
-														>
-															<div className="flex justify-between">
-																<div className="flex">
-																	<h5 className="text-xl font-bold leading-none dark:text-white flex flex-wrap">
-																		Connection Id
-																	</h5>
-																	<span className="text-xl font-bold leading-none dark:text-white pl-1">
-																		:
-																	</span>
-																	<p className="dark:text-white pl-1">
-																		{user?.connectionId}
-																	</p>
-																</div>
-																{values.credentialData.length > 1 && (
-																	<div
-																		key={index}
-																		className="sm:w-2/12 text-red-600 flex justify-end"
-																	>
-																		<Button
-																			data-testid="deleteBtn"
-																			type="button"
-																			color="danger"
-																			className={` dark:bg-gray-700 flex justify-end focus:ring-0`}
-																			onClick={async () => {
-																				const data =
-																					issuanceFormPayload?.credentialData;
-																				const findIndex = data.findIndex(
-																					(item) =>
-																						item.connectionId ===
-																						user.connectionId,
-																				);
-																				data.splice(findIndex, 1);
-																				const issuancePayload = {
-																					...issuanceFormPayload,
-																					credentialData: data,
-																				};
-																				setIssuanceFormPayload(issuancePayload);
-																				window.location.reload();
+												{values?.credentialData?.length > 0 && values?.credentialData?.map((user, index) => {
+													const attributes = w3cSchema ? issuanceFormPayload?.credentialData?.[0].attributes : user?.attributes;
 
-																				await setToLocalStorage(storageKeys.SELECTED_USER, data);	
-																		  
-																			}}
-																		>
-																			<svg
-																				xmlns="http://www.w3.org/2000/svg"
-																				fill="none"
-																				viewBox="0 0 24 24"
-																				strokeWidth={1.5}
-																				stroke="currentColor"
-																				className="w-6 h-6"
-																			>
-																				<path
-																					strokeLinecap="round"
-																					strokeLinejoin="round"
-																					d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
-																				/>
-																			</svg>
-																		</Button>
+													return (
+														<div key={user.connectionId}>
+															<Card
+																className="my-5"
+																style={{
+																	maxWidth: '100%',
+																	maxHeight: '100%',
+																	overflow: 'auto',
+																}}
+															>
+																<div className="flex justify-between">
+																	<div className="flex">
+																		<h5 className="text-xl font-bold leading-none dark:text-white flex flex-wrap">
+																			Connection Id
+																		</h5>
+																		<span className="text-xl font-bold leading-none dark:text-white pl-1">
+																			:
+																		</span>
+																		<p className="dark:text-white pl-1">
+																			{user?.connectionId}
+																		</p>
 																	</div>
-																)}
-															</div>
+																	{values.credentialData.length > 1 && (
+																		<div
+																			key={index}
+																			className="sm:w-2/12 text-red-600 flex justify-end"
+																		>
+																			<Button
+																				data-testid="deleteBtn"
+																				color="danger"
+																				type="button"
+																				className={` dark:bg-gray-700 flex justify-end focus:ring-0`}
+																				onClick={() => {
+																					arrayHelpers.remove(index);
+																				}}
+																			>
+																				<svg
+																					xmlns="http://www.w3.org/2000/svg"
+																					fill="none"
+																					viewBox="0 0 24 24"
+																					strokeWidth={1.5}
+																					stroke="currentColor"
+																					className="w-6 h-6"
+																				>
+																					<path
+																						strokeLinecap="round"
+																						strokeLinejoin="round"
+																						d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+																					/>
+																				</svg>
+																			</Button>
+																		</div>
+																	)}
+																</div>
 
-															<h3 className="dark:text-white">Attributes</h3>
-															<div className="container mx-auto pr-2">
-																<div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
-																	{schemaAttributesDetails &&
-																		schemaAttributesDetails?.length > 0 &&
-																		schemaAttributesDetails?.map(
-																			(attr, attrIndex) => (
-																				<div key={attr.attributeName}>
-																					<div
-																						key={attr?.attributeName}
-																						className="flex"
+																<h3 className="dark:text-white">Attributes</h3>
+																<div className="container mx-auto pr-2">
+																	<div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-2">
+																		
+																		{attributes?.map((attr, attrIndex) => {
+
+																			return (
+																			<div
+																				key={`${user.connectionId}-${attr.name}-${attrIndex}`}
+																			>
+																				<div key={attr?.name} className="flex">
+																					<label
+																						htmlFor={`credentialData.${index}.attributes.${attrIndex}.value`}
+																						className="dark:text-white w-2/5 pr-3 flex justify-end items-center font-light"
 																					>
-																						<label
-																							htmlFor={`values.credentialData.${index}.attributes.${attrIndex}.value`}
-																							className="dark:text-white w-2/5 pr-3 flex justify-end items-center font-light"
-																						>
-																							<div className="flex items-center word-break-word text-end">
-																								<Name attr={attr} />
-																								{attr.isRequired && (
-																									<span className="text-red-500">
-																										*
-																									</span>
-																								)}{' '}
-																								:
-																							</div>
-																						</label>
-																						<div className="w-3/5">
-																							<Field
-																								type={
-																									attr?.schemaDataType ===
-																									'date'
-																										? 'date'
-																										: attr?.schemaDataType
-																								}
-																								id={`credentialData.${index}.attributes.${attrIndex}.value`}
-																								name={`credentialData.${index}.attributes.${attrIndex}.value`}
-																								className="bg-gray-50 relative border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
-																								validate={(value) => {
-																									try {
-																										Yup.reach(
-																											validationSchema,
-																											`credentialData.${index}.attributes.${attrIndex}.value`,
-																										).validateSync(value, {
-																											abortEarly: false,
-																										});
-																									} catch (error) {
-																										return error.message;
-																									}
-																								}}
+																						<div className="flex items-center word-break-word text-end">
+																							<Name
+																								attr={attr?.name}
 																							/>
-																							{errors?.credentialData?.[index]
-																								?.attributes?.[attrIndex]
-																								?.value &&
-																								touched?.credentialData?.[index]
-																									?.attributes?.[attrIndex]
-																									?.value && (
-																									<div className="text-red-500 absolute text-xs word-break-word">
-																										{
-																											errors?.credentialData?.[
-																												index
-																											]?.attributes?.[attrIndex]
-																												?.value
-																										}
-																									</div>
-																								)}{' '}
+																							{attr.isRequired && (
+																								<span className="text-red-500">
+																									*
+																								</span>
+																							)}{' '}
+																							:
 																						</div>
+																					</label>
+																					<div className="w-3/5">
+																						<Field
+																							type={
+																								attr?.dataType === 'date'
+																									? 'date'
+																									: attr?.dataType
+																							}
+																							id={`credentialData.${index}.attributes.${attrIndex}.value`}
+																							name={`credentialData.${index}.attributes.${attrIndex}.value`}
+																							className="bg-gray-50 relative border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
+																							validate={(value: any) => {
+																								try {
+																									Yup.reach(
+																										validationSchema,
+																										`credentialData.${index}.attributes.${attrIndex}.value`,
+																									).validateSync(value, {
+																										abortEarly: false,
+																									});
+																								} catch (error) {
+																									return error.message;
+																								}
+																							}}
+																						/>
+																						{errors?.credentialData &&
+																							errors?.credentialData?.[index] &&
+																							errors?.credentialData[index]
+																								?.attributes &&
+																							errors?.credentialData[index]
+																								?.attributes[attrIndex] &&
+																							errors?.credentialData[index]
+																								?.attributes[attrIndex]?.value &&
+																							touched?.credentialData &&
+																							touched?.credentialData[index]
+																								?.attributes &&
+																							touched?.credentialData[index]
+																								?.attributes[attrIndex]
+																								?.value && (
+																								<div className="text-red-500 absolute text-xs word-break-word">
+																									{
+																										errors?.credentialData?.[
+																											index
+																										]?.attributes?.[attrIndex]
+																											?.value
+																									}
+																								</div>
+																							)}{' '}
 																					</div>
 																				</div>
-																			),
-																		)}
+																			</div>
+																			)
+												})}
+																	</div>
 																</div>
-															</div>
-														</Card>
-													</div>
-												))}
+															</Card>
+														</div>
+													)
+												})}
 											</>
 										)}
 									</FieldArray>
@@ -439,10 +636,10 @@ const IssueCred = () => {
 	);
 };
 
-const Name = (attr: { attr: any; displayName: string }) => {
+const Name = (attr: { attr: string}) => {
 	return (
 		<>
-			{attr?.attr?.displayName
+			{attr?.attr
 				?.split('_')
 				.map(
 					(item: string | any[]) =>

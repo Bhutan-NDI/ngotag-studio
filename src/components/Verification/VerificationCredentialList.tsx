@@ -1,7 +1,7 @@
-'use client';
 
 import { Alert, Button } from 'flowbite-react';
-import React, { ChangeEvent, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import type { ChangeEvent } from 'react';
 import {
 	ProofRequestState,
 	ProofRequestStateUserText,
@@ -24,7 +24,7 @@ import RoleViewButton from '../RoleViewButton';
 import type { TableData } from '../../commonComponents/datatable/interface';
 import { dateConversion } from '../../utils/DateConversion';
 import { pathRoutes } from '../../config/pathRoutes';
-import { getFromLocalStorage, removeFromLocalStorage } from '../../api/Auth';
+import { getFromLocalStorage } from '../../api/Auth';
 import { getOrgDetails } from '../../config/ecosystem';
 import type { IConnectionListAPIParameter } from '../../api/connection';
 import SortDataTable from '../../commonComponents/datatable/SortDataTable';
@@ -324,7 +324,8 @@ const VerificationCredentialList = () => {
 	}, [listAPIParameter]);
 
 	const schemeSelection = () => {
-		window.location.href = pathRoutes.organizations.verification.schema;
+		window.location.href = pathRoutes.organizations.verification.requestProof;
+
 	};
 
 	const refreshPage = () => {

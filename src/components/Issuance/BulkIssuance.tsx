@@ -1,13 +1,13 @@
 import { Button, Card, Pagination } from 'flowbite-react';
 import React, { useEffect, useState } from 'react';
-import Select from 'react-select';
+import Select, { type SingleValue } from 'react-select';
 import {
 	DownloadCsvTemplate, getSchemaCredDef, getCsvFileData,
 	issueBulkCredential,
 	uploadCsvFile,
 } from '../../api/BulkIssuance';
 import { getFromLocalStorage, setToLocalStorage } from '../../api/Auth';
-import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
+import { apiStatusCodes, itemPerPage, storageKeys } from '../../config/CommonConstant';
 import { AlertComponent } from '../AlertComponent';
 import type { AxiosResponse } from 'axios';
 import { pathRoutes } from '../../config/pathRoutes';
@@ -16,11 +16,13 @@ import SOCKET from '../../config/SocketConfig';
 import { ToastContainer, toast } from 'react-toastify';
 import BreadCrumbs from '../BreadCrumbs';
 import BackButton from '../../commonComponents/backbutton'
-import { checkEcosystem, type ICheckEcosystem } from '../../config/ecosystem';
-import type { ICredentials, IValues, IAttributes, IUploadMessage } from './interface';
+import type { ICredentials, IAttributes, IUploadMessage } from './interface';
 import RoleViewButton from '../RoleViewButton';
 import { Features } from '../../utils/enums/features';
-import { Create, SchemaEndorsement } from './Constant';
+import { Create } from './Constant';
+import { DidMethod, SchemaTypes } from '../../common/enums';
+import type { GetAllSchemaListParameter } from '../Resources/Schema/interfaces';
+import { getAllSchemas } from '../../api/Schema';
 
 export interface SelectRef {
   clearValue(): void;
@@ -30,8 +32,8 @@ const BulkIssuance = () => {
 	const [requestId, setRequestId] = useState("");
 	const [process, setProcess] = useState<boolean>(false);
 	const [loading, setLoading] = useState<boolean>(true);
-	const [credentialOptions, setCredentialOptions] = useState([]);
-	const [credentialSelected, setCredentialSelected] = useState<string>("");	
+	const [ credentialOptionsData,  setCredentialOptionsData] = useState([]);
+	const [credentialSelected, setCredentialSelected] = useState<ICredentials | null>();	
 	const [isFileUploaded, setIsFileUploaded] = useState(false);
 	const [uploadedFileName, setUploadedFileName] = useState('');
 	const [uploadedFile, setUploadedFile] = useState(null);
@@ -40,7 +42,19 @@ const BulkIssuance = () => {
 	const [uploadMessage, setUploadMessage] = useState<IUploadMessage | null>(null)
 	const [success, setSuccess] = useState<string | null>(null);
 	const [failure, setFailure] = useState<string | null>(null);
-	const [isEcosystemData, setIsEcosystemData] = useState<ICheckEcosystem>();
+	const [mounted, setMounted] = useState<boolean>(false)
+	const [schemaType, setSchemaType]= useState<SchemaTypes>();
+	const [selectedTemplate, setSelectedTemplate] = useState<any>();
+	const [isAllSchema, setIsAllSchema] = useState<boolean>();
+	const [schemaListAPIParameters, setSchemaListAPIParameters] = useState({
+		itemPerPage: itemPerPage,
+		page: 1,
+		search: '',
+		sortBy: 'id',
+		sortingOrder: 'desc',
+		allSearch: '',
+	});
+
 
 	const onPageChange = (page: number) => {
 		setCurrentPage({
@@ -55,28 +69,107 @@ const BulkIssuance = () => {
 	};
 	const [currentPage, setCurrentPage] = useState(initialPageState);
 
-	const getSchemaCredentials = async () => {
+	const [searchValue, setSearchValue] = useState('');
+
+	const onInputChange = (inputValue: string) => {
+		setSearchValue(inputValue); 
+		setSchemaListAPIParameters(prevParams => {
+			const updatedParams = {
+				...prevParams,
+				allSearch: inputValue,
+			};
+			getSchemaCredentials(updatedParams);
+			return updatedParams;
+		});
+	};
+
+	const getSchemaCredentials = async (schemaListAPIParameters: GetAllSchemaListParameter) => {
 		try {
 			setLoading(true);
 			const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
-			if (orgId) {
-				const response = await getSchemaCredDef();
+
+			const orgDid = await getFromLocalStorage(storageKeys.ORG_DID);
+
+			const isAllSchemaSelectedFlag = await getFromLocalStorage(storageKeys.ALL_SCHEMAS)
+			if(isAllSchemaSelectedFlag === `false` || !isAllSchemaSelectedFlag){
+				setIsAllSchema(false)
+			}
+			else if(isAllSchemaSelectedFlag ==='true'){
+				setIsAllSchema(true)
+			}
+		
+			let currentSchemaType = schemaType;
+	
+			if (orgDid?.includes(DidMethod.POLYGON) || orgDid?.includes(DidMethod.KEY) || orgDid?.includes(DidMethod.WEB)) {
+				currentSchemaType = SchemaTypes.schema_W3C;
+			} else if (orgDid?.includes(DidMethod.INDY)) {
+				currentSchemaType = SchemaTypes.schema_INDY;
+			}
+
+			let dropDownOptions;
+			setSchemaType(currentSchemaType); 
+			if ((currentSchemaType === SchemaTypes.schema_INDY &&  isAllSchema) || (currentSchemaType && orgId && !isAllSchema)) {
+				const response = await getSchemaCredDef(currentSchemaType); 
 				const { data } = response as AxiosResponse;
 
 				if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-					const credentialDefs = data.data;
+					const { data:  credentialDefsData } = data;
 
-					const options = credentialDefs.map(
-						(credDef: ICredentials) => ({
-							value: credDef.credentialDefinitionId,
-							label: `${credDef.schemaName} [${credDef.schemaVersion}] - (${credDef.credentialDefinition})`,
-							schemaName: credDef.schemaName,
-							schemaVersion: credDef.schemaVersion,
-							credentialDefinition: credDef.credentialDefinition,
-							schemaAttributes: credDef.schemaAttributes && typeof credDef.schemaAttributes === "string" && JSON.parse(credDef.schemaAttributes)
+					dropDownOptions =  credentialDefsData.map(
+						({
+							schemaName,
+							schemaVersion,
+							credentialDefinition,
+							credentialDefinitionId,
+							schemaIdentifier,
+							schemaAttributes
+						}: ICredentials) => ({
+							value: schemaType===SchemaTypes.schema_INDY ? credentialDefinitionId : schemaVersion,
+							label: `${schemaName} [${schemaVersion}]${currentSchemaType === SchemaTypes.schema_INDY ? ` - (${credentialDefinition})` : ''}`,
+							schemaName: schemaName,
+							schemaVersion: schemaVersion,
+							credentialDefinition: credentialDefinition,
+		                    credentialDefinitionId: credentialDefinitionId,
+							schemaIdentifier: schemaIdentifier,
+							schemaAttributes: schemaAttributes && typeof schemaAttributes === "string" && JSON.parse(schemaAttributes)
 						}),
 					);
-					setCredentialOptions(options);
+					
+					 setCredentialOptionsData(dropDownOptions);
+				} else {
+					setUploadMessage({message: response as string, type: "failure"});
+					setSuccess(null)
+					setFailure(null)
+				}
+				setLoading(false);
+			}
+			else if (currentSchemaType === SchemaTypes.schema_W3C && orgId && isAllSchema) {
+
+				
+				const response = await getAllSchemas(schemaListAPIParameters,currentSchemaType); 
+					const { data } = response as AxiosResponse;
+					
+
+					if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+						const  credentialDefsData = data.data.data;
+						
+
+						dropDownOptions =  credentialDefsData.map(({
+							name,
+							version,
+							schemaLedgerId,
+							attributes,
+							type
+						} : ICredentials) => ({
+							value:  version,
+							label: `${name} [${version}]`,
+							schemaName: name,
+							type:type,
+							schemaVersion: version,
+							schemaIdentifier: schemaLedgerId,
+							attributes: Array.isArray(attributes) ? attributes : (attributes ? JSON.parse(attributes) : []),
+						}));	
+					 setCredentialOptionsData(dropDownOptions);
 				} else {
 					setUploadMessage({message: response as string, type: "failure"});
 					setSuccess(null)
@@ -85,25 +178,33 @@ const BulkIssuance = () => {
 				setLoading(false);
 			}
 		} catch (error) {
-			setUploadMessage({message: error as string, type: "failure"});
+			setUploadMessage({ message: (error as Error).message, type: "failure" });
 			setSuccess(null)
 			setFailure(null)
 		}
 	};
 
+
+	const onSelectChange = (newValue: SingleValue<ICredentials | undefined>) => {
+		const value = newValue as ICredentials | undefined;
+		if (schemaType === SchemaTypes.schema_INDY) {
+			setSelectedTemplate(value?.credentialDefinitionId);
+			setCredentialSelected(value ?? null);
+		} else if (schemaType === SchemaTypes.schema_W3C) {
+			setCredentialSelected(value ?? null);
+			setSelectedTemplate(value?.schemaIdentifier)
+		}
+	};
+
+
 	useEffect(() => {
-		getSchemaCredentials();
-		(async () => {
-			try {
-				const data: ICheckEcosystem = await checkEcosystem();				
-				setIsEcosystemData(data);
-			} catch (error) {
-				console.log(error);
-			}
-		})();
+		getSchemaCredentials(schemaListAPIParameters);
+	}, [isAllSchema]);
+	useEffect(() => {	
+		setMounted(true);
 	}, []);
 
-
+	
 	const downloadFile = (url: string, fileName: string) => {
 		const link = document.createElement('a');
 		link.href = url;
@@ -118,10 +219,9 @@ const BulkIssuance = () => {
 		if (credentialSelected) {
 			try {
 				setProcess(true);
-
-				const response = await DownloadCsvTemplate(credentialSelected);
+				const response = await DownloadCsvTemplate(selectedTemplate, schemaType);
 				const { data } = response as AxiosResponse;
-
+				
 				if (data) {
 					const fileUrl = data;
 					if (fileUrl) {
@@ -247,7 +347,7 @@ const BulkIssuance = () => {
 			setUploadedFileName(file?.name);
 			setUploadedFile(file);
 
-			const response = await uploadCsvFile(payload, credentialSelected);
+			const response = await uploadCsvFile(payload, selectedTemplate, schemaType);
 			const { data } = response as AxiosResponse;
 
 			if (data?.statusCode === apiStatusCodes?.API_STATUS_CREATED) {
@@ -366,13 +466,13 @@ const BulkIssuance = () => {
 	
 	const handleReset = () => {
 		handleDiscardFile();
-		setCredentialSelected("");
+		setCredentialSelected(null);
 		setSuccess(null);
 		onClear()
 	};
 	const handleResetForConfirm = () => {
 		handleDiscardFile();
-		setCredentialSelected("");
+		setCredentialSelected(null);
 	};
 
 	const confirmCredentialIssuance = async () => {
@@ -406,15 +506,13 @@ const BulkIssuance = () => {
 
 	const isCredSelected = Boolean(credentialSelected);
 
-	const selectedCred: ICredentials | boolean | undefined = credentialOptions && credentialOptions.length > 0 && credentialOptions.find(
+	const selectedCred: ICredentials | boolean | undefined =  credentialOptionsData &&  credentialOptionsData.length > 0 &&  credentialOptionsData.find(
 		(item: { value: string }) =>
 			item.value &&
 			item.value === credentialSelected,
 	);
 	
-	const createSchemaTitle = isEcosystemData?.isEcosystemMember
-		? { title: 'Schema Endorsement', svg: <SchemaEndorsement/> }
-		: { title: 'Create Schema', svg: <Create/> };
+	const createSchemaTitle =  { title: 'Create Schema', svg: <Create/> };
 		
 	return (
 		<div className="px-4 pt-2">
@@ -491,7 +589,9 @@ const BulkIssuance = () => {
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
 								<div className="flex flex-col justify-between">
 									<div className="search-dropdown text-primary-700 drak:text-primary-700">
-										<Select
+										{
+											mounted ?
+											<Select
 											placeholder="Select Schema - Credential definition"
 											className="basic-single "
 											classNamePrefix="select"
@@ -500,41 +600,63 @@ const BulkIssuance = () => {
 											isRtl={false}
 											isSearchable={true}
 											name="color"
-											options={credentialOptions}
-											onChange={(value: IValues | null) => {
-												setCredentialSelected(value?.value ?? "");
-											}}
+											options={ credentialOptionsData}
+											onInputChange={onInputChange}
+											onChange={onSelectChange}
+											value={credentialOptionsData.find(option => option.value === searchValue)}
 											ref={selectInputRef}
-										/>
+										/>:
+										null
+										}
 									</div>
 									<div className="mt-4">
-										{credentialSelected && selectedCred && (
+										{credentialSelected &&(
 											<Card className='max-w-[30rem]'>
 												<div>
 													<p className="text-black dark:text-white pb-2">
 														<span className="font-semibold">Schema: </span>
-														{selectedCred?.schemaName || ""}{' '}
-														<span>[{selectedCred?.schemaVersion}]</span>
+														{credentialSelected?.schemaName || ""}{' '}
+														<span>[{credentialSelected?.schemaVersion}]</span>
 													</p>
+													{
+														schemaType === SchemaTypes.schema_INDY && 
 													<p className="text-black dark:text-white pb-2">
 														{' '}
 														<span className="font-semibold">
 															Credential Definition:
 														</span>{' '}
-														{selectedCred?.credentialDefinition}
+														{credentialSelected?.credentialDefinition}
 													</p>
+													}
+
 													<span className='text-black dark:text-white font-semibold'>Attributes:</span>
 													<div className="flex flex-wrap overflow-hidden">
-														{selectedCred?.schemaAttributes.map(
-															(element: IAttributes) => (
-																<div key={element.attributeName}>
-																	<span className="m-1 bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
-																		{element.attributeName}
-																	</span>
-																</div>
-															),
-														)}
+														{
+															!isAllSchema ? (
+																credentialSelected?.schemaAttributes?.map(
+																	(element: IAttributes) => (
+																		<div key={element.attributeName}>
+																			<span className="m-1 bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+																				{element.attributeName}
+																			</span>
+																		</div>
+																	),
+																)
+															) : (
+																credentialSelected?.attributes?.map(
+																	(element: IAttributes) => (
+																		<div key={element.attributeName}>
+																			<span className="m-1 bg-blue-100 text-blue-800 text-sm font-medium mr-2 px-2.5 py-0.5 rounded dark:bg-blue-900 dark:text-blue-300">
+																				{element.attributeName}
+																			</span>
+																		</div>
+																	),
+																)
+															)
+														
+														}
 													</div>
+													
 												</div>
 											</Card>
 										)}

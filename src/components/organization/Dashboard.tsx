@@ -1,24 +1,28 @@
 import type { OrgDashboard, Organisation } from './interfaces';
 import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
-import { getOrgDashboard, getOrganizationById } from '../../api/organization';
+import { getEcosystems, getOrgDashboard, getOrganizationById } from '../../api/organization';
 import { useEffect, useState } from 'react';
 import { Alert } from 'flowbite-react';
 import type { AxiosResponse } from 'axios';
 import BreadCrumbs from '../BreadCrumbs';
-import credIcon from '../../assets/cred-icon.svg';
-import CustomAvatar from '../Avatar';
+import CustomAvatar from '../Avatar/index';
 import CustomSpinner from '../CustomSpinner';
 import EditOrgdetailsModal from './EditOrgdetailsModal';
 import OrganizationDetails from './OrganizationDetails';
 import { Roles } from '../../utils/enums/roles';
-import schemaCard from '../../assets/schema-icon.svg';
-import userCard from '../../assets/users-icon.svg';
-import WalletSpinup from './WalletSpinup';
 import { getFromLocalStorage, setToLocalStorage } from '../../api/Auth';
 import { pathRoutes } from '../../config/pathRoutes';
-import DashboardCard from '../../commonComponents/DashboardCard';
 import { AlertComponent } from '../AlertComponent';
-import React from 'react';
+import WalletSpinup from './walletCommonComponents/WalletSpinup';
+import DashboardCard from '../../commonComponents/DashboardCard';
+import { envConfig } from '../../config/envConfig';
+
+const initialPageState = {
+	pageNumber: 1,
+	pageSize: 10,
+	total: 0,
+};
+
 
 const Dashboard = () => {
 	const [orgData, setOrgData] = useState<Organisation | null>(null);
@@ -30,9 +34,20 @@ const Dashboard = () => {
 	const [userRoles, setUserRoles] = useState<string[]>([]);
 	const [orgSuccess, setOrgSuccess] = useState<string | null>(null);
 	const [openModal, setOpenModal] = useState<boolean>(false);
+	const [currentPage, setCurrentPage] = useState(initialPageState);
+	const [ecoCount, setEcoCount] = useState(0);
+	const [error, setError] = useState<string | null>(null);
+	const [redirectToEndorsment, setRedirectToEndorsment] = useState<boolean>();
+	const [ecosystemUserRoles, setEcosystemUserRoles] = useState<string>('');
+
+
 
 	const EditOrgDetails = () => {
 		setOpenModal(true);
+	};
+
+	const deleteOrgDetails = () => {
+		window.location.href = pathRoutes.organizations.deleteOrganization
 	};
 
 	const getUserRoles = async () => {
@@ -40,11 +55,12 @@ const Dashboard = () => {
 		const roles = orgRoles.split(',');
 		setUserRoles(roles);
 	};
-
+	
 	useEffect(() => {
 		getUserRoles();
 	}, []);
 
+	
 	const fetchOrganizationDetails = async () => {
 		setLoading(true);
 		const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
@@ -52,11 +68,14 @@ const Dashboard = () => {
 		const response = await getOrganizationById(orgId as string);
 		const { data } = response as AxiosResponse;
 		setLoading(false)
-		if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-			if (data?.data?.org_agents && data?.data?.org_agents?.length > 0) {
+		if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {			
+			
+			if (data?.data?.org_agents?.length > 0 && data?.data?.org_agents[0]?.orgDid) {
 				setWalletStatus(true);
 			}
+			
 			setOrgData(data?.data);
+				
 			const organizationData = orgInfoData ? JSON.parse(orgInfoData) : {};
 			const {id, name, description, logoUrl} = data?.data || {};
 			const orgInfo = {
@@ -67,11 +86,46 @@ const Dashboard = () => {
 				...logoUrl && { logoUrl }
 			}
 			await setToLocalStorage(storageKeys.ORG_INFO, orgInfo);
+
 		} else {
 			setFailure(response as string);
 		}
 		setLoading(false);
 	};
+
+	const fetchEcosystems = async () => {
+		let organizationId = await getFromLocalStorage(storageKeys.ORG_ID);
+	  
+		if (organizationId) {
+		  const response = await getEcosystems(
+			organizationId,
+			currentPage.pageNumber,
+			currentPage.pageSize,
+			'',
+		);
+		  const { data } = response as AxiosResponse;	  
+		  if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+			setEcoCount(data?.data?.totalItems);
+			const ecosystems = data?.data?.ecosystemList;
+			let isLead = false;
+	  
+			ecosystems.forEach((ecosystem: any) => {
+			  ecosystem.ecosystemOrgs.forEach((org: any) => {
+				const role = org.ecosystemRole?.name;
+				if (role === 'Ecosystem Lead') {
+				  isLead = true;
+				}
+			  });
+			});
+			if (!isLead && ecoCount > 0) {
+			  setRedirectToEndorsment(true);
+			}
+		  } else {
+			setError(response as string);
+		  }
+		}
+	  };  
+	
 
 	const fetchOrganizationDashboard = async () => {
 		setLoading(true);
@@ -88,11 +142,12 @@ const Dashboard = () => {
 			}
 		}
 		setLoading(false);
-	};
+	};	
 
 	useEffect(() => {
 		fetchOrganizationDetails();
 		fetchOrganizationDashboard();
+		fetchEcosystems();
 	}, []);
 
 	const handleEditModalClose = () => {
@@ -116,6 +171,8 @@ const Dashboard = () => {
 	const redirectOrgUsers = () => {
 		window.location.href = pathRoutes.organizations.users;
 	};
+	
+		
 
 	return (
 		<div className="px-4 pt-2 w-full">
@@ -141,9 +198,9 @@ const Dashboard = () => {
 						<div className="items-center block sm:flex flex-wrap break-normal w-full sm:space-x-4 justify-center sm:justify-start">
 							<div>
 								{orgData?.logoUrl ? (
-									<CustomAvatar size="80" src={orgData?.logoUrl} />
+									<CustomAvatar className='text-violet11 leading-1 flex h-full w-full items-center justify-center bg-white text-[15px] font-medium' size="80px" src={orgData?.logoUrl} round />
 								) : (
-									<CustomAvatar size="90" name={orgData?.name} />
+									<CustomAvatar className='text-violet11 leading-1 flex h-full w-full items-center justify-center bg-white text-[15px] font-medium' size="80px" name={orgData?.name} round/>
 								)}
 							</div>
 							<div className="sm:w-100/12rem mt-2">
@@ -169,10 +226,14 @@ const Dashboard = () => {
 								)}
 							</div>
 						</div>
+						
+						<div className='absolute top-0 right-0 flex' >
+						
 
-						{(userRoles.includes(Roles.OWNER) ||
+						 <div>
+                             {(userRoles.includes(Roles.OWNER) ||
 							userRoles.includes(Roles.ADMIN)) && (
-							<div className="absolute top-0 right-0">
+							<div className="">
 								<button type="button">
 									<svg
 										aria-hidden="true"
@@ -193,6 +254,20 @@ const Dashboard = () => {
 								</button>
 							</div>
 						)}
+						</div>
+						<div>
+							{
+								userRoles.includes(Roles.OWNER) && (
+									<div className='ml-4'>
+										<button onClick={deleteOrgDetails}>
+										<img src="/images/delete_button_image.svg" width={20} height={20} alt="" />
+                                       </button>
+
+									</div>
+								)
+							}
+							</div>
+						</div>					
 					</div>
 
 					<EditOrgdetailsModal
@@ -209,7 +284,7 @@ const Dashboard = () => {
 				<div className="mt-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm 2xl:col-span-2 dark:border-gray-700 sm:p-6 dark:bg-gray-800">
 					<div className="grid w-full grid-cols-1 gap-4 mt-0 xl:grid-cols-3 2xl:grid-cols-3">
 						<DashboardCard
-							icon={userCard}
+							icon={'/images/users-icon.svg'}
 							backgroundColor="linear-gradient(279deg, #FFF -18.24%, #2F80ED -0.8%, #1F4EAD 61.45%)"
 							label="Users"
 							value={orgDashboard?.usersCount ?? 0}
@@ -217,19 +292,22 @@ const Dashboard = () => {
 						/>
 
 						<DashboardCard
-							icon={schemaCard}
+							icon={'/images/schema-icon.svg'}
 							classes={!walletStatus ? 'pointer-events-none' : ''}
 							backgroundColor="linear-gradient(279deg, #FFF -28.6%, #5AC2E8 21.61%, #0054FF 68.63%)"
 							label="Schemas"
 							value={orgDashboard?.schemasCount ?? 0}
 							onClickHandler={() => {
-								if (walletStatus) {
+								if (walletStatus && !redirectToEndorsment) {
 									window.location.href = pathRoutes.organizations.schemas;
+								}
+								else if(walletStatus && redirectToEndorsment) {
+									window.location.href = `${envConfig.PUBLIC_ECOSYSTEM_FRONT_END_URL}${pathRoutes.organizations.schemas}`
 								}
 							}}
 						/>
 						<DashboardCard
-							icon={credIcon}
+							icon={'/images/cred-icon.svg'}
 							backgroundColor="linear-gradient(279deg, #FFF -34.06%, #FFC968 43.71%, #FEB431 111.13%)"
 							label="Credentials"
 							value={orgDashboard?.credentialsCount ?? 0}
@@ -253,7 +331,8 @@ const Dashboard = () => {
 					</div>
 				) : (
 					walletStatus === true ? (
-						<OrganizationDetails orgData={orgData} />
+						<OrganizationDetails orgData={orgData}  />
+
 					) : (
 						(userRoles.includes(Roles.OWNER) ||
 							userRoles.includes(Roles.ADMIN)) && (

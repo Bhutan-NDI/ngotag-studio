@@ -1,8 +1,7 @@
-'use client';
 
 import { Button } from 'flowbite-react';
-import { useState } from 'react';
-import { setToLocalStorage } from '../../api/Auth';
+import { useEffect, useState } from 'react';
+import { getFromLocalStorage, setToLocalStorage } from '../../api/Auth';
 import DataTable from '../../commonComponents/datatable';
 import type { TableData } from '../../commonComponents/datatable/interface';
 import { storageKeys } from '../../config/CommonConstant';
@@ -13,6 +12,8 @@ import BackButton from '../../commonComponents/backbutton';
 import type { IConnectionList } from './interface';
 import DateTooltip from '../Tooltip';
 import { dateConversion } from '../../utils/DateConversion';
+import React from 'react';
+import { DidMethod } from '../../common/enums';
 
 const Connections = () => {
 	const [selectedConnections, setSelectedConnections] = useState<
@@ -24,6 +25,17 @@ const Connections = () => {
 		{ columnName: 'Connection ID' },
 		{ columnName: 'Created on' }
 	];
+
+const [isW3cDid, setisW3cDid] = useState<boolean>(false);
+const orgData =async () =>{
+	const orgDid = await getFromLocalStorage(storageKeys.ORG_DID);	
+	if(orgDid.includes(DidMethod.POLYGON) || orgDid.includes(DidMethod.KEY) || orgDid.includes(DidMethod.WEB)){
+		setisW3cDid(true)
+	}
+}
+useEffect(() => {
+	orgData();
+}, []);
 
 	const selectConnection = (connections: IConnectionList[]) => {
 		try {
@@ -63,6 +75,12 @@ const Connections = () => {
 		});
 		await setToLocalStorage(storageKeys.SELECTED_USER, selectedConnectionData);
 		window.location.href = `${pathRoutes.organizations.Issuance.issuance}`;
+
+		if(isW3cDid){
+			window.location.href = `${pathRoutes.organizations.Issuance.w3cIssuance}`;
+			}else {
+				window.location.href = `${pathRoutes.organizations.Issuance.issuance}`;
+			}
 	};
 
 	return (
@@ -119,7 +137,7 @@ const Connections = () => {
 							<div className="flex justify-end pt-3">
 								<Button
 									onClick={continueToIssue}
-									className='text-base text-center text-white bg-primary-700 hover:!bg-primary-800 rounded-lg hover:bg-accent-00 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"'
+									className="text-base text-center text-white bg-primary-700 hover:!bg-primary-800 rounded-lg hover:bg-accent-00 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
 								>
 									<div className="pr-3">
 										<svg

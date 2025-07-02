@@ -1,7 +1,7 @@
-'use client';
-import React from 'react';
+
+import  type {ChangeEvent } from 'react';
 import { Card, Pagination } from 'flowbite-react';
-import { ChangeEvent, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { apiStatusCodes, storageKeys } from '../../config/CommonConstant';
 
 import { AlertComponent } from '../AlertComponent';
@@ -20,12 +20,13 @@ import {
 } from '../../api/Auth';
 import { EmptyListMessage } from '../EmptyListComponent';
 import CustomSpinner from '../CustomSpinner';
-import CreateEcosystemOrgModal from '../CreateEcosystemOrgModal';
+import CreateOrgModal from '../CreateOrgModal';
 
 const initialPageState = {
 	pageNumber: 1,
 	pageSize: 9,
 	total: 100,
+	totalCount: 0
 };
 
 const OrganizationsList = () => {
@@ -59,10 +60,9 @@ const OrganizationsList = () => {
 			searchText,
 		);
 		const { data } = response as AxiosResponse;
-
 		if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
 			const totalPages = data?.data?.totalPages;
-
+        const totalCount =data?.data?.totalCount;
 			const orgList = data?.data?.organizations.map((userOrg: Organisation) => {
 				const roles: string[] = userOrg.userOrgRoles.map(
 					(role) => role.orgRole.name,
@@ -75,6 +75,7 @@ const OrganizationsList = () => {
 			setCurrentPage({
 				...currentPage,
 				total: totalPages,
+				totalCount: totalCount,
 			});
 		} else {
 			setError(response as string);
@@ -111,8 +112,6 @@ const OrganizationsList = () => {
 	};
 
 	const redirectOrgDashboard = async (activeOrg: Organisation) => {
-		await removeFromLocalStorage(storageKeys.ECOSYSTEM_ID);
-		await removeFromLocalStorage(storageKeys.ECOSYSTEM_ROLE);
 		await removeFromLocalStorage(storageKeys.ORG_DETAILS);
 
 		await setToLocalStorage(storageKeys.ORG_ID, activeOrg.id.toString());
@@ -142,16 +141,20 @@ const OrganizationsList = () => {
 								maxWidth: '100%',
 								overflow: 'auto',
 							}}
-						>
+						 >
 							<div className="flex items-center min-[401px]:flex-nowrap flex-wrap">
+								
 								{org.logoUrl ? (
 									<CustomAvatar
-										className="min-w-[80px]"
-										size="80"
+									textSizeRatio={2.5}
+										className="min-w-[80px] text-violet11 leading-1 flex h-full w-full items-center justify-center bg-white text-[15px] font-medium "
+										size="80px"
 										src={org?.logoUrl}
-									/>
+										round
+										
+									/>	
 								) : (
-									<CustomAvatar size="80" name={org.name} />
+									<CustomAvatar textSizeRatio={2.5} className='text-violet11 leading-1 flex h-full w-full items-center justify-center bg-white text-[15px] font-medium ' size="80px" name={org.name} round/>
 								)}
 
 								<div className="ml-4 w-100/6rem line-clamp-4 ">
@@ -244,6 +247,7 @@ const OrganizationsList = () => {
 					<SearchInput onInputChange={searchInputChange} />
 				</div>
 				<RoleViewButton
+					disabled={currentPage.totalCount >= 10}
 					buttonTitle="Create"
 					feature={Features.CRETAE_ORG}
 					svgComponent={
@@ -267,7 +271,7 @@ const OrganizationsList = () => {
 			</div>
 			<div>
 				<div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm 2xl:col-span-2 dark:border-gray-700   sm:p-6 dark:bg-gray-800">
-					<CreateEcosystemOrgModal
+					<CreateOrgModal
 						openModal={props.openModal}
 						setMessage={(data) => setMessage(data)}
 						setOpenModal={props.setOpenModal}
