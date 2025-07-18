@@ -54,7 +54,7 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 
 
 			let ledgerName;
-			if (didMethod === DidMethod.INDY || DidMethod.POLYGON || DidMethod.ETHR) {
+			if (didMethod === DidMethod.INDY || didMethod === DidMethod.POLYGON || didMethod === DidMethod.ETHR) {
 				ledgerName = data?.data?.org_agents[0]?.orgDid.split(':')[1];
 			} else {
 				ledgerName = 'No Ledger';
@@ -149,13 +149,13 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 			network = `${values.ledger}:${values.network}`;
 		}
 		const didData = {
-			seed: values.method === DidMethod.POLYGON || DidMethod.ETHR ? '' : seed,
+			seed: values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? '' : seed,
 			keyType: 'ed25519',
 			method: values.method.split(':')[1],
 			network: network,
 			domain: values.method === DidMethod.WEB ? values.domain : '',
 			role: values.method === DidMethod.INDY ? 'endorser' : '',
-			privatekey: values.method === DidMethod.POLYGON || DidMethod.ETHR ? values.privatekey : '',
+			privatekey: values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? values.privatekey : '',
 			did: values?.did ?? '',
 			endorserDid: values?.endorserDid || '',
 			isPrimaryDid: false,
@@ -238,7 +238,7 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 
 	const validations = {
 		...(DidMethod.WEB === method) && { domain: yup.string().required('Domain is required') },
-		...(DidMethod.POLYGON === method) && { privatekey: yup.string().required('Private key is required').trim().length(64, 'Private key must be exactly 64 characters long') },
+		...(DidMethod.POLYGON === method || DidMethod.ETHR === method) && { privatekey: yup.string().required('Private key is required').trim().length(64, 'Private key must be exactly 64 characters long') },
 	};
 
 	return (
@@ -655,7 +655,7 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 											</div>
 											<div className="grid-col-1 mb-2 relative mt-4">
 												<Label className="flex mb-2">
-													<p>Follow these instructions to generate polygon tokens:</p>
+													<p>Follow these instructions to generate ethereum tokens:</p>
 												</Label>
 												<ol>
 													<li className='mb-2'>

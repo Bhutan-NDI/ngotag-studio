@@ -115,6 +115,7 @@ export enum Ledgers {
 export enum SchemaTypeValue {
 	INDY = 'indy',
 	POLYGON = 'polygon',
+	ETHEREUM = 'ethereum',
 	NO_LEDGER = 'no_ledger'
 }
 
@@ -146,5 +147,6 @@ export enum RequestType {
 
 export enum ProofType {
 	polygon = 'EcdsaSecp256k1Signature2019',
+	ethereum = 'EcdsaSecp256k1RecoveryMethod2020',
 	no_ledger = 'Ed25519Signature2018'
 }

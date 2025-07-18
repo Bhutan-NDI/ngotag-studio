@@ -230,8 +230,8 @@ const SharedAgentForm = ({
 		}
 
 		let filteredNetworks = Object.keys(networks);
-		if (selectedMethod === DidMethod.POLYGON) {
-			filteredNetworks = filteredNetworks.filter(network => network === Network.TESTNET);
+		if (selectedMethod === DidMethod.POLYGON || selectedMethod ===  DidMethod.ETHR) {
+			filteredNetworks = filteredNetworks.filter(network => network === Network.TESTNET || Network.MAINNET);
 		}
 
 		return filteredNetworks.map((network) => (
@@ -259,7 +259,7 @@ const SharedAgentForm = ({
 		if (!selectedLedger) {
 			return true;
 		}
-		else if ((selectedLedger === Ledgers.POLYGON && !privateKeyValue) || (selectedLedger === Ledgers.INDY && (!selectedMethod || !selectedNetwork))) {
+		else if ((selectedLedger === Ledgers.POLYGON && !privateKeyValue) || (selectedLedger === Ledgers.ETHEREUM && !privateKeyValue) || (selectedLedger === Ledgers.INDY && (!selectedMethod || !selectedNetwork))) {
 			return true;
 		}
 		else if ((selectedLedger === Ledgers.NO_LEDGER && !selectedMethod) ||(selectedLedger === Ledgers.NO_LEDGER && selectedMethod === DidMethod.WEB && !domainValue)) {
@@ -506,14 +506,14 @@ const SharedAgentForm = ({
 						</div>
 
 						<div className="grid grid-cols-1 md:grid-cols-2 bg-[#F4F4F4] dark:bg-gray-700 mt-4 pl-4 pr-2 md:pr-0">
-							{selectedMethod === DidMethod.POLYGON && (
+							{(selectedMethod === DidMethod.POLYGON || selectedMethod === DidMethod.ETHR) && (
 								<><div className="grid-col-1">
 									<SetPrivateKeyValueInput setPrivateKeyValue={setPrivateKeyValue}
 										privateKeyValue={privateKeyValue} formikHandlers={formikHandlers} />	
 								</div>
 									<div className="grid-col-1 mb-2 relative mt-4">
 										<Label className="flex mb-2">
-											<p>Follow these instructions to generate polygon tokens:</p>
+											<p>Follow these instructions to generate tokens:</p>
 										</Label>
 										<ol>
 											<li className='mb-2'>
@@ -521,9 +521,16 @@ const SharedAgentForm = ({
 												<div className='ml-4 text-sm text-gray-900 dark:text-white'>
 													Copy the address and get the free tokens for the testnet.
 													<div> For eg. use&nbsp;
+													{ selectedMethod === DidMethod.POLYGON && (
 														<a href='https://faucet.polygon.technology/' className='text-blue-900 dark:text-primary-500 text-sm underline'>
-															`https://faucet.polygon.technology/`&nbsp;
+															https://faucet.polygon.technology/&nbsp;
 														</a>
+													)}
+													{ selectedMethod === DidMethod.ETHR && (
+														<a href='https://cloud.google.com/application/web3/faucet/ethereum/sepolia' className='text-blue-900 dark:text-primary-500 text-sm underline'>
+															https://cloud.google.com/application/web3/faucet/ethereum/sepolia&nbsp;
+														</a>
+													)}
 														to get free token
 													</div>
 												</div>
@@ -533,9 +540,16 @@ const SharedAgentForm = ({
 												<div className='ml-4 text-sm text-gray-900 dark:text-white'>Check that you have recieved the tokens.</div>
 												<div className='ml-4 text-sm text-gray-900 dark:text-white'>For eg. copy the address and check the balance on
 													<div>
-														<a href='https://mumbai.polygonscan.com/' className='text-blue-900 dark:text-primary-500 text-sm underline'>
-															https://mumbai.polygonscan.com/&nbsp;
-														</a>
+														{ selectedMethod === DidMethod.POLYGON && (
+															<a href='https://mumbai.polygonscan.com/' className='text-blue-900 dark:text-primary-500 text-sm underline'>
+																https://mumbai.polygonscan.com/&nbsp;
+															</a>
+														)}
+														{ selectedMethod === DidMethod.ETHR && (
+															<a href='https://sepolia.etherscan.io/' className='text-blue-900 dark:text-primary-500 text-sm underline'>
+																https://sepolia.etherscan.io/&nbsp;
+															</a>
+														)}
 													</div>
 												</div>
 											</li>

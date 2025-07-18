@@ -45,7 +45,7 @@ const EmailVerification = () => {
         if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
             const did = data?.data?.org_agents?.[0]?.orgDid;
 
-            if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
+            if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.ETHR) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
                 setW3cSchema(true);
             }
             if (did.includes(DidMethod.INDY)) {

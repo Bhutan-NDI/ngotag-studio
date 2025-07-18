@@ -52,6 +52,24 @@ const LedgerLessMethodsComponent = ({ formikHandlers, setSelectedDid, selectedDi
 								</option>
 							),
 						)}
+					{formikHandlers.values.method === DidMethod.ETHR &&
+						mappedData &&
+						Object.keys(mappedData[selectedLedger])?.map((network) => (
+							<option key={network} value={network}>
+									{network.charAt(0).toUpperCase() + network.slice(1)}{' '}
+							</option>
+					))}
+					{formikHandlers.values.method !== DidMethod.ETHR &&
+						mappedData &&
+						selectedLedger &&
+						selectedNetwork &&
+						Object.keys(mappedData[selectedLedger][selectedNetwork])?.map(
+							(network) => (
+								<option key={network} value={network}>
+									{network.charAt(0).toUpperCase() + network.slice(1)}{' '}
+								</option>
+							),
+					)}
 				</select>
 
 				{formikHandlers?.errors?.network &&
