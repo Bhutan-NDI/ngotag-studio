@@ -98,7 +98,18 @@ const SharedAgentForm = ({
 								ledgerConfigData.polygon[`${DidMethod.POLYGON}`][key] = value;
 							}
 						}
-					} else if (lowerName === Ledgers.NO_LEDGER.toLowerCase() && details) {
+					} else if (lowerName === Ledgers.ETHEREUM && details) {
+						for (const [key, value] of Object.entries(details)) {
+							if (typeof value === 'object' && value !== null) {
+								for (const [subKey, subValue] of Object.entries(value)) {
+									ledgerConfigData.ethereum[`${DidMethod.ETHR}`][subKey] = subValue;
+								}
+							} else if (typeof value === 'string') {
+								ledgerConfigData.ethereum[`${DidMethod.ETHR}`][key] = value;
+							}
+						}
+					}   
+					else if (lowerName === Ledgers.NO_LEDGER.toLowerCase() && details) {
 						for (const [key, value] of Object.entries(details)) {
 							ledgerConfigData.noLedger[key] = value  as string;
 						}

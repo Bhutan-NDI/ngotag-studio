@@ -108,7 +108,8 @@ Linux = 'linux'
 export enum Ledgers {
 	INDY = 'indy',
 	POLYGON = 'polygon',
-	NO_LEDGER = 'noLedger'
+	NO_LEDGER = 'noLedger',
+	ETHEREUM = 'ethereum'
 }
 
 export enum SchemaTypeValue {

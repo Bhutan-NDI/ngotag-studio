@@ -8,7 +8,7 @@ import { AlertComponent } from '../../AlertComponent';
 import type { AxiosResponse } from 'axios';
 import { createDid, getOrganizationById } from '../../../api/organization';
 import type { EditOrgdetailsModalProps, IFormikValues } from '../interfaces';
-import { createPolygonKeyValuePair } from '../../../api/Agent';
+import { createEthereumKeyValuePair, createPolygonKeyValuePair } from '../../../api/Agent';
 import { nanoid } from 'nanoid';
 import TokenWarningMessage from '../walletCommonComponents/TokenWarningMessage';
 import CopyDid from '../../../commonComponents/CopyDid';
@@ -54,7 +54,7 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 
 
 			let ledgerName;
-			if (didMethod === DidMethod.INDY || DidMethod.POLYGON) {
+			if (didMethod === DidMethod.INDY || DidMethod.POLYGON || DidMethod.ETHR) {
 				ledgerName = data?.data?.org_agents[0]?.orgDid.split(':')[1];
 			} else {
 				ledgerName = 'No Ledger';
@@ -68,7 +68,10 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 				networkName = data?.data?.org_agents[0]?.orgDid.split(':').slice(2, 4).join(':');
 			} else if (didMethod === DidMethod.POLYGON) {
 				networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2];
-			} else {
+			} else if (didMethod === DidMethod.ETHR) {
+				networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2];
+			} 
+			 else {
 				networkName = '';
 			}
 			setNetworkValue(networkName);
@@ -142,15 +145,17 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 			network = values?.network;
 		} else if (values.method === DidMethod.POLYGON) {
 			network = `${values.ledger}:${values.network}`;
+		} else if (values.method === DidMethod.ETHR) {
+			network = `${values.ledger}:${values.network}`;
 		}
 		const didData = {
-			seed: values.method === DidMethod.POLYGON ? '' : seed,
+			seed: values.method === DidMethod.POLYGON || DidMethod.ETHR ? '' : seed,
 			keyType: 'ed25519',
 			method: values.method.split(':')[1],
 			network: network,
 			domain: values.method === DidMethod.WEB ? values.domain : '',
 			role: values.method === DidMethod.INDY ? 'endorser' : '',
-			privatekey: values.method === DidMethod.POLYGON ? values.privatekey : '',
+			privatekey: values.method === DidMethod.POLYGON || DidMethod.ETHR ? values.privatekey : '',
 			did: values?.did ?? '',
 			endorserDid: values?.endorserDid || '',
 			isPrimaryDid: false,
@@ -184,6 +189,25 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 			const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
 			const resCreatePolygonKeys = await createPolygonKeyValuePair(orgId);
 			const { data } = resCreatePolygonKeys as AxiosResponse;
+
+			if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+				setGeneratedKeys(data?.data);
+				setIsLoading(false);
+				const privateKey = data?.data?.privateKey.slice(2)
+				setPrivateKeyValue(privateKeyValue || privateKey);
+				await checkBalance(privateKeyValue || privateKey, Network.TESTNET);
+			}
+		} catch (err) {
+			console.error('Generate private key ERROR::::', err);
+		}
+	};
+
+	const generateEthereumKeyValuePair = async () => {
+		setIsLoading(true);
+		try {
+			const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+			const resCreateEthereumKeys = await createEthereumKeyValuePair(orgId);
+			const { data } = resCreateEthereumKeys as AxiosResponse;
 
 			if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
 				setGeneratedKeys(data?.data);
@@ -519,12 +543,149 @@ const CreateDIDModal = (props: EditOrgdetailsModalProps) => {
 											</div>
 										</>
 									)}
+
+									{formikHandlers.values.method === DidMethod.ETHR && (
+										<>
+											<div className="mb-3 relative">
+												<div className="flex items-center gap-2 mt-4">
+													<Checkbox
+														id="havePrivateKey"
+														onChange={(e) => setHavePrivateKey(e.target.checked)} />
+													<Label className="flex" htmlFor="havePrivateKey">
+														<p>Already have a private key?</p>
+													</Label>
+												</div>
+												{!havePrivateKey ? (
+													<>
+														<div className="my-3 relative flex justify-between">
+															<div className="mt-4">
+																<Label value="Generate private key" />
+																<span className="text-red-500 text-xs">*</span>
+															</div>
+
+															<Button
+																type="button"
+																isProcessing={isLoading}
+																className="h-min p-0 focus:z-10 focus:outline-none border border-transparent enabled:hover:bg-cyan-800 dark:enabled:hover:bg-cyan-700 mt-4 text-base font-medium text-center text-white bg-primary-700 rounded-md hover:!bg-primary-800 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
+																onClick={() => generateEthereumKeyValuePair()}
+															>
+																Generate
+															</Button>
+														</div>
+														{generatedKeys && (
+															<>
+																<div className="mt-3 relative flex items-center">
+
+																	<Field
+																		type="text"
+																		id="privatekey"
+																		name="privatekey"
+																		className="truncate bg-gray-50 border mt-2 border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 h-11"
+																		value={generatedKeys.privateKey.slice(2)}
+																		placeholder="Generated private key"
+																		readOnly />
+																	<div className='mt-4'>
+																		<CopyDid
+																			className="align-center hidden text-sm text-gray-900 dark:text-white truncate mt-8"
+																			value={generatedKeys.privateKey.slice(2)}
+																		/>
+																	</div>
+																</div>
+
+
+																{formikHandlers?.errors?.privatekey &&
+																	formikHandlers?.touched?.privatekey && (
+																		<span className="static botton-0 text-red-500 text-xs">
+																			{formikHandlers?.errors?.privatekey}
+																		</span>
+																	)}
+																{walletErrorMessage && (
+																	<span className="static bottom-0 text-red-500 text-xs">
+																		{walletErrorMessage}
+																	</span>
+																)}
+																<TokenWarningMessage />
+																<div className="my-3 relative">
+																	<p className="text-sm truncate">
+																		<span className="font-semibold text-gray-900 dark:text-white">
+																			Address:
+																		</span>
+																		<div className="flex">
+																			<CopyDid
+																				className="align-center block text-sm text-gray-900 dark:text-white truncate"
+																				value={generatedKeys.address} />
+																		</div>
+																	</p>
+																</div>
+															</>
+														)}
+													</>
+												) : (
+													<>
+														<Field
+															type="text"
+															id="privatekey"
+															name="privatekey"
+															className="truncate bg-gray-50 border mt-2 border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500 h-11"
+															value={formikHandlers.values.privatekey}
+															onChange={(e) => {
+																formikHandlers.setFieldValue('privatekey', e.target.value);
+																setWalletErrorMessage(null);
+																checkBalance(e.target.value, Network.TESTNET);
+															}}
+															placeholder="Enter private key" />
+														<div>
+														</div>
+														{formikHandlers?.errors?.privatekey &&
+															formikHandlers?.touched?.privatekey && (
+																<span className="static botton-0 text-red-500 text-xs">
+																	{formikHandlers?.errors?.privatekey}
+																</span>
+															)}
+														<div>
+															{walletErrorMessage && (
+																<span className="static bottom-0 text-red-500 text-xs">
+																	{walletErrorMessage}
+																</span>
+															)}
+														</div>
+														<TokenWarningMessage />
+													</>
+												)}
+											</div>
+											<div className="grid-col-1 mb-2 relative mt-4">
+												<Label className="flex mb-2">
+													<p>Follow these instructions to generate polygon tokens:</p>
+												</Label>
+												<ol>
+													<li className='mb-2'>
+														<span className='font-semibold text-sm text-gray-800'>Step 1:</span>
+														<div className='ml-4 text-sm text-gray-700'>Copy the address and get the free tokens for the testnet.<div> For eg. use&nbsp;<a href='https://cloud.google.com/application/web3/faucet/ethereum/sepolia' className='text-blue-900 text-sm underline'>https://cloud.google.com/application/web3/faucet/ethereum/sepolia&nbsp;</a>
+															to get free token
+														</div>
+														</div>
+													</li>
+													<li className='mb-2'>
+														<span className='font-semibold text-sm'>Step 2:</span>
+														<div className='ml-4 text-sm text-gray-700'>Check that you have recieved the tokens.</div>
+														<div className='ml-4 text-sm text-gray-700'>For eg. copy the address and check the balance on
+															<div>
+																<a href='https://sepolia.etherscan.io/' className='text-blue-900 text-sm underline'>
+																https://sepolia.etherscan.io/&nbsp;
+																</a>
+															</div>
+														</div>
+													</li>
+												</ol>
+											</div>
+										</>
+									)}
 								</div>
 								<div className="flex justify-end mt-4">
 									<Button
 										type="submit"
 										isProcessing={loading}
-										disabled={formikHandlers.values.method === DidMethod.POLYGON && !formikHandlers.values.privatekey}
+										disabled={formikHandlers.values.method === DidMethod.ETHR && !formikHandlers.values.privatekey}
 										className="mb-2 text-base font-medium text-center text-white bg-primary-700 rounded-lg hover:!bg-primary-800 focus:ring-4 focus:ring-primary-300 sm:w-auto dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800"
 									>
 										Submit
