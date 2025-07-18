@@ -34,6 +34,11 @@ interface ILedgerConfigData {
     noLedger: {
         [key: string]: string;
     };
+	ethereum: {
+		'did:ethr': {
+			[key: string]: string;
+		}
+	}
 }
 
 const SharedAgentForm = ({
@@ -65,7 +70,10 @@ const SharedAgentForm = ({
 					polygon: {
 						[`${DidMethod.POLYGON}`]: {}
 					},
-					noLedger: {}
+					noLedger: {},
+					ethereum: {
+						[`${DidMethod.ETHR}`]: {}
+					}
 				};
 				
 				data.data.forEach(({ name, details }: ILedgerItem) => {

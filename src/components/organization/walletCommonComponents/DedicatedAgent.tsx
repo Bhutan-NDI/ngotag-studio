@@ -55,7 +55,10 @@ const DedicatedAgentForm = ({
 					polygon: {
 						[`${DidMethod.POLYGON}`]: {}
 					},
-					noLedger: {}
+					noLedger: {},
+					ethereum: {
+						[`${DidMethod.ETHR}`]: {}
+					}
 				};
 				
 				data.data.forEach(({ name, details }: ILedgerItem) => {

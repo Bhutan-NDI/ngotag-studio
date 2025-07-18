@@ -88,7 +88,8 @@ export enum DidMethod {
     INDY = 'did:indy',
     KEY = 'did:key',
     WEB = 'did:web',
-    POLYGON = 'did:polygon'
+    POLYGON = 'did:polygon',
+	ETHR = 'did:ethr'
 }
 
 export enum Network {
