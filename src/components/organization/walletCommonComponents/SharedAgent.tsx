@@ -509,7 +509,7 @@ const SharedAgentForm = ({
 							{(selectedMethod === DidMethod.POLYGON || selectedMethod === DidMethod.ETHR) && (
 								<><div className="grid-col-1">
 									<SetPrivateKeyValueInput setPrivateKeyValue={setPrivateKeyValue}
-										privateKeyValue={privateKeyValue} formikHandlers={formikHandlers} />	
+										privateKeyValue={privateKeyValue} formikHandlers={formikHandlers} didMethod={selectedMethod} />	
 								</div>
 									<div className="grid-col-1 mb-2 relative mt-4">
 										<Label className="flex mb-2">
