@@ -181,7 +181,7 @@ const SharedAgentForm = ({
 			seed: yup.string().required('Seed is required'),
 			did: yup.string().required('DID is required'),
 		},
-		...(DidMethod.INDY === selectedMethod || DidMethod.POLYGON === selectedMethod) && { network: yup.string().required('Network is required') },
+		...(DidMethod.INDY === selectedMethod || DidMethod.POLYGON === selectedMethod || DidMethod.ETHR === selectedMethod) && { network: yup.string().required('Network is required') },
 		...(DidMethod.WEB === selectedMethod) && { domain: yup.string().required('Domain is required') },
 	};
 
