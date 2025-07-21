@@ -1,5 +1,5 @@
 {
-    "family": "	QA-FRONTEND_UI_TASKDEF",
+    "family": "QA-FRONTEND_UI_TASKDEF",
     "containerDefinitions": [
         {
             "name": "frontend_ui",
