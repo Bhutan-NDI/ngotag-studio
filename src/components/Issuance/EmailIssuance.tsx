@@ -92,6 +92,11 @@ const EmailIssuance = () => {
 				setSchemaTypeValue(SchemaTypeValue.POLYGON)
 				setCredentialType(CredentialType.JSONLD)
 
+			} else if (orgDid?.includes(DidMethod.ETHR)) {
+				currentSchemaType = SchemaTypes.schema_W3C;
+				setSchemaTypeValue(SchemaTypeValue.ETHEREUM)
+				setCredentialType(CredentialType.JSONLD)
+
 			} else if (orgDid?.includes(DidMethod.KEY) || orgDid?.includes(DidMethod.WEB)) {
 				currentSchemaType = SchemaTypes.schema_W3C;
 				setSchemaTypeValue(SchemaTypeValue.NO_LEDGER)
@@ -270,7 +275,7 @@ const EmailIssuance = () => {
 				}, {}),
 			},
                 options: {
-                    proofType: schemaTypeValue===SchemaTypeValue.POLYGON ? ProofType.polygon : ProofType.no_ledger,
+                    proofType: schemaTypeValue===SchemaTypeValue.POLYGON ? ProofType.polygon :  schemaTypeValue===SchemaTypeValue.ETHEREUM ? ProofType.ethereum : ProofType.no_ledger,
                     proofPurpose: proofPurpose
                 }
             };

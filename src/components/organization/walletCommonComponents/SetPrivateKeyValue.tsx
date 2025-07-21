@@ -1,17 +1,17 @@
 import { Checkbox, Label } from 'flowbite-react';
 import { Field } from 'formik';
 import { useEffect, useState, type ChangeEvent } from 'react';
-import GenerateBtnPolygon from './GenerateBtnPolygon';
+import GenerateKeyPairButton from './GenerateKeyPairBtn';
 import { getFromLocalStorage } from '../../../api/Auth';
 import { apiStatusCodes, storageKeys } from '../../../config/CommonConstant';
-import { createPolygonKeyValuePair } from '../../../api/Agent';
+import { createEthereumKeyValuePair, createPolygonKeyValuePair } from '../../../api/Agent';
 import type { AxiosResponse } from 'axios';
 import TokenWarningMessage from './TokenWarningMessage';
 import CopyDid from '../../../commonComponents/CopyDid';
 import type { IPolygonKeys } from './interfaces';
 import { ethers } from 'ethers';
 import { envConfig } from '../../../config/envConfig';
-import { CommonConstants, Network } from '../../../common/enums';
+import { CommonConstants, DidMethod, Network } from '../../../common/enums';
 interface IProps {
 	setPrivateKeyValue: (val: string) => void
 	privateKeyValue: string | undefined
@@ -25,12 +25,14 @@ interface IProps {
 			privatekey?: boolean;
 		};
 	};
+	didMethod: DidMethod;
 }
 
 const SetPrivateKeyValueInput = ({
 	setPrivateKeyValue,
 	privateKeyValue,
 	formikHandlers,
+	didMethod
 }: IProps) => {
 	const [havePrivateKey, setHavePrivateKey] = useState(false);
 	const [generatedKeys, setGeneratedKeys] = useState<IPolygonKeys | null>(null);
@@ -105,6 +107,24 @@ const SetPrivateKeyValueInput = ({
 			console.error('Generate private key ERROR::::', err);
 		}
 	};
+	const generateEthereumKeyValuePair = async () => {
+		setLoading(true);
+		try {
+			const orgId = await getFromLocalStorage(storageKeys.ORG_ID);
+			const resCreatePolygonKeys = await createEthereumKeyValuePair(orgId);
+			const { data } = resCreatePolygonKeys as AxiosResponse;
+
+			if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+				setGeneratedKeys(data?.data);
+				setLoading(false);
+				const privateKey = data?.data?.privateKey.slice(2)
+				setPrivateKeyValue(privateKey || privateKeyValue);
+				await checkWalletBalance(privateKey || privateKeyValue, Network.TESTNET);
+			}
+		} catch (err) {
+			console.error('Generate private key ERROR::::', err);
+		}
+	};
 
 	return (
 		<div className="mb-3 relative">
@@ -118,7 +138,8 @@ const SetPrivateKeyValueInput = ({
 			</div>
 			{!havePrivateKey ? (
 				<>
-					<GenerateBtnPolygon generatePolygonKeyValuePair={() => generatePolygonKeyValuePair()} loading={loading} />
+					{didMethod === DidMethod.POLYGON && (<GenerateKeyPairButton generateKeyValuePair={() => generatePolygonKeyValuePair()} loading={loading} />)}
+					{didMethod === DidMethod.ETHR && (<GenerateKeyPairButton generateKeyValuePair={() => generateEthereumKeyValuePair()} loading={loading} />)}
 
 					{generatedKeys && (
 						<>

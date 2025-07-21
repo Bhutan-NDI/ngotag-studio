@@ -174,7 +174,7 @@ const VerificationSchemasList = () => {
 			if (data?.data?.org_agents && data?.data?.org_agents?.length > 0) {
 				setWalletStatus(true);
 			}
-			if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
+			if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.ETHR) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
 				setW3cSchema(true);
 				setSchemaType(SchemaTypes.schema_W3C)
 			}

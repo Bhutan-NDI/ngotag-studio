@@ -126,8 +126,10 @@ const CreateSchema = () => {
 				} else if (did.includes(DidMethod.POLYGON)) {
 					setType(SchemaType.W3C);
 					setSchemaTypeValues(SchemaTypeValue.POLYGON);				
-				}
-				else if (did.includes(DidMethod.KEY) || (did.includes(DidMethod.WEB))) {
+				} else if (did.includes(DidMethod.ETHR)) {
+					setType(SchemaType.W3C);
+					setSchemaTypeValues(SchemaTypeValue.ETHEREUM);				
+				} else if (did.includes(DidMethod.KEY) || (did.includes(DidMethod.WEB))) {
 					setType(SchemaType.W3C);
 					setSchemaTypeValues(SchemaTypeValue.NO_LEDGER);				
 				}
@@ -376,6 +378,7 @@ const CreateSchema = () => {
 
 if (
   schemaTypeValues === SchemaTypeValue.POLYGON ||
+  schemaTypeValues === SchemaTypeValue.ETHEREUM ||
   schemaTypeValues === SchemaTypeValue.NO_LEDGER
 ) {
   filteredOptions = options.filter(

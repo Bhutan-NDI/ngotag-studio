@@ -48,6 +48,28 @@ export const createPolygonKeyValuePair = async (orgId:string) => {
   }
 }
 
+export const createEthereumKeyValuePair = async (orgId:string) => {
+  const token = await getFromLocalStorage(storageKeys.TOKEN)
+  const details = {
+    url: `${apiRoutes.organizations.root}/${orgId}${apiRoutes.Agent.createEthereumKeys}`,
+    config: {
+      headers: {
+        'Content-type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    },
+  };
+
+  try {
+    const response = await axiosPost(details)
+    return response
+  }
+  catch (error) {
+    const err = error as Error
+    return err?.message
+  }
+}
+
 export const getAgentHealth = async (orgId:string) => {
   const token = await getFromLocalStorage(storageKeys.TOKEN)
   const details = {

@@ -103,18 +103,18 @@ const submitDedicatedWallet = async (
 	domain: string
 ) => {	
 		const didData = {
-			seed:values.method === DidMethod.POLYGON ? '' : seeds,
+			seed:values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? '' : seeds,
 			keyType: values.keyType || 'ed25519',
 		    method: values.method.split(':')[1] || '',
 			network:
 			values.method === DidMethod.INDY ?
             values.network?.split(':').slice(2).join(':') :
-				values.method === DidMethod.POLYGON
+				values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
 					? values.network?.split(':').slice(1).join(':') 
 					: '',
 			domain: values.method === DidMethod.WEB ? domain : '',
 			role: values.method === DidMethod.INDY ? 'endorser' : '',
-			privatekey: values.method === DidMethod.POLYGON ? privatekey : '',
+			privatekey: values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? privatekey : '',
 			did: values.did || '',
 			endorserDid: values?.endorserDid || '',
 			isPrimaryDid: true,
@@ -153,10 +153,10 @@ const submitDedicatedWallet = async (
 			method: values.method.split(':')[1] || '',
 			ledger: values.method === DidMethod.INDY ? ledgerName : '',
 			label: values.label,
-			privatekey: values.method === DidMethod.POLYGON ? values?.privatekey : '',
-			seed: values.method === DidMethod.POLYGON ? '' : values?.seed || seeds,
+			privatekey: values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? values?.privatekey : '',
+			seed: values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR ? '' : values?.seed || seeds,
 			network:
-				values.method === DidMethod.POLYGON
+				values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
 					? polygonNetwork
 					: network,
 			domain: values.method === DidMethod.WEB ? domain : '',
