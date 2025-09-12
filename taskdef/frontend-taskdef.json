@@ -1,5 +1,5 @@
 {
-    "family": "	QA-FRONTEND_UI_TASKDEF",
+    "family": "DEV-FRONTEND_UI_TASKDEF",
     "containerDefinitions": [
         {
             "name": "frontend_ui",
@@ -7,10 +7,12 @@
             "cpu": 1024,
             "memory": 2048,
             "portMappings": [
-                {
+                { 
+									  "name": "frontend-port",
                     "containerPort": 8085,
                     "hostPort": 8085,
-                    "protocol": "tcp"
+                    "protocol": "tcp",
+                    "appProtocol": "http"
                 }
             ],
             "essential": true,
@@ -23,7 +25,7 @@
                 "logDriver": "awslogs",
                 "options": {
                     "awslogs-create-group": "true",
-                    "awslogs-group": "/ecs/QA-FRONTEND_UI_TASKDEF",
+                    "awslogs-group": "/ecs/DEV-FRONTEND_UI_TASKDEF",
                     "awslogs-region": "ap-southeast-1",
                     "awslogs-stream-prefix": "ecs"
                 },

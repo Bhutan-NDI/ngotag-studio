@@ -33,6 +33,15 @@ Then, you can preview the generated build with a local web server:
 pnpm run preview
 ```
 
+## How to get client Id and Client Secret
+- In the `.env.sample` file, there are two new values to be put:
+    - `PUBLIC_KEYCLOAK_MANAGEMENT_CLIENT_ID=`
+    - `PUBLIC_KEYCLOAK_MANAGEMENT_CLIENT_SECRET=`
+
+- For these two values above, put the same values as available in `.env` of the platform, which has:
+    - `KEYCLOAK_MANAGEMENT_CLIENT_ID=`
+    - `KEYCLOAK_MANAGEMENT_CLIENT_SECRET=` 
+
 
 ## Credit
 

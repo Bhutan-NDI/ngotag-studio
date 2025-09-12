@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head><title>NGOTAG - Self-Sovereign Identity Platform — v2.0.0</title>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta name="generator" content="Astro v2.9.1">
+		<meta name="description" content="An open-source Self-Sovereign Identity Platform">
+		<link rel="icon" href="/favicon.ico">
+		<link rel="sitemap" type="application/xml" href="/sitemap-index.xml">
+
+		<meta name="author" content="Julian Cataldo, Zoltán Szőgyényi, Robert Tanislav">
+		<meta name="copyright" content="MIT">
+		<meta property="og:image" content="https://dev-ngotag-organization-upload.s3.ap-southeast-1.amazonaws.com/ngotag-assets/ndi-logo.png">
+
+		<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+
+		<meta property="og:image" content="https://dev-ngotag-organization-upload.s3.ap-southeast-1.amazonaws.com/ngotag-assets/ndi-logo.png">
+		<script nonce="dynamicNONCE1713354623351_scripts"  id="theme">
+			if (
+				localStorage.getItem('color-theme') === 'dark' ||
+				(!('color-theme' in localStorage) &&
+					window.matchMedia('(prefers-color-scheme: dark)').matches)
+			) {
+				document.documentElement.classList.add('dark');
+			} else {
+				document.documentElement.classList.remove('dark');
+			}
+		</script>
+	<link rel="stylesheet" href="/_astro/404.7115dee7.css" />
+<link rel="stylesheet" href="/_astro/404.83ebfad6.css" />
+<link rel="stylesheet" href="/_astro/connections.97252de9.css" />
+<link rel="stylesheet" href="/_astro/connections.ea745e3c.css" /><script nonce="dynamicNONCE1713354623351_scripts"  type="module" src="/_astro/hoisted.421c96a1.js"></script></head>
+
+	<body class="scrollbar scrollbar-w-3 scrollbar-thumb-rounded-[0.25rem] scrollbar-track-slate-200 scrollbar-thumb-gray-400 dark:scrollbar-track-gray-900 dark:scrollbar-thumb-gray-700 dark:bg-[#111827]">
+		<nav class="fixed z-50 w-full bg-white border-b border-gray-200 sm:py-2 dark:bg-gray-800 dark:border-gray-700">
+	<div>
+
+		<div class="flex items-center justify-between">
+			<div class="flex items-center justify-start">
+				<a class="flex ml-2 md:mr-24" href="/">
+					<img src="https://dev-ngotag-organization-upload.s3.ap-southeast-1.amazonaws.com/ngotag-assets/ndi-logo.png" class="h-8 mr-3" alt="NGOTAG logo"/><span class="self-center text-xl font-semibold sm:text-2xl whitespace-nowrap dark:text-white">NGOTAG</span>
+				</a>			
+				
+			</div>
+
+			<div>
+				<button data-collapse-toggle="mobile-menu" type="button" class="inline-flex items-center justify-center p-2 ml-3 text-gray-400 rounded-lg sm:hidden hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-300 dark:hover:bg-gray-700 dark:hover:text-white" aria-controls="mobile-menu-2" aria-expanded="false">
+					<span class="sr-only">Open main menu</span>
+					<!-- Open mobile menu icon -->
+					<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+						<path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+					</svg>
+					<!-- Close mobile menu icon -->
+					<svg class="hidden w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+						<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+					</svg>
+				</button>
+			</div>
+		</div>
+	</div>
+	<!-- Mobile menu -->
+	<div class="hidden sm:hidden" id="mobile-menu">
+		<ul class="pt-2">
+			<li>
+				<a href="#" class="block py-2 pl-3 pr-4 text-base font-normal text-gray-900 bg-gray-100 dark:bg-gray-700 dark:text-white">Dashboard</a>
+			</li>
+			<li>
+				<a href="#" class="block px-3 py-2 text-base font-normal text-gray-600 border-b border-gray-100 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-white">Team</a>
+			</li>
+			<li>
+				<a href="#" class="block px-3 py-2 text-base font-normal text-gray-600 border-b border-gray-100 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-white">Projects</a>
+			</li>
+			<li>
+				<a href="#" class="block px-3 py-2 text-base font-normal text-gray-600 border-b border-gray-100 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-white">Calendar
+				</a>
+			</li>
+			<li class="block">
+				<a href="/authentication/sign-in" class="inline-flex items-center w-full px-3 py-2 text-base font-normal text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 dark:border-gray-700 dark:hover:bg-gray-700 dark:text-gray-400 dark:hover:text-white">
+					<svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+					</svg>
+					Login/Register
+				</a>
+			</li>
+		</ul>
+	</div>
+</nav><div class="flex pt-16 overflow-hidden bg-gray-50 dark:bg-gray-900">
+				<div id="main-content" class="relative w-full max-w-screen-2xl mx-auto h-full overflow-y-auto bg-gray-50 dark:bg-gray-900 min-h-screen">
+					<div class="px-4 pt-6 2xl:px-0">
+						
+	<div class="flex flex-col justify-center items-center px-6 mx-auto h-screen xl:px-0 dark:bg-gray-900">
+	<div class="block md:max-w-lg">
+		<img src="https://flowbite-admin-dashboard.vercel.app/images/illustrations/404.svg" alt="astronaut image">
+	</div>
+	<div class="text-center xl:max-w-4xl">
+		<h1 class="mb-3 text-2xl font-bold leading-tight text-gray-900 sm:text-4xl lg:text-5xl dark:text-white">
+			Page not found
+		</h1>
+		<p class="mb-5 text-base font-normal text-gray-500 md:text-lg dark:text-gray-400">
+			Oops! Looks like you followed a bad link. If you think this is a problem
+			with us, please tell us.
+		</p>
+		<a href="/dashboard" class="text-white bg-primary-700 hover:bg-primary-800 focus:ring-4 focus:ring-primary-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center mr-3 dark:bg-primary-600 dark:hover:bg-primary-700 dark:focus:ring-primary-800">
+			<svg class="mr-2 -ml-1 w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
+			Go back home
+		</a>
+	</div>
+</div>
+
+					</div>
+
+					<footer class="md:flex md:items-center md:justify-between px-4 2xl:px-0 py-6 md:py-10">
+	<p class="my-10 text-sm text-center text-gray-500">
+	&copy; 2019 - 2024
+	<a class="hover:underline" target="_blank">Blockster Labs Pvt. Ltd.</a> | All rights reserved.
+</p>
+
+	<!-- <ul class="flex flex-wrap items-center justify-center">
+		<li>
+			<a
+				href="#"
+				class="mr-4 text-sm font-normal text-gray-500 hover:underline md:mr-6 dark:text-gray-400"
+				>Terms</a
+			>
+		</li>
+		<li>
+			<a
+				href="#"
+				class="mr-4 text-sm font-normal text-gray-500 hover:underline md:mr-6 dark:text-gray-400"
+				>Licensing</a
+			>
+		</li>
+		<li>
+			<a
+				href="#"
+				class="mr-4 text-sm font-normal text-gray-500 hover:underline md:mr-6 dark:text-gray-400"
+				>Cookie Policy</a
+			>
+		</li>
+		<li>
+			<a
+				href="#"
+				class="text-sm font-normal text-gray-500 hover:underline dark:text-gray-400"
+				>Contact</a
+			>
+		</li>
+	</ul> -->
+</footer>
+				</div>
+			</div>
+		<script nonce="dynamicNONCE1713354623351_scripts"  src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/1.8.0/flowbite.min.js"></script>
+
+		<script nonce="dynamicNONCE1713354623351_scripts"  id="global">(function(){const initData = {"npm_command":"run-script","HOME":"/root","npm_config_npm_version":"10.5.0","COLOR":"0","npm_package_json":"/app/package.json","ECS_CONTAINER_METADATA_URI":"http://169.254.170.2/v3/0a59669e7ecf4c2bbbcc61c89e6da08e-1435145376","AWS_EXECUTION_ENV":"AWS_ECS_FARGATE","INIT_CWD":"/app","npm_config_user_agent":"npm/10.5.0 node/v20.12.1 linux x64 workspaces/false","npm_node_execpath":"/usr/local/bin/node","YARN_VERSION":"1.22.19","npm_config_cache":"/root/.npm","npm_config_node_gyp":"/usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js","npm_lifecycle_script":"deno run --allow-net --allow-read --allow-env ./dist/server/entry.mjs","npm_lifecycle_event":"preview","EDITOR":"vi","PATH":"/app/node_modules/.bin:/node_modules/.bin:/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/node-gyp-bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin","npm_config_local_prefix":"/app","npm_package_name":"credebl-studio","npm_package_version":"2.0.0","ECS_AGENT_URI":"http://169.254.170.2/api/0a59669e7ecf4c2bbbcc61c89e6da08e-1435145376","PWD":"/app","npm_config_prefix":"/usr/local","ECS_CONTAINER_METADATA_URI_V4":"http://169.254.170.2/v4/0a59669e7ecf4c2bbbcc61c89e6da08e-1435145376","HOSTNAME":"ip-10-4-3-218.ap-southeast-1.compute.internal","NODE":"/usr/local/bin/node","npm_config_init_module":"/root/.npm-init.js","npm_execpath":"/usr/local/lib/node_modules/npm/bin/npm-cli.js","NODE_VERSION":"20.12.1","AWS_DEFAULT_REGION":"ap-southeast-1","npm_config_userconfig":"/root/.npmrc","npm_config_global_prefix":"/usr/local","AWS_REGION":"ap-southeast-1","npm_config_globalconfig":"/usr/local/etc/npmrc","PUBLIC_BASE_URL":"https://dev-service.ngotag.com","PUBLIC_CRYPTO_PRIVATE_KEY":"5jZSI6ICI0NjQ3OTc0MTgwOTY0In0","PUBLIC_PLATFORM_NAME":"NGOTAG","PUBLIC_PLATFORM_LOGO":"https://dev-ngotag-organization-upload.s3.ap-southeast-1.amazonaws.com/ngotag-assets/ndi-logo.png","PUBLIC_POWERED_BY":"Blockster Labs Pvt. Ltd.","PUBLIC_PLATFORM_WEB_URL":"https://dev.ngotag.com/","PUBLIC_POWERED_BY_URL":"https://blockster.global","PUBLIC_PLATFORM_DOCS_URL":"","PUBLIC_PLATFORM_GIT":"","PUBLIC_PLATFORM_SUPPORT_EMAIL":"support@blockster.global","PUBLIC_PLATFORM_SUPPORT_INVITE":"","PUBLIC_PLATFORM_TWITTER_URL":"","PUBLIC_PLATFROM_DISCORD_SUPPORT":"","PUBLIC_SHOW_NAME_AS_LOGO":"true","BASE_URL":"/","MODE":"production","DEV":false,"PROD":true,"SSR":true,"SITE":"http://localhost:3000"};
+const envKeys = ["npm_command","HOME","npm_config_noproxy","npm_config_npm_version","COLOR","npm_package_json","ECS_CONTAINER_METADATA_URI","AWS_EXECUTION_ENV","INIT_CWD","npm_config_user_agent","npm_node_execpath","YARN_VERSION","npm_config_cache","npm_config_node_gyp","npm_lifecycle_script","npm_lifecycle_event","EDITOR","PATH","npm_config_local_prefix","npm_package_name","npm_package_version","ECS_AGENT_URI","PWD","npm_config_prefix","ECS_CONTAINER_METADATA_URI_V4","HOSTNAME","NODE","npm_config_init_module","npm_execpath","NODE_VERSION","AWS_DEFAULT_REGION","npm_config_userconfig","npm_config_global_prefix","AWS_REGION","npm_config_globalconfig","PUBLIC_BASE_URL","PUBLIC_CRYPTO_PRIVATE_KEY","PUBLIC_PLATFORM_NAME","PUBLIC_PLATFORM_LOGO","PUBLIC_POWERED_BY","PUBLIC_PLATFORM_WEB_URL","PUBLIC_POWERED_BY_URL","PUBLIC_PLATFORM_DOCS_URL","PUBLIC_PLATFORM_GIT","PUBLIC_PLATFORM_SUPPORT_EMAIL","PUBLIC_PLATFORM_SUPPORT_INVITE","PUBLIC_PLATFORM_TWITTER_URL","PUBLIC_PLATFROM_DISCORD_SUPPORT","PUBLIC_SHOW_NAME_AS_LOGO","BASE_URL","MODE","DEV","PROD","SSR","SITE","ASSETS_PREFIX"];
+const sessionToken = undefined;
+const refreshToken = undefined;
+
+			envKeys.forEach((item) => {
+				globalThis[item] = initData[item];
+			});
+
+			globalThis.access_token = sessionToken;
+			globalThis.refresh_token = refreshToken;
+		})();</script>
+
+		
+	</body>
+</html>
