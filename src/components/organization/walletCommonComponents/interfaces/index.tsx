@@ -66,6 +66,11 @@ export interface ILedgerConfigData {
     noLedger: {
         [key: string]: string;
     };
+	ethereum: {
+		'did:ethr': {
+			[key: string]: string;
+		}
+	}
 }
 
 export interface ILedgerItem {

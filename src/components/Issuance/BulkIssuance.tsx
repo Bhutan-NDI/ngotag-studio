@@ -100,7 +100,7 @@ const BulkIssuance = () => {
 		
 			let currentSchemaType = schemaType;
 	
-			if (orgDid?.includes(DidMethod.POLYGON) || orgDid?.includes(DidMethod.KEY) || orgDid?.includes(DidMethod.WEB)) {
+			if (orgDid?.includes(DidMethod.POLYGON) || orgDid?.includes(DidMethod.ETHR) || orgDid?.includes(DidMethod.KEY) || orgDid?.includes(DidMethod.WEB)) {
 				currentSchemaType = SchemaTypes.schema_W3C;
 			} else if (orgDid?.includes(DidMethod.INDY)) {
 				currentSchemaType = SchemaTypes.schema_INDY;

@@ -68,7 +68,7 @@ const VerificationCred = () => {
 			if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
 				const did = data?.data?.org_agents?.[0]?.orgDid;
 				
-				if (did?.includes(DidMethod.POLYGON)) {
+				if (did?.includes(DidMethod.POLYGON) || did?.includes(DidMethod.ETHR)) {
 					setW3CSchema(true);
 					setRequestType(RequestType.PRESENTATION_EXCHANGE)
 					await getSchemaAndUsers(true);

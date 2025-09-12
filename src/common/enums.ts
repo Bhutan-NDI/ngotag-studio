@@ -88,7 +88,8 @@ export enum DidMethod {
     INDY = 'did:indy',
     KEY = 'did:key',
     WEB = 'did:web',
-    POLYGON = 'did:polygon'
+    POLYGON = 'did:polygon',
+	ETHR = 'did:ethr'
 }
 
 export enum Network {
@@ -107,12 +108,14 @@ Linux = 'linux'
 export enum Ledgers {
 	INDY = 'indy',
 	POLYGON = 'polygon',
-	NO_LEDGER = 'noLedger'
+	NO_LEDGER = 'noLedger',
+	ETHEREUM = 'ethereum'
 }
 
 export enum SchemaTypeValue {
 	INDY = 'indy',
 	POLYGON = 'polygon',
+	ETHEREUM = 'ethereum',
 	NO_LEDGER = 'no_ledger'
 }
 
@@ -144,5 +147,6 @@ export enum RequestType {
 
 export enum ProofType {
 	polygon = 'EcdsaSecp256k1Signature2019',
+	ethereum = 'EcdsaSecp256k1RecoveryMethod2020',
 	no_ledger = 'Ed25519Signature2018'
 }

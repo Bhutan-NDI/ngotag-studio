@@ -26,7 +26,7 @@ const Connections = () => {
 	const fetchOrgData = async () => {
 		const orgDid = await getFromLocalStorage(storageKeys.ORG_DID);
 		
-		if (orgDid.includes(DidMethod.POLYGON) || orgDid.includes(DidMethod.KEY) || orgDid.includes(DidMethod.WEB)) {
+		if (orgDid.includes(DidMethod.POLYGON) || orgDid.includes(DidMethod.ETHR) || orgDid.includes(DidMethod.KEY) || orgDid.includes(DidMethod.WEB)) {
 		  setIsW3cDid(true);
 		} else {
 		  setIsW3cDid(false);

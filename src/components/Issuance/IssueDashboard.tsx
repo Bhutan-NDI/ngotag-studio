@@ -12,7 +12,7 @@ const IssueDashboard = () => {
 
 const orgData =async () =>{
 	const orgDid = await getFromLocalStorage(storageKeys.ORG_DID);	
-	if(orgDid.includes(DidMethod.POLYGON) || orgDid.includes(DidMethod.WEB) || orgDid.includes(DidMethod.KEY)){
+	if(orgDid.includes(DidMethod.POLYGON) || orgDid.includes(DidMethod.ETHR) || orgDid.includes(DidMethod.WEB) || orgDid.includes(DidMethod.KEY)){
 		setisW3cDid(true)
 	} else {
 		setisW3cDid(false)

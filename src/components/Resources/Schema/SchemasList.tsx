@@ -238,7 +238,7 @@ const SchemaList = (props: {
 			if (data?.data?.org_agents && data?.data?.org_agents?.length > 0) {
 				setWalletStatus(true);
 			}
-			if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
+			if (did.includes(DidMethod.POLYGON) || did.includes(DidMethod.ETHR) || did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
 				setW3CSchema(true);
 				setSchemaType(SchemaTypes.schema_W3C)
 			}

@@ -77,8 +77,13 @@ const IssueCred = () => {
 					setSchemaType(SchemaTypeValue.POLYGON)
 					await getSchemaAndUsers(true)
 					setOrgDid(did);
-				}
-				else if (did?.includes(DidMethod.KEY) || did?.includes(DidMethod.WEB)) {
+				} else if (did?.includes(DidMethod.ETHR)) {
+					setW3CSchema(true);
+					setCredentialType(CredentialType.JSONLD);
+					setSchemaType(SchemaTypeValue.ETHEREUM)
+					await getSchemaAndUsers(true)
+					setOrgDid(did);
+				} else if (did?.includes(DidMethod.KEY) || did?.includes(DidMethod.WEB)) {
 					setW3CSchema(true);
 					setSchemaType(SchemaTypeValue.NO_LEDGER)
 					setCredentialType(CredentialType.JSONLD);
@@ -354,7 +359,7 @@ const getSelectedUsers = async (): Promise<SelectedUsers[]> => {
 						},
 
 						options: {
-							proofType: schemaType=== SchemaTypeValue.POLYGON ? ProofType.polygon : ProofType.no_ledger,
+							proofType: schemaType=== SchemaTypeValue.POLYGON ? ProofType.polygon : schemaType=== SchemaTypeValue.ETHEREUM ? ProofType.ethereum : ProofType.no_ledger,
 							proofPurpose: proofPurpose
 						}
 					};
