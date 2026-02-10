@@ -36,11 +36,12 @@ export const fetchOrganizationDetails = async ({
     }
 
     const isPolygon = did.includes(DidMethod.POLYGON)
+    const isEthereum = did.includes(DidMethod.ETHR)
     const isKey = did.includes(DidMethod.KEY)
     const isWeb = did.includes(DidMethod.WEB)
     const isIndy = did.includes(DidMethod.INDY)
 
-    if (isPolygon || isKey || isWeb) {
+    if (isPolygon || isEthereum || isKey || isWeb) {
       setW3cSchema(true)
       setSchemaType(SchemaTypes.schema_W3C)
     }

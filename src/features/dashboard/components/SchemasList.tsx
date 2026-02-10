@@ -132,6 +132,8 @@ const SchemasList = ({
             setSchemaTypeValues(SchemaTypeValue.INDY)
           } else if (did.includes(DidMethod.POLYGON)) {
             setSchemaTypeValues(SchemaTypeValue.POLYGON)
+          } else if (did.includes(DidMethod.ETHR)) {
+            setSchemaTypeValues(SchemaTypeValue.ETHEREUM)
           } else if (
             did.includes(DidMethod.KEY) ||
             did.includes(DidMethod.WEB)
