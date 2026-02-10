@@ -139,6 +139,7 @@ const EmailAttributesSelection = (): JSX.Element => {
 
         if (
           did.includes(DidMethod.POLYGON) ||
+          did.includes(DidMethod.ETHR) ||
           did.includes(DidMethod.KEY) ||
           did.includes(DidMethod.WEB)
         ) {
@@ -215,12 +216,15 @@ const EmailAttributesSelection = (): JSX.Element => {
   const mapCredDefs = (
     selectedCredDefs: CredDefData[],
     schema: ISchemaAttributeData,
-  ): CredDefData[] =>
-    (Array.isArray(selectedCredDefs)
-      ? selectedCredDefs.filter(
-          (credDef) => credDef.schemaLedgerId === schema.schemaId,
-        )
-      : [])
+  ): CredDefData[] => {
+    if (!Array.isArray(selectedCredDefs)) {
+      return []
+    }
+    return selectedCredDefs.filter(
+      (credDef) => credDef.schemaLedgerId === schema.schemaId,
+    )
+  }
+
   const mapMatchingCredDefs = (
     matchingCredDefs: CredDefData[],
     attribute: IAttributesDetails,

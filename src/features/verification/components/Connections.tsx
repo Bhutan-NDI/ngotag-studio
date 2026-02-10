@@ -120,6 +120,9 @@ const Connections = (): JSX.Element => {
         if (did?.includes(DidMethod.POLYGON)) {
           setIsW3cDid(true)
         }
+        if (did?.includes(DidMethod.ETHR)) {
+          setIsW3cDid(true)
+        }
         if (did?.includes(DidMethod.KEY) || did?.includes(DidMethod.WEB)) {
           setIsW3cDid(true)
         }

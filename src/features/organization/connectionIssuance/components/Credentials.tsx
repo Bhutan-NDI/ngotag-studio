@@ -191,6 +191,7 @@ const Credentials = (): JSX.Element => {
 
       if (
         orgDid.includes(DidMethod.POLYGON) ||
+        orgDid.includes(DidMethod.ETHR) ||
         orgDid.includes(DidMethod.KEY) ||
         orgDid.includes(DidMethod.WEB)
       ) {

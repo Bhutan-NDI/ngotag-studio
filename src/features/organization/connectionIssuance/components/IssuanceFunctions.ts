@@ -85,7 +85,9 @@ export const handleSubmit = async ({
           proofType:
             schemaType === SchemaTypeValue.POLYGON
               ? ProofType.polygon
-              : ProofType.no_ledger,
+              : schemaType === SchemaTypeValue.ETHEREUM
+                ? ProofType.ethereum
+                : ProofType.no_ledger,
           proofPurpose,
         },
       })),

@@ -240,6 +240,11 @@ const IssueCred = (): React.JSX.Element => {
           setSchemaType(SchemaTypeValue.POLYGON)
           setOrgDid(did)
           return true
+        } else if (did?.includes(DidMethod.ETHR)) {
+          setw3cSchema(true)
+          setSchemaType(SchemaTypeValue.ETHEREUM)
+          setOrgDid(did)
+          return true
         } else if (
           did?.includes(DidMethod.KEY) ||
           did?.includes(DidMethod.WEB)
