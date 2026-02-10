@@ -17,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import React, { ReactNode, useEffect, useState } from 'react'
 import {
   apiStatusCodes,
+  ethereumFaucet,
   polygonFaucet,
   polygonScan,
 } from '@/config/CommonConstant'
@@ -111,6 +112,22 @@ const LedgerConfig = ({
     return result
   }
 
+  function processEthereum(
+    details: Record<string, any>,
+  ): Record<string, string> {
+    const result: Record<string, string> = {}
+    for (const [key, value] of Object.entries(details)) {
+      if (typeof value === 'object' && value !== null) {
+        for (const [subKey, subValue] of Object.entries(value)) {
+          result[subKey] = subValue as string
+        }
+      } else if (typeof value === 'string') {
+        result[key] = value
+      }
+    }
+    return result
+  }
+
   function processNoLedger(
     details: Record<string, any>,
   ): Record<string, string> {
@@ -132,6 +149,7 @@ const LedgerConfig = ({
       const ledgerConfigData: ILedgerConfigData = {
         indy: { [`${DidMethod.INDY}`]: {} },
         polygon: { [`${DidMethod.POLYGON}`]: {} },
+        ethereum: { [`${DidMethod.ETHR}`]: {} },
         noLedger: {},
       }
 
@@ -147,6 +165,9 @@ const LedgerConfig = ({
         } else if (lowerName === Ledgers.POLYGON) {
           ledgerConfigData.polygon[`${DidMethod.POLYGON}`] =
             processPolygon(details)
+        } else if (lowerName === Ledgers.ETHEREUM) {
+          ledgerConfigData.ethereum[`${DidMethod.ETHR}`] =
+            processEthereum(details)
         } else if (lowerName === Ledgers.NO_LEDGER.toLowerCase()) {
           ledgerConfigData.noLedger = processNoLedger(details)
         }
@@ -229,7 +250,8 @@ const LedgerConfig = ({
     let filteredNetworks = Object.keys(networkOptions)
     if (
       process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.PROD &&
-      selectedMethod === DidMethod.POLYGON
+      (selectedMethod === DidMethod.POLYGON ||
+        selectedMethod === DidMethod.ETHR)
     ) {
       filteredNetworks = filteredNetworks.filter(
         (network) => network === Network.MAINNET,
@@ -237,7 +259,8 @@ const LedgerConfig = ({
     } else if (
       (process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.DEV ||
         process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.QA) &&
-      selectedMethod === DidMethod.POLYGON
+      (selectedMethod === DidMethod.POLYGON ||
+        selectedMethod === DidMethod.ETHR)
     ) {
       filteredNetworks = filteredNetworks.filter(
         (network) => network === Network.TESTNET,
@@ -340,6 +363,7 @@ const LedgerConfig = ({
 
     if (
       (selectedLedger === Ledgers.POLYGON && !privateKeyValue) ||
+      (selectedLedger === Ledgers.ETHEREUM && !privateKeyValue) ||
       (selectedLedger === Ledgers.INDY &&
         (!selectedMethod || !selectedNetwork)) ||
       (selectedLedger === Ledgers.NO_LEDGER &&
@@ -542,6 +566,21 @@ const LedgerConfig = ({
                   }
                 />
                 <LedgerCard
+                  ledger={Ledgers.ETHEREUM}
+                  title=""
+                  description="Ethereum Blockchain"
+                  selectedLedger={selectedLedger}
+                  handleLedgerSelect={handleLedgerSelect}
+                  icon={
+                    <Image
+                      src="/images/ethereum.png"
+                      alt="Ethereum Icon"
+                      width={112}
+                      height={112}
+                    />
+                  }
+                />
+                <LedgerCard
                   ledger={Ledgers.NO_LEDGER}
                   title=""
                   description="No Ledger"
@@ -687,6 +726,61 @@ const LedgerConfig = ({
                                   className="font-semibold underline"
                                 >
                                   {polygonFaucet}
+                                </a>{' '}
+                                to get free tokens.
+                              </div>
+                            </div>
+                          </li>
+                          <li className="">
+                            <span className="mr-2 font-semibold">Step 2:</span>
+                            <div>
+                              Check that you have received the tokens.
+                              <div className="mt-1">
+                                For example, copy the address and check the
+                                balance on{' '}
+                                <a
+                                  href={polygonScan}
+                                  className="font-semibold underline"
+                                >
+                                  {polygonScan}
+                                </a>
+                              </div>
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedMethod === DidMethod.ETHR && (
+                  <div className="bg-muted mx-auto mt-6 max-w-2xl rounded-lg p-4">
+                    <div className="">
+                      <div>
+                        <SetPrivateKeyValueInput
+                          orgId={orgId}
+                          setPrivateKeyValue={setPrivateKeyValue}
+                          privateKeyValue={privateKeyValue}
+                          formikHandlers={formikHandlers}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="mb-3 text-sm font-medium">
+                          Follow these instructions to generate ethereum tokens:
+                        </h4>
+                        <ol className="space-y-3 text-sm">
+                          <li className="">
+                            <span className="mr-2 font-semibold">Step 1:</span>
+                            <div>
+                              Copy the address and get the free tokens for the
+                              Sepolia testnet.
+                              <div className="mt-1">
+                                For example, use{' '}
+                                <a
+                                  href={ethereumFaucet}
+                                  className="font-semibold underline"
+                                >
+                                  {ethereumFaucet}
                                 </a>{' '}
                                 to get free tokens.
                               </div>

@@ -96,6 +96,7 @@ const apiRoutes = {
     agentSharedSpinup: '/agents/wallet',
     getLedgerConfig: '/agents/ledgerConfig',
     createPolygonKeys: '/agents/polygon/create-keys',
+    createEthereumKeys: '/agents/ethereum/create-keys',
     setAgentConfig: '/agents/configure',
     deleteWallet: '/agents/wallet',
   },

@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import React, { useEffect, useState } from 'react'
 import {
   apiStatusCodes,
+  ethereumFaucet,
   polygonFaucet,
   polygonScan,
 } from '@/config/CommonConstant'
@@ -49,6 +50,11 @@ interface ILedgerConfigData {
   }
   polygon: {
     'did:polygon': {
+      [key: string]: string
+    }
+  }
+  ethereum: {
+    'did:ethr': {
       [key: string]: string
     }
   }
@@ -136,6 +142,21 @@ const DedicatedLedgerConfig = ({
     }
   }
 
+  const processEthereumLedger = (
+    details: IDetails,
+    configData: ILedgerConfigData,
+  ): void => {
+    for (const [key, value] of Object.entries(details)) {
+      if (typeof value === 'object' && value !== null) {
+        for (const [subKey, subValue] of Object.entries(value)) {
+          configData.ethereum[`${DidMethod.ETHR}`][subKey] = subValue
+        }
+      } else if (typeof value === 'string') {
+        configData.ethereum[`${DidMethod.ETHR}`][key] = value
+      }
+    }
+  }
+
   const processNoLedger = (
     details: IDetails,
     configData: ILedgerConfigData,
@@ -155,6 +176,7 @@ const DedicatedLedgerConfig = ({
       const dedicatedLedgerConfigData: ILedgerConfigData = {
         indy: { [`${DidMethod.INDY}`]: {} },
         polygon: { [`${DidMethod.POLYGON}`]: {} },
+        ethereum: { [`${DidMethod.ETHR}`]: {} },
         noLedger: {},
       }
 
@@ -165,6 +187,8 @@ const DedicatedLedgerConfig = ({
           processIndyLedger(details, dedicatedLedgerConfigData)
         } else if (lowerName === Ledgers.POLYGON && details) {
           processPolygonLedger(details, dedicatedLedgerConfigData)
+        } else if (lowerName === Ledgers.ETHEREUM && details) {
+          processEthereumLedger(details, dedicatedLedgerConfigData)
         } else if (lowerName === Ledgers.NO_LEDGER.toLowerCase() && details) {
           processNoLedger(details, dedicatedLedgerConfigData)
         }
@@ -196,6 +220,7 @@ const DedicatedLedgerConfig = ({
 
     if (
       (selectedLedger === Ledgers.POLYGON && !privateKeyValue) ||
+      (selectedLedger === Ledgers.ETHEREUM && !privateKeyValue) ||
       (selectedLedger === Ledgers.INDY &&
         (!selectedMethod || !selectedNetwork)) ||
       (selectedLedger === Ledgers.NO_LEDGER && !selectedMethod) ||
@@ -249,7 +274,8 @@ const DedicatedLedgerConfig = ({
     let filteredNetworks = Object.keys(networkOptions)
     if (
       process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.PROD &&
-      selectedMethod === DidMethod.POLYGON
+      (selectedMethod === DidMethod.POLYGON ||
+        selectedMethod === DidMethod.ETHR)
     ) {
       filteredNetworks = filteredNetworks.filter(
         (network) => network === Network.MAINNET,
@@ -257,7 +283,8 @@ const DedicatedLedgerConfig = ({
     } else if (
       (process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.DEV ||
         process.env.NEXT_PUBLIC_MODE?.toUpperCase() === Environment.QA) &&
-      selectedMethod === DidMethod.POLYGON
+      (selectedMethod === DidMethod.POLYGON ||
+        selectedMethod === DidMethod.ETHR)
     ) {
       filteredNetworks = filteredNetworks.filter(
         (network) => network === Network.TESTNET,
@@ -461,6 +488,21 @@ const DedicatedLedgerConfig = ({
             }
           />
           <LedgerCard
+            ledger={Ledgers.ETHEREUM}
+            title=""
+            description="Ethereum Blockchain"
+            selectedLedger={selectedLedger}
+            handleLedgerSelect={handleLedgerSelect}
+            icon={
+              <Image
+                src="/images/ethereum.png"
+                alt="Ethereum Icon"
+                width={112}
+                height={112}
+              />
+            }
+          />
+          <LedgerCard
             ledger={Ledgers.NO_LEDGER}
             title=""
             description="No Ledger"
@@ -528,7 +570,8 @@ const DedicatedLedgerConfig = ({
                     {renderMethodOptions(formikHandlers)}
 
                     {(selectedMethod === DidMethod.INDY ||
-                      selectedMethod === DidMethod.POLYGON) &&
+                      selectedMethod === DidMethod.POLYGON ||
+                      selectedMethod === DidMethod.ETHR) &&
                       renderNetworkOptions(formikHandlers)}
                   </div>
 
@@ -587,6 +630,68 @@ const DedicatedLedgerConfig = ({
                                     className="font-semibold underline"
                                   >
                                     {polygonFaucet}
+                                  </a>{' '}
+                                  to get free tokens.
+                                </div>
+                              </div>
+                            </li>
+                            <li className="">
+                              <span className="mr-2 font-semibold">
+                                Step 2:
+                              </span>
+                              <div>
+                                Check that you have received the tokens.
+                                <div className="mt-1">
+                                  For example, copy the address and check the
+                                  balance on{' '}
+                                  <a
+                                    href={polygonScan}
+                                    className="font-semibold underline"
+                                  >
+                                    {polygonScan}
+                                  </a>{' '}
+                                  .
+                                </div>
+                              </div>
+                            </li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Private key for Ethereum */}
+                  {selectedMethod === DidMethod.ETHR && (
+                    <div className="bg-muted mx-auto mt-6 max-w-2xl rounded-lg p-4">
+                      <div className="">
+                        <div>
+                          <SetPrivateKeyValueInput
+                            orgId={orgId}
+                            setPrivateKeyValue={setPrivateKeyValue}
+                            privateKeyValue={privateKeyValue}
+                            formikHandlers={formikHandlers}
+                          />
+                        </div>
+                        <div>
+                          <h4 className="mb-3 text-sm font-medium">
+                            Follow these instructions to generate ethereum
+                            tokens:
+                          </h4>
+                          <ol className="space-y-3 text-sm">
+                            <li className="">
+                              <span className="mr-2 font-semibold">
+                                Step 1:
+                              </span>
+                              <div>
+                                Copy the address and get the free tokens for the
+                                Sepolia testnet.
+                                <div className="mt-1">
+                                  For example, use{' '}
+                                  <a
+                                    href={ethereumFaucet}
+                                    className="font-semibold underline"
+                                  >
+                                    {ethereumFaucet}
                                   </a>{' '}
                                   to get free tokens.
                                 </div>

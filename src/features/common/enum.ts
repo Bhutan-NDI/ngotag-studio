@@ -77,6 +77,7 @@ export enum DidMethod {
   KEY = 'did:key',
   WEB = 'did:web',
   POLYGON = 'did:polygon',
+  ETHR = 'did:ethr',
 }
 
 export enum Network {
@@ -87,6 +88,11 @@ export enum Network {
 export enum PolygonNetworks {
   TESTNET = 'Polygon Testnet',
   MAINNET = 'Polygon Mainnet',
+}
+
+export enum EthereumNetworks {
+  TESTNET = 'Ethereum Testnet Sepolia',
+  MAINNET = 'Ethereum Mainnet',
 }
 
 export enum CommonConstants {
@@ -100,12 +106,14 @@ export enum Devices {
 export enum Ledgers {
   INDY = 'indy',
   POLYGON = 'polygon',
+  ETHEREUM = 'ethereum',
   NO_LEDGER = 'noLedger',
 }
 
 export enum SchemaTypeValue {
   INDY = 'indy',
   POLYGON = 'polygon',
+  ETHEREUM = 'ethereum',
   NO_LEDGER = 'no_ledger',
 }
 
@@ -137,6 +145,7 @@ export enum RequestType {
 
 export enum ProofType {
   polygon = 'EcdsaSecp256k1Signature2019',
+  ethereum = 'EcdsaSecp256k1RecoveryMethod2020',
   no_ledger = 'Ed25519Signature2018',
 }
 

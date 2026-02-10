@@ -20,11 +20,13 @@ import {
 import {
   apiStatusCodes,
   currentPageNumber,
+  ethereumFaucet,
   itemPerPage,
   polygonFaucet,
 } from '@/config/CommonConstant'
 import {
   createDid,
+  createEthereumKeyValuePair,
   createPolygonKeyValuePair,
   getDids,
   updatePrimaryDid,
@@ -339,6 +341,12 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
           .required('Private key is required')
           .length(64, 'Private key must be exactly 64 characters long'),
       })
+    } else if (method === DidMethod.ETHR) {
+      schema = schema.shape({
+        privatekey: Yup.string()
+          .required('Private key is required')
+          .length(64, 'Private key must be exactly 64 characters long'),
+      })
     }
 
     return schema
@@ -356,7 +364,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       setMethod(didMethod)
 
       let ledgerName: string = ''
-      if (didMethod === DidMethod.INDY || didMethod === DidMethod.POLYGON) {
+      if (
+        didMethod === DidMethod.INDY ||
+        didMethod === DidMethod.POLYGON ||
+        didMethod === DidMethod.ETHR
+      ) {
         ledgerName = data?.data?.org_agents[0]?.orgDid.split(':')[1]
       } else {
         ledgerName = 'No Ledger'
@@ -370,6 +382,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
           .slice(2, 4)
           .join(':')
       } else if (didMethod === DidMethod.POLYGON) {
+        networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
+      } else if (didMethod === DidMethod.ETHR) {
         networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
       }
 
@@ -412,6 +426,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     if (
       isCreatingDid &&
       method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
       method !== DidMethod.WEB
     ) {
       return (
@@ -475,7 +490,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     setErrMsg(null)
 
     // Only set isCreatingDid for non-Polygon and non-Web methods
-    if (method !== DidMethod.POLYGON && method !== DidMethod.WEB) {
+    if (
+      method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
+      method !== DidMethod.WEB
+    ) {
       setIsCreatingDid(true)
     }
 
@@ -484,15 +503,23 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       network = values?.network || ''
     } else if (values.method === DidMethod.POLYGON) {
       network = `${values.ledger}:${values.network}`
+    } else if (values.method === DidMethod.ETHR) {
+      network = `${values.ledger}:${values.network}`
     }
     const didData = {
-      seed: values.method === DidMethod.POLYGON ? '' : seed,
+      seed:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? ''
+          : seed,
       keyType: 'ed25519',
       method: values.method?.split(':')[1] || '',
       network,
       domain: values.method === DidMethod.WEB ? values.domain : '',
       role: values.method === DidMethod.INDY ? 'endorser' : '',
-      privatekey: values.method === DidMethod.POLYGON ? values.privatekey : '',
+      privatekey:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? values.privatekey
+          : '',
       did: values?.did ?? '',
       endorserDid: values?.endorserDid || '',
       isPrimaryDid: false,
@@ -516,6 +543,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setIsCreatingDid(false)
         if (
           values.method === DidMethod.POLYGON ||
+          values.method === DidMethod.ETHR ||
           values.method === DidMethod.WEB
         ) {
           setShowPopup(true)
@@ -537,6 +565,28 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     setIsLoading(true)
     try {
       const resCreatePolygonKeys = await createPolygonKeyValuePair(orgId)
+      const { data } = resCreatePolygonKeys as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+        setGeneratedKeys(data?.data)
+        setIsLoading(false)
+        const privateKey = data?.data?.privateKey.slice(2)
+        setPrivateKeyValue(privateKeyValue || privateKey)
+        setFieldValue('privatekey', privateKey)
+        await checkBalance(privateKeyValue || privateKey, Network.TESTNET)
+      }
+    } catch (err) {
+      console.error('Generate private key ERROR::::', err)
+      setIsLoading(false)
+    }
+  }
+
+  const generateEthereumKeyValuePair = async (
+    setFieldValue: FormikHelpers<IFormValues>['setFieldValue'],
+  ): Promise<void> => {
+    setIsLoading(true)
+    try {
+      const resCreatePolygonKeys = await createEthereumKeyValuePair(orgId)
       const { data } = resCreatePolygonKeys as AxiosResponse
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
@@ -601,7 +651,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
             setIsMethodLoading(false)
             setErrMsg(null)
 
-            if (method === DidMethod.POLYGON || method === DidMethod.WEB) {
+            if (
+              method === DidMethod.POLYGON ||
+              method === DidMethod.ETHR ||
+              method === DidMethod.WEB
+            ) {
               setShowPopup(true)
             } else {
               setIsCreatingDid(true)
@@ -678,8 +732,10 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         )}
       </div>
 
-      {/* Conditionally render the Dialog for both Polygon and Web DIDs */}
-      {(method === DidMethod.POLYGON || method === DidMethod.WEB) && (
+      {/* Conditionally render the Dialog for Polygon, Ethereum and Web DIDs */}
+      {(method === DidMethod.POLYGON ||
+        method === DidMethod.ETHR ||
+        method === DidMethod.WEB) && (
         <Dialog open={showPopup} onOpenChange={setShowPopup}>
           <DialogContent className="max-w-2xl!">
             <DialogHeader>
@@ -923,6 +979,170 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                         </div>
                       </>
                     )}
+
+                    {method === DidMethod.ETHR && (
+                      <>
+                        <div className="col-span-1 sm:col-span-2">
+                          <div className="mb-4 flex items-center space-x-2">
+                            <Checkbox
+                              id="havePrivateKey"
+                              checked={havePrivateKey}
+                              onCheckedChange={(checked) =>
+                                setHavePrivateKey(checked === true)
+                              }
+                            />
+                            <Label htmlFor="havePrivateKey">
+                              Already have a private key?
+                            </Label>
+                          </div>
+
+                          {!havePrivateKey ? (
+                            <>
+                              <div className="my-3 flex items-center justify-between">
+                                <Label>
+                                  Generate private key{' '}
+                                  <span className="text-destructive text-xs">
+                                    *
+                                  </span>
+                                </Label>
+                                <Button
+                                  type="button"
+                                  onClick={() =>
+                                    generateEthereumKeyValuePair(setFieldValue)
+                                  }
+                                  disabled={isLoading}
+                                >
+                                  {isLoading ? 'Generating...' : 'Generate'}
+                                </Button>
+                              </div>
+
+                              {generatedKeys && (
+                                <>
+                                  <div className="relative mt-3">
+                                    <div className="relative mt-3 w-full overflow-x-auto">
+                                      <div className="flex w-full items-center">
+                                        <div className="ml-2 shrink-0">
+                                          <CopyDid
+                                            value={generatedKeys.privateKey.slice(
+                                              2,
+                                            )}
+                                            showCheck={true}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <ErrorMessage
+                                      name="privatekey"
+                                      component="div"
+                                      className="text-destructive mt-1 text-sm"
+                                    />
+                                    {walletErrorMessage && (
+                                      <p className="text-destructive text-sm">
+                                        {walletErrorMessage}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <TokenWarningMessage />
+
+                                  <div className="my-3">
+                                    <div className="text-sm">
+                                      <span className="font-semibold">
+                                        Address:
+                                      </span>
+                                      <CopyDid
+                                        value={generatedKeys.address}
+                                        className="mt-1"
+                                        showCheck={true}
+                                      />
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <div>
+                              <Field
+                                as={Input}
+                                name="privatekey"
+                                placeholder="Enter private key"
+                                onChange={(
+                                  e: React.ChangeEvent<HTMLInputElement>,
+                                ) => {
+                                  setFieldValue('privatekey', e.target.value)
+                                  setPrivateKeyValue(e.target.value)
+                                  setWalletErrorMessage(null)
+                                  if (e.target.value.length === 64) {
+                                    checkBalance(
+                                      e.target.value,
+                                      Network.TESTNET,
+                                    )
+                                  }
+                                }}
+                              />
+                              <ErrorMessage
+                                name="privatekey"
+                                component="div"
+                                className="text-destructive mt-1 text-sm"
+                              />
+                              {walletErrorMessage && (
+                                <p className="text-destructive text-sm">
+                                  {walletErrorMessage}
+                                </p>
+                              )}
+                              <TokenWarningMessage />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="col-span-1 sm:col-span-2">
+                          <h3 className="mb-2 text-sm font-semibold">
+                            Follow these instructions to generate Ethereum
+                            tokens:
+                          </h3>
+                          <ol className="space-y-2 text-sm">
+                            <li>
+                              <span className="font-semibold">Step 1:</span>
+                              <div className="ml-4">
+                                Copy the address and get the free tokens for the
+                                Sepolia testnet.
+                                <div>
+                                  For eg. use{' '}
+                                  <a
+                                    href={ethereumFaucet}
+                                    className="font-semibold underline"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    {ethereumFaucet}
+                                  </a>{' '}
+                                  to get free token
+                                </div>
+                              </div>
+                            </li>
+                            <li>
+                              <span className="font-semibold">Step 2:</span>
+                              <div className="ml-4">
+                                Check that you have received the tokens.
+                                <div>
+                                  For eg. copy the address and check the balance
+                                  on{' '}
+                                  <a
+                                    href="https://sepolia.etherscan.io/"
+                                    className="underline"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    https://sepolia.etherscan.io
+                                  </a>
+                                </div>
+                              </div>
+                            </li>
+                          </ol>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex justify-end">
@@ -931,6 +1151,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                       disabled={
                         loading ||
                         (method === DidMethod.POLYGON && !values.privatekey) ||
+                        (method === DidMethod.ETHR && !values.privatekey) ||
                         (method === DidMethod.WEB && !values.domain)
                       }
                     >

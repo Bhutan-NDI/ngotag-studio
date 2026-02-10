@@ -163,6 +163,24 @@ export const createPolygonKeyValuePair = async (
   }
 }
 
+export const createEthereumKeyValuePair = async (
+  orgId: string,
+): Promise<AxiosResponse | string> => {
+  const url = `${apiRoutes.organizations.root}/${orgId}${apiRoutes.Agent.createEthereumKeys}`
+  const config = getHeaderConfigs()
+  const axiosPayload = {
+    url,
+    config,
+  }
+
+  try {
+    return await axiosPost(axiosPayload)
+  } catch (error) {
+    const err = error as Error
+    return err?.message
+  }
+}
+
 export const getDids = async (
   orgId: string,
 ): Promise<AxiosResponse | string> => {
