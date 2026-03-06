@@ -18,6 +18,7 @@ import React, { ReactNode, useEffect, useState } from 'react'
 import {
   apiStatusCodes,
   ethereumFaucet,
+  ethereumScan,
   polygonFaucet,
   polygonScan,
 } from '@/config/CommonConstant'
@@ -707,6 +708,7 @@ const LedgerConfig = ({
                           setPrivateKeyValue={setPrivateKeyValue}
                           privateKeyValue={privateKeyValue}
                           formikHandlers={formikHandlers}
+                          didMethod={selectedMethod}
                         />
                       </div>
                       <div>
@@ -762,6 +764,7 @@ const LedgerConfig = ({
                           setPrivateKeyValue={setPrivateKeyValue}
                           privateKeyValue={privateKeyValue}
                           formikHandlers={formikHandlers}
+                          didMethod={selectedMethod}
                         />
                       </div>
                       <div>
@@ -794,10 +797,10 @@ const LedgerConfig = ({
                                 For example, copy the address and check the
                                 balance on{' '}
                                 <a
-                                  href={polygonScan}
+                                  href={ethereumScan}
                                   className="font-semibold underline"
                                 >
-                                  {polygonScan}
+                                  {ethereumScan}
                                 </a>
                               </div>
                             </div>
