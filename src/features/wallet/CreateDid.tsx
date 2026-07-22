@@ -195,12 +195,19 @@ const CreateDid = (): React.JSX.Element => {
       const fullMethod = `${didPrefix}:${method}`
       let network = ''
 
-      if (fullMethod === DidMethod.INDY || fullMethod === DidMethod.POLYGON) {
+      if (
+        fullMethod === DidMethod.INDY ||
+        fullMethod === DidMethod.POLYGON ||
+        fullMethod === DidMethod.ETHR
+      ) {
         network = didParts.slice(-2).join(':')
       }
 
       const payload = {
-        seed: fullMethod === DidMethod.POLYGON ? '' : seeds,
+        seed:
+          fullMethod === DidMethod.POLYGON || fullMethod === DidMethod.ETHR
+            ? ''
+            : seeds,
         keyType: 'ed25519',
         method,
         ledger: didParts[2] || '',
@@ -636,6 +643,7 @@ const CreateDid = (): React.JSX.Element => {
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
+                  didMethod={DidMethod.POLYGON}
                 />
 
                 <div className="space-y-5">
@@ -662,6 +670,58 @@ const CreateDid = (): React.JSX.Element => {
                         </span>
                         <div className="text-foreground/80 text-sm">
                           Verify the balance using Polygon Scan.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {selectedDid === 'did:ethr:testnet' && (
+            <Card className="border-border mt-6 border shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-foreground text-lg font-semibold">
+                  Ethereum Configuration
+                </CardTitle>
+                <CardDescription className="text-muted-foreground text-sm">
+                  Configure your Ethereum DID by setting the private key.
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-6 pt-6">
+                <SetPrivateKeyValueInput
+                  orgId={orgId || ''}
+                  privateKeyValue={privateKeyValue}
+                  setPrivateKeyValue={setPrivateKeyValue}
+                  didMethod={DidMethod.ETHR}
+                />
+
+                <div className="space-y-5">
+                  <h4 className="text-foreground/80 text-sm font-medium">
+                    Steps to get Ethereum Sepolia Tokens
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div className="border-border bg-secondary rounded-lg border p-4">
+                      <div className="flex items-start space-x-3">
+                        <span className="text-primary text-sm font-semibold">
+                          Step 1
+                        </span>
+                        <div className="text-foreground/80 text-sm">
+                          Copy your address and claim test tokens.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-border bg-secondary rounded-lg border p-4">
+                      <div className="flex items-start space-x-3">
+                        <span className="text-primary text-sm font-semibold">
+                          Step 2
+                        </span>
+                        <div className="text-foreground/80 text-sm">
+                          Verify the balance using Etherscan.
                         </div>
                       </div>
                     </div>

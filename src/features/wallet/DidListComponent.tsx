@@ -20,11 +20,13 @@ import {
 import {
   apiStatusCodes,
   currentPageNumber,
+  ethereumFaucet,
   itemPerPage,
   polygonFaucet,
 } from '@/config/CommonConstant'
 import {
   createDid,
+  createEthereumKeyValuePair,
   createPolygonKeyValuePair,
   generateDidWeb,
   getDids,
@@ -327,7 +329,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       did: Yup.string(),
     })
 
-    if (method === DidMethod.POLYGON) {
+    if (method === DidMethod.POLYGON || method === DidMethod.ETHR) {
       schema = schema.shape({
         privatekey: Yup.string()
           .required('Private key is required')
@@ -423,7 +425,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       setMethod(didMethod)
 
       let ledgerName = ''
-      if (didMethod === DidMethod.INDY || didMethod === DidMethod.POLYGON) {
+      if (
+        didMethod === DidMethod.INDY ||
+        didMethod === DidMethod.POLYGON ||
+        didMethod === DidMethod.ETHR
+      ) {
         ledgerName = data?.data?.org_agents[0]?.orgDid.split(':')[1]
       } else {
         ledgerName = 'No Ledger'
@@ -436,6 +442,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
           .slice(2, 4)
           .join(':')
       } else if (didMethod === DidMethod.POLYGON) {
+        networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
+      } else if (didMethod === DidMethod.ETHR) {
         networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
       }
 
@@ -541,7 +549,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     setErrMsg(null)
 
     // Only set isCreatingDid for non-Polygon and non-Web methods
-    if (method !== DidMethod.POLYGON && method !== DidMethod.WEB) {
+    if (
+      method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
+      method !== DidMethod.WEB
+    ) {
       setIsCreatingDid(true)
     }
 
@@ -550,16 +562,24 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       network = values?.network || ''
     } else if (values.method === DidMethod.POLYGON) {
       network = `${values.ledger}:${values.network}`
+    } else if (values.method === DidMethod.ETHR) {
+      network = `${values.ledger}:${values.network}`
     }
 
     const didData = {
-      seed: values.method === DidMethod.POLYGON ? '' : seed,
+      seed:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? ''
+          : seed,
       keyType: 'ed25519',
       method: values.method?.split(':')[1] || '',
       network,
       domain: values.method === DidMethod.WEB ? values.domain : '',
       role: values.method === DidMethod.INDY ? 'endorser' : '',
-      privatekey: values.method === DidMethod.POLYGON ? values.privatekey : '',
+      privatekey:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? values.privatekey
+          : '',
       did: values?.did ?? '',
       endorserDid: values?.endorserDid || '',
       isPrimaryDid: false,
@@ -584,6 +604,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setIsCreatingDid(false)
         if (
           values.method === DidMethod.POLYGON ||
+          values.method === DidMethod.ETHR ||
           values.method === DidMethod.WEB
         ) {
           setShowPopup(true)
@@ -607,6 +628,28 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     try {
       const resCreatePolygonKeys = await createPolygonKeyValuePair(orgId)
       const { data } = resCreatePolygonKeys as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+        setGeneratedKeys(data?.data)
+        setIsLoading(false)
+        const privateKey = data?.data?.privateKey.slice(2)
+        setPrivateKeyValue(privateKeyValue || privateKey)
+        setFieldValue('privatekey', privateKey)
+        await checkBalance(privateKeyValue || privateKey, Network.TESTNET)
+      }
+    } catch (err) {
+      console.error('Generate private key ERROR:', err)
+      setIsLoading(false)
+    }
+  }
+
+  const generateEthereumKeyValuePair = async (
+    setFieldValue: FormikHelpers<IFormValues>['setFieldValue'],
+  ): Promise<void> => {
+    setIsLoading(true)
+    try {
+      const resCreateEthereumKeys = await createEthereumKeyValuePair(orgId)
+      const { data } = resCreateEthereumKeys as AxiosResponse
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
         setGeneratedKeys(data?.data)
@@ -768,6 +811,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     if (
       isCreatingDid &&
       method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
       method !== DidMethod.WEB
     ) {
       return (
@@ -817,7 +861,10 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
             if (method === DidMethod.WEB) {
               resetWebDialog()
               setShowPopup(true)
-            } else if (method === DidMethod.POLYGON) {
+            } else if (
+              method === DidMethod.POLYGON ||
+              method === DidMethod.ETHR
+            ) {
               setShowPopup(true)
             } else {
               setIsCreatingDid(true)
@@ -1088,8 +1135,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         </Dialog>
       )}
 
-      {/* ── Polygon dialog — original Formik ── */}
-      {method === DidMethod.POLYGON && (
+      {/* ── Polygon / Ethereum dialog — original Formik ── */}
+      {(method === DidMethod.POLYGON || method === DidMethod.ETHR) && (
         <Dialog open={showPopup} onOpenChange={setShowPopup}>
           <DialogContent className="max-w-2xl!">
             <DialogHeader>
@@ -1170,9 +1217,13 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                             </Label>
                             <Button
                               type="button"
-                              onClick={() =>
-                                generatePolygonKeyValuePair(setFieldValue)
-                              }
+                              onClick={() => {
+                                if (method === DidMethod.ETHR) {
+                                  generateEthereumKeyValuePair(setFieldValue)
+                                } else {
+                                  generatePolygonKeyValuePair(setFieldValue)
+                                }
+                              }}
                               disabled={isLoading}
                             >
                               {isLoading ? 'Generating...' : 'Generate'}
@@ -1253,49 +1304,99 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                       )}
                     </div>
 
-                    <div className="col-span-1 sm:col-span-2">
-                      <h3 className="mb-2 text-sm font-semibold">
-                        Follow these instructions to generate polygon tokens:
-                      </h3>
-                      <ol className="space-y-2 text-sm">
-                        <li>
-                          <span className="font-semibold">Step 1:</span>
-                          <div className="ml-4">
-                            Copy the address and get the free tokens for the
-                            testnet.
-                            <div>
-                              For eg. use{' '}
-                              <a
-                                href={polygonFaucet}
-                                className="font-semibold underline"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {polygonFaucet}
-                              </a>{' '}
-                              to get free token
+                    {method === DidMethod.POLYGON && (
+                      <div className="col-span-1 sm:col-span-2">
+                        <h3 className="mb-2 text-sm font-semibold">
+                          Follow these instructions to generate polygon tokens:
+                        </h3>
+                        <ol className="space-y-2 text-sm">
+                          <li>
+                            <span className="font-semibold">Step 1:</span>
+                            <div className="ml-4">
+                              Copy the address and get the free tokens for the
+                              testnet.
+                              <div>
+                                For eg. use{' '}
+                                <a
+                                  href={polygonFaucet}
+                                  className="font-semibold underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {polygonFaucet}
+                                </a>{' '}
+                                to get free token
+                              </div>
                             </div>
-                          </div>
-                        </li>
-                        <li>
-                          <span className="font-semibold">Step 2:</span>
-                          <div className="ml-4">
-                            Check that you have received the tokens.
-                            <div>
-                              For eg. copy the address and check the balance on{' '}
-                              <a
-                                href="https://mumbai.polygonscan.com/"
-                                className="underline"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                https://mumbai.polygonscan.com/
-                              </a>
+                          </li>
+                          <li>
+                            <span className="font-semibold">Step 2:</span>
+                            <div className="ml-4">
+                              Check that you have received the tokens.
+                              <div>
+                                For eg. copy the address and check the balance
+                                on{' '}
+                                <a
+                                  href="https://mumbai.polygonscan.com/"
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  https://mumbai.polygonscan.com/
+                                </a>
+                              </div>
                             </div>
-                          </div>
-                        </li>
-                      </ol>
-                    </div>
+                          </li>
+                        </ol>
+                      </div>
+                    )}
+
+                    {method === DidMethod.ETHR && (
+                      <div className="col-span-1 sm:col-span-2">
+                        <h3 className="mb-2 text-sm font-semibold">
+                          Follow these instructions to generate Ethereum tokens:
+                        </h3>
+                        <ol className="space-y-2 text-sm">
+                          <li>
+                            <span className="font-semibold">Step 1:</span>
+                            <div className="ml-4">
+                              Copy the address and get the free tokens for the
+                              Sepolia testnet.
+                              <div>
+                                For eg. use{' '}
+                                <a
+                                  href={ethereumFaucet}
+                                  className="font-semibold underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {ethereumFaucet}
+                                </a>{' '}
+                                to get free token
+                              </div>
+                            </div>
+                          </li>
+                          <li>
+                            <span className="font-semibold">Step 2:</span>
+                            <div className="ml-4">
+                              Check that you have received the tokens.
+                              <div>
+                                For eg. copy the address and check the balance
+                                on{' '}
+                                <a
+                                  href="https://sepolia.etherscan.io/"
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  https://sepolia.etherscan.io
+                                </a>
+                              </div>
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end">
@@ -1303,7 +1404,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                       type="submit"
                       disabled={
                         loading ||
-                        (method === DidMethod.POLYGON && !values.privatekey)
+                        (method === DidMethod.POLYGON && !values.privatekey) ||
+                        (method === DidMethod.ETHR && !values.privatekey)
                       }
                     >
                       {loading ? 'Submitting...' : 'Submit'}

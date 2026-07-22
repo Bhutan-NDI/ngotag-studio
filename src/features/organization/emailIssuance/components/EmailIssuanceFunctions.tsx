@@ -150,7 +150,9 @@ const transformW3CData = async (
         proofType:
           schemaTypeValue === SchemaTypeValue.POLYGON
             ? ProofType.polygon
-            : ProofType.no_ledger,
+            : schemaTypeValue === SchemaTypeValue.ETHEREUM
+              ? ProofType.ethereum
+              : ProofType.no_ledger,
         proofPurpose,
       },
     }
@@ -306,6 +308,10 @@ const setSchemaAndCredentialType = (
 ): SchemaTypes | undefined => {
   if (orgDid?.includes(DidMethod.POLYGON)) {
     setSchemaTypeValue(SchemaTypeValue.POLYGON)
+    setCredentialType(CredentialType.JSONLD)
+    return SchemaTypes.schema_W3C
+  } else if (orgDid?.includes(DidMethod.ETHR)) {
+    setSchemaTypeValue(SchemaTypeValue.ETHEREUM)
     setCredentialType(CredentialType.JSONLD)
     return SchemaTypes.schema_W3C
   } else if (
