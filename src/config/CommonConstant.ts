@@ -17,6 +17,7 @@ export const pageIndex = 0
 export const pageCount = 1
 export const allSchemas = 'All schemas'
 export const polygonScan = 'https://mumbai.polygonscan.com/'
+export const ethereumScan = 'https://etherscan.io/'
 export const createDateTime = 'createDateTime'
 export const totalRecords = 'totalRecords'
 export const successfulRecords = 'successfulRecords'
@@ -24,6 +25,8 @@ export const currentPageNumber = 1
 export const sortBy = 'createdAt'
 export const sortOrder = 'desc'
 export const polygonFaucet = 'https://faucet.polygon.technology/'
+export const ethereumFaucet =
+  'https://cloud.google.com/application/web3/faucet/ethereum/sepolia'
 export const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 export const URL_REGEX_PATTERN =
