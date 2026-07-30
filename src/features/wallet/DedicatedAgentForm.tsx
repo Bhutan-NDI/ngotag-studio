@@ -6,14 +6,20 @@ import { Field, FieldProps, Form, Formik, FormikProps } from 'formik'
 import React, { useEffect, useRef, useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
-import type { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { getOrganizationById } from '@/app/api/organization'
 import { setAgentConfigDetails } from '@/app/api/Agent'
+import { useOrgWalletName } from './useOrgWalletName'
+
+// Mirrors AgentConfigureDto (ngotag-platform apps/api-gateway/src/agent-service/dto/agent-configure.dto.ts)
+const WALLET_NAME_REGEX = /^[a-zA-Z0-9]*$/
+const HOST_PORT_REGEX =
+  /^(http:\/\/|https:\/\/)?(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)):(?:\d{1,5})(\/[^\s]*)?$/
+const DOMAIN_REGEX =
+  /^(http:\/\/|https:\/\/)?(?:localhost|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})(:\d{1,5})?(\/[^\s]*)?$/
 
 interface DedicatedAgentFormProps {
   orgId: string
@@ -49,58 +55,37 @@ const DedicatedAgentForm = ({
 }: DedicatedAgentFormProps): React.JSX.Element => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [orgName, setOrgName] = useState<string>('')
+  const walletName = useOrgWalletName(orgId)
   const formikRef = useRef<FormikProps<DedicatedAgentFormValues>>(null)
   const walletNameEditedRef = useRef(false)
 
-  const fetchOrganizationDetails = async (): Promise<void> => {
-    if (!orgId) {
-      return
-    }
-    try {
-      const response = await getOrganizationById(orgId)
-      const { data } = response as AxiosResponse
-
-      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const name = data?.data?.name || ''
-        setOrgName(name)
-      }
-    } catch (error) {
-      console.error('Error fetching organization:', error)
-    }
-  }
-
-  const generateWalletName = (orgName: string): string => {
-    if (!orgName) {
-      return 'Wallet'
-    }
-
-    const words = orgName.split(/\s+/).filter(Boolean)
-
-    const first = words[0] || ''
-    const second = words[1]?.substring(0, 5) || ''
-
-    const name = `${first}${second}Wallet`
-
-    return name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 25)
-  }
-
-  useEffect(() => {
-    fetchOrganizationDetails()
-  }, [orgId])
-
   useEffect(() => {
     if (!walletNameEditedRef.current) {
-      formikRef.current?.setFieldValue(
-        'walletName',
-        generateWalletName(orgName),
-      )
+      formikRef.current?.setFieldValue('walletName', walletName)
     }
-  }, [orgName])
+  }, [walletName])
 
   const validationSchema = yup.object({
-    walletName: yup.string().required('Wallet name is required'),
-    agentEndpoint: yup.string().required('Agent endpoint is required'),
+    walletName: yup
+      .string()
+      .trim()
+      .required('Wallet name is required')
+      .min(2, 'Minimum length for wallet name must be 2 characters.')
+      .max(25, 'Maximum length for wallet must be 25 characters.')
+      .matches(
+        WALLET_NAME_REGEX,
+        'Wallet name must not contain spaces or special characters.',
+      ),
+    agentEndpoint: yup
+      .string()
+      .required('Agent endpoint is required')
+      .test(
+        'is-host-port-or-domain',
+        'Invalid host:port or domain format',
+        (value) =>
+          Boolean(value) &&
+          (HOST_PORT_REGEX.test(value) || DOMAIN_REGEX.test(value)),
+      ),
     apiKey: yup.string().required('API key is required'),
   })
 
@@ -151,7 +136,7 @@ const DedicatedAgentForm = ({
       <Formik
         innerRef={formikRef}
         initialValues={{
-          walletName: generateWalletName(orgName),
+          walletName,
           agentEndpoint: '',
           apiKey: '',
         }}
