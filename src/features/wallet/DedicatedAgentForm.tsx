@@ -2,8 +2,8 @@
 
 import * as yup from 'yup'
 
-import { Field, Form, Formik } from 'formik'
-import React, { useEffect, useState } from 'react'
+import { Field, FieldProps, Form, Formik, FormikProps } from 'formik'
+import React, { useEffect, useRef, useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import type { AxiosResponse } from 'axios'
@@ -36,6 +36,12 @@ export interface WalletResponse {
   data: WalletData
 }
 
+interface DedicatedAgentFormValues {
+  walletName: string
+  agentEndpoint: string
+  apiKey: string
+}
+
 const DedicatedAgentForm = ({
   orgId,
   onSuccess,
@@ -44,6 +50,8 @@ const DedicatedAgentForm = ({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [orgName, setOrgName] = useState<string>('')
+  const formikRef = useRef<FormikProps<DedicatedAgentFormValues>>(null)
+  const walletNameEditedRef = useRef(false)
 
   const fetchOrganizationDetails = async (): Promise<void> => {
     if (!orgId) {
@@ -80,6 +88,15 @@ const DedicatedAgentForm = ({
   useEffect(() => {
     fetchOrganizationDetails()
   }, [orgId])
+
+  useEffect(() => {
+    if (!walletNameEditedRef.current) {
+      formikRef.current?.setFieldValue(
+        'walletName',
+        generateWalletName(orgName),
+      )
+    }
+  }, [orgName])
 
   const validationSchema = yup.object({
     walletName: yup.string().required('Wallet name is required'),
@@ -132,7 +149,7 @@ const DedicatedAgentForm = ({
   return (
     <div className="mt-6">
       <Formik
-        enableReinitialize
+        innerRef={formikRef}
         initialValues={{
           walletName: generateWalletName(orgName),
           agentEndpoint: '',
@@ -149,14 +166,21 @@ const DedicatedAgentForm = ({
                 This name is auto-generated based on your organization name. You
                 can edit it if needed.
               </p>
-              <Field
-                as={Input}
-                id="walletName"
-                name="walletName"
-                placeholder="Enter wallet name"
-                className="mt-2"
-                disabled={disabled}
-              />
+              <Field name="walletName">
+                {({ field }: FieldProps<string, DedicatedAgentFormValues>) => (
+                  <Input
+                    {...field}
+                    id="walletName"
+                    placeholder="Enter wallet name"
+                    className="mt-2"
+                    disabled={disabled}
+                    onChange={(e) => {
+                      walletNameEditedRef.current = true
+                      field.onChange(e)
+                    }}
+                  />
+                )}
+              </Field>
               {errors.walletName && touched.walletName && (
                 <p className="text-destructive mt-1 text-sm">
                   {errors.walletName}
