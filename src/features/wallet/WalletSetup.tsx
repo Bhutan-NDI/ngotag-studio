@@ -143,7 +143,9 @@ const WalletSetup = (): React.JSX.Element => {
           >
             <Label
               htmlFor="dedicated"
-              className={`cursor-pointer rounded-2xl border p-5 transition-all ${
+              className={`rounded-2xl border p-5 transition-all ${
+                clientAlias ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'
+              } ${
                 agentType === AgentType.DEDICATED
                   ? 'border-primary bg-accent dark:bg-accent shadow-md'
                   : 'border-border hover:border-primary/50'
@@ -154,6 +156,7 @@ const WalletSetup = (): React.JSX.Element => {
                   id="dedicated"
                   className="border"
                   value={AgentType.DEDICATED}
+                  disabled={Boolean(clientAlias)}
                 />
                 <div>
                   <h3 className="text-foreground mb-1 font-semibold">
