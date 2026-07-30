@@ -2,13 +2,17 @@
 /* eslint-disable sort-imports */
 
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import React, { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import DedicatedAgentForm from './DedicatedAgentForm'
+import { Label } from '@/components/ui/label'
 import { Loader } from 'lucide-react'
+import PageContainer from '@/components/layout/page-container'
 import SharedAgentForm from './SharedAgentForm'
 import Stepper from '@/components/StepperComponent'
 import { apiStatusCodes } from '@/config/CommonConstant'
@@ -41,11 +45,14 @@ export interface WalletResponse {
 }
 
 const WalletSetup = (): React.JSX.Element => {
+  const [agentType, setAgentType] = useState<AgentType>(AgentType.SHARED)
   const [alert, setAlert] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const totalSteps = 4
   const [sharedWalletResponse, setSharedWalletResponse] =
     useState<WalletResponse | null>()
+  const [dedicatedWalletResponse, setDedicatedWalletResponse] =
+    useState<WalletResponse | null>(null)
   const [activeButton, setActiveButton] = useState<'skip' | 'continue' | null>(
     null,
   )
@@ -61,6 +68,15 @@ const WalletSetup = (): React.JSX.Element => {
       setIsDialogOpen(true)
     } else {
       setAlert(response?.message || 'Failed to create shared wallet')
+    }
+  }
+
+  const handleDedicatedWalletCreated = (response?: WalletResponse): void => {
+    setDedicatedWalletResponse(response ?? null)
+    if (response?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+      setIsDialogOpen(true)
+    } else {
+      setAlert(response?.message || 'Failed to create dedicated wallet')
     }
   }
 
@@ -81,130 +97,201 @@ const WalletSetup = (): React.JSX.Element => {
     hardNavigate(redirectUrl)
   }
 
-  const isAnyWalletCreated = Boolean(sharedWalletResponse)
+  const isAnyWalletCreated = Boolean(
+    sharedWalletResponse || dedicatedWalletResponse,
+  )
 
   return (
-    <div className="mx-auto mt-10 max-w-5xl">
-      {alert && (
-        <div className="mx-auto mt-6 w-full max-w-5xl" role="alert">
-          <AlertComponent
-            message={alert}
-            type="failure"
-            onAlertClose={() => setAlert(null)}
-          />
-        </div>
-      )}
-
-      <Card className="p-6">
-        <div
-          className={`${
-            isAnyWalletCreated
-              ? 'pointer-events-none opacity-60 select-none'
-              : ''
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold">Wallet type</h1>
-              <p className="">Setup wallet for your organization</p>
-            </div>
-
-            <div className="text-muted-foreground text-sm">
-              Step 2 of {totalSteps}
-            </div>
-          </div>
-          <Stepper currentStep={2} totalSteps={totalSteps} />
-
-          <div className="border-primary bg-accent dark:bg-accent rounded-2xl border p-5 shadow-md">
-            <div>
-              <h3 className="text-foreground mb-1 font-semibold">
-                Shared Agent
-              </h3>
-              <p className="text-muted-foreground text-sm">
-                Use our cloud-hosted shared agent infrastructure
-              </p>
-              <ul className="text-muted-foreground mt-2 ml-5 list-disc space-y-1 text-sm">
-                <li>Cost-effective solution</li>
-                <li>Managed infrastructure</li>
-                <li>Quick setup with no maintenance</li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-10">
-            <SharedAgentForm
-              orgId={orgId}
-              onSuccess={handleSharedWalletCreated}
-              disabled={!orgId || !isValidUuid(orgId)}
+    <PageContainer>
+      <div className="mx-auto mt-10 mb-10 max-w-5xl">
+        {alert && (
+          <div className="mx-auto mt-6 w-full max-w-5xl" role="alert">
+            <AlertComponent
+              message={alert}
+              type="failure"
+              onAlertClose={() => setAlert(null)}
             />
           </div>
-        </div>
-      </Card>
+        )}
 
-      <Dialog open={isDialogOpen}>
-        <DialogTitle></DialogTitle>
-        <DialogContent
-          className="max-w-md rounded-2xl p-8 text-center [&>button]:hidden"
-          onInteractOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <div className="flex justify-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-              <svg
-                className="h-9 w-9 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
+        <Card className="p-6">
+          <div
+            className={`${
+              isAnyWalletCreated
+                ? 'pointer-events-none opacity-60 select-none'
+                : ''
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold">Wallet type</h1>
+                <p className="">Setup wallet for your organization</p>
+              </div>
+
+              <div className="text-muted-foreground text-sm">
+                Step 2 of {totalSteps}
+              </div>
+            </div>
+            <Stepper currentStep={2} totalSteps={totalSteps} />
+
+            <RadioGroup
+              value={agentType}
+              onValueChange={(value) => {
+                if (!isAnyWalletCreated) {
+                  setAgentType(value as AgentType)
+                }
+              }}
+              className="grid grid-cols-1 gap-6 md:grid-cols-2"
+            >
+              <Label
+                htmlFor="dedicated"
+                className={`rounded-2xl border p-5 transition-all ${
+                  clientAlias
+                    ? 'cursor-not-allowed opacity-50'
+                    : 'cursor-pointer'
+                } ${
+                  agentType === AgentType.DEDICATED
+                    ? 'border-primary bg-accent dark:bg-accent shadow-md'
+                    : 'border-border hover:border-primary/50'
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem
+                    id="dedicated"
+                    className="border"
+                    value={AgentType.DEDICATED}
+                    disabled={Boolean(clientAlias)}
+                  />
+                  <div>
+                    <h3 className="text-foreground mb-1 font-semibold">
+                      Dedicated Agent
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Private agent instance exclusively for your organization
+                    </p>
+                    <ul className="text-muted-foreground mt-2 ml-5 list-disc space-y-1 text-sm">
+                      <li>Higher performance and reliability</li>
+                      <li>Enhanced privacy and security</li>
+                      <li>Full control over the agent infrastructure</li>
+                    </ul>
+                  </div>
+                </div>
+              </Label>
+
+              <Label
+                htmlFor="shared"
+                className={`cursor-pointer rounded-2xl border p-5 transition-all ${
+                  agentType === AgentType.SHARED
+                    ? 'border-primary bg-accent dark:bg-accent shadow-md'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem
+                    id="shared"
+                    className="border"
+                    value={AgentType.SHARED}
+                  />
+                  <div>
+                    <h3 className="text-foreground mb-1 font-semibold">
+                      Shared Agent
+                    </h3>
+                    <p className="text-muted-foreground text-sm">
+                      Use our cloud-hosted shared agent infrastructure
+                    </p>
+                    <ul className="text-muted-foreground mt-2 ml-5 list-disc space-y-1 text-sm">
+                      <li>Cost-effective solution</li>
+                      <li>Managed infrastructure</li>
+                      <li>Quick setup with no maintenance</li>
+                    </ul>
+                  </div>
+                </div>
+              </Label>
+            </RadioGroup>
+
+            <div className="mt-10">
+              {agentType === AgentType.DEDICATED ? (
+                <DedicatedAgentForm
+                  orgId={orgId}
+                  onSuccess={handleDedicatedWalletCreated}
+                  disabled={!orgId || !isValidUuid(orgId)}
                 />
-              </svg>
+              ) : (
+                <SharedAgentForm
+                  orgId={orgId}
+                  onSuccess={handleSharedWalletCreated}
+                  disabled={!orgId || !isValidUuid(orgId)}
+                />
+              )}
             </div>
           </div>
+        </Card>
 
-          <h2 className="text-foreground text-xl font-semibold">
-            Wallet created successfully!
-          </h2>
+        <Dialog open={isDialogOpen}>
+          <DialogTitle></DialogTitle>
+          <DialogContent
+            className="max-w-md rounded-2xl p-8 text-center [&>button]:hidden"
+            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => e.preventDefault()}
+          >
+            <div className="flex justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
+                <svg
+                  className="h-9 w-9 text-green-600"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+            </div>
 
-          <p className="text-muted-foreground">
-            {redirectTo || clientAlias
-              ? 'Proceed to DID creation to continue your setup.'
-              : 'Would you like to continue with DID creation or skip it for now?'}
-          </p>
+            <h2 className="text-foreground text-xl font-semibold">
+              Wallet created successfully!
+            </h2>
 
-          <div className="flex justify-center gap-4 pt-4">
-            {!redirectTo && !clientAlias && (
+            <p className="text-muted-foreground">
+              {redirectTo || clientAlias
+                ? 'Proceed to DID creation to continue your setup.'
+                : 'Would you like to continue with DID creation or skip it for now?'}
+            </p>
+
+            <div className="flex justify-center gap-4 pt-4">
+              {!redirectTo && !clientAlias && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setActiveButton('skip')
+                    hardNavigate('/dashboard')
+                  }}
+                  className="px-6"
+                  disabled={activeButton !== null}
+                >
+                  {activeButton === 'skip' ? <Loader /> : 'Skip'}
+                </Button>
+              )}
+
               <Button
-                variant="outline"
                 onClick={() => {
-                  setActiveButton('skip')
-                  hardNavigate('/dashboard')
+                  setActiveButton('continue')
+                  handleContinue()
                 }}
                 className="px-6"
                 disabled={activeButton !== null}
               >
-                {activeButton === 'skip' ? <Loader /> : 'Skip'}
+                {activeButton === 'continue' ? <Loader /> : 'Continue'}
               </Button>
-            )}
-
-            <Button
-              onClick={() => {
-                setActiveButton('continue')
-                handleContinue()
-              }}
-              className="px-6"
-              disabled={activeButton !== null}
-            >
-              {activeButton === 'continue' ? <Loader /> : 'Continue'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </PageContainer>
   )
 }
 
