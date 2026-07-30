@@ -102,11 +102,24 @@ const DedicatedAgentForm = ({
     }
 
     try {
-      const res = (await setAgentConfigDetails(payload, orgId)) as AxiosResponse
+      const res = await setAgentConfigDetails(payload, orgId)
+
+      if (typeof res === 'string') {
+        setError(res || 'Something went wrong while creating dedicated wallet')
+        return
+      }
 
       const { data } = res
       if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
         onSuccess?.(data)
+      } else {
+        const errorMessage = Array.isArray(data?.message)
+          ? data.message.join(' ')
+          : data?.message
+        setError(
+          errorMessage ||
+            'Something went wrong while creating dedicated wallet',
+        )
       }
     } catch (err) {
       console.error(err)

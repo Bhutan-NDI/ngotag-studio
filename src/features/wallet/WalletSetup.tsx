@@ -44,7 +44,7 @@ export interface WalletResponse {
 }
 
 const WalletSetup = (): React.JSX.Element => {
-  const [agentType, setAgentType] = useState<AgentType>(AgentType.DEDICATED)
+  const [agentType, setAgentType] = useState<AgentType>(AgentType.SHARED)
   const [alert, setAlert] = useState<string | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const totalSteps = 4
