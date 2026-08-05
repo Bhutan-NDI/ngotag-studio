@@ -29,7 +29,6 @@ export enum CommonConstants {
 export enum Ledgers {
   INDY = 'indy',
   POLYGON = 'polygon',
-  ETHEREUM = 'ethereum',
   NO_LEDGER = 'noLedger',
 }
 

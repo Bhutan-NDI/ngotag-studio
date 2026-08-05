@@ -28,6 +28,7 @@ interface IProps {
   privateKeyValue: string
   setPrivateKeyValue: (val: string) => void
   didMethod: DidMethod
+  network: Network
 }
 
 const SetPrivateKeyValueInput = ({
@@ -35,6 +36,7 @@ const SetPrivateKeyValueInput = ({
   privateKeyValue,
   setPrivateKeyValue,
   didMethod,
+  network,
 }: IProps): React.JSX.Element => {
   const [havePrivateKey, setHavePrivateKey] = useState(false)
   const [generatedKeys, setGeneratedKeys] = useState<IPolygonKeys | null>(null)
@@ -43,7 +45,7 @@ const SetPrivateKeyValueInput = ({
 
   const checkWalletBalance = async (
     privateKey: string,
-    network: Network,
+    balanceNetwork: Network,
   ): Promise<string | null> => {
     try {
       const rpcUrls = {
@@ -61,7 +63,7 @@ const SetPrivateKeyValueInput = ({
               : '',
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrls[network])
+      const provider = new ethers.JsonRpcProvider(rpcUrls[balanceNetwork])
       const wallet = new ethers.Wallet(privateKey, provider)
       const balance = await provider.getBalance(await wallet.getAddress())
       const etherBalance = ethers.formatEther(balance)
@@ -80,11 +82,11 @@ const SetPrivateKeyValueInput = ({
   }
   useEffect(() => {
     if (privateKeyValue?.length === 64) {
-      checkWalletBalance(privateKeyValue, Network.TESTNET)
+      checkWalletBalance(privateKeyValue, network)
     } else {
       setErrorMessage(null)
     }
-  }, [privateKeyValue])
+  }, [privateKeyValue, network])
 
   useEffect(() => {
     setPrivateKeyValue('')
@@ -107,7 +109,7 @@ const SetPrivateKeyValueInput = ({
         setLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
         setPrivateKeyValue(privateKey)
-        await checkWalletBalance(privateKey, Network.TESTNET)
+        await checkWalletBalance(privateKey, network)
       }
     } catch (err) {
       console.error('Generate private key ERROR::::', err)
@@ -128,7 +130,7 @@ const SetPrivateKeyValueInput = ({
         setLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
         setPrivateKeyValue(privateKey)
-        await checkWalletBalance(privateKey, Network.TESTNET)
+        await checkWalletBalance(privateKey, network)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)

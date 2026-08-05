@@ -492,8 +492,14 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Polygon balance check
+  // Polygon / Ethereum balance check
   // ---------------------------------------------------------------------------
+
+  // The org's existing primary-DID network (e.g. 'testnet'/'mainnet' for
+  // polygon, 'sepolia'/'mainnet' for ethr) — a new same-chain DID always
+  // shares it, so balance checks should use it instead of a fixed network.
+  const balanceNetwork =
+    initialValues.network === 'mainnet' ? Network.MAINNET : Network.TESTNET
 
   const checkBalance = async (
     privateKey: string,
@@ -501,8 +507,14 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
   ): Promise<string | null> => {
     try {
       const rpcUrls = {
-        testnet: `${process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL}`,
-        mainnet: `${process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL}`,
+        testnet:
+          method === DidMethod.ETHR
+            ? process.env.NEXT_PUBLIC_ETHEREUM_TESTNET_URL
+            : process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
+        mainnet:
+          method === DidMethod.ETHR
+            ? process.env.NEXT_PUBLIC_ETHEREUM_MAINNET_URL
+            : process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
       }
       const networkUrl = rpcUrls?.[network]
       const provider = new ethers.JsonRpcProvider(networkUrl)
@@ -526,11 +538,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
 
   React.useEffect(() => {
     if (privateKeyValue && privateKeyValue.length === 64) {
-      checkBalance(privateKeyValue, Network.TESTNET)
+      checkBalance(privateKeyValue, balanceNetwork)
     } else {
       setWalletErrorMessage(null)
     }
-  }, [privateKeyValue])
+  }, [privateKeyValue, balanceNetwork])
 
   React.useEffect(() => {
     if (havePrivateKey) {
@@ -638,7 +650,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         const privateKey = data?.data?.privateKey.slice(2)
         setPrivateKeyValue(privateKey)
         setFieldValue('privatekey', privateKey)
-        await checkBalance(privateKey, Network.TESTNET)
+        await checkBalance(privateKey, balanceNetwork)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)
@@ -660,7 +672,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         const privateKey = data?.data?.privateKey.slice(2)
         setPrivateKeyValue(privateKey)
         setFieldValue('privatekey', privateKey)
-        await checkBalance(privateKey, Network.TESTNET)
+        await checkBalance(privateKey, balanceNetwork)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)
@@ -1288,7 +1300,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                               setPrivateKeyValue(e.target.value)
                               setWalletErrorMessage(null)
                               if (e.target.value.length === 64) {
-                                checkBalance(e.target.value, Network.TESTNET)
+                                checkBalance(e.target.value, balanceNetwork)
                               }
                             }}
                           />
