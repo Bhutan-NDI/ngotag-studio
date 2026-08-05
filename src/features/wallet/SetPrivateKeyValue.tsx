@@ -106,8 +106,8 @@ const SetPrivateKeyValueInput = ({
         setGeneratedKeys(data?.data)
         setLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKey || privateKeyValue)
-        await checkWalletBalance(privateKey || privateKeyValue, Network.TESTNET)
+        setPrivateKeyValue(privateKey)
+        await checkWalletBalance(privateKey, Network.TESTNET)
       }
     } catch (err) {
       console.error('Generate private key ERROR::::', err)
@@ -127,8 +127,8 @@ const SetPrivateKeyValueInput = ({
         setGeneratedKeys(data?.data)
         setLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKey || privateKeyValue)
-        await checkWalletBalance(privateKey || privateKeyValue, Network.TESTNET)
+        setPrivateKeyValue(privateKey)
+        await checkWalletBalance(privateKey, Network.TESTNET)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)

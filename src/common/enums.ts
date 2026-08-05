@@ -64,7 +64,7 @@ export enum SchemaType {
 export enum SchemaTypeValue {
   INDY = 'indy',
   POLYGON = 'polygon',
-  ETHEREUM = 'ethereum',
+  ETHEREUM = 'ethr',
   NO_LEDGER = 'no_ledger',
 }
 
