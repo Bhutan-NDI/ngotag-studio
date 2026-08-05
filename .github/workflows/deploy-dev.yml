@@ -3,6 +3,8 @@ on:
   push:
     tags:
       - 'deno-dev-*'
+  pull_request:
+    branches: develop
 
 jobs:
   deploy:
