@@ -1,7 +1,8 @@
 name: Deploy develop branch to Deno
 on:
   push:
-    branches: develop
+    tags:
+      - 'deno-dev-*'
   pull_request:
     branches: develop
 
