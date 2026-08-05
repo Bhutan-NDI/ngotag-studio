@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Check, Copy, Download } from 'lucide-react'
-import { DidMethod } from '@/common/enums'
+import { DidMethod, Network } from '@/common/enums'
 import PageContainer from '@/components/layout/page-container'
 import SetDomainValueInput from './SetDomainValueInput'
 import SetPrivateKeyValueInput from './SetPrivateKeyValue'
@@ -349,6 +349,10 @@ const CreateDid = (): React.JSX.Element => {
     selectedProtocol?.toUpperCase()
 
   const didOptions = selectedOption ? (didOptionsMap[selectedOption] ?? []) : []
+  const selectedDidNetwork =
+    selectedDid === 'did:polygon:mainnet' || selectedDid === 'did:ethr:mainnet'
+      ? Network.MAINNET
+      : Network.TESTNET
 
   // When only one option is active (others are commented out), render it as
   // non-interactive so the user isn't shown a clickable card with nothing to switch to.
@@ -645,6 +649,7 @@ const CreateDid = (): React.JSX.Element => {
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
                   didMethod={DidMethod.POLYGON}
+                  network={selectedDidNetwork}
                 />
 
                 <div className="space-y-5">
@@ -702,6 +707,7 @@ const CreateDid = (): React.JSX.Element => {
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
                   didMethod={DidMethod.ETHR}
+                  network={selectedDidNetwork}
                 />
 
                 <div className="space-y-5">

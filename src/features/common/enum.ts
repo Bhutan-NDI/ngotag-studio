@@ -106,7 +106,6 @@ export enum Devices {
 export enum Ledgers {
   INDY = 'indy',
   POLYGON = 'polygon',
-  ETHEREUM = 'ethereum',
   NO_LEDGER = 'noLedger',
 }
 
