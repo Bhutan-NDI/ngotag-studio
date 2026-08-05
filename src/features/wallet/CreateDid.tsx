@@ -627,7 +627,8 @@ const CreateDid = (): React.JSX.Element => {
             </CardContent>
           </Card>
 
-          {selectedDid === 'did:polygon:testnet' && (
+          {(selectedDid === 'did:polygon:testnet' ||
+            selectedDid === 'did:polygon:mainnet') && (
             <Card className="border-border mt-6 border shadow-sm">
               <CardHeader>
                 <CardTitle className="text-foreground text-lg font-semibold">
@@ -648,7 +649,9 @@ const CreateDid = (): React.JSX.Element => {
 
                 <div className="space-y-5">
                   <h4 className="text-foreground/80 text-sm font-medium">
-                    Steps to get Polygon Testnet Tokens
+                    {selectedDid === 'did:polygon:mainnet'
+                      ? 'Steps to fund your Polygon Mainnet wallet'
+                      : 'Steps to get Polygon Testnet Tokens'}
                   </h4>
 
                   <div className="space-y-4">
@@ -658,7 +661,9 @@ const CreateDid = (): React.JSX.Element => {
                           Step 1
                         </span>
                         <div className="text-foreground/80 text-sm">
-                          Copy your address and claim test tokens.
+                          {selectedDid === 'did:polygon:mainnet'
+                            ? 'Copy your address and fund it with MATIC.'
+                            : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
                     </div>
@@ -679,7 +684,8 @@ const CreateDid = (): React.JSX.Element => {
             </Card>
           )}
 
-          {selectedDid === 'did:ethr:sepolia' && (
+          {(selectedDid === 'did:ethr:sepolia' ||
+            selectedDid === 'did:ethr:mainnet') && (
             <Card className="border-border mt-6 border shadow-sm">
               <CardHeader>
                 <CardTitle className="text-foreground text-lg font-semibold">
@@ -700,7 +706,9 @@ const CreateDid = (): React.JSX.Element => {
 
                 <div className="space-y-5">
                   <h4 className="text-foreground/80 text-sm font-medium">
-                    Steps to get Ethereum Sepolia Tokens
+                    {selectedDid === 'did:ethr:mainnet'
+                      ? 'Steps to fund your Ethereum Mainnet wallet'
+                      : 'Steps to get Ethereum Sepolia Tokens'}
                   </h4>
 
                   <div className="space-y-4">
@@ -710,7 +718,9 @@ const CreateDid = (): React.JSX.Element => {
                           Step 1
                         </span>
                         <div className="text-foreground/80 text-sm">
-                          Copy your address and claim test tokens.
+                          {selectedDid === 'did:ethr:mainnet'
+                            ? 'Copy your address and fund it with ETH.'
+                            : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
                     </div>
