@@ -3,6 +3,7 @@
 
 import {
   DataType,
+  DidMethod,
   EthereumNetworks,
   Ledgers,
   Network,
@@ -41,8 +42,8 @@ const SchemaCard = (props: Readonly<ISchemaCardProps>): React.JSX.Element => {
     ledgerDisplay = props.issuerDid.includes(Network.TESTNET)
       ? PolygonNetworks.TESTNET
       : PolygonNetworks.MAINNET
-  } else if (props.issuerDid?.includes(Ledgers.ETHEREUM)) {
-    ledgerDisplay = props.issuerDid.includes(Network.TESTNET)
+  } else if (props.issuerDid?.includes(DidMethod.ETHR)) {
+    ledgerDisplay = props.issuerDid.includes('sepolia')
       ? EthereumNetworks.TESTNET
       : EthereumNetworks.MAINNET
   } else if (props?.issuerDid) {

@@ -444,7 +444,10 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       } else if (didMethod === DidMethod.POLYGON) {
         networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
       } else if (didMethod === DidMethod.ETHR) {
-        networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
+        const ethrDidParts = data?.data?.org_agents[0]?.orgDid.split(':') ?? []
+        // Mainnet ethr DIDs have no network segment (did:ethr:0xADDRESS) —
+        // a 3-segment DID means the "network" position holds the address.
+        networkName = ethrDidParts.length > 3 ? ethrDidParts[2] : 'mainnet'
       }
 
       let completeDidMethod = ''
