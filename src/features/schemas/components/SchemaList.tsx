@@ -116,6 +116,7 @@ const SchemaList = (props: {
   const processDidSettings = useCallback((did: string): void => {
     if (
       did.includes(DidMethod.POLYGON) ||
+      did.includes(DidMethod.ETHR) ||
       did.includes(DidMethod.KEY) ||
       did.includes(DidMethod.WEB)
     ) {

@@ -140,6 +140,7 @@ const EmailAttributesSelection = (): JSX.Element => {
 
         if (
           did.includes(DidMethod.POLYGON) ||
+          did.includes(DidMethod.ETHR) ||
           did.includes(DidMethod.KEY) ||
           did.includes(DidMethod.WEB)
         ) {
@@ -231,6 +232,7 @@ const EmailAttributesSelection = (): JSX.Element => {
       (credDef) => credDef.schemaLedgerId === schema.schemaId,
     )
   }
+
   const mapMatchingCredDefs = (
     matchingCredDefs: CredDefData[],
     attribute: IAttributesDetails,

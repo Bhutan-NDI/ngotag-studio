@@ -28,7 +28,8 @@ export const getDidValidationSchema = ({
     did: yup.string().required('DID is required'),
   }),
   ...((selectedMethod === DidMethod.INDY ||
-    selectedMethod === DidMethod.POLYGON) && {
+    selectedMethod === DidMethod.POLYGON ||
+    selectedMethod === DidMethod.ETHR) && {
     network: yup.string().required('Network is required'),
   }),
   ...(selectedMethod === DidMethod.WEB && {
