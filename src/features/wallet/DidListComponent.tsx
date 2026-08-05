@@ -636,9 +636,9 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setGeneratedKeys(data?.data)
         setIsLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKeyValue || privateKey)
+        setPrivateKeyValue(privateKey)
         setFieldValue('privatekey', privateKey)
-        await checkBalance(privateKeyValue || privateKey, Network.TESTNET)
+        await checkBalance(privateKey, Network.TESTNET)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)
@@ -658,9 +658,9 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setGeneratedKeys(data?.data)
         setIsLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKeyValue || privateKey)
+        setPrivateKeyValue(privateKey)
         setFieldValue('privatekey', privateKey)
-        await checkBalance(privateKeyValue || privateKey, Network.TESTNET)
+        await checkBalance(privateKey, Network.TESTNET)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)
