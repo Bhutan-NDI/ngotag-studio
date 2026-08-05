@@ -2,21 +2,29 @@
 
 import * as yup from 'yup'
 
-import { Field, Form, Formik } from 'formik'
-import React, { useState } from 'react'
+import { Field, FieldProps, Form, Formik, FormikProps } from 'formik'
+import React, { useEffect, useRef, useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
-import type { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { setAgentConfigDetails } from '@/app/api/Agent'
+import { useOrgWalletName } from './useOrgWalletName'
+
+// Mirrors AgentConfigureDto (ngotag-platform apps/api-gateway/src/agent-service/dto/agent-configure.dto.ts)
+const WALLET_NAME_REGEX = /^[a-zA-Z0-9]*$/
+const HOST_PORT_REGEX =
+  /^(http:\/\/|https:\/\/)?(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)):(?:\d{1,5})(\/[^\s]*)?$/
+const DOMAIN_REGEX =
+  /^(http:\/\/|https:\/\/)?(?:localhost|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})(:\d{1,5})?(\/[^\s]*)?$/
 
 interface DedicatedAgentFormProps {
   orgId: string
   onSuccess?: (data?: WalletResponse) => void
+  disabled?: boolean
 }
 
 export interface WalletData {
@@ -34,16 +42,50 @@ export interface WalletResponse {
   data: WalletData
 }
 
+interface DedicatedAgentFormValues {
+  walletName: string
+  agentEndpoint: string
+  apiKey: string
+}
+
 const DedicatedAgentForm = ({
   orgId,
   onSuccess,
+  disabled,
 }: DedicatedAgentFormProps): React.JSX.Element => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const walletName = useOrgWalletName(orgId)
+  const formikRef = useRef<FormikProps<DedicatedAgentFormValues>>(null)
+  const walletNameEditedRef = useRef(false)
+
+  useEffect(() => {
+    if (!walletNameEditedRef.current) {
+      formikRef.current?.setFieldValue('walletName', walletName)
+    }
+  }, [walletName])
 
   const validationSchema = yup.object({
-    walletName: yup.string().required('Wallet name is required'),
-    agentEndpoint: yup.string().required('Agent endpoint is required'),
+    walletName: yup
+      .string()
+      .trim()
+      .required('Wallet name is required')
+      .min(2, 'Minimum length for wallet name must be 2 characters.')
+      .max(25, 'Maximum length for wallet must be 25 characters.')
+      .matches(
+        WALLET_NAME_REGEX,
+        'Wallet name must not contain spaces or special characters.',
+      ),
+    agentEndpoint: yup
+      .string()
+      .required('Agent endpoint is required')
+      .test(
+        'is-host-port-or-domain',
+        'Invalid host:port or domain format',
+        (value) =>
+          Boolean(value) &&
+          (HOST_PORT_REGEX.test(value) || DOMAIN_REGEX.test(value)),
+      ),
     apiKey: yup.string().required('API key is required'),
   })
 
@@ -62,11 +104,24 @@ const DedicatedAgentForm = ({
     }
 
     try {
-      const res = (await setAgentConfigDetails(payload, orgId)) as AxiosResponse
+      const res = await setAgentConfigDetails(payload, orgId)
+
+      if (typeof res === 'string') {
+        setError(res || 'Something went wrong while creating dedicated wallet')
+        return
+      }
 
       const { data } = res
       if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
         onSuccess?.(data)
+      } else {
+        const errorMessage = Array.isArray(data?.message)
+          ? data.message.join(' ')
+          : data?.message
+        setError(
+          errorMessage ||
+            'Something went wrong while creating dedicated wallet',
+        )
       }
     } catch (err) {
       console.error(err)
@@ -79,8 +134,9 @@ const DedicatedAgentForm = ({
   return (
     <div className="mt-6">
       <Formik
+        innerRef={formikRef}
         initialValues={{
-          walletName: '',
+          walletName,
           agentEndpoint: '',
           apiKey: '',
         }}
@@ -91,13 +147,25 @@ const DedicatedAgentForm = ({
           <Form className="space-y-6">
             <div>
               <Label htmlFor="walletName">Wallet Name</Label>
-              <Field
-                as={Input}
-                id="walletName"
-                name="walletName"
-                placeholder="Enter wallet name"
-                className="mt-2"
-              />
+              <p className="text-muted-foreground mt-1 text-sm">
+                This name is auto-generated based on your organization name. You
+                can edit it if needed.
+              </p>
+              <Field name="walletName">
+                {({ field }: FieldProps<string, DedicatedAgentFormValues>) => (
+                  <Input
+                    {...field}
+                    id="walletName"
+                    placeholder="Enter wallet name"
+                    className="mt-2"
+                    disabled={disabled}
+                    onChange={(e) => {
+                      walletNameEditedRef.current = true
+                      field.onChange(e)
+                    }}
+                  />
+                )}
+              </Field>
               {errors.walletName && touched.walletName && (
                 <p className="text-destructive mt-1 text-sm">
                   {errors.walletName}
@@ -113,6 +181,7 @@ const DedicatedAgentForm = ({
                 name="agentEndpoint"
                 placeholder="https://agent.example.com"
                 className="mt-2"
+                disabled={disabled}
               />
               {errors.agentEndpoint && touched.agentEndpoint && (
                 <p className="text-destructive mt-1 text-sm">
@@ -129,6 +198,7 @@ const DedicatedAgentForm = ({
                 name="apiKey"
                 placeholder="Enter API key"
                 className="mt-2"
+                disabled={disabled}
               />
               {errors.apiKey && touched.apiKey && (
                 <p className="text-destructive mt-1 text-sm">{errors.apiKey}</p>
@@ -144,7 +214,7 @@ const DedicatedAgentForm = ({
             )}
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={loading}>
+              <Button type="submit" disabled={loading || disabled}>
                 {loading ? <Loader /> : 'Create Dedicated Wallet'}
               </Button>
             </div>

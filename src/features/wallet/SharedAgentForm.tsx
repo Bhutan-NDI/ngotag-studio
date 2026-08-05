@@ -3,7 +3,7 @@
 import * as yup from 'yup'
 
 import { Field, Form, Formik } from 'formik'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import type { AxiosResponse } from 'axios'
@@ -13,8 +13,8 @@ import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import SOCKET from '@/config/SocketConfig'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { getOrganizationById } from '@/app/api/organization'
 import { spinupSharedAgent } from '@/app/api/Agent'
+import { useOrgWalletName } from './useOrgWalletName'
 
 interface SharedAgentFormProps {
   orgId: string
@@ -44,39 +44,7 @@ const SharedAgentForm = ({
 }: SharedAgentFormProps): React.JSX.Element => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [orgName, setOrgName] = useState<string>('')
-
-  const fetchOrganizationDetails = async (): Promise<void> => {
-    if (!orgId) {
-      return
-    }
-    try {
-      const response = await getOrganizationById(orgId)
-      const { data } = response as AxiosResponse
-
-      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const name = data?.data?.name || ''
-        setOrgName(name)
-      }
-    } catch (error) {
-      console.error('Error fetching organization:', error)
-    }
-  }
-
-  const generateWalletLabel = (orgName: string): string => {
-    if (!orgName) {
-      return 'Wallet'
-    }
-
-    const words = orgName.split(/\s+/).filter(Boolean)
-
-    const first = words[0] || ''
-    const second = words[1]?.substring(0, 5) || ''
-
-    const label = `${first}${second}Wallet`
-
-    return label.replace(/[^a-zA-Z0-9]/g, '').slice(0, 25)
-  }
+  const walletLabel = useOrgWalletName(orgId)
 
   const validationSchema = yup.object({
     label: yup.string().required('Wallet label is required'),
@@ -111,15 +79,11 @@ const SharedAgentForm = ({
     }
   }
 
-  useEffect(() => {
-    fetchOrganizationDetails()
-  }, [orgId])
-
   return (
     <div className="mt-6">
       <Formik
         enableReinitialize
-        initialValues={{ label: generateWalletLabel(orgName) }}
+        initialValues={{ label: walletLabel }}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
