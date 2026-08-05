@@ -4,12 +4,12 @@ import Loader from '@/components/Loader'
 import React from 'react'
 
 interface IProps {
-  generatePolygonKeyValuePair: () => void
+  generateKeyValuePair: () => void
   loading: boolean
 }
 
-const GenerateButtonPolygon = ({
-  generatePolygonKeyValuePair,
+const GenerateButton = ({
+  generateKeyValuePair,
   loading,
 }: IProps): React.JSX.Element => (
   <div className="relative my-3 grid w-fit grid-cols-2 gap-x-9 md:gap-56">
@@ -23,7 +23,7 @@ const GenerateButtonPolygon = ({
       id="generateKey"
       type="button"
       className=""
-      onClick={generatePolygonKeyValuePair}
+      onClick={generateKeyValuePair}
       disabled={loading}
     >
       {loading ? <Loader /> : 'Generate'}
@@ -31,4 +31,4 @@ const GenerateButtonPolygon = ({
   </div>
 )
 
-export default GenerateButtonPolygon
+export default GenerateButton

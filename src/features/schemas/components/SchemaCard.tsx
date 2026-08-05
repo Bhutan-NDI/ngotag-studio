@@ -1,7 +1,14 @@
 /* eslint-disable sort-imports */
 'use client'
 
-import { DataType, Ledgers, Network, PolygonNetworks } from '@/common/enums'
+import {
+  DataType,
+  DidMethod,
+  EthereumNetworks,
+  Ledgers,
+  Network,
+  PolygonNetworks,
+} from '@/common/enums'
 import {
   IAttributes,
   ISchemaCardProps,
@@ -35,6 +42,10 @@ const SchemaCard = (props: Readonly<ISchemaCardProps>): React.JSX.Element => {
     ledgerDisplay = props.issuerDid.includes(Network.TESTNET)
       ? PolygonNetworks.TESTNET
       : PolygonNetworks.MAINNET
+  } else if (props.issuerDid?.includes(DidMethod.ETHR)) {
+    ledgerDisplay = props.issuerDid.includes('sepolia')
+      ? EthereumNetworks.TESTNET
+      : EthereumNetworks.MAINNET
   } else if (props?.issuerDid) {
     const [, , ledger] = props.issuerDid.split(':')
     ledgerDisplay = ledger

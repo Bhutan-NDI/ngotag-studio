@@ -5,6 +5,7 @@ export enum DidMethod {
   KEY = 'did:key',
   WEB = 'did:web',
   POLYGON = 'did:polygon',
+  ETHR = 'did:ethr',
 }
 
 export enum Network {
@@ -14,6 +15,11 @@ export enum Network {
 export enum PolygonNetworks {
   TESTNET = 'Polygon Testnet',
   MAINNET = 'Polygon Mainnet',
+}
+
+export enum EthereumNetworks {
+  TESTNET = 'Ethereum Testnet Sepolia',
+  MAINNET = 'Ethereum Mainnet',
 }
 
 export enum CommonConstants {
@@ -57,6 +63,7 @@ export enum SchemaType {
 export enum SchemaTypeValue {
   INDY = 'indy',
   POLYGON = 'polygon',
+  ETHEREUM = 'ethr',
   NO_LEDGER = 'no_ledger',
 }
 
@@ -106,6 +113,11 @@ export enum CredentialType {
 }
 export enum ProofType {
   polygon = 'EcdsaSecp256k1Signature2019',
+  // Same value as polygon: the agent's EthereumModule registers the identical
+  // EcdsaSecp256k1Signature2019 Credo suite for did:ethr — it's the only
+  // proof type @bhutan-ndi/ethr-credo-module actually wires up.
+  // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
+  ethereum = 'EcdsaSecp256k1Signature2019',
   no_ledger = 'Ed25519Signature2018',
 }
 
