@@ -186,7 +186,11 @@ const SetPrivateKeyValueInput = ({
                 </span>
               )}
 
-              <TokenWarningMessage mode="generated" />
+              <TokenWarningMessage
+                mode="generated"
+                didMethod={didMethod}
+                network={network}
+              />
             </>
           )}
         </>
@@ -211,7 +215,11 @@ const SetPrivateKeyValueInput = ({
             </span>
           )}
 
-          <TokenWarningMessage mode="existing" />
+          <TokenWarningMessage
+            mode="existing"
+            didMethod={didMethod}
+            network={network}
+          />
         </>
       )}
     </div>
