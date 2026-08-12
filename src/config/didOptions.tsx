@@ -1,4 +1,4 @@
-const MODE = process.env.MODE || ''
+const MODE = process.env.NEXT_PUBLIC_MODE || ''
 
 const polygonDidOptions = [
   'did:polygon:testnet',
