@@ -517,6 +517,13 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
             : process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
       }
       const networkUrl = rpcUrls?.[network]
+      if (!networkUrl) {
+        setWalletErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
       const provider = new ethers.JsonRpcProvider(networkUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const address = await wallet.getAddress()
@@ -532,6 +539,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setWalletErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }

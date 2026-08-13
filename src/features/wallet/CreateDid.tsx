@@ -667,7 +667,7 @@ const CreateDid = (): React.JSX.Element => {
                         </span>
                         <div className="text-foreground/80 text-sm">
                           {selectedDid === 'did:polygon:mainnet'
-                            ? 'Copy your address and fund it with MATIC.'
+                            ? 'Copy your address and fund it with POL.'
                             : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
