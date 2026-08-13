@@ -500,27 +500,25 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     privateKey: string,
     network: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (method === DidMethod.ETHR) {
+      setWalletErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
-        testnet:
-          method === DidMethod.ETHR
-            ? process.env.NEXT_PUBLIC_ETHEREUM_TESTNET_URL
-            : process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
-        mainnet:
-          method === DidMethod.ETHR
-            ? process.env.NEXT_PUBLIC_ETHEREUM_MAINNET_URL
-            : process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
+        testnet: process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
+        mainnet: process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
       }
       const networkUrl = rpcUrls?.[network]
       if (!networkUrl) {
-        // Balance is only informational for did:ethr (DID creation itself needs no
-        // gas), so a failed check shouldn't alarm the user — only surface it for
-        // methods where funding is actually required up front.
-        if (method !== DidMethod.ETHR) {
-          setWalletErrorMessage(
-            'Unable to check wallet balance: RPC URL is not configured for this network.',
-          )
-        }
+        setWalletErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
         return null
       }
 
@@ -531,11 +529,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       const etherBalance = ethers.formatEther(balance)
 
       if (parseFloat(etherBalance) < CommonConstants.BALANCELIMIT) {
-        setWalletErrorMessage(
-          method === DidMethod.ETHR
-            ? 'Low balance — you will need ETH before creating schemas with this DID. Creating the DID itself is free.'
-            : 'You have insufficient funds.',
-        )
+        setWalletErrorMessage('You have insufficient funds.')
       } else {
         setWalletErrorMessage(null)
       }
@@ -543,11 +537,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
-      if (method !== DidMethod.ETHR) {
-        setWalletErrorMessage(
-          'Unable to check wallet balance. Please try again.',
-        )
-      }
+      setWalletErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }

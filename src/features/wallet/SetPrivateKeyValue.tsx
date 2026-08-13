@@ -47,20 +47,25 @@ const SetPrivateKeyValueInput = ({
     privateKey: string,
     balanceNetwork: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (didMethod === DidMethod.ETHR) {
+      setErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
         testnet:
           didMethod === DidMethod.POLYGON
             ? process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL
-            : didMethod === DidMethod.ETHR
-              ? process.env.NEXT_PUBLIC_ETHEREUM_TESTNET_URL
-              : '',
+            : '',
         mainnet:
           didMethod === DidMethod.POLYGON
             ? process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL
-            : didMethod === DidMethod.ETHR
-              ? process.env.NEXT_PUBLIC_ETHEREUM_MAINNET_URL
-              : '',
+            : '',
       }
 
       const rpcUrl = rpcUrls[balanceNetwork]
@@ -78,9 +83,7 @@ const SetPrivateKeyValueInput = ({
 
       setErrorMessage(
         parseFloat(etherBalance) < CommonConstants.BALANCELIMIT
-          ? didMethod === DidMethod.ETHR
-            ? 'Low balance — you will need ETH before creating schemas with this DID. Creating the DID itself is free.'
-            : 'You have insufficient funds.'
+          ? 'You have insufficient funds.'
           : null,
       )
 
