@@ -17,16 +17,15 @@ const TokenWarningMessage = ({
   didMethod,
   network,
 }: Props): React.JSX.Element | null => {
-  // did:polygon DID creation is an on-chain transaction, so POL is required up
-  // front — worth warning about. did:ethr DID creation is off-chain (no
-  // transaction, no gas): no token is needed to create the DID at all, so
-  // there's nothing to warn about here (ETH only matters later, for schema
-  // creation, which is a separate flow).
-  if (didMethod === 'did:ethr') {
+  // Only did:polygon shows this warning. did:ethr DID creation is off-chain
+  // (no transaction, no gas) and is intentionally kept silent here — not
+  // shown at all, even though ETH is needed later for schema creation.
+  if (didMethod !== 'did:polygon') {
     return null
   }
 
   const isMainnet = network === 'mainnet'
+
   const description = `Creating a did:polygon DID requires POL tokens on the Polygon ${isMainnet ? 'mainnet' : 'testnet'}. ${mode === 'generated' ? 'Copy the address above and fund it before proceeding.' : 'Make sure the wallet for this private key is funded before proceeding.'}`
 
   return (

@@ -1383,8 +1383,14 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                     {method === DidMethod.ETHR && (
                       <div className="col-span-1 sm:col-span-2">
                         <h3 className="mb-2 text-sm font-semibold">
-                          Follow these instructions to generate Ethereum tokens:
+                          Follow these instructions to generate Ethereum tokens
+                          for schema creation:
                         </h3>
+                        <p className="text-muted-foreground mb-2 text-sm">
+                          Creating this DID is free — no funds are needed for
+                          that step. These tokens are only needed before you
+                          create schemas with this DID.
+                        </p>
                         <ol className="space-y-2 text-sm">
                           <li>
                             <span className="font-semibold">Step 1:</span>

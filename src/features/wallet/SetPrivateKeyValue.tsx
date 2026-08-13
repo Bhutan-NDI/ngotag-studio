@@ -90,7 +90,7 @@ const SetPrivateKeyValueInput = ({
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
-      // setErrorMessage('Unable to check wallet balance. Please try again.')
+      setErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
