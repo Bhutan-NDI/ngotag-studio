@@ -48,6 +48,7 @@ import { CommonConstants } from '../common/enum'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
+import TokenWarningMessage from './TokenWarningMessage'
 import { dateConversion } from '@/utils/DateConversion'
 import { ethers } from 'ethers'
 import { formatDidWebError } from './formatDidWebError'
@@ -235,12 +236,6 @@ const CopyDid = ({
     </Tooltip>
   )
 }
-
-const TokenWarningMessage = (): React.JSX.Element => (
-  <div className="mt-3 text-xs">
-    <p>Note: You need to have tokens in your wallet to create a DID.</p>
-  </div>
-)
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -518,9 +513,14 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       }
       const networkUrl = rpcUrls?.[network]
       if (!networkUrl) {
-        setWalletErrorMessage(
-          'Unable to check wallet balance: RPC URL is not configured for this network.',
-        )
+        // Balance is only informational for did:ethr (DID creation itself needs no
+        // gas), so a failed check shouldn't alarm the user — only surface it for
+        // methods where funding is actually required up front.
+        if (method !== DidMethod.ETHR) {
+          setWalletErrorMessage(
+            'Unable to check wallet balance: RPC URL is not configured for this network.',
+          )
+        }
         return null
       }
 
@@ -531,7 +531,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       const etherBalance = ethers.formatEther(balance)
 
       if (parseFloat(etherBalance) < CommonConstants.BALANCELIMIT) {
-        setWalletErrorMessage('You have insufficient funds.')
+        setWalletErrorMessage(
+          method === DidMethod.ETHR
+            ? 'Low balance — you will need ETH before creating schemas with this DID. Creating the DID itself is free.'
+            : 'You have insufficient funds.',
+        )
       } else {
         setWalletErrorMessage(null)
       }
@@ -539,7 +543,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
-      setWalletErrorMessage('Unable to check wallet balance. Please try again.')
+      if (method !== DidMethod.ETHR) {
+        setWalletErrorMessage(
+          'Unable to check wallet balance. Please try again.',
+        )
+      }
       return null
     }
   }
@@ -1279,7 +1287,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                                   </p>
                                 )}
                               </div>
-                              <TokenWarningMessage />
+                              <TokenWarningMessage
+                                mode="generated"
+                                didMethod={method}
+                                network={balanceNetwork}
+                              />
                               <div className="my-3">
                                 <div className="text-sm">
                                   <span className="font-semibold">
@@ -1322,7 +1334,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                               {walletErrorMessage}
                             </p>
                           )}
-                          <TokenWarningMessage />
+                          <TokenWarningMessage
+                            mode="existing"
+                            didMethod={method}
+                            network={balanceNetwork}
+                          />
                         </div>
                       )}
                     </div>
