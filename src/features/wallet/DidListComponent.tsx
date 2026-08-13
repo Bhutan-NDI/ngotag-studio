@@ -48,6 +48,7 @@ import { CommonConstants } from '../common/enum'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
+import TokenWarningMessage from './TokenWarningMessage'
 import { dateConversion } from '@/utils/DateConversion'
 import { ethers } from 'ethers'
 import { formatDidWebError } from './formatDidWebError'
@@ -235,12 +236,6 @@ const CopyDid = ({
     </Tooltip>
   )
 }
-
-const TokenWarningMessage = (): React.JSX.Element => (
-  <div className="mt-3 text-xs">
-    <p>Note: You need to have tokens in your wallet to create a DID.</p>
-  </div>
-)
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -505,18 +500,28 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     privateKey: string,
     network: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (method === DidMethod.ETHR) {
+      setWalletErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
-        testnet:
-          method === DidMethod.ETHR
-            ? process.env.NEXT_PUBLIC_ETHEREUM_TESTNET_URL
-            : process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
-        mainnet:
-          method === DidMethod.ETHR
-            ? process.env.NEXT_PUBLIC_ETHEREUM_MAINNET_URL
-            : process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
+        testnet: process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
+        mainnet: process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
       }
       const networkUrl = rpcUrls?.[network]
+      if (!networkUrl) {
+        setWalletErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
       const provider = new ethers.JsonRpcProvider(networkUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const address = await wallet.getAddress()
@@ -532,6 +537,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setWalletErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
@@ -1271,7 +1277,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                                   </p>
                                 )}
                               </div>
-                              <TokenWarningMessage />
+                              <TokenWarningMessage
+                                mode="generated"
+                                didMethod={method}
+                                network={balanceNetwork}
+                              />
                               <div className="my-3">
                                 <div className="text-sm">
                                   <span className="font-semibold">
@@ -1314,7 +1324,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                               {walletErrorMessage}
                             </p>
                           )}
-                          <TokenWarningMessage />
+                          <TokenWarningMessage
+                            mode="existing"
+                            didMethod={method}
+                            network={balanceNetwork}
+                          />
                         </div>
                       )}
                     </div>
@@ -1369,8 +1383,14 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                     {method === DidMethod.ETHR && (
                       <div className="col-span-1 sm:col-span-2">
                         <h3 className="mb-2 text-sm font-semibold">
-                          Follow these instructions to generate Ethereum tokens:
+                          Follow these instructions to generate Ethereum tokens
+                          for schema creation:
                         </h3>
+                        <p className="text-muted-foreground mb-2 text-sm">
+                          Creating this DID is free — no funds are needed for
+                          that step. These tokens are only needed before you
+                          create schemas with this DID.
+                        </p>
                         <ol className="space-y-2 text-sm">
                           <li>
                             <span className="font-semibold">Step 1:</span>

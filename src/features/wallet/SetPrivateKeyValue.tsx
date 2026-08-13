@@ -47,23 +47,36 @@ const SetPrivateKeyValueInput = ({
     privateKey: string,
     balanceNetwork: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (didMethod === DidMethod.ETHR) {
+      setErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
         testnet:
           didMethod === DidMethod.POLYGON
             ? process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL
-            : didMethod === DidMethod.ETHR
-              ? process.env.NEXT_PUBLIC_ETHEREUM_TESTNET_URL
-              : '',
+            : '',
         mainnet:
           didMethod === DidMethod.POLYGON
             ? process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL
-            : didMethod === DidMethod.ETHR
-              ? process.env.NEXT_PUBLIC_ETHEREUM_MAINNET_URL
-              : '',
+            : '',
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrls[balanceNetwork])
+      const rpcUrl = rpcUrls[balanceNetwork]
+      if (!rpcUrl) {
+        setErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
+      const provider = new ethers.JsonRpcProvider(rpcUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const balance = await provider.getBalance(await wallet.getAddress())
       const etherBalance = ethers.formatEther(balance)
@@ -77,6 +90,7 @@ const SetPrivateKeyValueInput = ({
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
@@ -186,7 +200,11 @@ const SetPrivateKeyValueInput = ({
                 </span>
               )}
 
-              <TokenWarningMessage mode="generated" />
+              <TokenWarningMessage
+                mode="generated"
+                didMethod={didMethod}
+                network={network}
+              />
             </>
           )}
         </>
@@ -211,7 +229,11 @@ const SetPrivateKeyValueInput = ({
             </span>
           )}
 
-          <TokenWarningMessage mode="existing" />
+          <TokenWarningMessage
+            mode="existing"
+            didMethod={didMethod}
+            network={network}
+          />
         </>
       )}
     </div>
