@@ -78,14 +78,16 @@ const SetPrivateKeyValueInput = ({
 
       setErrorMessage(
         parseFloat(etherBalance) < CommonConstants.BALANCELIMIT
-          ? 'You have insufficient funds.'
+          ? didMethod === DidMethod.ETHR
+            ? 'Low balance — you will need ETH before creating schemas with this DID. Creating the DID itself is free.'
+            : 'You have insufficient funds.'
           : null,
       )
 
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
-      setErrorMessage('Unable to check wallet balance. Please try again.')
+      // setErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
