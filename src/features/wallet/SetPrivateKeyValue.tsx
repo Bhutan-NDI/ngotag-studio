@@ -63,7 +63,15 @@ const SetPrivateKeyValueInput = ({
               : '',
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrls[balanceNetwork])
+      const rpcUrl = rpcUrls[balanceNetwork]
+      if (!rpcUrl) {
+        setErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
+      const provider = new ethers.JsonRpcProvider(rpcUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const balance = await provider.getBalance(await wallet.getAddress())
       const etherBalance = ethers.formatEther(balance)
@@ -77,6 +85,7 @@ const SetPrivateKeyValueInput = ({
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }

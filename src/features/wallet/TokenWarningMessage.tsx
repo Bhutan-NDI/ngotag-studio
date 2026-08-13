@@ -17,9 +17,9 @@ const TokenWarningMessage = ({
 }: Props): React.JSX.Element => {
   const isMainnet = network === Network.MAINNET
   const tokenLabel =
-    didMethod === DidMethod.POLYGON
-      ? `POL tokens on the Polygon ${isMainnet ? 'mainnet' : 'testnet'}`
-      : `ETH on the Ethereum ${isMainnet ? 'mainnet' : 'Sepolia testnet'}`
+    didMethod === DidMethod.ETHR
+      ? `ETH on the Ethereum ${isMainnet ? 'mainnet' : 'Sepolia testnet'}`
+      : `POL tokens on the Polygon ${isMainnet ? 'mainnet' : 'testnet'}`
 
   return (
     <Alert variant="warning" className="mt-4">
