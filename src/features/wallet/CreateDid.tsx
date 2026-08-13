@@ -645,6 +645,7 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
+                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
@@ -667,7 +668,7 @@ const CreateDid = (): React.JSX.Element => {
                         </span>
                         <div className="text-foreground/80 text-sm">
                           {selectedDid === 'did:polygon:mainnet'
-                            ? 'Copy your address and fund it with MATIC.'
+                            ? 'Copy your address and fund it with POL.'
                             : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
@@ -703,6 +704,7 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
+                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
