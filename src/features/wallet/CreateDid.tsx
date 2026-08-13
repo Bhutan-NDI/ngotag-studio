@@ -645,6 +645,7 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
+                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
@@ -703,6 +704,7 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
+                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
