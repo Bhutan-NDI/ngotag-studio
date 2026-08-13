@@ -645,7 +645,6 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
-                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
@@ -668,7 +667,7 @@ const CreateDid = (): React.JSX.Element => {
                         </span>
                         <div className="text-foreground/80 text-sm">
                           {selectedDid === 'did:polygon:mainnet'
-                            ? 'Copy your address and fund it with POL.'
+                            ? 'Copy your address and fund it with MATIC.'
                             : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
@@ -704,7 +703,6 @@ const CreateDid = (): React.JSX.Element => {
 
               <CardContent className="space-y-6 pt-6">
                 <SetPrivateKeyValueInput
-                  key={selectedDid}
                   orgId={orgId || ''}
                   privateKeyValue={privateKeyValue}
                   setPrivateKeyValue={setPrivateKeyValue}
@@ -715,9 +713,14 @@ const CreateDid = (): React.JSX.Element => {
                 <div className="space-y-5">
                   <h4 className="text-foreground/80 text-sm font-medium">
                     {selectedDid === 'did:ethr:mainnet'
-                      ? 'Steps to fund your Ethereum Mainnet wallet'
-                      : 'Steps to get Ethereum Sepolia Tokens'}
+                      ? 'Steps to fund your wallet for schema creation (Ethereum Mainnet)'
+                      : 'Steps to get Ethereum Sepolia tokens for schema creation'}
                   </h4>
+                  <p className="text-muted-foreground text-sm">
+                    Creating this DID is free — no funds are needed for that
+                    step. The wallet below only needs to be funded before you
+                    create schemas with this DID.
+                  </p>
 
                   <div className="space-y-4">
                     <div className="border-border bg-secondary rounded-lg border p-4">
