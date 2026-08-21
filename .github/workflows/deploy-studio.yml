@@ -54,7 +54,7 @@ jobs:
         id: manifest_token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.IAC_MANIFEST_APP_ID }}
+          client-id: ${{ vars.IAC_MANIFEST_APP_CLIENT_ID }}
           private-key: ${{ secrets.IAC_MANIFEST_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
@@ -206,8 +206,8 @@ jobs:
         id: release_token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.STUDIO_RELEASE_APP_ID }}
-          private-key: ${{ secrets.STUDIO_RELEASE_APP_PRIVATE_KEY }}
+          client-id: ${{ vars.RELEASE_PUBLISHER_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_PUBLISHER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
@@ -254,7 +254,7 @@ jobs:
         id: manifest_writer_token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ vars.IAC_MANIFEST_WRITER_APP_ID }}
+          client-id: ${{ vars.IAC_MANIFEST_WRITER_APP_CLIENT_ID }}
           private-key: ${{ secrets.IAC_MANIFEST_WRITER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
