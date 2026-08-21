@@ -1,0 +1,300 @@
+name: Deploy Studio
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [qa, stage, prod]
+
+# The default GITHUB_TOKEN is deliberately read-only. AWS access is obtained only
+# through short-lived OIDC credentials after the branch and config checks pass.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: studio-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Studio (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      CONFIG_REPOSITORY: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY }}
+      CONFIG_PATH: studio/environments/${{ inputs.environment }}.json
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - name: Enforce branch policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$TARGET_ENVIRONMENT" in
+            qa) expected_branch=develop ;;
+            stage|prod) expected_branch=main ;;
+            *) echo "unsupported environment" >&2; exit 1 ;;
+          esac
+          test "$GITHUB_REF_NAME" = "$expected_branch" || {
+            echo "$TARGET_ENVIRONMENT releases must run from $expected_branch; got $GITHUB_REF_NAME" >&2
+            exit 1
+          }
+      - name: Check out Studio source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # This token is scoped to the private configuration repository and revoked
+      # automatically after the job.
+      - name: Create scoped manifest-reader GitHub App token
+        id: manifest_token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.IAC_MANIFEST_APP_ID }}
+          private-key: ${{ secrets.IAC_MANIFEST_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          permission-contents: read
+
+      - name: Check out approved deployment configuration
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CONFIG_REPOSITORY }}
+          ref: main
+          token: ${{ steps.manifest_token.outputs.token }}
+          path: deployment-config
+          persist-credentials: false
+
+      - name: Validate deployment configuration
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          config="deployment-config/$CONFIG_PATH"
+          test -f "$config"
+          jq -e --arg environment "$TARGET_ENVIRONMENT" '
+            .schema_version == 1 and
+            .environment == $environment and
+            .enabled == true and
+            (.release.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
+            (.release.state == "pending") and
+            (.deployment.allowed_branch == (if $environment == "qa" then "develop" else "main" end)) and
+            (.deployment.aws_region | test("^[a-z]+-[a-z]+-[0-9]+$")) and
+            (.deployment.cluster | length > 0) and
+            (.deployment.service | length > 0) and
+            (.deployment.task_definition_family | length > 0) and
+            (.deployment.container_name | length > 0) and
+            (.deployment.ecr_repository | length > 0) and
+            ([.deployment | to_entries[] | select(.value | startswith("REVIEW_AND_SET_"))] | length == 0) and
+            (.build_args | type == "object") and
+            (.release.version == .build_args.NEXT_PUBLIC_CURRENT_RELEASE) and
+            ([
+              "NEXT_PUBLIC_MODE", "NEXT_PUBLIC_BASE_URL",
+              "NEXT_PUBLIC_ECOSYSTEM_FRONT_END_URL", "NEXT_PUBLIC_PLATFORM_NAME",
+              "NEXT_PUBLIC_ACTIVE_THEME", "NEXT_PUBLIC_APP_TITLE",
+              "NEXT_PUBLIC_FOOTER_TEXT", "NEXT_PUBLIC_LOGO_BASE_URL",
+              "NEXT_PUBLIC_CURRENT_RELEASE", "NEXT_PUBLIC_ENABLE_APP_LAUNCHER",
+              "NEXT_PUBLIC_APP_NAME", "NEXT_PUBLIC_ENABLE_SOCIAL_LOGIN",
+              "NEXT_PUBLIC_ENABLE_BILLING_OPTION", "NEXT_PUBLIC_SOVIO_LANDINGPAGE_URL",
+              "NEXT_PUBLIC_LANDINGPAGE_URL", "NEXT_PUBLIC_POLYGON_TESTNET_URL",
+              "NEXT_PUBLIC_POLYGON_MAINNET_URL", "NEXT_PUBLIC_MARKETPLACE_MANAGE_URL",
+              "NEXT_PUBLIC_MARKETPLACE_OFFER_URL", "NEXT_PUBLIC_MARKETPLACE_REQUIRED",
+              "NEXT_PUBLIC_MARKETPLACE_PRODUCT_NAME", "NEXT_PUBLIC_MARKETPLACE_PUBLISHER_NAME",
+              "NEXT_PUBLIC_MARKETPLACE_SUPPORT_EMAIL", "NEXT_PUBLIC_MARKETPLACE_PRIVACY_EMAIL",
+              "NEXT_PUBLIC_ADMIN_PORTAL_CLIENT_ID", "NEXT_PUBLIC_ETHEREUM_TESTNET_URL",
+              "NEXT_PUBLIC_ETHEREUM_MAINNET_URL", "NEXT_PUBLIC_DOCS_URL"
+            ] - (.build_args | keys) | length == 0) and
+            ([.build_args | keys[] | select(test("^NEXT_PUBLIC_[A-Z0-9_]+$") | not)] | length == 0) and
+            ([.build_args | keys[] | select(test("(SECRET|PASSWORD|PRIVATE|TOKEN|ACCESS_KEY)") )] | length == 0) and
+            ([.build_args[] | select(type != "string" or test("[\\r\\n]"))] | length == 0)
+          ' "$config" >/dev/null
+          release_version="$(jq -r '.release.version' "$config")"
+          config_hash="$(sha256sum "$config" | awk '{print $1}')"
+          image_tag="studio-v${release_version}-$(git rev-parse --short=12 HEAD)-${config_hash:0:12}"
+          echo "config=$config" >> "$GITHUB_OUTPUT"
+          echo "aws_region=$(jq -r '.deployment.aws_region' "$config")" >> "$GITHUB_OUTPUT"
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_STUDIO_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ steps.config.outputs.aws_region }}
+
+      - name: Verify assumed AWS account
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(aws sts get-caller-identity --query Account --output text)" = "${{ vars.AWS_ACCOUNT_ID }}"
+
+      - name: Resolve ECS deployment values
+        id: deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          jq -r '.deployment | to_entries[] | "\(.key)=\(.value)"' "$config" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=${{ steps.config.outputs.image_tag }}" >> "$GITHUB_ENV"
+          echo "registry=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and publish one immutable amd64 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          if aws ecr describe-images --repository-name "$ecr_repository" --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Reusing existing immutable image tag $IMAGE_TAG"
+            exit 0
+          fi
+          mapfile -t build_args < <(jq -r '.build_args | to_entries[] | "\(.key)=\(.value)"' "$config")
+          command=(docker buildx build --platform linux/amd64 --provenance=false --sbom=false --push
+            --tag "${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}")
+          for build_arg in "${build_args[@]}"; do
+            command+=(--build-arg "$build_arg")
+          done
+          command+=(.)
+          "${command[@]}"
+
+      - name: Register task definition and deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}"
+          task_definition_json="$(mktemp)"
+          trap 'rm -f "$task_definition_json"' EXIT
+          aws ecs describe-task-definition --task-definition "$task_definition_family" \
+            --query taskDefinition --output json \
+            | jq --arg container "$container_name" --arg image "$image" '
+                del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                    .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+                | .containerDefinitions |= map(
+                    if .name == $container then .image = $image else . end
+                  )
+              ' > "$task_definition_json"
+          jq -e --arg container "$container_name" \
+            '[.containerDefinitions[] | select(.name == $container)] | length == 1' \
+            "$task_definition_json" >/dev/null
+          task_definition_arn="$(aws ecs register-task-definition \
+            --cli-input-json "file://$task_definition_json" \
+            --query taskDefinition.taskDefinitionArn --output text)"
+          aws ecs update-service --cluster "$cluster" --service "$service" \
+            --task-definition "$task_definition_arn" --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster "$cluster" --services "$service"
+
+      - name: Resolve immutable image identity
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}"
+          digest="$(aws ecr describe-images --repository-name "$ecr_repository" \
+            --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      # This token is scoped only to this repository. It is separate from the
+      # configuration Apps and revoked automatically after the job.
+      - name: Create scoped Studio-release GitHub App token
+        id: release_token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.STUDIO_RELEASE_APP_ID }}
+          private-key: ${{ secrets.STUDIO_RELEASE_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - name: Create immutable GitHub Release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.release_token.outputs.token }}
+          RELEASE_VERSION: ${{ steps.config.outputs.release_version }}
+          REGISTRY: ${{ steps.deployment.outputs.registry }}
+        run: |
+          set -euo pipefail
+          image="${{ steps.image.outputs.image }}"
+          image_digest="${{ steps.image.outputs.digest }}"
+          case "$TARGET_ENVIRONMENT" in
+            qa)
+              release_tag="v${RELEASE_VERSION}-qa.${GITHUB_RUN_NUMBER}"
+              prerelease_flag=--prerelease
+              ;;
+            stage)
+              release_tag="v${RELEASE_VERSION}-rc.${GITHUB_RUN_NUMBER}"
+              prerelease_flag=--prerelease
+              ;;
+            prod)
+              release_tag="v${RELEASE_VERSION}"
+              prerelease_flag=
+              if gh release view "$release_tag" >/dev/null 2>&1; then
+                echo "production release $release_tag already exists; bump release_version" >&2
+                exit 1
+              fi
+              ;;
+          esac
+          notes=$(printf 'Environment: `%s`\n\nCommit: `%s`\n\nImage: `%s@%s`\n' \
+            "$TARGET_ENVIRONMENT" "$GITHUB_SHA" "$image" "$image_digest")
+          gh release create "$release_tag" --target "$GITHUB_SHA" \
+            --title "NGOTAG Studio $release_tag" --notes "$notes" $prerelease_flag
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+      # This App is installed only on the private manifest repository with
+      # Contents: Read & Write. It records what was actually deployed only after
+      # ECS is stable and GitHub Release creation succeeds.
+      - name: Create scoped manifest-writer GitHub App token
+        id: manifest_writer_token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.IAC_MANIFEST_WRITER_APP_ID }}
+          private-key: ${{ secrets.IAC_MANIFEST_WRITER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          permission-contents: write
+
+      - name: Record deployed image in manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.manifest_writer_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          current_json="$(gh api "repos/${CONFIG_REPOSITORY}/contents/${CONFIG_PATH}")"
+          current_sha="$(jq -r '.sha' <<<"$current_json")"
+          current_config="$(jq -r '.content' <<<"$current_json" | base64 --decode)"
+          test "$(jq -r '.release.version' <<<"$current_config")" = "${{ steps.config.outputs.release_version }}"
+          test "$(jq -r '.release.state' <<<"$current_config")" = "pending"
+          updated_config="$(jq \
+            --arg tag "$IMAGE_TAG" \
+            --arg digest "${{ steps.image.outputs.digest }}" \
+            --arg commit "$GITHUB_SHA" \
+            --arg github_release "${{ steps.release.outputs.release_tag }}" \
+            --arg deployed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '.release.state = "deployed"
+             | .release.deployed = {
+                 image_tag: $tag,
+                 image_digest: $digest,
+                 commit: $commit,
+                 github_release: $github_release,
+                 deployed_at: $deployed_at
+               }' <<<"$current_config")"
+          encoded_config="$(printf '%s' "$updated_config" | base64 | tr -d '\n')"
+          gh api --method PUT "repos/${CONFIG_REPOSITORY}/contents/${CONFIG_PATH}" \
+            -f message="chore(studio): record ${TARGET_ENVIRONMENT} release ${{ steps.release.outputs.release_tag }}" \
+            -f content="$encoded_config" -f sha="$current_sha" >/dev/null
+
+      - name: Report deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecs describe-services --cluster "$cluster" --services "$service" \
+            --query 'services[0].{taskDefinition:taskDefinition,running:runningCount,desired:desiredCount,deployments:deployments[0].rolloutState}' \
+            --output table
