@@ -26,7 +26,7 @@ jobs:
     environment: ${{ inputs.environment }}
     timeout-minutes: 30
     env:
-      CONFIG_REPOSITORY: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY }}
+      CONFIG_REPOSITORY: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY }}
       CONFIG_PATH: studio/environments/${{ inputs.environment }}.json
       TARGET_ENVIRONMENT: ${{ inputs.environment }}
     steps:
@@ -54,10 +54,10 @@ jobs:
         id: manifest_token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ vars.IAC_MANIFEST_APP_CLIENT_ID }}
+          client-id: ${{ secrets.IAC_MANIFEST_APP_CLIENT_ID }}
           private-key: ${{ secrets.IAC_MANIFEST_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          repositories: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
           permission-contents: read
 
       - name: Check out approved deployment configuration
@@ -123,14 +123,14 @@ jobs:
       - name: Configure AWS credentials through GitHub OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_STUDIO_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_STUDIO_DEPLOY_ROLE_ARN }}
           aws-region: ${{ steps.config.outputs.aws_region }}
 
       - name: Verify assumed AWS account
         shell: bash
         run: |
           set -euo pipefail
-          test "$(aws sts get-caller-identity --query Account --output text)" = "${{ vars.AWS_ACCOUNT_ID }}"
+          test "$(aws sts get-caller-identity --query Account --output text)" = "${{ secrets.AWS_ACCOUNT_ID }}"
 
       - name: Resolve ECS deployment values
         id: deployment
@@ -206,7 +206,7 @@ jobs:
         id: release_token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ vars.RELEASE_PUBLISHER_APP_CLIENT_ID }}
+          client-id: ${{ secrets.RELEASE_PUBLISHER_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_PUBLISHER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: ${{ github.event.repository.name }}
@@ -254,10 +254,10 @@ jobs:
         id: manifest_writer_token
         uses: actions/create-github-app-token@v3
         with:
-          client-id: ${{ vars.IAC_MANIFEST_WRITER_APP_CLIENT_ID }}
+          client-id: ${{ secrets.IAC_MANIFEST_WRITER_APP_CLIENT_ID }}
           private-key: ${{ secrets.IAC_MANIFEST_WRITER_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
-          repositories: ${{ vars.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          repositories: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
           permission-contents: write
 
       - name: Record deployed image in manifest
