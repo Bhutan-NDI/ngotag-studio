@@ -21,7 +21,8 @@ An approved private release manifest moves through two states:
 1. `pending`: a new SemVer release is requested.
 2. `deployed`: the workflow has built an immutable image, completed the service
    health check, created the corresponding GitHub Release, and recorded the exact
-   image tag, digest, commit, and timestamp back in the private manifest.
+   image tag, digest, source and manifest commits, ECS task definition, and
+   timestamp back in the private manifest.
 
 The release workflow enforces the organization’s branch policy, authenticates to
 cloud resources using short-lived GitHub OIDC credentials, and uses narrowly scoped
@@ -31,6 +32,18 @@ The workflow derives the ECR image tag itself from the approved SemVer release,
 the exact source commit, and a hash of the approved private manifest. It will never
 accept a caller-provided image tag or overwrite an existing tag. This keeps a
 configuration-only release just as traceable as a source-code release.
+
+`make deploy-qa`, `make deploy-stage`, and `make deploy-prod` dispatch only from
+their permitted source branch and wait for the resulting workflow to finish. The
+workflow builds and pushes the image first, clones the task definition currently
+used by the service, registers a new revision with only the intended container
+image changed, deploys it, and verifies that ECS stabilized on that exact revision
+before publishing the release ledger.
+
+A reviewed public-build configuration change in the private manifest repository
+also prepares and dispatches a release automatically. Disabled environments never
+dispatch. Deployment-ledger updates are ignored, preventing a successful release
+record from triggering another image build.
 
 Operational setup and environment details are intentionally maintained in the
 private infrastructure repositories.
