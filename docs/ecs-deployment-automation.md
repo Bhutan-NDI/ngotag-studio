@@ -34,8 +34,11 @@ accept a caller-provided image tag or overwrite an existing tag. This keeps a
 configuration-only release just as traceable as a source-code release.
 
 `make deploy-qa`, `make deploy-stage`, and `make deploy-prod` dispatch only from
-their permitted source branch and wait for the resulting workflow to finish. The
-workflow builds and pushes the image first, clones the task definition currently
+their permitted source branch, pin the exact preflight source commit, and wait for
+the resulting workflow to finish. Before obtaining AWS credentials, the workflow
+requires the GitHub Actions `Lint & Build` check to have succeeded for that exact
+commit. It then builds and pushes the image using an environment-scoped GitHub
+Actions layer cache, clones the task definition currently
 used by the service, registers a new revision with only the intended container
 image changed, deploys it, and verifies that ECS stabilized on that exact revision
 before publishing the release ledger.

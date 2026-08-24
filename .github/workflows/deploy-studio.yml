@@ -18,10 +18,15 @@ on:
         description: Non-secret dispatch correlation identifier
         required: false
         type: string
+      source_sha:
+        description: Exact source commit expected by a Makefile dispatch
+        required: false
+        type: string
 
 # The default GITHUB_TOKEN is deliberately read-only. AWS access is obtained only
 # through short-lived OIDC credentials after the branch and config checks pass.
 permissions:
+  checks: read
   contents: read
   id-token: write
 
@@ -42,8 +47,12 @@ jobs:
     steps:
       - name: Enforce branch policy
         shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
+          # This trusted mapping is intentionally independent of the private
+          # manifest. The manifest must agree with it; it cannot redefine it.
           case "$TARGET_ENVIRONMENT" in
             qa) expected_branch=develop ;;
             stage|prod) expected_branch=main ;;
@@ -53,10 +62,50 @@ jobs:
             echo "$TARGET_ENVIRONMENT releases must run from $expected_branch; got $GITHUB_REF_NAME" >&2
             exit 1
           }
+          if [ -n "$EXPECTED_SOURCE_SHA" ]; then
+            test "$EXPECTED_SOURCE_SHA" = "$GITHUB_SHA" || {
+              echo "source branch advanced after the Makefile preflight; re-run the deployment" >&2
+              exit 1
+            }
+          fi
+          echo "EXPECTED_BRANCH=$expected_branch" >> "$GITHUB_ENV"
       - name: Check out Studio source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
+
+      - name: Require successful CI for the exact source commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          test "$source_sha" = "$GITHUB_SHA"
+          for attempt in $(seq 1 120); do
+            check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/check-runs")"
+            state="$(jq -r '
+              [.check_runs[] | select(.name == "Lint & Build" and .app.slug == "github-actions")]
+              | sort_by(.started_at)
+              | last
+              | if . == null then "waiting"
+                elif .status != "completed" then "waiting"
+                elif .conclusion == "success" then "success"
+                else "failed:" + (.conclusion // "unknown")
+                end
+            ' <<<"$check_runs")"
+            case "$state" in
+              success) break ;;
+              failed:*) echo "CI did not pass for $source_sha ($state)" >&2; exit 1 ;;
+              waiting) ;;
+            esac
+            if [ "$attempt" -eq 120 ]; then
+              echo "timed out waiting for Lint & Build on $source_sha" >&2
+              exit 1
+            fi
+            sleep 5
+          done
 
       # This token is scoped to the private configuration repository and revoked
       # automatically after the job.
@@ -92,20 +141,24 @@ jobs:
             echo "manifest_ref must belong to the reviewed manifest main history" >&2
             exit 1
           }
-          jq -e --arg environment "$TARGET_ENVIRONMENT" '
+          jq -e --arg environment "$TARGET_ENVIRONMENT" --arg expected_branch "$EXPECTED_BRANCH" '
             .schema_version == 1 and
             .environment == $environment and
             .enabled == true and
             (.release.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
             (.release.state == "pending") and
-            (.deployment.allowed_branch == (if $environment == "qa" then "develop" else "main" end)) and
+            (.deployment | type == "object") and
+            ([.deployment[] | select(type != "string" or test("[\\r\\n]"))] | length == 0) and
+            (.deployment.allowed_branch == $expected_branch) and
             (.deployment.aws_region | test("^[a-z]+-[a-z]+-[0-9]+$")) and
             (.deployment.cluster | length > 0) and
             (.deployment.service | length > 0) and
             (.deployment.task_definition_family | length > 0) and
             (.deployment.container_name | length > 0) and
             (.deployment.ecr_repository | length > 0) and
-            ([.deployment | to_entries[] | select(.value | startswith("REVIEW_AND_SET_"))] | length == 0) and
+            ([.deployment | to_entries[] | select(
+              (.value | type) == "string" and (.value | startswith("REVIEW_AND_SET_"))
+            )] | length == 0) and
             (.build_args | type == "object") and
             (.release.version == .build_args.NEXT_PUBLIC_CURRENT_RELEASE) and
             ([
@@ -157,9 +210,18 @@ jobs:
         run: |
           set -euo pipefail
           config='${{ steps.config.outputs.config }}'
-          jq -r '.deployment | to_entries[] | "\(.key)=\(.value)"' "$config" >> "$GITHUB_ENV"
-          echo "IMAGE_TAG=${{ steps.config.outputs.image_tag }}" >> "$GITHUB_ENV"
+          {
+            printf 'ECS_CLUSTER=%s\n' "$(jq -r '.deployment.cluster' "$config")"
+            printf 'ECS_SERVICE=%s\n' "$(jq -r '.deployment.service' "$config")"
+            printf 'TASK_DEFINITION_FAMILY=%s\n' "$(jq -r '.deployment.task_definition_family' "$config")"
+            printf 'CONTAINER_NAME=%s\n' "$(jq -r '.deployment.container_name' "$config")"
+            printf 'ECR_REPOSITORY=%s\n' "$(jq -r '.deployment.ecr_repository' "$config")"
+            printf 'IMAGE_TAG=%s\n' '${{ steps.config.outputs.image_tag }}'
+          } >> "$GITHUB_ENV"
           echo "registry=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
@@ -169,13 +231,15 @@ jobs:
         run: |
           set -euo pipefail
           config='${{ steps.config.outputs.config }}'
-          if aws ecr describe-images --repository-name "$ecr_repository" --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
             echo "Reusing existing immutable image tag $IMAGE_TAG"
             exit 0
           fi
           mapfile -t build_args < <(jq -r '.build_args | to_entries[] | "\(.key)=\(.value)"' "$config")
           command=(docker buildx build --platform linux/amd64 --provenance=false --sbom=false --push
-            --tag "${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}")
+            --cache-from "type=gha,scope=studio-${TARGET_ENVIRONMENT}"
+            --cache-to "type=gha,mode=max,scope=studio-${TARGET_ENVIRONMENT}"
+            --tag "${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}")
           for build_arg in "${build_args[@]}"; do
             command+=(--build-arg "$build_arg")
           done
@@ -186,7 +250,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}"
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
           manifest="$(docker buildx imagetools inspect --raw "$image")"
           media_type="$(jq -r '.mediaType // empty' <<<"$manifest")"
           case "$media_type" in
@@ -199,35 +263,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}"
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
           task_definition_json="$(mktemp)"
           service_json="$(mktemp)"
           trap 'rm -f "$task_definition_json" "$service_json"' EXIT
-          active_task_definition="$(aws ecs describe-services --cluster "$cluster" --services "$service" \
+          active_task_definition="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
             --query 'services[0].taskDefinition' --output text)"
           case "$active_task_definition" in
-            *":task-definition/${task_definition_family}:"*) ;;
-            *) echo "service task definition does not belong to $task_definition_family" >&2; exit 1 ;;
+            *":task-definition/${TASK_DEFINITION_FAMILY}:"*) ;;
+            *) echo "service task definition does not belong to $TASK_DEFINITION_FAMILY" >&2; exit 1 ;;
           esac
           aws ecs describe-task-definition --task-definition "$active_task_definition" \
             --query taskDefinition --output json \
-            | jq --arg container "$container_name" --arg image "$image" '
+            | jq --arg container "$CONTAINER_NAME" --arg image "$image" '
                 del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
                     .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
                 | .containerDefinitions |= map(
                     if .name == $container then .image = $image else . end
                   )
               ' > "$task_definition_json"
-          jq -e --arg container "$container_name" \
+          jq -e --arg container "$CONTAINER_NAME" \
             '[.containerDefinitions[] | select(.name == $container)] | length == 1' \
             "$task_definition_json" >/dev/null
           task_definition_arn="$(aws ecs register-task-definition \
             --cli-input-json "file://$task_definition_json" \
             --query taskDefinition.taskDefinitionArn --output text)"
-          aws ecs update-service --cluster "$cluster" --service "$service" \
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
             --task-definition "$task_definition_arn" --force-new-deployment >/dev/null
-          aws ecs wait services-stable --cluster "$cluster" --services "$service"
-          aws ecs describe-services --cluster "$cluster" --services "$service" \
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
             --query 'services[0]' --output json > "$service_json"
           jq -e --arg task_definition "$task_definition_arn" '
             .taskDefinition == $task_definition and
@@ -246,8 +310,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          image="${{ steps.deployment.outputs.registry }}/${ecr_repository}:${IMAGE_TAG}"
-          digest="$(aws ecr describe-images --repository-name "$ecr_repository" \
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          digest="$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
             --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
@@ -296,8 +360,16 @@ jobs:
             "$image" "$image_digest" "${{ steps.ecs.outputs.task_definition_arn }}")
           if gh release view "$release_tag" >/dev/null 2>&1; then
             existing="$(gh release view "$release_tag" --json targetCommitish,body)"
-            test "$(jq -r '.targetCommitish' <<<"$existing")" = "$GITHUB_SHA"
-            jq -e --arg digest "$image_digest" '.body | contains($digest)' <<<"$existing" >/dev/null
+            existing_commit="$(jq -r '.targetCommitish' <<<"$existing")"
+            test "$existing_commit" = "$GITHUB_SHA" || {
+              echo "existing release $release_tag belongs to $existing_commit, not $GITHUB_SHA" >&2
+              exit 1
+            }
+            jq -e --arg digest "$image_digest" '.body | contains($digest)' <<<"$existing" >/dev/null || {
+              echo "existing release $release_tag does not record the deployed digest" >&2
+              exit 1
+            }
+            echo "Reusing matching release $release_tag after a safe retry"
           else
             gh release create "$release_tag" --target "$GITHUB_SHA" \
               --title "NGOTAG Studio $release_tag" --notes "$notes" $prerelease_flag
@@ -362,6 +434,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          aws ecs describe-services --cluster "$cluster" --services "$service" \
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
             --query 'services[0].{taskDefinition:taskDefinition,running:runningCount,desired:desiredCount,deployments:deployments[0].rolloutState}' \
             --output table

@@ -5,6 +5,8 @@ DEPLOY_WAIT ?= true
 
 # These targets only dispatch a GitHub Actions workflow. The workflow repeats every
 # branch/environment check, so bypassing Make cannot bypass the release policy.
+# The mapping is deliberately repeated in the manifest dispatcher, GitHub
+# Environment restrictions, and deployment workflow as independent security gates.
 deploy-qa:
 	@$(MAKE) --no-print-directory _dispatch DEPLOY_ENV=qa REQUIRED_BRANCH=develop
 
@@ -26,6 +28,7 @@ _dispatch:
 		request_id="manual-$(DEPLOY_ENV)-$$(date -u +%Y%m%dT%H%M%SZ)-$$(git rev-parse --short=12 HEAD)"; \
 		gh workflow run "$(DEPLOY_WORKFLOW)" --ref "$(REQUIRED_BRANCH)" \
 			-f environment="$(DEPLOY_ENV)" \
+			-f source_sha="$$(git rev-parse HEAD)" \
 			-f request_id="$$request_id"; \
 		echo "Deployment dispatched: $$request_id"; \
 		if [ "$(DEPLOY_WAIT)" = "true" ]; then \
