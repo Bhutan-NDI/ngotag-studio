@@ -1,0 +1,443 @@
+name: Deploy Studio
+run-name: Deploy Studio (${{ inputs.environment }}) [${{ inputs.request_id || github.run_id }}]
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options: [qa, stage, prod]
+      manifest_ref:
+        description: Exact approved manifest commit; defaults to manifest main
+        required: false
+        type: string
+        default: main
+      request_id:
+        description: Non-secret dispatch correlation identifier
+        required: false
+        type: string
+      source_sha:
+        description: Exact source commit expected by a Makefile dispatch
+        required: false
+        type: string
+
+# The default GITHUB_TOKEN is deliberately read-only. AWS access is obtained only
+# through short-lived OIDC credentials after the branch and config checks pass.
+permissions:
+  checks: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: studio-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Studio (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      CONFIG_REPOSITORY: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY }}
+      CONFIG_PATH: studio/environments/${{ inputs.environment }}.json
+      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+    steps:
+      - name: Enforce branch policy
+        shell: bash
+        env:
+          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          # This trusted mapping is intentionally independent of the private
+          # manifest. The manifest must agree with it; it cannot redefine it.
+          case "$TARGET_ENVIRONMENT" in
+            qa) expected_branch=develop ;;
+            stage|prod) expected_branch=main ;;
+            *) echo "unsupported environment" >&2; exit 1 ;;
+          esac
+          test "$GITHUB_REF_NAME" = "$expected_branch" || {
+            echo "$TARGET_ENVIRONMENT releases must run from $expected_branch; got $GITHUB_REF_NAME" >&2
+            exit 1
+          }
+          if [ -n "$EXPECTED_SOURCE_SHA" ]; then
+            test "$EXPECTED_SOURCE_SHA" = "$GITHUB_SHA" || {
+              echo "source branch advanced after the Makefile preflight; re-run the deployment" >&2
+              exit 1
+            }
+          fi
+          echo "EXPECTED_BRANCH=$expected_branch" >> "$GITHUB_ENV"
+      - name: Check out Studio source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Require successful CI for the exact source commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source_sha="$(git rev-parse HEAD)"
+          test "$source_sha" = "$GITHUB_SHA"
+          for attempt in $(seq 1 120); do
+            check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/check-runs")"
+            state="$(jq -r '
+              [.check_runs[] | select(.name == "Lint & Build" and .app.slug == "github-actions")]
+              | sort_by(.started_at)
+              | last
+              | if . == null then "waiting"
+                elif .status != "completed" then "waiting"
+                elif .conclusion == "success" then "success"
+                else "failed:" + (.conclusion // "unknown")
+                end
+            ' <<<"$check_runs")"
+            case "$state" in
+              success) break ;;
+              failed:*) echo "CI did not pass for $source_sha ($state)" >&2; exit 1 ;;
+              waiting) ;;
+            esac
+            if [ "$attempt" -eq 120 ]; then
+              echo "timed out waiting for Lint & Build on $source_sha" >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
+      # This token is scoped to the private configuration repository and revoked
+      # automatically after the job.
+      - name: Create scoped manifest-reader GitHub App token
+        id: manifest_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.IAC_MANIFEST_APP_ID }}
+          private-key: ${{ secrets.IAC_MANIFEST_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          permission-contents: read
+
+      - name: Check out approved deployment configuration
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.CONFIG_REPOSITORY }}
+          ref: ${{ inputs.manifest_ref || 'main' }}
+          token: ${{ steps.manifest_token.outputs.token }}
+          path: deployment-config
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate deployment configuration
+        id: config
+        shell: bash
+        run: |
+          set -euo pipefail
+          config="deployment-config/$CONFIG_PATH"
+          test -f "$config"
+          git -C deployment-config rev-parse --verify origin/main >/dev/null
+          git -C deployment-config merge-base --is-ancestor HEAD origin/main || {
+            echo "manifest_ref must belong to the reviewed manifest main history" >&2
+            exit 1
+          }
+          git -C deployment-config diff --quiet HEAD origin/main -- "$CONFIG_PATH" || {
+            echo "selected manifest differs from the current main copy; dispatch the current approved manifest" >&2
+            exit 1
+          }
+          jq -e --arg environment "$TARGET_ENVIRONMENT" --arg expected_branch "$EXPECTED_BRANCH" '
+            .schema_version == 1 and
+            .environment == $environment and
+            .enabled == true and
+            (.release.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
+            (.release.state == "pending") and
+            (.deployment | type == "object") and
+            ([.deployment[] | select(type != "string" or test("[\\r\\n]"))] | length == 0) and
+            (.deployment.allowed_branch == $expected_branch) and
+            (.deployment.aws_region | test("^[a-z]+-[a-z]+-[0-9]+$")) and
+            (.deployment.cluster | length > 0) and
+            (.deployment.service | length > 0) and
+            (.deployment.task_definition_family | length > 0) and
+            (.deployment.container_name | length > 0) and
+            (.deployment.ecr_repository | length > 0) and
+            ([.deployment | to_entries[] | select(
+              (.value | type) == "string" and (.value | startswith("REVIEW_AND_SET_"))
+            )] | length == 0) and
+            (.build_args | type == "object") and
+            (.release.version == .build_args.NEXT_PUBLIC_CURRENT_RELEASE) and
+            ([
+              "NEXT_PUBLIC_MODE", "NEXT_PUBLIC_BASE_URL",
+              "NEXT_PUBLIC_ECOSYSTEM_FRONT_END_URL", "NEXT_PUBLIC_PLATFORM_NAME",
+              "NEXT_PUBLIC_ACTIVE_THEME", "NEXT_PUBLIC_APP_TITLE",
+              "NEXT_PUBLIC_FOOTER_TEXT", "NEXT_PUBLIC_LOGO_BASE_URL",
+              "NEXT_PUBLIC_CURRENT_RELEASE", "NEXT_PUBLIC_ENABLE_APP_LAUNCHER",
+              "NEXT_PUBLIC_APP_NAME", "NEXT_PUBLIC_ENABLE_SOCIAL_LOGIN",
+              "NEXT_PUBLIC_ENABLE_BILLING_OPTION", "NEXT_PUBLIC_SOVIO_LANDINGPAGE_URL",
+              "NEXT_PUBLIC_LANDINGPAGE_URL", "NEXT_PUBLIC_POLYGON_TESTNET_URL",
+              "NEXT_PUBLIC_POLYGON_MAINNET_URL", "NEXT_PUBLIC_MARKETPLACE_MANAGE_URL",
+              "NEXT_PUBLIC_MARKETPLACE_OFFER_URL", "NEXT_PUBLIC_MARKETPLACE_REQUIRED",
+              "NEXT_PUBLIC_MARKETPLACE_PRODUCT_NAME", "NEXT_PUBLIC_MARKETPLACE_PUBLISHER_NAME",
+              "NEXT_PUBLIC_MARKETPLACE_SUPPORT_EMAIL", "NEXT_PUBLIC_MARKETPLACE_PRIVACY_EMAIL",
+              "NEXT_PUBLIC_ADMIN_PORTAL_CLIENT_ID", "NEXT_PUBLIC_ETHEREUM_TESTNET_URL",
+              "NEXT_PUBLIC_ETHEREUM_MAINNET_URL", "NEXT_PUBLIC_DOCS_URL"
+            ] - (.build_args | keys) | length == 0) and
+            ([.build_args | keys[] | select(test("^NEXT_PUBLIC_[A-Z0-9_]+$") | not)] | length == 0) and
+            ([.build_args | keys[] | select(test("(SECRET|PASSWORD|PRIVATE|TOKEN|ACCESS_KEY)") )] | length == 0) and
+            ([.build_args[] | select(type != "string" or test("[\\r\\n]"))] | length == 0)
+          ' "$config" >/dev/null
+          release_version="$(jq -r '.release.version' "$config")"
+          config_hash="$(sha256sum "$config" | awk '{print $1}')"
+          image_tag="studio-v${release_version}-$(git rev-parse --short=12 HEAD)-${config_hash:0:12}"
+          manifest_commit="$(git -C deployment-config rev-parse HEAD)"
+          echo "config=$config" >> "$GITHUB_OUTPUT"
+          echo "aws_region=$(jq -r '.deployment.aws_region' "$config")" >> "$GITHUB_OUTPUT"
+          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+          echo "config_hash=$config_hash" >> "$GITHUB_OUTPUT"
+          echo "manifest_commit=$manifest_commit" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ secrets.AWS_STUDIO_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ steps.config.outputs.aws_region }}
+
+      - name: Verify assumed AWS account
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(aws sts get-caller-identity --query Account --output text)" = "${{ secrets.AWS_ACCOUNT_ID }}"
+
+      - name: Resolve ECS deployment values
+        id: deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          {
+            printf 'ECS_CLUSTER=%s\n' "$(jq -r '.deployment.cluster' "$config")"
+            printf 'ECS_SERVICE=%s\n' "$(jq -r '.deployment.service' "$config")"
+            printf 'TASK_DEFINITION_FAMILY=%s\n' "$(jq -r '.deployment.task_definition_family' "$config")"
+            printf 'CONTAINER_NAME=%s\n' "$(jq -r '.deployment.container_name' "$config")"
+            printf 'ECR_REPOSITORY=%s\n' "$(jq -r '.deployment.ecr_repository' "$config")"
+            printf 'IMAGE_TAG=%s\n' '${{ steps.config.outputs.image_tag }}'
+          } >> "$GITHUB_ENV"
+          echo "registry=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.${AWS_REGION}.amazonaws.com" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+      - name: Build and publish one immutable amd64 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          if aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$IMAGE_TAG" >/dev/null 2>&1; then
+            echo "Reusing existing immutable image tag $IMAGE_TAG"
+            exit 0
+          fi
+          mapfile -t build_args < <(jq -r '.build_args | to_entries[] | "\(.key)=\(.value)"' "$config")
+          command=(docker buildx build --platform linux/amd64 --provenance=false --sbom=false --push
+            --cache-from "type=gha,scope=studio-${TARGET_ENVIRONMENT}"
+            --cache-to "type=gha,mode=max,scope=studio-${TARGET_ENVIRONMENT}"
+            --tag "${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}")
+          for build_arg in "${build_args[@]}"; do
+            command+=(--build-arg "$build_arg")
+          done
+          command+=(.)
+          "${command[@]}"
+
+      - name: Verify a single-platform image was published
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          manifest="$(docker buildx imagetools inspect --raw "$image")"
+          media_type="$(jq -r '.mediaType // empty' <<<"$manifest")"
+          case "$media_type" in
+            application/vnd.docker.distribution.manifest.v2+json|application/vnd.oci.image.manifest.v1+json) ;;
+            *) echo "expected one image manifest, got ${media_type:-unknown}" >&2; exit 1 ;;
+          esac
+
+      - name: Register task definition and deploy
+        id: ecs
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          task_definition_json="$(mktemp)"
+          service_json="$(mktemp)"
+          trap 'rm -f "$task_definition_json" "$service_json"' EXIT
+          active_task_definition="$(aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].taskDefinition' --output text)"
+          case "$active_task_definition" in
+            *":task-definition/${TASK_DEFINITION_FAMILY}:"*) ;;
+            *) echo "service task definition does not belong to $TASK_DEFINITION_FAMILY" >&2; exit 1 ;;
+          esac
+          aws ecs describe-task-definition --task-definition "$active_task_definition" \
+            --query taskDefinition --output json \
+            | jq --arg container "$CONTAINER_NAME" --arg image "$image" '
+                del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                    .compatibilities, .registeredAt, .registeredBy, .deregisteredAt)
+                | .containerDefinitions |= map(
+                    if .name == $container then .image = $image else . end
+                  )
+              ' > "$task_definition_json"
+          jq -e --arg container "$CONTAINER_NAME" \
+            '[.containerDefinitions[] | select(.name == $container)] | length == 1' \
+            "$task_definition_json" >/dev/null
+          task_definition_arn="$(aws ecs register-task-definition \
+            --cli-input-json "file://$task_definition_json" \
+            --query taskDefinition.taskDefinitionArn --output text)"
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
+            --task-definition "$task_definition_arn" --force-new-deployment >/dev/null
+          aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0]' --output json > "$service_json"
+          jq -e --arg task_definition "$task_definition_arn" '
+            .taskDefinition == $task_definition and
+            .runningCount == .desiredCount and
+            .pendingCount == 0 and
+            ([.deployments[] | select(.taskDefinition == $task_definition and .rolloutState == "COMPLETED")] | length == 1)
+          ' "$service_json" >/dev/null || {
+            echo "ECS did not stabilize on the newly registered task definition" >&2
+            exit 1
+          }
+          echo "task_definition_arn=$task_definition_arn" >> "$GITHUB_OUTPUT"
+          echo "task_definition_revision=${task_definition_arn##*:}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve immutable image identity
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${{ steps.deployment.outputs.registry }}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          digest="$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" --query 'imageDetails[0].imageDigest' --output text)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+
+      # This token is scoped only to this repository. It is separate from the
+      # configuration Apps and revoked automatically after the job.
+      - name: Create scoped Studio-release GitHub App token
+        id: release_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.RELEASE_PUBLISHER_APP_ID }}
+          private-key: ${{ secrets.RELEASE_PUBLISHER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+
+      - name: Create immutable GitHub Release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.release_token.outputs.token }}
+          RELEASE_VERSION: ${{ steps.config.outputs.release_version }}
+          REGISTRY: ${{ steps.deployment.outputs.registry }}
+        run: |
+          set -euo pipefail
+          image="${{ steps.image.outputs.image }}"
+          image_digest="${{ steps.image.outputs.digest }}"
+          release_suffix="${GITHUB_SHA:0:8}.${{ steps.config.outputs.config_hash }}"
+          release_suffix="${release_suffix:0:17}"
+          case "$TARGET_ENVIRONMENT" in
+            qa)
+              release_tag="v${RELEASE_VERSION}-qa.${release_suffix}"
+              prerelease_flag=--prerelease
+              ;;
+            stage)
+              release_tag="v${RELEASE_VERSION}-rc.${release_suffix}"
+              prerelease_flag=--prerelease
+              ;;
+            prod)
+              release_tag="v${RELEASE_VERSION}"
+              prerelease_flag=
+              ;;
+          esac
+          notes=$(printf 'Environment: `%s`\n\nSource commit: `%s`\n\nManifest commit: `%s`\n\nImage: `%s@%s`\n\nTask definition: `%s`\n' \
+            "$TARGET_ENVIRONMENT" "$GITHUB_SHA" "${{ steps.config.outputs.manifest_commit }}" \
+            "$image" "$image_digest" "${{ steps.ecs.outputs.task_definition_arn }}")
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            existing="$(gh release view "$release_tag" --json targetCommitish,body)"
+            existing_commit="$(jq -r '.targetCommitish' <<<"$existing")"
+            test "$existing_commit" = "$GITHUB_SHA" || {
+              echo "existing release $release_tag belongs to $existing_commit, not $GITHUB_SHA" >&2
+              exit 1
+            }
+            jq -e --arg digest "$image_digest" '.body | contains($digest)' <<<"$existing" >/dev/null || {
+              echo "existing release $release_tag does not record the deployed digest" >&2
+              exit 1
+            }
+            echo "Reusing matching release $release_tag after a safe retry"
+          else
+            gh release create "$release_tag" --target "$GITHUB_SHA" \
+              --title "NGOTAG Studio $release_tag" --notes "$notes" $prerelease_flag
+          fi
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+      # This App is installed only on the private manifest repository with
+      # Contents: Read & Write. It records what was actually deployed only after
+      # ECS is stable and GitHub Release creation succeeds.
+      - name: Create scoped manifest-writer GitHub App token
+        id: manifest_writer_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.IAC_MANIFEST_WRITER_APP_ID }}
+          private-key: ${{ secrets.IAC_MANIFEST_WRITER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY_NAME }}
+          permission-contents: write
+
+      - name: Record deployed image in manifest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.manifest_writer_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          config='${{ steps.config.outputs.config }}'
+          current_json="$(gh api "repos/${CONFIG_REPOSITORY}/contents/${CONFIG_PATH}")"
+          current_sha="$(jq -r '.sha' <<<"$current_json")"
+          current_config="$(jq -r '.content' <<<"$current_json" | base64 --decode)"
+          test "$(jq -r '.release.version' <<<"$current_config")" = "${{ steps.config.outputs.release_version }}"
+          test "$(jq -r '.release.state' <<<"$current_config")" = "pending"
+          expected_request="$(jq -cS 'del(.release.deployed)' "$config")"
+          current_request="$(jq -cS 'del(.release.deployed)' <<<"$current_config")"
+          test "$current_request" = "$expected_request" || {
+            echo "manifest changed after this deployment started; refusing to overwrite its ledger" >&2
+            exit 1
+          }
+          updated_config="$(jq \
+            --arg tag "$IMAGE_TAG" \
+            --arg digest "${{ steps.image.outputs.digest }}" \
+            --arg commit "$GITHUB_SHA" \
+            --arg manifest_commit "${{ steps.config.outputs.manifest_commit }}" \
+            --arg github_release "${{ steps.release.outputs.release_tag }}" \
+            --arg task_definition "${{ steps.ecs.outputs.task_definition_arn }}" \
+            --arg deployed_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '.release.state = "deployed"
+             | .release.deployed = {
+                 image_tag: $tag,
+                 image_digest: $digest,
+                 commit: $commit,
+                 manifest_commit: $manifest_commit,
+                 github_release: $github_release,
+                 task_definition: $task_definition,
+                 deployed_at: $deployed_at
+               }' <<<"$current_config")"
+          encoded_config="$(printf '%s' "$updated_config" | base64 | tr -d '\n')"
+          gh api --method PUT "repos/${CONFIG_REPOSITORY}/contents/${CONFIG_PATH}" \
+            -f message="chore(studio): record ${TARGET_ENVIRONMENT} release ${{ steps.release.outputs.release_tag }}" \
+            -f content="$encoded_config" -f sha="$current_sha" >/dev/null
+
+      - name: Report deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].{taskDefinition:taskDefinition,running:runningCount,desired:desiredCount,deployments:deployments[0].rolloutState}' \
+            --output table
