@@ -24,6 +24,10 @@ An approved private release manifest moves through two states:
    image tag, digest, source and manifest commits, ECS task definition, and
    timestamp back in the private manifest.
 
+Before obtaining AWS credentials, the workflow also confirms that the selected
+environment manifest still matches its current reviewed `main` copy. A stale
+configuration is therefore rejected before any image or ECS mutation.
+
 The release workflow enforces the organization’s branch policy, authenticates to
 cloud resources using short-lived GitHub OIDC credentials, and uses narrowly scoped
 GitHub App tokens for private configuration reads/writes and Release creation.

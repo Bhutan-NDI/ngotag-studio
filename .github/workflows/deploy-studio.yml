@@ -141,6 +141,10 @@ jobs:
             echo "manifest_ref must belong to the reviewed manifest main history" >&2
             exit 1
           }
+          git -C deployment-config diff --quiet HEAD origin/main -- "$CONFIG_PATH" || {
+            echo "selected manifest differs from the current main copy; dispatch the current approved manifest" >&2
+            exit 1
+          }
           jq -e --arg environment "$TARGET_ENVIRONMENT" --arg expected_branch "$EXPECTED_BRANCH" '
             .schema_version == 1 and
             .environment == $environment and
