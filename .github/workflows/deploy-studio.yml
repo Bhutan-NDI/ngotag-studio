@@ -1,27 +1,12 @@
 name: Deploy Studio
-run-name: Deploy Studio (${{ inputs.environment }}) [${{ inputs.request_id || github.run_id }}]
+run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: Target environment
-        required: true
-        type: choice
-        options: [qa, stage, prod]
-      manifest_ref:
-        description: Exact approved manifest commit; defaults to manifest main
-        required: false
-        type: string
-        default: main
-      request_id:
-        description: Non-secret dispatch correlation identifier
-        required: false
-        type: string
-      source_sha:
-        description: Exact source commit expected by a Makefile dispatch
-        required: false
-        type: string
+  push:
+    tags:
+      - studio-qa-*
+      - studio-stage-*
+      - studio-prod-*
 
 # The default GITHUB_TOKEN is deliberately read-only. AWS access is obtained only
 # through short-lived OIDC credentials after the branch and config checks pass.
@@ -31,48 +16,80 @@ permissions:
   id-token: write
 
 concurrency:
-  group: studio-${{ inputs.environment }}
+  group: >-
+    studio-${{
+      startsWith(github.ref_name, 'studio-qa-') && 'qa' ||
+      startsWith(github.ref_name, 'studio-stage-') && 'stage' ||
+      startsWith(github.ref_name, 'studio-prod-') && 'prod' ||
+      'invalid'
+    }}
   cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy Studio (${{ inputs.environment }})
+    name: >-
+      Deploy Studio (${{
+        startsWith(github.ref_name, 'studio-qa-') && 'qa' ||
+        startsWith(github.ref_name, 'studio-stage-') && 'stage' ||
+        startsWith(github.ref_name, 'studio-prod-') && 'prod' ||
+        'invalid'
+      }})
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: >-
+      ${{
+        startsWith(github.ref_name, 'studio-qa-') && 'qa' ||
+        startsWith(github.ref_name, 'studio-stage-') && 'stage' ||
+        startsWith(github.ref_name, 'studio-prod-') && 'prod' ||
+        'invalid'
+      }}
     timeout-minutes: 30
     env:
       CONFIG_REPOSITORY: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY }}
-      CONFIG_PATH: studio/environments/${{ inputs.environment }}.json
-      TARGET_ENVIRONMENT: ${{ inputs.environment }}
     steps:
-      - name: Enforce branch policy
+      - name: Validate Makefile release trigger
+        id: trigger
         shell: bash
         env:
-          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # This trusted mapping is intentionally independent of the private
-          # manifest. The manifest must agree with it; it cannot redefine it.
-          case "$TARGET_ENVIRONMENT" in
-            qa) expected_branch=develop ;;
-            stage|prod) expected_branch=main ;;
-            *) echo "unsupported environment" >&2; exit 1 ;;
+
+          # Tags are created only by the repository Makefile. The exact manifest
+          # commit is embedded in the immutable tag so the workflow never follows
+          # a moving configuration ref.
+          case "$GITHUB_REF_NAME" in
+            studio-qa-*) target_environment=qa; expected_branch=develop ;;
+            studio-stage-*) target_environment=stage; expected_branch=main ;;
+            studio-prod-*) target_environment=prod; expected_branch=main ;;
+            *) echo "unsupported Studio release tag" >&2; exit 1 ;;
           esac
-          test "$GITHUB_REF_NAME" = "$expected_branch" || {
-            echo "$TARGET_ENVIRONMENT releases must run from $expected_branch; got $GITHUB_REF_NAME" >&2
+
+          tag_pattern="^studio-${target_environment}-([0-9a-f]{40})-([0-9a-f]{12})-([0-9]{8}T[0-9]{6}Z)$"
+          [[ "$GITHUB_REF_NAME" =~ $tag_pattern ]] || {
+            echo "release tag does not match the Makefile contract" >&2
             exit 1
           }
-          if [ -n "$EXPECTED_SOURCE_SHA" ]; then
-            test "$EXPECTED_SOURCE_SHA" = "$GITHUB_SHA" || {
-              echo "source branch advanced after the Makefile preflight; re-run the deployment" >&2
-              exit 1
-            }
-          fi
-          echo "EXPECTED_BRANCH=$expected_branch" >> "$GITHUB_ENV"
+          manifest_ref="${BASH_REMATCH[1]}"
+          expected_source_short="${BASH_REMATCH[2]}"
+          test "${GITHUB_SHA:0:12}" = "$expected_source_short"
+
+          branch_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${expected_branch}" --jq '.object.sha')"
+          test "$GITHUB_SHA" = "$branch_sha" || {
+            echo "$target_environment releases must use the current $expected_branch head" >&2
+            exit 1
+          }
+
+          {
+            echo "TARGET_ENVIRONMENT=$target_environment"
+            echo "EXPECTED_BRANCH=$expected_branch"
+            echo "CONFIG_PATH=studio/environments/${target_environment}.json"
+          } >> "$GITHUB_ENV"
+          echo "manifest_ref=$manifest_ref" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
       - name: Check out Studio source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source_sha || github.sha }}
+          ref: ${{ steps.trigger.outputs.source_sha }}
           fetch-depth: 0
 
       - name: Require successful CI for the exact source commit
@@ -123,7 +140,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.CONFIG_REPOSITORY }}
-          ref: ${{ inputs.manifest_ref || 'main' }}
+          ref: ${{ steps.trigger.outputs.manifest_ref }}
           token: ${{ steps.manifest_token.outputs.token }}
           path: deployment-config
           fetch-depth: 0
