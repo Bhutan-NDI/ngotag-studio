@@ -24,6 +24,7 @@ _release:
 	@command -v gh >/dev/null || (echo "GitHub CLI (gh) is required" && exit 1)
 	@command -v jq >/dev/null || (echo "jq is required" && exit 1)
 	@command -v base64 >/dev/null || (echo "base64 is required" && exit 1)
+	@command -v cut >/dev/null || (echo "cut is required" && exit 1)
 	@set -eu; \
 		config_repository="$(DEPLOYMENT_CONFIG_REPOSITORY)"; \
 		test -n "$$config_repository" || { \
@@ -32,9 +33,10 @@ _release:
 		}; \
 		studio_repository="$$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"; \
 		source_sha="$$(git rev-parse HEAD)"; \
-		source_short="$$(git rev-parse --short=12 HEAD)"; \
+		source_short="$$(printf '%s' "$$source_sha" | cut -c1-12)"; \
 		manifest_ref="$$(gh api "repos/$${config_repository}/git/ref/heads/main" --jq '.object.sha')"; \
-		manifest="$$(gh api "repos/$${config_repository}/contents/studio/environments/$(DEPLOY_ENV).json?ref=$${manifest_ref}" --jq '.content' | base64 --decode)"; \
+		manifest_content="$$(gh api "repos/$${config_repository}/contents/studio/environments/$(DEPLOY_ENV).json?ref=$${manifest_ref}" --jq '.content')"; \
+		manifest="$$(printf '%s' "$$manifest_content" | base64 --decode)"; \
 		printf '%s' "$$manifest" | jq -e \
 			--arg environment "$(DEPLOY_ENV)" \
 			--arg branch "$(REQUIRED_BRANCH)" '
@@ -48,7 +50,8 @@ _release:
 			echo "the current reviewed $(DEPLOY_ENV) manifest is not an eligible pending release" >&2; \
 			exit 1; \
 		}; \
-		ci_state="$$(gh api "repos/$${studio_repository}/commits/$${source_sha}/check-runs" | jq -r '
+		check_runs="$$(gh api "repos/$${studio_repository}/commits/$${source_sha}/check-runs")"; \
+		ci_state="$$(printf '%s' "$$check_runs" | jq -r '
 			[.check_runs[] | select(.name == "Lint & Build" and .app.slug == "github-actions")]
 			| sort_by(.started_at)
 			| last
@@ -78,9 +81,9 @@ _release:
 		if [ "$(DEPLOY_WAIT)" = "true" ]; then \
 			run_id=""; attempts=0; \
 			while [ -z "$$run_id" ] && [ "$$attempts" -lt 90 ]; do \
-				run_id="$$(gh run list --repo "$$studio_repository" --commit "$$source_sha" \
-					--event push --limit 50 --json databaseId,displayTitle \
-					| jq -r --arg tag "$$release_tag" '.[] | select(.displayTitle | contains($$tag)) | .databaseId' \
+				workflow_runs="$$(gh api "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; \
+				run_id="$$(printf '%s' "$$workflow_runs" \
+					| jq -r --arg tag "$$release_tag" '.workflow_runs[] | select(.path == ".github/workflows/deploy-studio.yml" and (.display_title | contains($$tag))) | .id' \
 					| head -n 1)"; \
 				[ -n "$$run_id" ] || sleep 2; \
 				attempts=$$((attempts + 1)); \

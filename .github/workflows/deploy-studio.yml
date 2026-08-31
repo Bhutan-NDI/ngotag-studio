@@ -2,6 +2,9 @@ name: Deploy Studio
 run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
+  # Keep this environment mapping synchronized with concurrency.group,
+  # jobs.deploy.name, jobs.deploy.environment, and the validation step's case.
+  # Job-level fields are evaluated before steps and cannot use step outputs.
   push:
     tags:
       - studio-qa-*
@@ -71,7 +74,10 @@ jobs:
           }
           manifest_ref="${BASH_REMATCH[1]}"
           expected_source_short="${BASH_REMATCH[2]}"
-          test "${GITHUB_SHA:0:12}" = "$expected_source_short"
+          test "${GITHUB_SHA:0:12}" = "$expected_source_short" || {
+            echo "tag-embedded source commit does not match the tagged commit" >&2
+            exit 1
+          }
 
           branch_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${expected_branch}" --jq '.object.sha')"
           test "$GITHUB_SHA" = "$branch_sha" || {
