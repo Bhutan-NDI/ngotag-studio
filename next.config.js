@@ -13,7 +13,10 @@ const nextConfig = {
         port: '',
       },
     ],
-    domains: ['dev-org-logo.s3.ap-south-1.amazonaws.com'],
+    domains: [
+      'dev-org-logo.s3.ap-south-1.amazonaws.com',
+      'qa-ngotag-organization-upload.s3.ap-southeast-1.amazonaws.com',
+    ],
   },
   reactStrictMode: false,
   transpilePackages: ['geist'],

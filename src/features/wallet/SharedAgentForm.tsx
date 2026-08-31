@@ -2,17 +2,25 @@
 
 import * as yup from 'yup'
 
-import { Field, Form, Formik } from 'formik'
+import {
+  FIELD_BLOCK_CLASS,
+  FIELD_CLASS,
+  LABEL_CLASS,
+} from '@/components/ngotag/ui/formStyles'
+import { Field, FieldProps, Form, Formik } from 'formik'
 import React, { useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
+import { AuthAlert } from '@/components/ngotag/ui/AuthAlert'
 import type { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
+import { GradientButton } from '@/components/ngotag/ui/GradientButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import SOCKET from '@/config/SocketConfig'
 import { apiStatusCodes } from '@/config/CommonConstant'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { spinupSharedAgent } from '@/app/api/Agent'
 import { useOrgWalletName } from './useOrgWalletName'
 
@@ -79,6 +87,8 @@ const SharedAgentForm = ({
     }
   }
 
+  const ngotag = isNgotagTheme()
+
   return (
     <div className="mt-6">
       <Formik
@@ -87,42 +97,92 @@ const SharedAgentForm = ({
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
-        {({ errors, touched }) => (
-          <Form className="space-y-6">
-            <div>
-              <Label htmlFor="label">Wallet Label</Label>
-              <p className="text-muted-foreground mt-1 text-sm">
-                This label is auto-generated based on your organization name.
-                You can edit it if needed.
-              </p>
-              <Field
-                as={Input}
-                id="label"
-                name="label"
-                placeholder="Enter wallet label"
-                className="mt-2"
-                disabled={disabled}
-              />
-              {errors.label && touched.label && (
-                <p className="text-destructive mt-1 text-sm">{errors.label}</p>
+        {({ errors, touched }) => {
+          if (ngotag) {
+            return (
+              <Form className="space-y-6">
+                <label className={FIELD_BLOCK_CLASS}>
+                  <span className={LABEL_CLASS}>Wallet Label</span>
+                  <p className="text-ngotag-muted -mt-0.5 text-[13px] leading-[1.5]">
+                    This label is auto-generated based on your organization
+                    name. You can edit it if needed.
+                  </p>
+                  <Field name="label">
+                    {({ field }: FieldProps<string, { label: string }>) => (
+                      <input
+                        {...field}
+                        id="label"
+                        placeholder="Enter wallet label"
+                        className={`${FIELD_CLASS} h-12`}
+                        disabled={disabled}
+                      />
+                    )}
+                  </Field>
+                  {errors.label && touched.label ? (
+                    <p
+                      className="text-[12px]"
+                      style={{ color: 'var(--ngotag-text-danger)' }}
+                    >
+                      {errors.label}
+                    </p>
+                  ) : null}
+                </label>
+
+                {error ? (
+                  <AuthAlert
+                    variant="danger"
+                    message={error}
+                    onDismiss={() => setError(null)}
+                  />
+                ) : null}
+
+                <div className="flex justify-end">
+                  <GradientButton type="submit" disabled={loading || disabled}>
+                    {loading ? <Loader /> : 'Create Shared Wallet'}
+                  </GradientButton>
+                </div>
+              </Form>
+            )
+          }
+          return (
+            <Form className="space-y-6">
+              <div>
+                <Label htmlFor="label">Wallet Label</Label>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  This label is auto-generated based on your organization name.
+                  You can edit it if needed.
+                </p>
+                <Field
+                  as={Input}
+                  id="label"
+                  name="label"
+                  placeholder="Enter wallet label"
+                  className="mt-2"
+                  disabled={disabled}
+                />
+                {errors.label && touched.label && (
+                  <p className="text-destructive mt-1 text-sm">
+                    {errors.label}
+                  </p>
+                )}
+              </div>
+
+              {error && (
+                <AlertComponent
+                  message={error}
+                  type="failure"
+                  onAlertClose={() => setError(null)}
+                />
               )}
-            </div>
 
-            {error && (
-              <AlertComponent
-                message={error}
-                type="failure"
-                onAlertClose={() => setError(null)}
-              />
-            )}
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={loading || disabled}>
-                {loading ? <Loader /> : 'Create Shared Wallet'}
-              </Button>
-            </div>
-          </Form>
-        )}
+              <div className="flex justify-end">
+                <Button type="submit" disabled={loading || disabled}>
+                  {loading ? <Loader /> : 'Create Shared Wallet'}
+                </Button>
+              </div>
+            </Form>
+          )
+        }}
       </Formik>
     </div>
   )

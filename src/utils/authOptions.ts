@@ -139,10 +139,24 @@ export const authOptions: MyAuthOptions = {
             )
           }
 
-          const responseData = await res?.json()
+          // The backend can fail with a non-JSON body (e.g. a proxy/gateway
+          // HTML error page on a 502/503) — parse defensively so that case
+          // surfaces as a clean error instead of a raw JSON.parse exception.
+          // eslint-disable-next-line init-declarations
+          let responseData
+          try {
+            responseData = (await res?.json()) ?? {}
+          } catch {
+            responseData = {}
+          }
 
           if (!res?.ok) {
-            throw new Error(responseData.message || 'Invalid credentials')
+            throw new Error(
+              responseData.message ||
+                (res
+                  ? `Service unavailable (${res.status})`
+                  : 'Invalid credentials'),
+            )
           }
 
           const user = responseData

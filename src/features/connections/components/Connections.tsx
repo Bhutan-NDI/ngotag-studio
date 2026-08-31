@@ -36,6 +36,8 @@ import { getConnectionsByOrg } from '@/app/api/connection'
 import { useAppSelector } from '@/lib/hooks'
 import type { AxiosResponse } from 'axios'
 import { apiStatusCodes } from '@/config/CommonConstant'
+import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { isNgotagTheme } from '@/lib/active-theme'
 
 export default function Connections(): JSX.Element {
   const metadata: ITableMetadata = {
@@ -290,6 +292,11 @@ export default function Connections(): JSX.Element {
 
   return (
     <PageContainer>
+      {isNgotagTheme() && (
+        <div className="mb-4">
+          <Breadcrumb items={[{ label: 'Connections' }]} />
+        </div>
+      )}
       <div className="mb-2 flex flex-wrap items-center justify-between space-y-2 gap-x-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Connections</h2>

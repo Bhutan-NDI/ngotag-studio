@@ -185,7 +185,7 @@ const OrgSwitcherInner = ({
                     </div>
 
                     {tenant.id === currentTenant?.id && (
-                      <Check className="ml-auto shrink-0" />
+                      <Check className="text-primary ml-auto shrink-0" />
                     )}
                   </DropdownMenuItem>
                 ))}

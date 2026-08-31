@@ -13,12 +13,14 @@ import {
 } from '@/components/ui/dropdown-menu'
 import React, { useEffect, useState } from 'react'
 
+import { AvatarBadge } from '@/components/ngotag/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
 import { IUserProfile } from '../profile/interfaces'
 import { apiRoutes } from '@/config/apiRoutes'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getUserProfile } from '@/app/api/Auth'
 import { hardNavigate } from '@/utils/navigation'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { persistor } from '@/lib/store'
 import { setUserProfileDetails } from '@/lib/userSlice'
@@ -96,12 +98,24 @@ export function UserNav(): React.JSX.Element | null {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="">
-            <AvatarImage src={userProfile?.profileImg} alt="profileImg" />
-            <AvatarFallback className="text-md">
-              {userProfile?.email?.[0]?.toUpperCase() ?? ''}
-            </AvatarFallback>
-          </Avatar>
+          {isNgotagTheme() ? (
+            <AvatarBadge
+              src={userProfile?.profileImg}
+              name={
+                `${userProfile?.firstName ?? ''} ${
+                  userProfile?.lastName ?? ''
+                }`.trim() || userProfile?.email
+              }
+              size={32}
+            />
+          ) : (
+            <Avatar className="">
+              <AvatarImage src={userProfile?.profileImg} alt="profileImg" />
+              <AvatarFallback className="text-md">
+                {userProfile?.email?.[0]?.toUpperCase() ?? ''}
+              </AvatarFallback>
+            </Avatar>
+          )}
         </Button>
       </DropdownMenuTrigger>
 

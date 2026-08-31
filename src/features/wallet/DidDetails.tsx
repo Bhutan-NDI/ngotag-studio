@@ -14,9 +14,11 @@ import {
 import { useSearchParams } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
+import { NgotagDidDetails } from './NgotagDidDetails'
 import PageContainer from '@/components/layout/page-container'
 import Stepper from '@/components/StepperComponent'
 import { hardNavigate } from '@/utils/navigation'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { useState } from 'react'
 
 export default function DidDetails(): React.JSX.Element {
@@ -46,6 +48,24 @@ export default function DidDetails(): React.JSX.Element {
   const handleDashboard = (): void => {
     setActiveAction('dashboard')
     hardNavigate('/dashboard')
+  }
+
+  if (isNgotagTheme()) {
+    return (
+      <PageContainer>
+        <NgotagDidDetails
+          protocol={protocol}
+          credentialType={credentialType}
+          didMethod={didMethod}
+          generatedDid={generatedDid}
+          copied={copied}
+          onCopy={() => copyToClipboard(generatedDid || '')}
+          activeAction={activeAction}
+          onSchema={handleSchema}
+          onDashboard={handleDashboard}
+        />
+      </PageContainer>
+    )
   }
 
   return (

@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 'use client'
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -10,23 +9,44 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import React, { useEffect, useState } from 'react'
+import { getOrganizationRoles, getOrganizations } from '@/app/api/organization'
+import {
+  setOrgId,
+  setOrgRoles,
+  setSelectedOrgId,
+  setTenantData,
+} from '@/lib/orgSlice'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ngotag/ui/EmptyState'
+import { GradientButton } from '@/components/ngotag/ui/GradientButton'
+import { Icon } from '@/components/ngotag/ui/icons'
 import { Input } from '@/components/ui/input'
 import Loader from '@/components/Loader'
+import { NgotagOrgCard } from './NgotagOrganizationCard'
 import { Organization } from '@/features/dashboard/type/organization'
+import { PageHeader } from '@/components/ngotag/ui/PageHeader'
+import { Panel } from '@/components/ngotag/ui/Panel'
 import { Plus } from 'lucide-react'
+import { SearchField } from '@/components/ngotag/ui/SearchField'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { getOrganizations } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
+import { isNgotagTheme } from '@/lib/active-theme'
 
 export const OrganizationList = (): React.JSX.Element => {
   const [organizationsList, setOrganizationsList] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [isCreatingOrg, setIsCreatingOrg] = useState(false)
+  // Ngotag-only: which card's "Switch to this" is in flight, and the
+  // currently-active org (same selector NgotagTopBar/NgotagSidebar use) that
+  // decides which card gets the "Current" pill instead.
+  const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
+  const dispatch = useAppDispatch()
+  const activeOrgId = useAppSelector((state) => state.organization.orgId)
 
   const [currentPage, setCurrentPage] = useState({
     pageNumber: 1,
@@ -88,9 +108,218 @@ export const OrganizationList = (): React.JSX.Element => {
     }, 300)
   }
 
+  // Edit and Delete both open the same unified ngotag "Organization profile"
+  // page (CreateOrganizationModal.tsx's ngotag+edit-mode branch, rendering
+  // NgotagOrganizationProfile) — Delete just deep-links to its danger-zone
+  // panel via the #danger-zone anchor instead of the old standalone
+  // /delete-organization wizard route. (OrganizationDashboard.tsx's own
+  // handleEditOrg/handleDeleteOrg are unrelated — those back the *generic*,
+  // non-ngotag dashboard's Edit/Delete icon buttons and still use the two
+  // separate routes verbatim.)
+  const handleEditOrg = (orgId: string): void => {
+    hardNavigate(`/create-organization?orgId=${orgId}`)
+  }
+
+  const handleDeleteOrg = (orgId: string): void => {
+    hardNavigate(`/create-organization?orgId=${orgId}#danger-zone`)
+  }
+
+  // Same dispatch sequence as org-switcher.tsx's handleTenantSwitch — reused
+  // rather than reimplemented, so switching from this list stays in sync
+  // with the sidebar's org switcher.
+  const handleSwitchOrg = async (org: Organization): Promise<void> => {
+    setSwitchingOrgId(org.id)
+    try {
+      dispatch(setOrgId(org.id))
+      dispatch(setSelectedOrgId(org.id))
+      dispatch(
+        setTenantData({ id: org.id, name: org.name, logoUrl: org.logoUrl }),
+      )
+
+      const response = await getOrganizationRoles(org.id)
+      const { data } = response as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+        dispatch(setOrgRoles(data?.data ?? []))
+      }
+    } catch (err) {
+      console.error('Error switching organization:', err)
+    } finally {
+      setSwitchingOrgId(null)
+    }
+  }
+
+  // The Members page (`/users`) only ever reads the currently-active org
+  // from redux — it has no per-org URL override — so viewing a non-current
+  // org's members has to switch into it first, reusing the same real
+  // switch logic above, rather than inventing a new API call.
+  const handleMembersClick = async (org: Organization): Promise<void> => {
+    if (org.id !== activeOrgId) {
+      await handleSwitchOrg(org)
+    }
+    hardNavigate('/users')
+  }
+
   useEffect(() => {
     getAllOrganizations()
   }, [currentPage.pageNumber, currentPage.pageSize, searchText])
+
+  if (isNgotagTheme()) {
+    const paginationBlock =
+      organizationsList.length > 0 ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-ngotag-muted m-0 text-[13px] whitespace-nowrap">
+            Showing {(currentPage.pageNumber - 1) * currentPage.pageSize + 1} to{' '}
+            {Math.min(
+              currentPage.pageNumber * currentPage.pageSize,
+              currentPage.totalCount,
+            )}{' '}
+            of {currentPage.totalCount} entries
+          </p>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() =>
+                currentPage.pageNumber > 1 &&
+                handlePageChange(currentPage.pageNumber - 1)
+              }
+              disabled={currentPage.pageNumber === 1}
+              className="ndi-navrow font-display inline-flex h-8 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium disabled:pointer-events-none disabled:opacity-40"
+              data-active="0"
+            >
+              <Icon
+                name="chevronRight"
+                size={14}
+                strokeWidth={2}
+                style={{ transform: 'rotate(180deg)' }}
+              />
+              Previous
+            </button>
+
+            {Array.from({ length: currentPage.total }, (_, index) => (
+              <button
+                key={index}
+                type="button"
+                onClick={() => handlePageChange(index + 1)}
+                aria-current={
+                  currentPage.pageNumber === index + 1 ? 'page' : undefined
+                }
+                className="ndi-navrow font-display inline-flex h-8 min-w-8 items-center justify-center rounded-[8px] px-2 text-[12.5px] font-medium"
+                data-active={currentPage.pageNumber === index + 1 ? '1' : '0'}
+              >
+                {index + 1}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onClick={() =>
+                currentPage.pageNumber < currentPage.total &&
+                handlePageChange(currentPage.pageNumber + 1)
+              }
+              disabled={currentPage.pageNumber === currentPage.total}
+              className="ndi-navrow font-display inline-flex h-8 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium disabled:pointer-events-none disabled:opacity-40"
+              data-active="0"
+            >
+              Next
+              <Icon name="chevronRight" size={14} strokeWidth={2} />
+            </button>
+          </div>
+        </div>
+      ) : null
+
+    return (
+      <div className="p-6">
+        <PageHeader
+          crumbs={[{ label: 'Organizations' }]}
+          title="Organizations"
+          actions={
+            <>
+              <SearchField
+                placeholder="Search organizations"
+                value={searchText}
+                onChange={setSearchText}
+                className="w-64"
+              />
+              <GradientButton
+                disabled={currentPage.totalCount >= 10 || isCreatingOrg}
+                onClick={handleCreateOrg}
+              >
+                {isCreatingOrg ? (
+                  <Loader />
+                ) : (
+                  <>
+                    <Icon name="plus" size={16} strokeWidth={2} />
+                    Create
+                  </>
+                )}
+              </GradientButton>
+            </>
+          }
+        />
+
+        <div className="mt-6 grid grid-cols-1 gap-5 min-[900px]:grid-cols-2 min-[1300px]:grid-cols-3">
+          {loading && (
+            <div className="col-span-full grid min-h-[40vh] w-full place-items-center">
+              <Loader />
+            </div>
+          )}
+
+          {!loading &&
+            organizationsList.length > 0 &&
+            organizationsList.map((org) => (
+              <NgotagOrgCard
+                key={org.id}
+                org={org}
+                isCurrent={org.id === activeOrgId}
+                isSwitching={switchingOrgId === org.id}
+                onSwitch={() => handleSwitchOrg(org)}
+                onMembers={() => handleMembersClick(org)}
+                onEdit={() => handleEditOrg(org.id)}
+                onDelete={() => handleDeleteOrg(org.id)}
+              />
+            ))}
+
+          {!loading && organizationsList.length === 0 && (
+            <div className="col-span-full">
+              <Panel>
+                <EmptyState
+                  icon="building"
+                  title="No organizations found"
+                  message={
+                    searchText
+                      ? 'No organizations match your search.'
+                      : 'Get started by creating a new organization.'
+                  }
+                  tone={searchText ? 'filtered' : 'empty'}
+                  action={
+                    !searchText ? (
+                      <GradientButton
+                        disabled={isCreatingOrg}
+                        onClick={handleCreateOrg}
+                      >
+                        {isCreatingOrg ? (
+                          <Loader />
+                        ) : (
+                          <>
+                            <Icon name="plus" size={16} strokeWidth={2} />
+                            Create Organization
+                          </>
+                        )}
+                      </GradientButton>
+                    ) : undefined
+                  }
+                />
+              </Panel>
+            </div>
+          )}
+        </div>
+
+        {paginationBlock}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

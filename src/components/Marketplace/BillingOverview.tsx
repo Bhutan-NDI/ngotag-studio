@@ -27,11 +27,13 @@ import {
 } from '@/components/ui/table'
 import { useCallback, useEffect, useState } from 'react'
 import { AxiosResponse } from 'axios'
+import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { MarketplacePlanSummary } from './MarketplacePlanSummary'
 import { MarketplaceStatusBanner } from './MarketplaceStatusBanner'
 import PageContainer from '@/components/layout/page-container'
 import { UsageMeterTable } from './UsageMeterTable'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { marketplacePlanCatalog } from '@/config/marketplacePlans'
 import { useAppSelector } from '@/lib/hooks'
 
@@ -326,6 +328,7 @@ export function BillingOverview(): React.JSX.Element {
   return (
     <PageContainer>
       <main className="space-y-6">
+        {isNgotagTheme() && <Breadcrumb items={[{ label: 'Billing' }]} />}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-normal">

@@ -4,10 +4,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Edit, Mail } from 'lucide-react'
 import React, { useMemo } from 'react'
 
+import { AvatarBadge } from '@/components/ngotag/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { EmptyState } from '@/components/ngotag/ui/EmptyState'
+import { Icon } from '@/components/ngotag/ui/icons'
+import { Panel } from '@/components/ngotag/ui/Panel'
 import RecentActivity from '@/features/dashboard/components/RecentActivity'
 import { getRandomAvatarColor } from '@/utils/avatarColors'
+import { isNgotagTheme } from '@/lib/active-theme'
 
 interface OrgRole {
   name: string
@@ -44,6 +49,8 @@ const DisplayUserProfile = ({
   toggleEditProfile,
   userProfileInfo,
 }: IDisplayUserProfileProps): React.JSX.Element => {
+  const ngotag = isNgotagTheme()
+
   const roles = useMemo(() => {
     const map: Record<string, string[]> = {}
 
@@ -71,6 +78,127 @@ const DisplayUserProfile = ({
 
     return Array.from(uniqueOrgsMap.values())
   }, [userProfileInfo])
+
+  const ownedCount =
+    userProfileInfo?.userOrgRoles?.filter(
+      (role) => role.orgRole.name === 'owner',
+    ).length || 0
+  const memberCount =
+    userProfileInfo?.userOrgRoles?.filter(
+      (role) => role.orgRole.name === 'member',
+    ).length || 0
+
+  const fullName = `${userProfileInfo?.firstName ?? ''} ${
+    userProfileInfo?.lastName ?? ''
+  }`.trim()
+
+  const orgTiles = orgPresent.map((role) => {
+    const { bg, text } = getRandomAvatarColor(role.organisation.name)
+    return (
+      <Card
+        key={role.id}
+        className="inline-flex items-center border px-3 py-1 text-xs font-medium"
+      >
+        {role.organisation.logoUrl ? (
+          <img
+            src={role.organisation.logoUrl}
+            alt={role.organisation.name}
+            className="h-12 w-12 rounded-full object-cover"
+          />
+        ) : (
+          <Avatar className="h-12 w-12">
+            <AvatarFallback className={`${bg} ${text} text-xs font-bold`}>
+              {role.organisation.name.substring(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        <div>
+          <span className="pl-2 text-base">{role.organisation.name}</span>
+          <div className="pl-2">
+            <b>Role</b> : {roles[role.orgId]?.join(', ') ?? ''}
+          </div>
+        </div>
+      </Card>
+    )
+  })
+
+  if (ngotag) {
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
+          <Panel className="relative col-span-1 flex flex-col items-center gap-4 text-center">
+            <button
+              type="button"
+              onClick={toggleEditProfile}
+              aria-label="Edit profile"
+              className="ndi-navrow absolute top-4 right-4 inline-flex h-9 w-9 items-center justify-center rounded-[10px]"
+              data-active="0"
+            >
+              <Icon name="edit" size={16} strokeWidth={1.8} />
+            </button>
+
+            <AvatarBadge
+              src={userProfileInfo?.profileImg}
+              name={fullName || userProfileInfo?.email}
+              size={112}
+            />
+
+            <div>
+              <h2 className="font-display text-ngotag-strong max-w-full text-2xl font-bold break-all">
+                {fullName || userProfileInfo?.username || 'Unnamed user'}
+              </h2>
+              <p className="text-ngotag-muted text-sm">
+                {userProfileInfo?.username}
+              </p>
+              <p className="text-ngotag-muted flex items-center justify-center gap-1 text-sm">
+                <Icon name="mail" size={14} strokeWidth={1.8} />
+                {userProfileInfo?.email}
+              </p>
+            </div>
+
+            {/* Stats */}
+            <div className="border-ngotag-grid text-ngotag-muted mt-2 grid w-full grid-cols-2 gap-4 border-t pt-4 text-sm">
+              <div className="text-center">
+                <p className="text-ngotag-strong text-lg font-semibold">
+                  {ownedCount}
+                </p>
+                <p>Organizations Owned</p>
+              </div>
+              <div className="text-center">
+                <p className="text-ngotag-strong text-lg font-semibold">
+                  {memberCount}
+                </p>
+                <p>Member Organizations</p>
+              </div>
+            </div>
+          </Panel>
+
+          <div className="col-span-1 md:col-span-2">
+            <RecentActivity />
+          </div>
+        </div>
+
+        <Panel>
+          {orgPresent && orgPresent.length > 0 ? (
+            <>
+              <h3 className="font-display text-ngotag-strong mb-4 text-lg font-semibold">
+                Organizations Associated
+              </h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {orgTiles}
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              icon="building"
+              title="No Organization"
+              message="Get started by creating a new organization."
+            />
+          )}
+        </Panel>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -117,19 +245,11 @@ const DisplayUserProfile = ({
           {/* Stats */}
           <div className="text-muted-foreground mt-2 grid w-full grid-cols-2 gap-4 text-sm">
             <div className="text-center">
-              <p className="text-lg font-semibold">
-                {userProfileInfo?.userOrgRoles?.filter(
-                  (role) => role.orgRole.name === 'owner',
-                ).length || 0}
-              </p>
+              <p className="text-lg font-semibold">{ownedCount}</p>
               <p>Organizations Owned</p>
             </div>
             <div className="text-center">
-              <p className="text-lg font-semibold">
-                {userProfileInfo?.userOrgRoles?.filter(
-                  (role) => role.orgRole.name === 'member',
-                ).length || 0}
-              </p>
+              <p className="text-lg font-semibold">{memberCount}</p>
               <p>Member Organizations</p>
             </div>
           </div>
@@ -147,41 +267,7 @@ const DisplayUserProfile = ({
               Organizations Associated
             </h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {orgPresent.map((role) => {
-                const { bg, text } = getRandomAvatarColor(
-                  role.organisation.name,
-                )
-                return (
-                  <Card
-                    key={role.id}
-                    className="inline-flex items-center border px-3 py-1 text-xs font-medium"
-                  >
-                    {role.organisation.logoUrl ? (
-                      <img
-                        src={role.organisation.logoUrl}
-                        alt={role.organisation.name}
-                        className="h-12 w-12 rounded-full object-cover"
-                      />
-                    ) : (
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback
-                          className={`${bg} ${text} text-xs font-bold`}
-                        >
-                          {role.organisation.name.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                    )}
-                    <div>
-                      <span className="pl-2 text-base">
-                        {role.organisation.name}
-                      </span>
-                      <div className="pl-2">
-                        <b>Role</b> : {roles[role.orgId]?.join(', ') ?? ''}
-                      </div>
-                    </div>
-                  </Card>
-                )
-              })}
+              {orgTiles}
             </div>
           </>
         ) : (

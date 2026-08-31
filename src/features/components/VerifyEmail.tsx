@@ -8,6 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { apiStatusCodes } from '@/config/CommonConstant'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { validEmail } from '@/utils/TextTransform'
 
 export default function VerifyEmailPage(): React.JSX.Element {
@@ -82,7 +83,13 @@ export default function VerifyEmailPage(): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center overflow-y-auto bg-[image:var(--card-gradient)] p-4">
+    <div
+      className={`flex items-center justify-center overflow-y-auto p-4 ${
+        isNgotagTheme()
+          ? 'min-h-full'
+          : 'h-screen bg-[image:var(--card-gradient)]'
+      }`}
+    >
       <div className="bg-card border-border w-full max-w-md overflow-hidden rounded-xl border p-8 shadow-xl">
         <div className="text-center">
           <div className="space-y-6">

@@ -12,6 +12,8 @@ import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NgotagSignupEmailCard } from '@/components/ngotag/auth/NgotagSignupEmailCard'
+import { isNgotagTheme } from '@/lib/active-theme'
 
 interface StepEmailProps {
   readonly email: string
@@ -190,6 +192,32 @@ export default function EmailVerificationForm({
         ): void => {
           handleChange(e)
           setEmail(e.target.value)
+        }
+
+        if (isNgotagTheme()) {
+          return (
+            <FormikForm
+              noValidate
+              className="relative z-[4] flex flex-col gap-[18px]"
+            >
+              <NgotagSignupEmailCard
+                email={values.email}
+                error={touched.email ? errors.email : undefined}
+                onChange={handleEmailChange}
+                onBlur={handleBlur}
+                locked={locked}
+                loading={loading}
+                verifyLoader={verifyLoader}
+                emailSent={emailSent}
+                addFailure={addFailure}
+                onDismissFailure={() => setAddFailure(null)}
+                onUseDifferentEmail={() => {
+                  setEmailSent(false)
+                  setAddFailure(null)
+                }}
+              />
+            </FormikForm>
+          )
         }
 
         return (

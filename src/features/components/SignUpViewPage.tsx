@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable sort-imports */
 
 import React, { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import SignUpUser from './SignUpUser'
 import { SubscribeRequired } from '@/components/Marketplace/SubscribeRequired'
 import { useSearchParams } from 'next/navigation'
 import { verifyInvitationPending } from '@/app/api/Invitation'
+import { isNgotagTheme } from '@/lib/active-theme'
 
 type GateStatus = 'loading' | 'valid' | 'invalid' | 'error'
 
@@ -91,6 +93,13 @@ export default function SignInPage(): React.JSX.Element {
         description="PHENIX ID is available through the Microsoft commercial marketplace. Subscribe on Microsoft to get started — after purchase you'll be brought back here to create your account."
       />
     )
+  }
+
+  // Page chrome (logo, gradient backdrop) comes from NgotagAuthShell instead,
+  // mounted inside SignUpUser where the step state — and therefore the
+  // per-step rail content — actually lives.
+  if (isNgotagTheme()) {
+    return <SignUpUser invitationVerified={status === 'valid'} />
   }
 
   return (

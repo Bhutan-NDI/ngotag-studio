@@ -19,6 +19,7 @@ import {
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { EmptyMessage } from '@/components/EmptyMessage'
 import { IconSearch } from '@tabler/icons-react'
@@ -27,6 +28,7 @@ import { Invitation } from '../interfaces/invitation-interface'
 import Loader from '@/components/Loader'
 import { OrgRole } from '@/features/users/components/users-interface'
 import { apiStatusCodes } from '@/config/CommonConstant'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 
 const initialPageState = {
@@ -218,6 +220,11 @@ export default function ReceivedInvitations(): React.JSX.Element {
 
   return (
     <div className="p-4 md:p-6">
+      {isNgotagTheme() && (
+        <div className="mb-4">
+          <Breadcrumb items={[{ label: 'Invitations' }]} />
+        </div>
+      )}
       <div className="mb-6">
         <h1 className="text-foreground text-2xl font-semibold">
           Received Invitations

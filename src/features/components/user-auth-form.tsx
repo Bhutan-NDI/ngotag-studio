@@ -24,8 +24,10 @@ import { Icons } from '@/config/svgs/Auth'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import Loader from '@/components/Loader'
+import { NgotagLoginCard } from '@/components/ngotag/auth/NgotagLoginCard'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { generateAuthenticationOption } from '@/app/api/Fido'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { safeInternalRedirect } from '@/utils/safeRedirect'
 import { setProfile } from '@/lib/profileSlice'
 import { signIn } from 'next-auth/react'
@@ -286,6 +288,25 @@ export default function SignInViewPage(): React.JSX.Element {
       console.error('An error occurred:', error)
       setForgetPasswordLoading(false)
     }
+  }
+
+  if (isNgotagTheme()) {
+    return (
+      <NgotagLoginCard
+        signInForm={signInForm}
+        onSubmit={handleFormSubmit}
+        loading={loading}
+        showPassword={showPassword}
+        onToggleShowPassword={() => setShowPassword(!showPassword)}
+        alert={alert}
+        onDismissAlert={() => setAlert(null)}
+        success={success}
+        onDismissSuccess={() => setSuccess(null)}
+        forgetPasswordLoading={forgetPasswordLoading}
+        onForgotPassword={forgotUserPassword}
+        signUpUrl={signUpUrl}
+      />
+    )
   }
 
   return (

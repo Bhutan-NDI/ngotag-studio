@@ -12,10 +12,14 @@ import {
 import React, { useEffect, useRef, useState } from 'react'
 import { calculateSize, dataURItoBlob } from '@/utils/CompressImage'
 
+import { AvatarBadge } from '@/components/ngotag/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
+import { GradientButton } from '@/components/ngotag/ui/GradientButton'
+import { HairlineButton } from '@/components/ngotag/ui/HairlineButton'
 import type { IUserProfile } from '@/components/profile/interfaces'
 import { Input } from '@/components/ui/input'
 import Loader from '@/components/Loader'
+import { isNgotagTheme } from '@/lib/active-theme'
 import { updateUserProfile } from '@/app/api/Auth'
 
 interface Values {
@@ -42,6 +46,7 @@ export default function EditUserProfile({
   userProfileInfo,
   updateProfile,
 }: Readonly<EditUserProfileProps>): React.JSX.Element {
+  const ngotag = isNgotagTheme()
   const [loading, setLoading] = useState(false)
   const [logoImage, setLogoImage] = useState<ILogoImage>({
     logoFile: '',
@@ -185,7 +190,17 @@ export default function EditUserProfile({
                       Profile Image
                     </span>
                     <div className="flex items-center space-x-4">
-                      {logoImage.imagePreviewUrl ? (
+                      {ngotag ? (
+                        <AvatarBadge
+                          src={logoImage.imagePreviewUrl as string}
+                          name={
+                            `${userProfileInfo?.firstName ?? ''} ${
+                              userProfileInfo?.lastName ?? ''
+                            }`.trim() || userProfileInfo?.email
+                          }
+                          size={96}
+                        />
+                      ) : logoImage.imagePreviewUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={logoImage.imagePreviewUrl as string}
@@ -278,22 +293,44 @@ export default function EditUserProfile({
               {/* Sticky footer for Save/Cancel */}
 
               <div className="bg-background absolute bottom-0 left-0 flex w-full flex-col gap-2 space-y-2 border-t px-6 py-4">
-                <Button
-                  type="submit"
-                  disabled={loading || !formik.isValid}
-                  className="w-full"
-                >
-                  {loading ? <Loader /> : 'Save Changes'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancel}
-                  className="w-full"
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
+                {ngotag ? (
+                  <>
+                    <GradientButton
+                      type="submit"
+                      disabled={loading || !formik.isValid}
+                      block
+                    >
+                      {loading ? <Loader /> : 'Save Changes'}
+                    </GradientButton>
+                    <HairlineButton
+                      type="button"
+                      onClick={handleCancel}
+                      disabled={loading}
+                      block
+                    >
+                      Cancel
+                    </HairlineButton>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="submit"
+                      disabled={loading || !formik.isValid}
+                      className="w-full"
+                    >
+                      {loading ? <Loader /> : 'Save Changes'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCancel}
+                      className="w-full"
+                      disabled={loading}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </div>
             </Form>
           )}

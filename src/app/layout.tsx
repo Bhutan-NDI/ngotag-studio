@@ -2,6 +2,8 @@ import './globals.css'
 import './theme.css'
 import type { Metadata, Viewport } from 'next'
 
+import { getActiveFaviconPath, getActiveTheme } from '@/lib/active-theme'
+
 import { FaviconUpdater } from '@/components/FaviconUpdater'
 import { HardNavigationBoundary } from '@/components/HardNavigationBoundary'
 import { Session as NextAuthSession } from 'next-auth'
@@ -13,12 +15,11 @@ import React from 'react'
 import { SessionManager } from '@/features/components/SessionManager'
 import StoreProvider from './StoreProvider'
 import { Toaster } from '@/components/ui/sonner'
-import { appFaviconPath } from '@/config/CommonConstant'
 import { authOptions } from '@/utils/authOptions'
 import { cn } from '@/lib/utils'
-import { cookies } from 'next/headers'
 import { fontVariables } from '@/lib/font'
 import { getServerSession } from 'next-auth/next'
+import { ngotagFontVariables } from '@/lib/ngotag-fonts'
 
 // Create a new type extending Session to guarantee expires is defined
 type SessionWithExpires = NextAuthSession & { expires: string }
@@ -35,12 +36,17 @@ export const viewport: Viewport = {
   themeColor: META_THEME_COLORS.light,
 }
 
+const activeFaviconPath = getActiveFaviconPath()
+const activeFaviconType = activeFaviconPath.endsWith('.ico')
+  ? 'image/x-icon'
+  : 'image/png'
+
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_APP_TITLE?.trim() || 'PHENIX ID',
   icons: {
-    icon: [{ url: appFaviconPath, type: 'image/png' }],
-    shortcut: [{ url: appFaviconPath, type: 'image/png' }],
-    apple: [{ url: appFaviconPath, type: 'image/png' }],
+    icon: [{ url: activeFaviconPath, type: activeFaviconType }],
+    shortcut: [{ url: activeFaviconPath, type: activeFaviconType }],
+    apple: [{ url: activeFaviconPath, type: activeFaviconType }],
   },
 }
 
@@ -63,9 +69,7 @@ export default async function RootLayout({
       }
     : null
 
-  const cookieStore = await cookies()
-  const activeThemeValue = cookieStore.get('active_theme')?.value
-  const isScaled = activeThemeValue?.endsWith('-scaled')
+  const activeTheme = getActiveTheme()
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -85,18 +89,19 @@ export default async function RootLayout({
       <body
         className={cn(
           'bg-background overflow-hidden overscroll-none font-sans antialiased',
-          activeThemeValue ? `theme-${activeThemeValue}` : '',
-          isScaled ? 'theme-scaled' : '',
+          `theme-${activeTheme}`,
           fontVariables,
+          // Host Grotesk / Inter / DM Mono, additive alongside the shared
+          // fontVariables above — only wired up under their own
+          // `font-display` / `font-ngotag-*` utilities, so this is a no-op
+          // for every other theme. See src/lib/ngotag-fonts.ts.
+          activeTheme === 'ngotag' ? ngotagFontVariables : '',
         )}
       >
         <NextTopLoader showSpinner={false} />
         <NuqsAdapter>
           <StoreProvider>
-            <Providers
-              session={session}
-              activeThemeValue={activeThemeValue as string}
-            >
+            <Providers session={session}>
               <SessionManager>
                 <Toaster />
                 <FaviconUpdater />
