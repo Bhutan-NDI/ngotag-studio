@@ -57,6 +57,7 @@ function credentialStateLabel(state: string): string {
 
 interface OrganizationAtAGlanceProps {
   orgList: OrgListItem[]
+  orgTotalCount: number
   schemasCount: number
   schemaPreview: SchemaPreviewItem[]
   credentialsCount: number
@@ -73,6 +74,7 @@ interface OrganizationAtAGlanceProps {
  */
 export function OrganizationAtAGlance({
   orgList,
+  orgTotalCount,
   schemasCount,
   schemaPreview,
   credentialsCount,
@@ -82,7 +84,7 @@ export function OrganizationAtAGlance({
     <div className="mb-10 grid grid-cols-1 gap-5 min-[640px]:grid-cols-3">
       <StatCard
         title="Organizations"
-        count={orgList.length}
+        count={orgTotalCount}
         hint="Organizations you belong to, and your role in each."
         emptyIcon="building"
         emptyMessage="You don't belong to any organizations yet."

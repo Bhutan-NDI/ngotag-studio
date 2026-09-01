@@ -16,7 +16,6 @@ import { SessionManager } from '@/features/components/SessionManager'
 import StoreProvider from './StoreProvider'
 import { Toaster } from '@/components/ui/sonner'
 import { authOptions } from '@/utils/authOptions'
-import { bhutanndiFontVariables } from '@/lib/bhutanndi-fonts'
 import { cn } from '@/lib/utils'
 import { fontVariables } from '@/lib/font'
 import { getServerSession } from 'next-auth/next'
@@ -70,6 +69,18 @@ export default async function RootLayout({
     : null
 
   const activeTheme = getActiveTheme()
+  // Dynamically imported, not a static top-level import: next/font/google's
+  // loader calls run as import-time side effects the moment their module is
+  // evaluated, so a plain `import { bhutanndiFontVariables } from ...`
+  // would bundle/self-host/preload Host Grotesk, Inter, and DM Mono for
+  // every white-label build regardless of theme. This keeps that module —
+  // and its font loader calls — out of the Phenix/CREDEBL/SOVIO builds
+  // entirely, since NEXT_PUBLIC_ACTIVE_THEME is a fixed, build-time-inlined
+  // constant per deployment.
+  const bhutanndiFontVariables =
+    activeTheme === 'bhutanndi'
+      ? (await import('@/lib/bhutanndi-fonts')).bhutanndiFontVariables
+      : ''
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -93,9 +104,9 @@ export default async function RootLayout({
           fontVariables,
           // Host Grotesk / Inter / DM Mono, additive alongside the shared
           // fontVariables above — only wired up under their own
-          // `font-display` / `font-bhutanndi-*` utilities, so this is a no-op
-          // for every other theme. See src/lib/bhutanndi-fonts.ts.
-          activeTheme === 'bhutanndi' ? bhutanndiFontVariables : '',
+          // `font-display` / `font-bhutanndi-*` utilities, so this is a
+          // no-op string for every other theme. See src/lib/bhutanndi-fonts.ts.
+          bhutanndiFontVariables,
         )}
       >
         <NextTopLoader showSpinner={false} />

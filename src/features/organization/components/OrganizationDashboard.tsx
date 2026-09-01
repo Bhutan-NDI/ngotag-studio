@@ -58,6 +58,10 @@ export const OrganizationDashboard = ({
   // no other white-label build renders this row, so no other build should
   // pay for these extra requests.
   const [orgList, setOrgList] = useState<OrgListItem[]>([])
+  // Real total organization count — orgList itself is only the first page
+  // (getOrganizations(currentPageNumber, 10)), so it under-reports for
+  // anyone in more than 10 organizations.
+  const [orgTotalCount, setOrgTotalCount] = useState<number>(0)
   const [schemaPreview, setSchemaPreview] = useState<SchemaPreviewItem[]>([])
   // Card removed from OrganizationAtAGlance's grid, but the real
   // getAllCredDef fetch below (batched with the other real Overview data)
@@ -109,35 +113,46 @@ export const OrganizationDashboard = ({
       }
     }, [activeOrgId])
 
+  // The user's organization-membership list — unlike the other "at a
+  // glance" data below, this isn't scoped to activeOrgId at all (it's the
+  // same list regardless of which org is active), so it's fetched
+  // separately rather than being tied to a callback that re-runs on every
+  // org switch.
+  const fetchOrgMembershipList = useCallback(async (): Promise<void> => {
+    if (!isBhutanndiTheme()) {
+      return
+    }
+
+    const response = await getOrganizations(currentPageNumber, 10)
+    if (typeof response !== 'string' && response?.data?.data?.organizations) {
+      setOrgList(response.data.data.organizations)
+      setOrgTotalCount(
+        response.data.data.totalCount ??
+          response.data.data.organizations.length,
+      )
+    }
+  }, [])
+
   const fetchAtAGlanceData = useCallback(async (): Promise<void> => {
     if (!isBhutanndiTheme() || !activeOrgId) {
       return
     }
 
-    const [orgsRes, schemasRes, credDefsRes, issuedRes] =
-      await Promise.allSettled([
-        getOrganizations(currentPageNumber, 10),
-        getAllSchemasByOrgId(
-          { search: '', itemPerPage: 5, page: currentPageNumber },
-          activeOrgId,
-        ),
-        getAllCredDef(activeOrgId),
-        getIssuedCredentials({
-          page: currentPageNumber,
-          itemPerPage: 5,
-          search: '',
-          sortBy: 'createDateTime',
-          sortingOrder: 'desc',
-          orgId: activeOrgId,
-        }),
-      ])
-
-    if (orgsRes.status === 'fulfilled') {
-      const response = orgsRes.value
-      if (typeof response !== 'string' && response?.data?.data?.organizations) {
-        setOrgList(response.data.data.organizations)
-      }
-    }
+    const [schemasRes, credDefsRes, issuedRes] = await Promise.allSettled([
+      getAllSchemasByOrgId(
+        { search: '', itemPerPage: 5, page: currentPageNumber },
+        activeOrgId,
+      ),
+      getAllCredDef(activeOrgId),
+      getIssuedCredentials({
+        page: currentPageNumber,
+        itemPerPage: 5,
+        search: '',
+        sortBy: 'createDateTime',
+        sortingOrder: 'desc',
+        orgId: activeOrgId,
+      }),
+    ])
 
     if (schemasRes.status === 'fulfilled') {
       const response = schemasRes.value
@@ -172,9 +187,14 @@ export const OrganizationDashboard = ({
   useEffect(() => {
     async function loadData(): Promise<void> {
       setLoading(true)
-      await fetchOrganizationDetails()
-      await fetchOrganizationDashboardDetails()
-      await fetchAtAGlanceData()
+      // None of these three depend on each other's results — each only
+      // needs activeOrgId, already known up front — so run them together
+      // instead of paying for three sequential round trips.
+      await Promise.all([
+        fetchOrganizationDetails(),
+        fetchOrganizationDashboardDetails(),
+        fetchAtAGlanceData(),
+      ])
       setLoading(false)
     }
     loadData()
@@ -183,6 +203,13 @@ export const OrganizationDashboard = ({
     fetchOrganizationDashboardDetails,
     fetchAtAGlanceData,
   ])
+
+  // Not org-scoped, so this doesn't belong in the activeOrgId-keyed effect
+  // above — otherwise it refetches from the network on every org switch for
+  // no reason.
+  useEffect(() => {
+    fetchOrgMembershipList()
+  }, [fetchOrgMembershipList])
 
   if (isBhutanndiTheme()) {
     return (
@@ -244,6 +271,7 @@ export const OrganizationDashboard = ({
 
         <OrganizationAtAGlance
           orgList={orgList}
+          orgTotalCount={orgTotalCount}
           schemasCount={orgDashboard?.schemasCount ?? 0}
           schemaPreview={schemaPreview}
           credentialsCount={orgDashboard?.credentialsCount ?? 0}

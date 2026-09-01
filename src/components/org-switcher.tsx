@@ -14,26 +14,14 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
-import {
-  setOrgId,
-  setOrgRoles,
-  setSelectedOrgId,
-  setTenantData,
-} from '@/lib/orgSlice'
+import { SwitchableOrg, switchOrganization } from '@/lib/switchOrganization'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
-import { AxiosResponse } from 'axios'
 import React from 'react'
 import { RootState } from '@/lib/store'
-import { apiStatusCodes } from '@/config/CommonConstant'
-import { getOrganizationRoles } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
 
-interface Tenant {
-  id: string
-  name: string
-  logoUrl?: string
-}
+type Tenant = SwitchableOrg
 
 const OrgSwitcherInner = ({
   tenants,
@@ -67,25 +55,8 @@ const OrgSwitcherInner = ({
       ? selectedTenantFromState
       : currentTenant
 
-  const getRoles = async (orgId: string): Promise<void> => {
-    try {
-      const res = await getOrganizationRoles(orgId)
-      const { data } = res as AxiosResponse
-
-      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const roles = data?.data ?? []
-        dispatch(setOrgRoles(roles))
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error)
-    }
-  }
-
   const handleTenantSwitch = (tenant: Tenant): void => {
-    dispatch(setOrgId(tenant.id))
-    dispatch(setSelectedOrgId(tenant.id))
-    dispatch(setTenantData(tenant))
-    getRoles(tenant.id)
+    switchOrganization(dispatch, tenant)
     if (onTenantSwitch) {
       onTenantSwitch(tenant.id)
     }

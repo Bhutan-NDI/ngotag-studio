@@ -9,13 +9,6 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import React, { useEffect, useState } from 'react'
-import { getOrganizationRoles, getOrganizations } from '@/app/api/organization'
-import {
-  setOrgId,
-  setOrgRoles,
-  setSelectedOrgId,
-  setTenantData,
-} from '@/lib/orgSlice'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AxiosResponse } from 'axios'
@@ -33,8 +26,10 @@ import { Panel } from '@/components/bhutanndi/ui/Panel'
 import { Plus } from 'lucide-react'
 import { SearchField } from '@/components/bhutanndi/ui/SearchField'
 import { apiStatusCodes } from '@/config/CommonConstant'
+import { getOrganizations } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
 import { isBhutanndiTheme } from '@/lib/active-theme'
+import { switchOrganization } from '@/lib/switchOrganization'
 
 export const OrganizationList = (): React.JSX.Element => {
   const [organizationsList, setOrganizationsList] = useState<Organization[]>([])
@@ -124,26 +119,13 @@ export const OrganizationList = (): React.JSX.Element => {
     hardNavigate(`/create-organization?orgId=${orgId}#danger-zone`)
   }
 
-  // Same dispatch sequence as org-switcher.tsx's handleTenantSwitch — reused
-  // rather than reimplemented, so switching from this list stays in sync
-  // with the sidebar's org switcher.
+  // The one real switch sequence, shared with org-switcher.tsx's
+  // handleTenantSwitch — so switching from this list stays in sync with the
+  // sidebar's org switcher instead of the two silently drifting apart.
   const handleSwitchOrg = async (org: Organization): Promise<void> => {
     setSwitchingOrgId(org.id)
     try {
-      dispatch(setOrgId(org.id))
-      dispatch(setSelectedOrgId(org.id))
-      dispatch(
-        setTenantData({ id: org.id, name: org.name, logoUrl: org.logoUrl }),
-      )
-
-      const response = await getOrganizationRoles(org.id)
-      const { data } = response as AxiosResponse
-
-      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        dispatch(setOrgRoles(data?.data ?? []))
-      }
-    } catch (err) {
-      console.error('Error switching organization:', err)
+      await switchOrganization(dispatch, org)
     } finally {
       setSwitchingOrgId(null)
     }

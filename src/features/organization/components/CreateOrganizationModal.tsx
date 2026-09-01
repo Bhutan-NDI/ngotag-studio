@@ -121,6 +121,15 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     issuanceRecordsCount: 0,
     connectionRecordsCount: 0,
   })
+  // getOrgDashboard/getOrganizationReferences resolve to an error *string*
+  // rather than rejecting on failure, so Promise.allSettled sees them as
+  // 'fulfilled' either way — orgRefCounts would otherwise silently stay at
+  // its {0,0,0} default and canDeleteNow would read that as "safe to
+  // delete" with no visible error. This tracks whether the counts fetch
+  // actually succeeded, so the delete gate can require that explicitly.
+  const [refCountsStatus, setRefCountsStatus] = useState<
+    'loading' | 'loaded' | 'error'
+  >('loading')
   const [isWalletPresent, setIsWalletPresent] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -252,6 +261,19 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, checkOrgLimit])
 
+  // The browser's one-shot #danger-zone hash scroll fires on initial
+  // navigation, before this loads — the DOM only has a Loader until
+  // dataLoaded flips true. Once the real content (and #danger-zone) is
+  // actually mounted, finish that scroll ourselves.
+  useEffect(() => {
+    if (!dataLoaded || window.location.hash !== '#danger-zone') {
+      return
+    }
+    document
+      .getElementById('danger-zone')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [dataLoaded])
+
   // These useEffects handle state/city loading when user changes selections
   useEffect(() => {
     if (selectedCountryId) {
@@ -307,8 +329,15 @@ export default function OrganizationOnboarding(): React.JSX.Element {
               issuanceRecordsCount: data?.data?.issuanceRecordsCount ?? 0,
               connectionRecordsCount: data?.data?.connectionRecordsCount ?? 0,
             })
+            setRefCountsStatus('loaded')
+          } else {
+            setRefCountsStatus('error')
           }
+        } else {
+          setRefCountsStatus('error')
         }
+      } else {
+        setRefCountsStatus('error')
       }
     }
 
@@ -501,17 +530,23 @@ export default function OrganizationOnboarding(): React.JSX.Element {
 
   // Real delete-safety gate: same blocking order DeleteOrganizationPage's
   // step cards enforce (verifications → issuance → connections → wallet)
-  // before the org itself may be deleted.
+  // before the org itself may be deleted. Blocked by default until the
+  // counts fetch actually succeeds — never inferred from the {0,0,0}
+  // default, which would otherwise read as "nothing to block on".
   const blockedReason =
-    orgRefCounts.connectionRecordsCount > 0
-      ? 'Delete connection records first.'
-      : orgRefCounts.issuanceRecordsCount > 0
-        ? 'Delete issuance records first.'
-        : orgRefCounts.verificationRecordsCount > 0
-          ? 'Delete verification records first.'
-          : isWalletPresent
-            ? 'Delete the organization wallet first.'
-            : null
+    refCountsStatus === 'loading'
+      ? 'Checking delete eligibility…'
+      : refCountsStatus === 'error'
+        ? 'Could not verify it is safe to delete this organization. Refresh and try again.'
+        : orgRefCounts.connectionRecordsCount > 0
+          ? 'Delete connection records first.'
+          : orgRefCounts.issuanceRecordsCount > 0
+            ? 'Delete issuance records first.'
+            : orgRefCounts.verificationRecordsCount > 0
+              ? 'Delete verification records first.'
+              : isWalletPresent
+                ? 'Delete the organization wallet first.'
+                : null
   const canDeleteNow = blockedReason === null
 
   // Same real deleteOrganization API call, dispatch sequence and redirect as
