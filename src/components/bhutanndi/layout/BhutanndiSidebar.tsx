@@ -17,7 +17,7 @@ import {
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 /**
  * This app's real nav icon keys (see src/constants/data.ts / src/components/icons.tsx)
@@ -110,8 +110,41 @@ export function BhutanndiSidebar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   )
 
-  const isCurrent = (href: string): boolean =>
-    pathname === href || pathname.startsWith(`${href}/`)
+  // Sibling routes can nest path-wise without being related — e.g.
+  // Organizations (/organizations) and Billing (/organizations/billing) —
+  // so a plain per-item prefix match lights up both at once on
+  // /organizations/billing. Instead, pick the single most specific href
+  // among every known nav link that matches the current path, and only
+  // that one counts as current.
+  const allHrefs = useMemo(() => {
+    const hrefs: string[] = []
+    for (const item of managedNavItem) {
+      if (item.items && item.items.length > 0) {
+        for (const child of item.items) {
+          hrefs.push(child.url)
+        }
+      } else {
+        hrefs.push(item.url)
+      }
+    }
+    for (const link of ACCOUNT_LINKS) {
+      hrefs.push(link.href)
+    }
+    return hrefs
+  }, [managedNavItem])
+
+  const activeHref = useMemo(() => {
+    let best: string | null = null
+    for (const href of allHrefs) {
+      const matches = pathname === href || pathname.startsWith(`${href}/`)
+      if (matches && (!best || href.length > best.length)) {
+        best = href
+      }
+    }
+    return best
+  }, [allHrefs, pathname])
+
+  const isCurrent = (href: string): boolean => href === activeHref
 
   useEffect(() => {
     const fetchOrganizations = async (): Promise<void> => {
