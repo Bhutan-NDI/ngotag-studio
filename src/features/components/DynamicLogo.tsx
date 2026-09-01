@@ -6,16 +6,16 @@ import {
   appLogoHeight,
   appLogoPath,
   appLogoWidth,
+  bhutanndiLogoAltText,
+  bhutanndiLogoDarkPath,
+  bhutanndiLogoHeight,
+  bhutanndiLogoLightPath,
+  bhutanndiLogoWidth,
   credeblLogoAltText,
   credeblLogoDarkPath,
   credeblLogoHeight,
   credeblLogoLightPath,
   credeblLogoWidth,
-  ngotagLogoAltText,
-  ngotagLogoDarkPath,
-  ngotagLogoHeight,
-  ngotagLogoLightPath,
-  ngotagLogoWidth,
   sovioLogoAltText,
   sovioLogoDarkPath,
   sovioLogoHeight,
@@ -43,12 +43,12 @@ const THEME_LOGOS: Record<
     height: number
   }
 > = {
-  ngotag: {
-    light: ngotagLogoLightPath,
-    dark: ngotagLogoDarkPath,
-    alt: ngotagLogoAltText,
-    width: ngotagLogoWidth,
-    height: ngotagLogoHeight,
+  bhutanndi: {
+    light: bhutanndiLogoLightPath,
+    dark: bhutanndiLogoDarkPath,
+    alt: bhutanndiLogoAltText,
+    width: bhutanndiLogoWidth,
+    height: bhutanndiLogoHeight,
   },
   credebl: {
     light: credeblLogoLightPath,

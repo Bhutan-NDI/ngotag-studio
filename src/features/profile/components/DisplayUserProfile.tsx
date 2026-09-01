@@ -4,15 +4,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Edit, Mail } from 'lucide-react'
 import React, { useMemo } from 'react'
 
-import { AvatarBadge } from '@/components/ngotag/ui/AvatarBadge'
+import { AvatarBadge } from '@/components/bhutanndi/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/ngotag/ui/EmptyState'
-import { Icon } from '@/components/ngotag/ui/icons'
-import { Panel } from '@/components/ngotag/ui/Panel'
+import { EmptyState } from '@/components/bhutanndi/ui/EmptyState'
+import { Icon } from '@/components/bhutanndi/ui/icons'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
 import RecentActivity from '@/features/dashboard/components/RecentActivity'
 import { getRandomAvatarColor } from '@/utils/avatarColors'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 interface OrgRole {
   name: string
@@ -49,7 +49,7 @@ const DisplayUserProfile = ({
   toggleEditProfile,
   userProfileInfo,
 }: IDisplayUserProfileProps): React.JSX.Element => {
-  const ngotag = isNgotagTheme()
+  const bhutanndi = isBhutanndiTheme()
 
   const roles = useMemo(() => {
     const map: Record<string, string[]> = {}
@@ -122,7 +122,7 @@ const DisplayUserProfile = ({
     )
   })
 
-  if (ngotag) {
+  if (bhutanndi) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
@@ -144,28 +144,28 @@ const DisplayUserProfile = ({
             />
 
             <div>
-              <h2 className="font-display text-ngotag-strong max-w-full text-2xl font-bold break-all">
+              <h2 className="font-display text-bhutanndi-strong max-w-full text-2xl font-bold break-all">
                 {fullName || userProfileInfo?.username || 'Unnamed user'}
               </h2>
-              <p className="text-ngotag-muted text-sm">
+              <p className="text-bhutanndi-muted text-sm">
                 {userProfileInfo?.username}
               </p>
-              <p className="text-ngotag-muted flex items-center justify-center gap-1 text-sm">
+              <p className="text-bhutanndi-muted flex items-center justify-center gap-1 text-sm">
                 <Icon name="mail" size={14} strokeWidth={1.8} />
                 {userProfileInfo?.email}
               </p>
             </div>
 
             {/* Stats */}
-            <div className="border-ngotag-grid text-ngotag-muted mt-2 grid w-full grid-cols-2 gap-4 border-t pt-4 text-sm">
+            <div className="border-bhutanndi-grid text-bhutanndi-muted mt-2 grid w-full grid-cols-2 gap-4 border-t pt-4 text-sm">
               <div className="text-center">
-                <p className="text-ngotag-strong text-lg font-semibold">
+                <p className="text-bhutanndi-strong text-lg font-semibold">
                   {ownedCount}
                 </p>
                 <p>Organizations Owned</p>
               </div>
               <div className="text-center">
-                <p className="text-ngotag-strong text-lg font-semibold">
+                <p className="text-bhutanndi-strong text-lg font-semibold">
                   {memberCount}
                 </p>
                 <p>Member Organizations</p>
@@ -181,7 +181,7 @@ const DisplayUserProfile = ({
         <Panel>
           {orgPresent && orgPresent.length > 0 ? (
             <>
-              <h3 className="font-display text-ngotag-strong mb-4 text-lg font-semibold">
+              <h3 className="font-display text-bhutanndi-strong mb-4 text-lg font-semibold">
                 Organizations Associated
               </h3>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

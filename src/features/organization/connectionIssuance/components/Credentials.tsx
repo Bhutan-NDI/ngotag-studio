@@ -17,7 +17,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { CellContext } from '@tanstack/react-table'
 import { ConnectionApiSortFields } from '@/features/connections/types/connections-interface'
 import { DataTable } from '../../../../components/ui/generic-table-component/data-table'
@@ -33,7 +33,7 @@ import SidePanelComponent from '@/config/SidePanelCommon'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getIssuedCredentials } from '@/app/api/Issuance'
 import { getOrganizationById } from '@/app/api/organization'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { issuanceSvgComponent } from '@/config/svgs/issuanceSvgComponent'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetSchemaDetails } from '@/lib/schemaStorageSlice'
@@ -352,7 +352,7 @@ const Credentials = (): JSX.Element => {
 
   return (
     <PageContainer>
-      {isNgotagTheme() && (
+      {isBhutanndiTheme() && (
         <div className="mb-4">
           <Breadcrumb items={[{ label: 'Credentials' }, { label: 'Issue' }]} />
         </div>

@@ -31,10 +31,10 @@ import { Button } from '@/components/ui/button'
 import { DeleteIcon } from '@/config/svgs/DeleteIcon'
 import { Edit } from 'lucide-react'
 import { Organisation as OrgListItem } from '@/features/dashboard/type/organization'
-import { Panel } from '@/components/ngotag/ui/Panel'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
 import { getIssuedCredentials } from '@/app/api/Issuance'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 type OrganizationDashboardProps = {
@@ -53,8 +53,8 @@ export const OrganizationDashboard = ({
   const [orgDashboard, setOrgDashboard] = useState<IOrgDashboard | null>(null)
   const [, setLoading] = useState(true)
   const [walletStatus, setWalletStatus] = useState<boolean>(false)
-  // "At a glance" preview data for the ngotag Organizations/Schemas/Credential
-  // definitions/Credentials issued cards. Fetched only for the ngotag theme —
+  // "At a glance" preview data for the bhutanndi Organizations/Schemas/Credential
+  // definitions/Credentials issued cards. Fetched only for the bhutanndi theme —
   // no other white-label build renders this row, so no other build should
   // pay for these extra requests.
   const [orgList, setOrgList] = useState<OrgListItem[]>([])
@@ -110,7 +110,7 @@ export const OrganizationDashboard = ({
     }, [activeOrgId])
 
   const fetchAtAGlanceData = useCallback(async (): Promise<void> => {
-    if (!isNgotagTheme() || !activeOrgId) {
+    if (!isBhutanndiTheme() || !activeOrgId) {
       return
     }
 
@@ -184,12 +184,12 @@ export const OrganizationDashboard = ({
     fetchAtAGlanceData,
   ])
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
       <div className="space-y-5">
         <Panel>
           {selectedDropdownOrgId === '' || !selectedDropdownOrgId ? (
-            <span className="text-ngotag-muted text-[13.5px]">
+            <span className="text-bhutanndi-muted text-[13.5px]">
               No organization Data
             </span>
           ) : (
@@ -199,18 +199,18 @@ export const OrganizationDashboard = ({
                   <AvatarImage src={orgData?.logoUrl} alt={orgData?.name} />
                 ) : (
                   <AvatarFallback
-                    className="font-display text-ngotag-accent rounded-xl text-2xl font-bold"
-                    style={{ background: 'var(--ngotag-mint-08)' }}
+                    className="font-display text-bhutanndi-accent rounded-xl text-2xl font-bold"
+                    style={{ background: 'var(--bhutanndi-mint-08)' }}
                   >
                     {orgData?.name.substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 )}
               </Avatar>
               <div className="min-w-0 space-y-1">
-                <h2 className="font-display text-ngotag-strong truncate text-[19px] font-semibold tracking-[-0.02em]">
+                <h2 className="font-display text-bhutanndi-strong truncate text-[19px] font-semibold tracking-[-0.02em]">
                   {orgData?.name}
                 </h2>
-                <div className="text-ngotag-muted text-[13.5px] break-all">
+                <div className="text-bhutanndi-muted text-[13.5px] break-all">
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -231,9 +231,9 @@ export const OrganizationDashboard = ({
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <p className="text-ngotag-faint mt-2 text-[12.5px]">
+                <p className="text-bhutanndi-faint mt-2 text-[12.5px]">
                   Profile view:{' '}
-                  <span className="text-ngotag-body font-medium">
+                  <span className="text-bhutanndi-body font-medium">
                     {orgData?.publicProfile ? 'public' : 'private'}
                   </span>
                 </p>

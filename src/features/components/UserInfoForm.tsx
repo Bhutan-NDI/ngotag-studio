@@ -10,11 +10,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { type AxiosResponse } from 'axios'
+import { BhutanndiUserInfoCard } from '@/components/bhutanndi/auth/BhutanndiUserInfoCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { NgotagUserInfoCard } from '@/components/ngotag/auth/NgotagUserInfoCard'
 import { addPasswordDetails } from '@/app/api/Auth'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { passwordValueEncryption } from '@/utils/passwordEncryption'
 
 interface StepUserInfoProps {
@@ -127,13 +127,13 @@ export default function UserInfoForm({
       onSubmit={onSubmit}
     >
       {({ errors, touched, handleChange, handleBlur, values }) => {
-        if (isNgotagTheme()) {
+        if (isBhutanndiTheme()) {
           return (
             <FormikForm
               noValidate
               className="relative z-[4] flex flex-col gap-[18px]"
             >
-              <NgotagUserInfoCard
+              <BhutanndiUserInfoCard
                 email={email}
                 values={values}
                 errors={errors}

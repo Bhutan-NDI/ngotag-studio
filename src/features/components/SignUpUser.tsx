@@ -8,13 +8,13 @@ import Footer from '@/components/Footer'
 import Link from 'next/link'
 import UserInfoForm from './UserInfoForm'
 import { useSearchParams } from 'next/navigation'
-import { NgotagAuthShell } from '@/components/ngotag/auth/NgotagAuthShell'
+import { BhutanndiAuthShell } from '@/components/bhutanndi/auth/BhutanndiAuthShell'
 import {
   PasswordScene,
   SecureSignInScene,
-} from '@/components/ngotag/auth/scenes'
-import { Icon } from '@/components/ngotag/ui/icons'
-import { isNgotagTheme } from '@/lib/active-theme'
+} from '@/components/bhutanndi/auth/scenes'
+import { Icon } from '@/components/bhutanndi/ui/icons'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 interface SignUpUserProps {
   invitationVerified?: boolean
@@ -48,7 +48,7 @@ export default function SignUpUser({
   const emailLocked =
     (cameFromMarketplace || Boolean(invitationVerified)) && Boolean(userEmail)
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     const rail =
       step === 1
         ? {
@@ -73,10 +73,14 @@ export default function SignUpUser({
           }
 
     return (
-      <NgotagAuthShell scene={rail.scene} title={rail.title} lead={rail.lead}>
+      <BhutanndiAuthShell
+        scene={rail.scene}
+        title={rail.title}
+        lead={rail.lead}
+      >
         <header className="relative z-[4] mb-6 flex flex-col items-center gap-3 text-center">
           <div className="flex w-full max-w-[168px] flex-col items-center gap-2">
-            <span className="font-ngotag-mono text-ngotag-faint text-[10px] tracking-[0.16em] uppercase">
+            <span className="font-bhutanndi-mono text-bhutanndi-faint text-[10px] tracking-[0.16em] uppercase">
               Step {step} <span className="opacity-50">of</span> 2
             </span>
             <span
@@ -94,10 +98,10 @@ export default function SignUpUser({
                   style={
                     s <= step
                       ? {
-                          background: 'var(--ngotag-grad-mint)',
-                          boxShadow: 'var(--ngotag-glow-sm)',
+                          background: 'var(--bhutanndi-grad-mint)',
+                          boxShadow: 'var(--bhutanndi-glow-sm)',
                         }
-                      : { background: 'var(--ngotag-border-grid)' }
+                      : { background: 'var(--bhutanndi-border-grid)' }
                   }
                 />
               ))}
@@ -105,10 +109,10 @@ export default function SignUpUser({
           </div>
 
           <div>
-            <h1 className="text-ngotag-strong font-display m-0 text-[26px] leading-[1.15] font-semibold tracking-[-0.025em]">
+            <h1 className="text-bhutanndi-strong font-display m-0 text-[26px] leading-[1.15] font-semibold tracking-[-0.025em]">
               Create an account
             </h1>
-            <p className="text-ngotag-muted m-0 mt-1.5 text-[14px] leading-[1.5]">
+            <p className="text-bhutanndi-muted m-0 mt-1.5 text-[14px] leading-[1.5]">
               {step === 1
                 ? 'Start with the address you will sign in with'
                 : 'Your name and a password'}
@@ -117,7 +121,7 @@ export default function SignUpUser({
         </header>
 
         {!marketplaceRequired ? (
-          <p className="border-ngotag-grid text-ngotag-muted relative z-[4] m-0 mb-5 flex items-start gap-2.5 rounded-xl border bg-[var(--ngotag-fill-sunk)] px-3.5 py-3 text-[13px] leading-[1.5]">
+          <p className="border-bhutanndi-grid text-bhutanndi-muted relative z-[4] m-0 mb-5 flex items-start gap-2.5 rounded-xl border bg-[var(--bhutanndi-fill-sunk)] px-3.5 py-3 text-[13px] leading-[1.5]">
             <Icon
               name="info"
               size={15}
@@ -148,17 +152,17 @@ export default function SignUpUser({
         ) : null}
 
         {step === 1 ? (
-          <p className="text-ngotag-muted relative z-[4] m-0 mt-5 text-center text-[13.5px]">
+          <p className="text-bhutanndi-muted relative z-[4] m-0 mt-5 text-center text-[13.5px]">
             Already have an account?{' '}
             <Link
               href={signInUrl}
-              className="ndi-plainlink text-ngotag-accent font-medium"
+              className="ndi-plainlink text-bhutanndi-accent font-medium"
             >
               Sign in
             </Link>
           </p>
         ) : null}
-      </NgotagAuthShell>
+      </BhutanndiAuthShell>
     )
   }
 

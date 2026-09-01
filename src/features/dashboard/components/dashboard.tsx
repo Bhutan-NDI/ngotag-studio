@@ -14,23 +14,23 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { Tabs as BhutanndiTabs } from '@/components/bhutanndi/ui/Tabs'
 import { Button } from '@/components/ui/button'
 import { CreateWalletIcon } from '@/components/iconsSvg'
-import { EmptyState } from '@/components/ngotag/ui/EmptyState'
-import { GradientButton } from '@/components/ngotag/ui/GradientButton'
-import { Icon } from '@/components/ngotag/ui/icons'
+import { EmptyState } from '@/components/bhutanndi/ui/EmptyState'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
+import { Icon } from '@/components/bhutanndi/ui/icons'
 import Loader from '@/components/Loader'
-import { Tabs as NgotagTabs } from '@/components/ngotag/ui/Tabs'
 import { OrganizationDashboard } from '@/features/organization/components/OrganizationDashboard'
 import OrganizationDetails from '@/features/organization/components/OrganizationDetails'
 import PageContainer from '@/components/layout/page-container'
-import { Panel } from '@/components/ngotag/ui/Panel'
-import { WaveBanner } from '@/components/ngotag/ui/WaveBanner'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
+import { WaveBanner } from '@/components/bhutanndi/ui/WaveBanner'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getEcosystemEnableStausApi } from '@/app/api/ecosystem'
 import { getOrganizationById } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { setEcosystemEnableStatus } from '@/lib/ecosystemSlice'
 import { setLedgerId } from '@/lib/orgSlice'
@@ -194,7 +194,7 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (!hasOrganization) {
-    walletSection = isNgotagTheme() ? (
+    walletSection = isBhutanndiTheme() ? (
       <Panel className="mb-6">
         <EmptyState
           icon="building"
@@ -213,14 +213,14 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (walletData.length === 0) {
-    walletSection = isNgotagTheme() ? (
+    walletSection = isBhutanndiTheme() ? (
       <Panel className="mb-6">
         <div className="relative z-[4] flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-col items-start">
-            <h3 className="font-display text-ngotag-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+            <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
               Wallet lets you create schemas and credential definitions
             </h3>
-            <p className="text-ngotag-muted mt-2 text-[13.5px] leading-[1.6]">
+            <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
               Please create a wallet for your organization to issue and verify
               credentials.
             </p>
@@ -261,13 +261,13 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (currentWallet?.orgDid) {
-    walletSection = isNgotagTheme() ? (
+    walletSection = isBhutanndiTheme() ? (
       <Panel className="mb-6">
         <div className="relative z-[4] flex flex-col items-start">
-          <h3 className="font-display text-ngotag-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+          <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
             Wallet Details
           </h3>
-          <p className="text-ngotag-muted mt-2 text-[13.5px] leading-[1.6]">
+          <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
             DID is already created for your organization.
           </p>
         </div>
@@ -283,14 +283,14 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else {
-    walletSection = isNgotagTheme() ? (
+    walletSection = isBhutanndiTheme() ? (
       <Panel className="mb-6">
         <div className="relative z-[4] flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-col items-start">
-            <h3 className="font-display text-ngotag-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+            <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
               Setup your DID
             </h3>
-            <p className="text-ngotag-muted mt-2 text-[13.5px] leading-[1.6]">
+            <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
               Your wallet is ready! Now set up a DID for issuing and verifying
               credentials.
             </p>
@@ -356,7 +356,7 @@ export default function Dashboard(): React.JSX.Element {
           </div>
         )}
 
-        {isNgotagTheme() ? (
+        {isBhutanndiTheme() ? (
           <div className="mb-6">
             <WaveBanner
               eyebrow="— Dashboard"
@@ -396,7 +396,7 @@ export default function Dashboard(): React.JSX.Element {
         )}
         {walletSection}
 
-        {isNgotagTheme() ? (
+        {isBhutanndiTheme() ? (
           // min-w-0 on both wrappers: without it, a flex item's default
           // min-width:auto means it won't shrink below its content's natural
           // width even when that content (the Wallet tab's wallet/DID
@@ -405,7 +405,7 @@ export default function Dashboard(): React.JSX.Element {
           // WaveBanner/wallet-status Panel siblings above it along with it
           // (align-items: stretch) the moment the Wallet tab mounted.
           <div className="w-full min-w-0">
-            <NgotagTabs
+            <BhutanndiTabs
               label="Dashboard sections"
               active={activeTab}
               onChange={(id) => {

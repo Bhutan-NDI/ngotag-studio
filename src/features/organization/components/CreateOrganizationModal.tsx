@@ -48,8 +48,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import LogoUploader from './LogoUploader'
-import { NgotagCreateOrganization } from './NgotagCreateOrganization'
-import { NgotagOrganizationProfile } from './NgotagOrganizationProfile'
+import { BhutanndiCreateOrganization } from './BhutanndiCreateOrganization'
+import { BhutanndiOrganizationProfile } from './BhutanndiOrganizationProfile'
 import PageContainer from '@/components/layout/page-container'
 import { PlanLimitNotice } from '@/components/Marketplace/PlanLimitNotice'
 import Stepper from '@/components/StepperComponent'
@@ -57,7 +57,7 @@ import { SubscribeRequired } from '@/components/Marketplace/SubscribeRequired'
 import { isMarketplaceLimitError } from '@/config/marketplaceErrors'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { toast } from 'sonner'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -108,8 +108,8 @@ export default function OrganizationOnboarding(): React.JSX.Element {
   const [initializing, setInitializing] = useState<boolean>(true)
   const [isBackLoading, setIsBackLoading] = useState(false)
 
-  // Ngotag-only extras for the unified "Organization profile" page (edit
-  // mode). Fetched only under isNgotagTheme() so no other white-label build
+  // Bhutanndi-only extras for the unified "Organization profile" page (edit
+  // mode). Fetched only under isBhutanndiTheme() so no other white-label build
   // pays for the extra requests. Counts mirror OrganizationAtAGlance's real
   // source (getOrgDashboard); reference counts mirror DeleteOrganization.tsx's
   // real safety checks so the danger-zone panel here never allows deleting an
@@ -227,11 +227,11 @@ export default function OrganizationOnboarding(): React.JSX.Element {
           setIsEditMode(true)
           await fetchOrganizationDetails()
         } else {
-          // Ngotag's create-mode Visibility cards need a pre-selected option
+          // Bhutanndi's create-mode Visibility cards need a pre-selected option
           // (screenshot shows "Public" checked by default); other themes'
           // create form never renders a visibility control at all, so this
           // is a no-op for them.
-          if (isNgotagTheme()) {
+          if (isBhutanndiTheme()) {
             setIsPublic(true)
           }
           // Surface the upgrade CTA immediately if the limit is already hit,
@@ -265,18 +265,18 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     }
   }, [selectedStateId, selectedCountryId])
 
-  // Ngotag-only: the profile page's stat tiles (members/schemas/credentials,
+  // Bhutanndi-only: the profile page's stat tiles (members/schemas/credentials,
   // same real source as OrganizationAtAGlance) and the danger-zone's
   // delete-safety counts (same real source as DeleteOrganization.tsx's
   // fetchOrganizationReferences). Skipped entirely for other white-label
   // builds and for create-mode (no orgId yet to look up).
   useEffect(() => {
-    if (!isNgotagTheme() || !orgId) {
+    if (!isBhutanndiTheme() || !orgId) {
       return
     }
     let cancelled = false
 
-    const fetchNgotagExtras = async (): Promise<void> => {
+    const fetchBhutanndiExtras = async (): Promise<void> => {
       const [dashboardRes, refsRes] = await Promise.allSettled([
         getOrgDashboard(orgId),
         getOrganizationReferences(orgId),
@@ -312,7 +312,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
       }
     }
 
-    fetchNgotagExtras()
+    fetchBhutanndiExtras()
     return (): void => {
       cancelled = true
     }
@@ -572,7 +572,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
         <div className="flex min-h-screen items-center justify-center">
           <Loader />
         </div>
-      ) : isNgotagTheme() && isEditMode ? (
+      ) : isBhutanndiTheme() && isEditMode ? (
         <Formik
           enableReinitialize
           initialValues={{
@@ -606,7 +606,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
               createLoading
 
             return (
-              <NgotagOrganizationProfile
+              <BhutanndiOrganizationProfile
                 orgId={orgId as string}
                 orgName={orgDetails?.name ?? ''}
                 orgLogoUrl={orgDetails?.logoUrl}
@@ -677,7 +677,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
             )
           }}
         </Formik>
-      ) : isNgotagTheme() && !isEditMode ? (
+      ) : isBhutanndiTheme() && !isEditMode ? (
         <Formik
           enableReinitialize
           initialValues={{
@@ -693,7 +693,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
             /* Submission is triggered by the "Create organization" button's
                onClick (handleCreateAndContinue below), not a native form
                submit — kept as a no-op so Formik still owns validation and
-               field state the same way the ngotag edit-mode form does. */
+               field state the same way the bhutanndi edit-mode form does. */
           }}
         >
           {({ errors, touched, setFieldValue, values, handleBlur }) => {
@@ -707,7 +707,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
               createLoading
 
             return (
-              <NgotagCreateOrganization
+              <BhutanndiCreateOrganization
                 values={values}
                 errors={errors}
                 touched={touched}

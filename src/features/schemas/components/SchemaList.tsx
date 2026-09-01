@@ -16,7 +16,7 @@ import { getAllSchemas, getAllSchemasByOrgId } from '@/app/api/schema'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AxiosResponse } from 'axios'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { EmptyMessage } from '@/components/EmptyMessage'
 import { GetAllSchemaListParameter } from '@/features/dashboard/type/schema'
@@ -32,7 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getOrganizationById } from '@/app/api/organization'
 import { getUserProfile } from '@/app/api/Auth'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 const generatePaginationNumbers = (
   currentPage: number,
@@ -390,7 +390,7 @@ const SchemaList = (props: {
   return (
     <PageContainer>
       <div className="px-4 pt-2">
-        {isNgotagTheme() && (
+        {isBhutanndiTheme() && (
           <div className="mb-4">
             <Breadcrumb items={[{ label: 'Schemas' }]} />
           </div>

@@ -6,21 +6,21 @@ import {
   FIELD_BLOCK_CLASS,
   FIELD_CLASS,
   LABEL_CLASS,
-} from '@/components/ngotag/ui/formStyles'
+} from '@/components/bhutanndi/ui/formStyles'
 import { Field, FieldProps, Form, Formik } from 'formik'
 import React, { useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
-import { AuthAlert } from '@/components/ngotag/ui/AuthAlert'
+import { AuthAlert } from '@/components/bhutanndi/ui/AuthAlert'
 import type { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
-import { GradientButton } from '@/components/ngotag/ui/GradientButton'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import SOCKET from '@/config/SocketConfig'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { spinupSharedAgent } from '@/app/api/Agent'
 import { useOrgWalletName } from './useOrgWalletName'
 
@@ -87,7 +87,7 @@ const SharedAgentForm = ({
     }
   }
 
-  const ngotag = isNgotagTheme()
+  const bhutanndi = isBhutanndiTheme()
 
   return (
     <div className="mt-6">
@@ -98,12 +98,12 @@ const SharedAgentForm = ({
         onSubmit={handleSubmit}
       >
         {({ errors, touched }) => {
-          if (ngotag) {
+          if (bhutanndi) {
             return (
               <Form className="space-y-6">
                 <label className={FIELD_BLOCK_CLASS}>
                   <span className={LABEL_CLASS}>Wallet Label</span>
-                  <p className="text-ngotag-muted -mt-0.5 text-[13px] leading-[1.5]">
+                  <p className="text-bhutanndi-muted -mt-0.5 text-[13px] leading-[1.5]">
                     This label is auto-generated based on your organization
                     name. You can edit it if needed.
                   </p>
@@ -121,7 +121,7 @@ const SharedAgentForm = ({
                   {errors.label && touched.label ? (
                     <p
                       className="text-[12px]"
-                      style={{ color: 'var(--ngotag-text-danger)' }}
+                      style={{ color: 'var(--bhutanndi-text-danger)' }}
                     >
                       {errors.label}
                     </p>

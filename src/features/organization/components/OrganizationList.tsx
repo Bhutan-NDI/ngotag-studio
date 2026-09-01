@@ -19,30 +19,30 @@ import {
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AxiosResponse } from 'axios'
+import { BhutanndiOrgCard } from './BhutanndiOrganizationCard'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/ngotag/ui/EmptyState'
-import { GradientButton } from '@/components/ngotag/ui/GradientButton'
-import { Icon } from '@/components/ngotag/ui/icons'
+import { EmptyState } from '@/components/bhutanndi/ui/EmptyState'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
+import { Icon } from '@/components/bhutanndi/ui/icons'
 import { Input } from '@/components/ui/input'
 import Loader from '@/components/Loader'
-import { NgotagOrgCard } from './NgotagOrganizationCard'
 import { Organization } from '@/features/dashboard/type/organization'
-import { PageHeader } from '@/components/ngotag/ui/PageHeader'
-import { Panel } from '@/components/ngotag/ui/Panel'
+import { PageHeader } from '@/components/bhutanndi/ui/PageHeader'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
 import { Plus } from 'lucide-react'
-import { SearchField } from '@/components/ngotag/ui/SearchField'
+import { SearchField } from '@/components/bhutanndi/ui/SearchField'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 export const OrganizationList = (): React.JSX.Element => {
   const [organizationsList, setOrganizationsList] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
   const [isCreatingOrg, setIsCreatingOrg] = useState(false)
-  // Ngotag-only: which card's "Switch to this" is in flight, and the
-  // currently-active org (same selector NgotagTopBar/NgotagSidebar use) that
+  // Bhutanndi-only: which card's "Switch to this" is in flight, and the
+  // currently-active org (same selector BhutanndiTopBar/BhutanndiSidebar use) that
   // decides which card gets the "Current" pill instead.
   const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
   const dispatch = useAppDispatch()
@@ -108,13 +108,13 @@ export const OrganizationList = (): React.JSX.Element => {
     }, 300)
   }
 
-  // Edit and Delete both open the same unified ngotag "Organization profile"
-  // page (CreateOrganizationModal.tsx's ngotag+edit-mode branch, rendering
-  // NgotagOrganizationProfile) — Delete just deep-links to its danger-zone
+  // Edit and Delete both open the same unified bhutanndi "Organization profile"
+  // page (CreateOrganizationModal.tsx's bhutanndi+edit-mode branch, rendering
+  // BhutanndiOrganizationProfile) — Delete just deep-links to its danger-zone
   // panel via the #danger-zone anchor instead of the old standalone
   // /delete-organization wizard route. (OrganizationDashboard.tsx's own
   // handleEditOrg/handleDeleteOrg are unrelated — those back the *generic*,
-  // non-ngotag dashboard's Edit/Delete icon buttons and still use the two
+  // non-bhutanndi dashboard's Edit/Delete icon buttons and still use the two
   // separate routes verbatim.)
   const handleEditOrg = (orgId: string): void => {
     hardNavigate(`/create-organization?orgId=${orgId}`)
@@ -164,11 +164,11 @@ export const OrganizationList = (): React.JSX.Element => {
     getAllOrganizations()
   }, [currentPage.pageNumber, currentPage.pageSize, searchText])
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     const paginationBlock =
       organizationsList.length > 0 ? (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-ngotag-muted m-0 text-[13px] whitespace-nowrap">
+          <p className="text-bhutanndi-muted m-0 text-[13px] whitespace-nowrap">
             Showing {(currentPage.pageNumber - 1) * currentPage.pageSize + 1} to{' '}
             {Math.min(
               currentPage.pageNumber * currentPage.pageSize,
@@ -269,7 +269,7 @@ export const OrganizationList = (): React.JSX.Element => {
           {!loading &&
             organizationsList.length > 0 &&
             organizationsList.map((org) => (
-              <NgotagOrgCard
+              <BhutanndiOrgCard
                 key={org.id}
                 org={org}
                 isCurrent={org.id === activeOrgId}

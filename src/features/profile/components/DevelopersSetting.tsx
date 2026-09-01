@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ClientSecretKeySvg } from '@/config/svgs/ClientSecretKeySvg'
@@ -16,7 +16,7 @@ import { Roles } from '@/common/enums'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getOrganizations } from '@/app/api/organization'
 import { getUserProfile } from '@/app/api/Auth'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 interface OrgRole {
@@ -213,7 +213,7 @@ const ClientCredentials = (): React.JSX.Element => {
   return (
     <div className="h-full">
       <div className="page-container relative flex h-full flex-auto flex-col p-3 sm:p-4">
-        {isNgotagTheme() && (
+        {isBhutanndiTheme() && (
           <div className="mb-4">
             <Breadcrumb items={[{ label: 'Developer settings' }]} />
           </div>

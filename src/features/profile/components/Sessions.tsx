@@ -12,15 +12,15 @@ import ConfirmationModal from '@/components/confirmation-modal'
 import { DeleteIcon } from '@/config/svgs/DeleteIcon'
 import { DestructiveConfirmation } from '@/config/svgs/Auth'
 import Loader from '@/components/Loader'
-import { Panel } from '@/components/ngotag/ui/Panel'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
 import { RootState } from '@/lib/store'
 import { SESSION_TYPE } from '@/components/types/Sessions'
 import { dateConversion } from '@/utils/DateConversion'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 function Sessions(): JSX.Element {
-  const ngotag = isNgotagTheme()
+  const bhutanndi = isBhutanndiTheme()
   const [loading, setLoading] = useState(true)
   const [sessions, setSessions] = useState<Session[]>()
   const [error, setError] = useState<string | null>(null)
@@ -139,8 +139,8 @@ function Sessions(): JSX.Element {
     )
   }
 
-  const title = ngotag ? (
-    <CardTitle className="font-display text-ngotag-strong px-4">
+  const title = bhutanndi ? (
+    <CardTitle className="font-display text-bhutanndi-strong px-4">
       User Sessions
     </CardTitle>
   ) : (
@@ -310,7 +310,7 @@ function Sessions(): JSX.Element {
     </>
   )
 
-  if (ngotag) {
+  if (bhutanndi) {
     return (
       <Panel padded={false} className="py-6">
         {title}

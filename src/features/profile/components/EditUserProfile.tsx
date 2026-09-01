@@ -12,14 +12,14 @@ import {
 import React, { useEffect, useRef, useState } from 'react'
 import { calculateSize, dataURItoBlob } from '@/utils/CompressImage'
 
-import { AvatarBadge } from '@/components/ngotag/ui/AvatarBadge'
+import { AvatarBadge } from '@/components/bhutanndi/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
-import { GradientButton } from '@/components/ngotag/ui/GradientButton'
-import { HairlineButton } from '@/components/ngotag/ui/HairlineButton'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
+import { HairlineButton } from '@/components/bhutanndi/ui/HairlineButton'
 import type { IUserProfile } from '@/components/profile/interfaces'
 import { Input } from '@/components/ui/input'
 import Loader from '@/components/Loader'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { updateUserProfile } from '@/app/api/Auth'
 
 interface Values {
@@ -46,7 +46,7 @@ export default function EditUserProfile({
   userProfileInfo,
   updateProfile,
 }: Readonly<EditUserProfileProps>): React.JSX.Element {
-  const ngotag = isNgotagTheme()
+  const bhutanndi = isBhutanndiTheme()
   const [loading, setLoading] = useState(false)
   const [logoImage, setLogoImage] = useState<ILogoImage>({
     logoFile: '',
@@ -190,7 +190,7 @@ export default function EditUserProfile({
                       Profile Image
                     </span>
                     <div className="flex items-center space-x-4">
-                      {ngotag ? (
+                      {bhutanndi ? (
                         <AvatarBadge
                           src={logoImage.imagePreviewUrl as string}
                           name={
@@ -293,7 +293,7 @@ export default function EditUserProfile({
               {/* Sticky footer for Save/Cancel */}
 
               <div className="bg-background absolute bottom-0 left-0 flex w-full flex-col gap-2 space-y-2 border-t px-6 py-4">
-                {ngotag ? (
+                {bhutanndi ? (
                   <>
                     <GradientButton
                       type="submit"

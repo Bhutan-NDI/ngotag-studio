@@ -146,11 +146,11 @@ export const appLogoAltText = 'PHENIX ID Logo'
 export const appLogoWidth = 781
 export const appLogoHeight = 204
 
-export const ngotagLogoLightPath = `${logoBasePath}/ndi-studio-on-light.svg`
-export const ngotagLogoDarkPath = `${logoBasePath}/ndi-studio-on-dark.svg`
-export const ngotagLogoAltText = 'Bhutan NDI Studio Logo'
-export const ngotagLogoWidth = 1456
-export const ngotagLogoHeight = 400
+export const bhutanndiLogoLightPath = `${logoBasePath}/ndi-studio-on-light.svg`
+export const bhutanndiLogoDarkPath = `${logoBasePath}/ndi-studio-on-dark.svg`
+export const bhutanndiLogoAltText = 'Bhutan NDI Studio Logo'
+export const bhutanndiLogoWidth = 1456
+export const bhutanndiLogoHeight = 400
 
 export const credeblLogoLightPath = `${imageBasePath}/CREDEBL_Logo_Web.svg`
 export const credeblLogoDarkPath = `${imageBasePath}/CREDEBL_Logo_Web_Dark.svg`
@@ -168,7 +168,7 @@ export const sovioLogoHeight = 34
 // in src/lib/active-theme.ts (browser tab icon in src/app/layout.tsx +
 // src/components/FaviconUpdater.tsx, and the splash/auth-gate loading marks
 // in src/app/page.tsx + src/features/components/SessionManager.tsx).
-export const ngotagFaviconPath = `${logoBasePath}/ndi-mark-mint.png`
+export const bhutanndiFaviconPath = `${logoBasePath}/ndi-mark-mint.png`
 export const credeblFaviconPath = '/favicons/favicon-credebl.ico'
 export const sovioFaviconPath = '/favicons/favicon-sovio.ico'
 

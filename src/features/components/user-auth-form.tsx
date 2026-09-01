@@ -19,15 +19,15 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { BhutanndiLoginCard } from '@/components/bhutanndi/auth/BhutanndiLoginCard'
 import { Button } from '@/components/ui/button'
 import { Icons } from '@/config/svgs/Auth'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import Loader from '@/components/Loader'
-import { NgotagLoginCard } from '@/components/ngotag/auth/NgotagLoginCard'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { generateAuthenticationOption } from '@/app/api/Fido'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { safeInternalRedirect } from '@/utils/safeRedirect'
 import { setProfile } from '@/lib/profileSlice'
 import { signIn } from 'next-auth/react'
@@ -290,9 +290,9 @@ export default function SignInViewPage(): React.JSX.Element {
     }
   }
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
-      <NgotagLoginCard
+      <BhutanndiLoginCard
         signInForm={signInForm}
         onSubmit={handleFormSubmit}
         loading={loading}

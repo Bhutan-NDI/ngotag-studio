@@ -9,7 +9,7 @@ import {
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import ConfirmationModal from '@/components/confirmation-modal'
 import EditUserRoleModal from './EditUserRoleModal'
 import { Invitation } from '@/features/invitations/interfaces/invitation-interface'
@@ -19,7 +19,7 @@ import SendInvitationModal from '@/features/invitations/components/sendInvitatio
 import TabData from './TabData'
 import { User } from './users-interface'
 import { getOrganizationInvitations } from '@/app/api/Invitation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 const initialPageState = {
@@ -287,7 +287,7 @@ export default function Members(): React.JSX.Element {
     <PageContainer>
       <div className="p-5">
         <div className="mb-6">
-          {isNgotagTheme() && (
+          {isBhutanndiTheme() && (
             <div className="mb-4">
               <Breadcrumb items={[{ label: 'Users' }]} />
             </div>

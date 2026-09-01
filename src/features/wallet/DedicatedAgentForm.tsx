@@ -6,23 +6,23 @@ import {
   FIELD_BLOCK_CLASS,
   FIELD_CLASS,
   LABEL_CLASS,
-} from '@/components/ngotag/ui/formStyles'
+} from '@/components/bhutanndi/ui/formStyles'
 import { Field, FieldProps, Form, Formik, FormikProps } from 'formik'
 import React, { useEffect, useRef, useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
-import { AuthAlert } from '@/components/ngotag/ui/AuthAlert'
+import { AuthAlert } from '@/components/bhutanndi/ui/AuthAlert'
 import { Button } from '@/components/ui/button'
-import { GradientButton } from '@/components/ngotag/ui/GradientButton'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { setAgentConfigDetails } from '@/app/api/Agent'
 import { useOrgWalletName } from './useOrgWalletName'
 
-// Mirrors AgentConfigureDto (ngotag-platform apps/api-gateway/src/agent-service/dto/agent-configure.dto.ts)
+// Mirrors AgentConfigureDto (bhutanndi-platform apps/api-gateway/src/agent-service/dto/agent-configure.dto.ts)
 const WALLET_NAME_REGEX = /^[a-zA-Z0-9]*$/
 const HOST_PORT_REGEX =
   /^(http:\/\/|https:\/\/)?(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)):(?:\d{1,5})(\/[^\s]*)?$/
@@ -139,7 +139,7 @@ const DedicatedAgentForm = ({
     }
   }
 
-  const ngotag = isNgotagTheme()
+  const bhutanndi = isBhutanndiTheme()
 
   return (
     <div className="mt-6">
@@ -154,12 +154,12 @@ const DedicatedAgentForm = ({
         onSubmit={handleSubmit}
       >
         {({ errors, touched }) => {
-          if (ngotag) {
+          if (bhutanndi) {
             return (
               <Form className="space-y-6">
                 <label className={FIELD_BLOCK_CLASS}>
                   <span className={LABEL_CLASS}>Wallet Name</span>
-                  <p className="text-ngotag-muted -mt-0.5 text-[13px] leading-[1.5]">
+                  <p className="text-bhutanndi-muted -mt-0.5 text-[13px] leading-[1.5]">
                     This name is auto-generated based on your organization name.
                     You can edit it if needed.
                   </p>
@@ -183,7 +183,7 @@ const DedicatedAgentForm = ({
                   {errors.walletName && touched.walletName ? (
                     <p
                       className="text-[12px]"
-                      style={{ color: 'var(--ngotag-text-danger)' }}
+                      style={{ color: 'var(--bhutanndi-text-danger)' }}
                     >
                       {errors.walletName}
                     </p>
@@ -201,7 +201,7 @@ const DedicatedAgentForm = ({
                   {errors.agentEndpoint && touched.agentEndpoint ? (
                     <p
                       className="text-[12px]"
-                      style={{ color: 'var(--ngotag-text-danger)' }}
+                      style={{ color: 'var(--bhutanndi-text-danger)' }}
                     >
                       {errors.agentEndpoint}
                     </p>
@@ -219,7 +219,7 @@ const DedicatedAgentForm = ({
                   {errors.apiKey && touched.apiKey ? (
                     <p
                       className="text-[12px]"
-                      style={{ color: 'var(--ngotag-text-danger)' }}
+                      style={{ color: 'var(--bhutanndi-text-danger)' }}
                     >
                       {errors.apiKey}
                     </p>

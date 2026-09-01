@@ -12,13 +12,13 @@ import { Card } from '@/components/ui/card'
 import DedicatedAgentForm from './DedicatedAgentForm'
 import { Label } from '@/components/ui/label'
 import { Loader } from 'lucide-react'
-import { NgotagWalletSetup } from './NgotagWalletSetup'
+import { BhutanndiWalletSetup } from './BhutanndiWalletSetup'
 import PageContainer from '@/components/layout/page-container'
 import SharedAgentForm from './SharedAgentForm'
 import Stepper from '@/components/StepperComponent'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 const isValidUuid = (value: string): boolean =>
@@ -103,10 +103,10 @@ const WalletSetup = (): React.JSX.Element => {
     sharedWalletResponse || dedicatedWalletResponse,
   )
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
       <PageContainer>
-        <NgotagWalletSetup
+        <BhutanndiWalletSetup
           agentType={agentType}
           onSelectAgentType={(type) => {
             if (!isAnyWalletCreated) {
@@ -142,7 +142,7 @@ const WalletSetup = (): React.JSX.Element => {
               disabled={!orgId || !isValidUuid(orgId)}
             />
           )}
-        </NgotagWalletSetup>
+        </BhutanndiWalletSetup>
       </PageContainer>
     )
   }

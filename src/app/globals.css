@@ -4,48 +4,48 @@
 
 @import '../../public/themes/phenix_theme.css';
 
-/* Ngotag ("Bhutan NDI") theme — additive only, see src/lib/active-theme.ts.
-   `ngotag-effects.css` is entirely scoped under `.theme-ngotag` (the body
+/* Bhutanndi ("Bhutan NDI") theme — additive only, see src/lib/active-theme.ts.
+   `bhutanndi-effects.css` is entirely scoped under `.theme-bhutanndi` (the body
    class `src/components/active-theme.tsx` applies when that theme is
    active), so it is inert markup for every other brand. */
-@import '../styles/ngotag-effects.css';
+@import '../styles/bhutanndi-effects.css';
 
 /* Tell Tailwind v4 to use the .dark class (from next-themes) for dark: utilities */
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ────────────────────────────────────────────────────────────────────────
-   Ngotag theme bridge — additive Tailwind utility registrations.
-   These only produce visible output once `public/themes/ngotag_theme.css`
+   Bhutanndi theme bridge — additive Tailwind utility registrations.
+   These only produce visible output once `public/themes/bhutanndi_theme.css`
    is the active dynamically-loaded stylesheet (see active-theme.tsx) and
-   defines the `--ngotag-*` custom properties referenced below; for every
+   defines the `--bhutanndi-*` custom properties referenced below; for every
    other theme these variables are undefined, so the utilities they back
-   (bg-ngotag-canvas, text-ngotag-muted, font-display, ...) resolve to
-   nothing and are safe no-ops. Only src/components/ngotag/** and
-   src/styles/ngotag-effects.css use these classes.
+   (bg-bhutanndi-canvas, text-bhutanndi-muted, font-display, ...) resolve to
+   nothing and are safe no-ops. Only src/components/bhutanndi/** and
+   src/styles/bhutanndi-effects.css use these classes.
    ──────────────────────────────────────────────────────────────────── */
 @theme inline {
-  --font-display: var(--font-ngotag-display);
-  --font-ngotag-body: var(--font-ngotag-body);
-  --font-ngotag-mono: var(--font-ngotag-mono);
+  --font-display: var(--font-bhutanndi-display);
+  --font-bhutanndi-body: var(--font-bhutanndi-body);
+  --font-bhutanndi-mono: var(--font-bhutanndi-mono);
 
-  --color-ngotag-canvas: var(--ngotag-surface-canvas);
-  --color-ngotag-sunken: var(--ngotag-surface-sunken);
-  --color-ngotag-raised: var(--ngotag-surface-raised);
-  --color-ngotag-card: var(--ngotag-surface-card);
-  --color-ngotag-hover: var(--ngotag-surface-hover);
-  --color-ngotag-strong: var(--ngotag-text-strong);
-  --color-ngotag-body: var(--ngotag-text-body);
-  --color-ngotag-muted: var(--ngotag-text-muted);
-  --color-ngotag-faint: var(--ngotag-text-faint);
-  --color-ngotag-accent: var(--ngotag-accent);
-  --color-ngotag-accent-hover: var(--ngotag-accent-hover);
-  --color-ngotag-accent-press: var(--ngotag-accent-press);
-  --color-ngotag-teal: var(--ngotag-teal);
-  --color-ngotag-grid: var(--ngotag-border-grid);
-  --color-ngotag-subtle: var(--ngotag-border-subtle);
-  --color-ngotag-divider: var(--ngotag-border-divider);
-  --radius-ngotag-card: 16px;
-  --ease-ngotag: var(--ngotag-ease-out);
+  --color-bhutanndi-canvas: var(--bhutanndi-surface-canvas);
+  --color-bhutanndi-sunken: var(--bhutanndi-surface-sunken);
+  --color-bhutanndi-raised: var(--bhutanndi-surface-raised);
+  --color-bhutanndi-card: var(--bhutanndi-surface-card);
+  --color-bhutanndi-hover: var(--bhutanndi-surface-hover);
+  --color-bhutanndi-strong: var(--bhutanndi-text-strong);
+  --color-bhutanndi-body: var(--bhutanndi-text-body);
+  --color-bhutanndi-muted: var(--bhutanndi-text-muted);
+  --color-bhutanndi-faint: var(--bhutanndi-text-faint);
+  --color-bhutanndi-accent: var(--bhutanndi-accent);
+  --color-bhutanndi-accent-hover: var(--bhutanndi-accent-hover);
+  --color-bhutanndi-accent-press: var(--bhutanndi-accent-press);
+  --color-bhutanndi-teal: var(--bhutanndi-teal);
+  --color-bhutanndi-grid: var(--bhutanndi-border-grid);
+  --color-bhutanndi-subtle: var(--bhutanndi-border-subtle);
+  --color-bhutanndi-divider: var(--bhutanndi-border-divider);
+  --radius-bhutanndi-card: 16px;
+  --ease-bhutanndi: var(--bhutanndi-ease-out);
 }
 
 /* Cursor pointer globally for buttons */

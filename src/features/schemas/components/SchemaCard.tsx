@@ -22,9 +22,9 @@ import DateTooltip from '@/components/DateTooltip'
 import Loader from '@/components/Loader'
 import { dateConversion } from '@/utils/DateConversion'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { limitedAttributesLength } from '@/config/CommonConstant'
-import NgotagSchemaCard from './NgotagSchemaCard'
+import BhutanndiSchemaCard from './BhutanndiSchemaCard'
 import { pathRoutes } from '@/config/pathRoutes'
 import { setSchemaDetails } from '@/lib/schemaStorageSlice'
 import { useAppDispatch } from '@/lib/hooks'
@@ -174,9 +174,9 @@ const SchemaCard = (props: Readonly<ISchemaCardProps>): React.JSX.Element => {
     !props.isVerification &&
     !props.isVerificationUsingEmail
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
-      <NgotagSchemaCard
+      <BhutanndiSchemaCard
         className={props.className}
         schemaName={props.schemaName}
         version={props.version}

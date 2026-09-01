@@ -3,7 +3,7 @@ import { IssuedCredential } from '../connectionIssuance/type/Issuance'
 
 import { Organisation as OrgListItem } from '@/features/dashboard/type/organization'
 import React from 'react'
-import { StatCard } from '@/components/ngotag/ui/StatCard'
+import { StatCard } from '@/components/bhutanndi/ui/StatCard'
 
 /** A schema's real name + version, as returned by getAllSchemasByOrgId. */
 export interface SchemaPreviewItem {
@@ -22,10 +22,10 @@ function PreviewRow({
 }): React.JSX.Element {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-ngotag-body min-w-0 truncate text-[13.5px] font-medium">
+      <span className="text-bhutanndi-body min-w-0 truncate text-[13.5px] font-medium">
         {primary}
       </span>
-      <span className="font-ngotag-mono text-ngotag-faint flex-none text-[12px]">
+      <span className="font-bhutanndi-mono text-bhutanndi-faint flex-none text-[12px]">
         {secondary}
       </span>
     </div>
@@ -64,7 +64,7 @@ interface OrganizationAtAGlanceProps {
 }
 
 /**
- * The "at a glance" cards on the ngotag Overview tab: Organizations, Schemas
+ * The "at a glance" cards on the bhutanndi Overview tab: Organizations, Schemas
  * and Credentials issued — each a title, an info hint, a real count badge,
  * and a preview of the first few real rows (StatCard, from the design
  * system, handles the empty state when a card's count is 0). Every count and

@@ -13,16 +13,16 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 // Passkey feature — hidden until ready for release
 // import AddPasskey from '@/features/passkey/AddPasskey'
+import { Tabs as BhutanndiTabs } from '@/components/bhutanndi/ui/Tabs'
 import DisplayUserProfile from './DisplayUserProfile'
 import EditUserProfile from './EditUserProfile'
 import { IUserProfile } from '@/components/profile/interfaces'
 import Loader from '@/components/Loader'
-import { Tabs as NgotagTabs } from '@/components/ngotag/ui/Tabs'
-import { PageHeader } from '@/components/ngotag/ui/PageHeader'
+import { PageHeader } from '@/components/bhutanndi/ui/PageHeader'
 import Sessions from './Sessions'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getUserProfile } from '@/app/api/Auth'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 export default function UserProfile(): React.JSX.Element {
   const token = useAppSelector((state) => state.auth.token)
@@ -122,13 +122,13 @@ export default function UserProfile(): React.JSX.Element {
     </Sheet>
   ) : null
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
       <div className="p-6">
         <PageHeader crumbs={[{ label: 'Profile' }]} title="Profile" />
 
         <div className="mt-6 mb-8">
-          <NgotagTabs
+          <BhutanndiTabs
             label="Profile sections"
             tabs={[
               { id: 'profile', label: 'Profile', icon: 'user' },

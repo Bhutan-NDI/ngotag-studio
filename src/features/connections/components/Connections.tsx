@@ -36,8 +36,8 @@ import { getConnectionsByOrg } from '@/app/api/connection'
 import { useAppSelector } from '@/lib/hooks'
 import type { AxiosResponse } from 'axios'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 export default function Connections(): JSX.Element {
   const metadata: ITableMetadata = {
@@ -292,7 +292,7 @@ export default function Connections(): JSX.Element {
 
   return (
     <PageContainer>
-      {isNgotagTheme() && (
+      {isBhutanndiTheme() && (
         <div className="mb-4">
           <Breadcrumb items={[{ label: 'Connections' }]} />
         </div>

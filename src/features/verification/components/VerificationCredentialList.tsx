@@ -21,7 +21,7 @@ import {
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
-import { Breadcrumb } from '@/components/ngotag/ui/Breadcrumb'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { ConnectionApiSortFields } from '@/features/connections/types/connections-interface'
 import { DataTable } from '../../../components/ui/generic-table-component/data-table'
@@ -34,7 +34,7 @@ import RoleViewButton from '@/components/RoleViewButton'
 import SidePanelComponent from '@/config/SidePanelCommon'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getOrganizationById } from '@/app/api/organization'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 import { useRouter } from 'next/navigation'
 import { verificationSvgComponent } from '@/config/verificationSvgComponent'
@@ -402,7 +402,7 @@ const VerificationCredentialList = (): JSX.Element => {
 
   return (
     <PageContainer>
-      {isNgotagTheme() && (
+      {isBhutanndiTheme() && (
         <div className="mb-4">
           <Breadcrumb items={[{ label: 'Credentials' }, { label: 'Verify' }]} />
         </div>

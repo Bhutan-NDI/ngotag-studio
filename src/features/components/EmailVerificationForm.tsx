@@ -10,10 +10,10 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { BhutanndiSignupEmailCard } from '@/components/bhutanndi/auth/BhutanndiSignupEmailCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { NgotagSignupEmailCard } from '@/components/ngotag/auth/NgotagSignupEmailCard'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 interface StepEmailProps {
   readonly email: string
@@ -194,13 +194,13 @@ export default function EmailVerificationForm({
           setEmail(e.target.value)
         }
 
-        if (isNgotagTheme()) {
+        if (isBhutanndiTheme()) {
           return (
             <FormikForm
               noValidate
               className="relative z-[4] flex flex-col gap-[18px]"
             >
-              <NgotagSignupEmailCard
+              <BhutanndiSignupEmailCard
                 email={values.email}
                 error={touched.email ? errors.email : undefined}
                 onChange={handleEmailChange}

@@ -14,11 +14,11 @@ import {
 import { useSearchParams } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
-import { NgotagDidDetails } from './NgotagDidDetails'
+import { BhutanndiDidDetails } from './BhutanndiDidDetails'
 import PageContainer from '@/components/layout/page-container'
 import Stepper from '@/components/StepperComponent'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useState } from 'react'
 
 export default function DidDetails(): React.JSX.Element {
@@ -50,10 +50,10 @@ export default function DidDetails(): React.JSX.Element {
     hardNavigate('/dashboard')
   }
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
       <PageContainer>
-        <NgotagDidDetails
+        <BhutanndiDidDetails
           protocol={protocol}
           credentialType={credentialType}
           didMethod={didMethod}

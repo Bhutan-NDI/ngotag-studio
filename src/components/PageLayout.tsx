@@ -4,18 +4,18 @@ import React, { ReactNode } from 'react'
 import { SidebarInset, SidebarProvider } from './ui/sidebar'
 
 import AppSidebar from './layout/app-sidebar'
+import { BhutanndiAppShell } from './bhutanndi/layout/BhutanndiAppShell'
+import { BhutanndiBareShell } from './bhutanndi/layout/BhutanndiBareShell'
 import Header from './layout/header'
 import KBar from './kbar'
-import { NgotagAppShell } from './ngotag/layout/NgotagAppShell'
-import { NgotagBareShell } from './ngotag/layout/NgotagBareShell'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { usePathname } from 'next/navigation'
 
 interface PageLayoutProps {
   children: ReactNode
 }
 
-// Sign-in/sign-up already wrap themselves in NgotagAuthShell (logo header,
+// Sign-in/sign-up already wrap themselves in BhutanndiAuthShell (logo header,
 // two-column marketing layout, its own background + footer) — skip them here
 // so they don't get double-wrapped.
 const authShellManagedRoutes = ['/sign-in', '/sign-up']
@@ -38,16 +38,16 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
     )
 
   if (shouldExcludeLayout) {
-    if (isNgotagTheme() && !authShellManagedRoutes.includes(pathname)) {
-      return <NgotagBareShell>{children}</NgotagBareShell>
+    if (isBhutanndiTheme() && !authShellManagedRoutes.includes(pathname)) {
+      return <BhutanndiBareShell>{children}</BhutanndiBareShell>
     }
     return <>{children}</>
   }
 
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
       <KBar>
-        <NgotagAppShell>{children}</NgotagAppShell>
+        <BhutanndiAppShell>{children}</BhutanndiAppShell>
       </KBar>
     )
   }

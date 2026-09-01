@@ -9,7 +9,7 @@ import SignUpUser from './SignUpUser'
 import { SubscribeRequired } from '@/components/Marketplace/SubscribeRequired'
 import { useSearchParams } from 'next/navigation'
 import { verifyInvitationPending } from '@/app/api/Invitation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 type GateStatus = 'loading' | 'valid' | 'invalid' | 'error'
 
@@ -95,10 +95,10 @@ export default function SignInPage(): React.JSX.Element {
     )
   }
 
-  // Page chrome (logo, gradient backdrop) comes from NgotagAuthShell instead,
+  // Page chrome (logo, gradient backdrop) comes from BhutanndiAuthShell instead,
   // mounted inside SignUpUser where the step state — and therefore the
   // per-step rail content — actually lives.
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return <SignUpUser invitationVerified={status === 'valid'} />
   }
 

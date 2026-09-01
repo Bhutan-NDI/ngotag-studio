@@ -41,10 +41,10 @@ import { createDid, generateDidWeb } from '@/app/api/Agent'
 import { formatDidWebError } from './formatDidWebError'
 import { getOrganizationById } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 import { nanoid } from 'nanoid'
-import { NgotagCreateDid } from './NgotagCreateDid'
+import { BhutanndiCreateDid } from './BhutanndiCreateDid'
 
 const isValidUuid = (value: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -362,10 +362,10 @@ const CreateDid = (): React.JSX.Element => {
   const activeSubOptions = subOptions.filter((o) => !o.disabled)
 
   // Extracted into its own local function (rather than inlined into the
-  // `if` below) purely so its many ngotag-branch conditionals are counted
+  // `if` below) purely so its many bhutanndi-branch conditionals are counted
   // by ESLint's complexity rule against a separate function node instead of
   // pushing CreateDid's own already-large complexity over the limit.
-  const renderNgotagCreateDid = (): React.JSX.Element => {
+  const renderBhutanndiCreateDid = (): React.JSX.Element => {
     const isDidWeb = selectedDid === 'did:web'
     const showBackToEdit = isDidWeb && webFlowState === 'generated'
     const submitDisabled =
@@ -386,7 +386,7 @@ const CreateDid = (): React.JSX.Element => {
 
     return (
       <PageContainer>
-        <NgotagCreateDid
+        <BhutanndiCreateDid
           step={step}
           totalSteps={totalSteps}
           activeProtocols={activeProtocols}
@@ -433,30 +433,30 @@ const CreateDid = (): React.JSX.Element => {
                   network={selectedDidNetwork}
                 />
                 <div className="space-y-4">
-                  <h4 className="text-ngotag-strong text-[13px] font-medium">
+                  <h4 className="text-bhutanndi-strong text-[13px] font-medium">
                     {selectedDid === 'did:polygon:mainnet'
                       ? 'Steps to fund your Polygon Mainnet wallet'
                       : 'Steps to get Polygon Testnet Tokens'}
                   </h4>
                   <div className="space-y-3">
-                    <div className="border-ngotag-grid bg-ngotag-raised rounded-[10px] border p-4">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-ngotag-accent text-[13px] font-semibold">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
                           Step 1
                         </span>
-                        <div className="text-ngotag-muted text-[13px]">
+                        <div className="text-bhutanndi-muted text-[13px]">
                           {selectedDid === 'did:polygon:mainnet'
                             ? 'Copy your address and fund it with POL.'
                             : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
                     </div>
-                    <div className="border-ngotag-grid bg-ngotag-raised rounded-[10px] border p-4">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-ngotag-accent text-[13px] font-semibold">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
                           Step 2
                         </span>
-                        <div className="text-ngotag-muted text-[13px]">
+                        <div className="text-bhutanndi-muted text-[13px]">
                           Verify the balance using Polygon Scan.
                         </div>
                       </div>
@@ -478,35 +478,35 @@ const CreateDid = (): React.JSX.Element => {
                   network={selectedDidNetwork}
                 />
                 <div className="space-y-4">
-                  <h4 className="text-ngotag-strong text-[13px] font-medium">
+                  <h4 className="text-bhutanndi-strong text-[13px] font-medium">
                     {selectedDid === 'did:ethr:mainnet'
                       ? 'Steps to fund your wallet for schema creation (Ethereum Mainnet)'
                       : 'Steps to get Ethereum Sepolia tokens for schema creation'}
                   </h4>
-                  <p className="text-ngotag-muted text-[13px]">
+                  <p className="text-bhutanndi-muted text-[13px]">
                     Creating this DID is free — no funds are needed for that
                     step. The wallet below only needs to be funded before you
                     create schemas with this DID.
                   </p>
                   <div className="space-y-3">
-                    <div className="border-ngotag-grid bg-ngotag-raised rounded-[10px] border p-4">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-ngotag-accent text-[13px] font-semibold">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
                           Step 1
                         </span>
-                        <div className="text-ngotag-muted text-[13px]">
+                        <div className="text-bhutanndi-muted text-[13px]">
                           {selectedDid === 'did:ethr:mainnet'
                             ? 'Copy your address and fund it with ETH.'
                             : 'Copy your address and claim test tokens.'}
                         </div>
                       </div>
                     </div>
-                    <div className="border-ngotag-grid bg-ngotag-raised rounded-[10px] border p-4">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
                       <div className="flex items-start gap-3">
-                        <span className="text-ngotag-accent text-[13px] font-semibold">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
                           Step 2
                         </span>
-                        <div className="text-ngotag-muted text-[13px]">
+                        <div className="text-bhutanndi-muted text-[13px]">
                           Verify the balance using Etherscan.
                         </div>
                       </div>
@@ -548,8 +548,8 @@ const CreateDid = (): React.JSX.Element => {
     )
   }
 
-  if (isNgotagTheme()) {
-    return renderNgotagCreateDid()
+  if (isBhutanndiTheme()) {
+    return renderBhutanndiCreateDid()
   }
 
   return (

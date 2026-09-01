@@ -8,7 +8,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { validEmail } from '@/utils/TextTransform'
 
 export default function VerifyEmailPage(): React.JSX.Element {
@@ -85,7 +85,7 @@ export default function VerifyEmailPage(): React.JSX.Element {
   return (
     <div
       className={`flex items-center justify-center overflow-y-auto p-4 ${
-        isNgotagTheme()
+        isBhutanndiTheme()
           ? 'min-h-full'
           : 'h-screen bg-[image:var(--card-gradient)]'
       }`}

@@ -16,10 +16,10 @@ import { SessionManager } from '@/features/components/SessionManager'
 import StoreProvider from './StoreProvider'
 import { Toaster } from '@/components/ui/sonner'
 import { authOptions } from '@/utils/authOptions'
+import { bhutanndiFontVariables } from '@/lib/bhutanndi-fonts'
 import { cn } from '@/lib/utils'
 import { fontVariables } from '@/lib/font'
 import { getServerSession } from 'next-auth/next'
-import { ngotagFontVariables } from '@/lib/ngotag-fonts'
 
 // Create a new type extending Session to guarantee expires is defined
 type SessionWithExpires = NextAuthSession & { expires: string }
@@ -93,9 +93,9 @@ export default async function RootLayout({
           fontVariables,
           // Host Grotesk / Inter / DM Mono, additive alongside the shared
           // fontVariables above — only wired up under their own
-          // `font-display` / `font-ngotag-*` utilities, so this is a no-op
-          // for every other theme. See src/lib/ngotag-fonts.ts.
-          activeTheme === 'ngotag' ? ngotagFontVariables : '',
+          // `font-display` / `font-bhutanndi-*` utilities, so this is a no-op
+          // for every other theme. See src/lib/bhutanndi-fonts.ts.
+          activeTheme === 'bhutanndi' ? bhutanndiFontVariables : '',
         )}
       >
         <NextTopLoader showSpinner={false} />

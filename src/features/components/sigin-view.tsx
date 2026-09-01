@@ -1,13 +1,13 @@
 'use client'
 
+import { BhutanndiAuthShell } from '@/components/bhutanndi/auth/BhutanndiAuthShell'
 import DynamicApplicationLogo from './DynamicLogo'
 import Footer from '@/components/Footer'
 import { Metadata } from 'next'
-import { NgotagAuthShell } from '@/components/ngotag/auth/NgotagAuthShell'
 import React from 'react'
-import { SecureSignInScene } from '@/components/ngotag/auth/scenes'
+import { SecureSignInScene } from '@/components/bhutanndi/auth/scenes'
 import UserAuthForm from './user-auth-form'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 export const metadata: Metadata = {
   title: 'Authentication',
@@ -17,9 +17,9 @@ export const metadata: Metadata = {
 const appTitle = process.env.NEXT_PUBLIC_APP_TITLE?.trim() || 'Studio'
 
 export default function SignInPage(): React.JSX.Element {
-  if (isNgotagTheme()) {
+  if (isBhutanndiTheme()) {
     return (
-      <NgotagAuthShell
+      <BhutanndiAuthShell
         scene={<SecureSignInScene />}
         title={
           <>
@@ -29,7 +29,7 @@ export default function SignInPage(): React.JSX.Element {
         lead={`${appTitle} is where organizations issue and verify digital credentials.`}
       >
         <UserAuthForm />
-      </NgotagAuthShell>
+      </BhutanndiAuthShell>
     )
   }
 

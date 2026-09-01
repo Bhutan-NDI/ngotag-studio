@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { marketplaceLegal } from '@/config/marketplaceLegal'
 
 interface LegalSection {
@@ -21,7 +21,7 @@ export function LegalPage({
   return (
     <main
       className={
-        isNgotagTheme()
+        isBhutanndiTheme()
           ? 'min-h-full overflow-y-auto'
           : 'bg-background h-screen overflow-y-auto'
       }

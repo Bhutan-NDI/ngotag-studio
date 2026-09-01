@@ -1,25 +1,25 @@
 import {
   appFaviconPath,
+  bhutanndiFaviconPath,
   credeblFaviconPath,
-  ngotagFaviconPath,
   sovioFaviconPath,
 } from '@/config/CommonConstant'
 
 /**
- * Build-time theme gate for the Ngotag ("Bhutan NDI") reskin.
+ * Build-time theme gate for the Bhutanndi ("Bhutan NDI") reskin.
  *
  * This app is a single shared source tree built into four white-labelled
- * deployments (Phenix, CREDEBL, SOVIO, Ngotag) that differ only by which
+ * deployments (Phenix, CREDEBL, SOVIO, Bhutanndi) that differ only by which
  * `public/themes/<name>_theme.css` file is dynamically loaded at runtime
  * (see `src/components/active-theme.tsx`) and which `NEXT_PUBLIC_*` env
  * vars a given deployment's CI pipeline bakes in at build time.
  *
- * `getActiveTheme()` is the single source of truth new Ngotag-specific
+ * `getActiveTheme()` is the single source of truth new Bhutanndi-specific
  * components/pages should check before rendering their reskinned
  * presentation instead of the shared/generic one, e.g.:
  *
- *   if (getActiveTheme() === 'ngotag') {
- *     return <NgotagDashboardView ... />
+ *   if (getActiveTheme() === 'bhutanndi') {
+ *     return <BhutanndiDashboardView ... />
  *   }
  *   return <ExistingDashboardView ... />
  *
@@ -28,7 +28,7 @@ import {
  * Each real deployment only ever ships one theme, so a build-time check is
  * the correct granularity for gating an entire reskinned component tree.
  */
-export const DEFAULT_THEME = 'ngotag'
+export const DEFAULT_THEME = 'bhutanndi'
 
 /** Resolves the active theme name purely from NEXT_PUBLIC_ACTIVE_THEME, falling back to DEFAULT_THEME. */
 export function getActiveTheme(): string {
@@ -37,12 +37,12 @@ export function getActiveTheme(): string {
   )
 }
 
-export function isNgotagTheme(): boolean {
-  return getActiveTheme() === 'ngotag'
+export function isBhutanndiTheme(): boolean {
+  return getActiveTheme() === 'bhutanndi'
 }
 
 const FAVICON_BY_THEME: Record<string, string> = {
-  ngotag: ngotagFaviconPath,
+  bhutanndi: bhutanndiFaviconPath,
   credebl: credeblFaviconPath,
   sovio: sovioFaviconPath,
 }

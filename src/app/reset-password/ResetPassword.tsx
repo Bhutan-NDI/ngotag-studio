@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label'
 import PasswordSuggestionBox from './PasswordSuggestionBox'
 import { RootState } from '@/lib/store'
 import { SubmitIcon } from '@/config/svgs/ResetPassword'
-import { isNgotagTheme } from '@/lib/active-theme'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { passwordValueEncryption } from '@/utils/passwordEncryption'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetPassword } from '../api/Auth'
@@ -80,12 +80,14 @@ const ResetPassword = (): JSX.Element => {
     }
   }
 
-  const ngotagTheme = isNgotagTheme()
+  const bhutanndiTheme = isBhutanndiTheme()
 
   return (
     <div
       className={`relative flex flex-col overflow-y-auto ${
-        ngotagTheme ? 'min-h-full' : 'h-screen bg-[image:var(--card-gradient)]'
+        bhutanndiTheme
+          ? 'min-h-full'
+          : 'h-screen bg-[image:var(--card-gradient)]'
       }`}
     >
       <ToastContainer position="top-center" />
@@ -95,7 +97,7 @@ const ResetPassword = (): JSX.Element => {
 
       <div
         className={`relative flex w-full items-center justify-center ${
-          ngotagTheme
+          bhutanndiTheme
             ? 'min-h-full'
             : 'h-screen bg-[image:var(--card-gradient)]'
         }`}
@@ -286,7 +288,7 @@ const ResetPassword = (): JSX.Element => {
         </div>
       </div>
 
-      {!ngotagTheme && <Footer fixed={true} />}
+      {!bhutanndiTheme && <Footer fixed={true} />}
     </div>
   )
 }
