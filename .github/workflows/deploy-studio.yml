@@ -2,8 +2,9 @@ name: Deploy Studio
 run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
-  # Keep this environment mapping synchronized with concurrency.group,
-  # jobs.deploy.name, jobs.deploy.environment, and the validation step's case.
+  # Keep this environment mapping synchronized with the Makefile deploy-qa,
+  # deploy-stage, and deploy-prod targets, concurrency.group, jobs.deploy.name,
+  # jobs.deploy.environment, and the validation step's case.
   # Job-level fields are evaluated before steps and cannot use step outputs.
   push:
     tags:
@@ -210,7 +211,7 @@ jobs:
           ' "$config" >/dev/null
           release_version="$(jq -r '.release.version' "$config")"
           config_hash="$(sha256sum "$config" | awk '{print $1}')"
-          image_tag="studio-v${release_version}-$(git rev-parse --short=12 HEAD)-${config_hash:0:12}"
+          image_tag="studio-v${release_version}-${GITHUB_SHA:0:12}-${config_hash:0:12}"
           manifest_commit="$(git -C deployment-config rev-parse HEAD)"
           echo "config=$config" >> "$GITHUB_OUTPUT"
           echo "aws_region=$(jq -r '.deployment.aws_region' "$config")" >> "$GITHUB_OUTPUT"

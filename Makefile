@@ -6,6 +6,8 @@ DEPLOYMENT_CONFIG_REPOSITORY ?=
 # A DevOps operator starts every release through one of these targets. Make pins the
 # exact reviewed manifest and source commits in an immutable tag; the workflow then
 # repeats every policy check before it can obtain AWS credentials.
+# Keep this environment/branch mapping synchronized with deploy-studio.yml's tag
+# globs, concurrency group, job name, GitHub Environment, and validation case.
 deploy-qa:
 	@$(MAKE) --no-print-directory _release DEPLOY_ENV=qa REQUIRED_BRANCH=develop
 
@@ -82,9 +84,9 @@ _release:
 			run_id=""; attempts=0; \
 			while [ -z "$$run_id" ] && [ "$$attempts" -lt 90 ]; do \
 				workflow_runs="$$(gh api "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; \
-				run_id="$$(printf '%s' "$$workflow_runs" \
-					| jq -r --arg tag "$$release_tag" '.workflow_runs[] | select(.path == ".github/workflows/deploy-studio.yml" and (.display_title | contains($$tag))) | .id' \
-					| head -n 1)"; \
+				matches="$$(printf '%s' "$$workflow_runs" \
+					| jq -r --arg tag "$$release_tag" '.workflow_runs[] | select(.path == ".github/workflows/deploy-studio.yml" and (.display_title | contains($$tag))) | .id')"; \
+				run_id="$$(printf '%s\n' "$$matches" | head -n 1)"; \
 				[ -n "$$run_id" ] || sleep 2; \
 				attempts=$$((attempts + 1)); \
 			done; \
