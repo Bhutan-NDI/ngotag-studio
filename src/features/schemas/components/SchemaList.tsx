@@ -268,6 +268,13 @@ const SchemaList = (props: {
   useEffect(() => {
     if (organizationId) {
       getSchemaList(schemaListAPIParameter, allSchemaFlag)
+    } else {
+      // No active organization to scope the schema list to (e.g. a
+      // brand-new account with none yet) — nothing will ever fetch, so
+      // loading (initialized true) must be cleared here or the skeleton
+      // grid spins forever instead of showing the empty state.
+      setSchemaList([])
+      setLoading(false)
     }
   }, [
     allSchemaFlag,
