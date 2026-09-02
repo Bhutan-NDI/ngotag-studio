@@ -31,6 +31,10 @@ configuration is therefore rejected before any image or ECS mutation.
 The release workflow enforces the organization’s branch policy, authenticates to
 cloud resources using short-lived GitHub OIDC credentials, and uses narrowly scoped
 GitHub App tokens for private configuration reads/writes and Release creation.
+Environment branches, release-tag prefixes, and the required CI check identity are
+defined once in `.github/studio-release-contract.json`. A secret-free resolver job
+validates the immutable tag and exposes that policy as job outputs; only the selected,
+protected deployment job receives GitHub Environment secrets and OIDC permission.
 
 The workflow derives the ECR image tag itself from the approved SemVer release,
 the exact source commit, and a hash of the approved private manifest. It will never
@@ -42,6 +46,9 @@ operator entry points. A DevOps operator supplies the restricted configuration
 repository locator through `DEPLOYMENT_CONFIG_REPOSITORY`; Make verifies the current
 manifest is enabled and pending, confirms the exact permitted source-branch head and
 its successful `Lint & Build` check, and pushes an immutable release-trigger tag.
+Make and the workflow invoke the same
+`.github/scripts/validate-studio-manifest.sh` policy, so an ineligible manifest is
+rejected before tag creation as well as before AWS access.
 The tag pins both the full manifest commit and the source commit. The workflow
 rejects malformed tags and repeats the manifest, branch, source, and CI checks
 before obtaining AWS credentials. It then builds and pushes the image using an

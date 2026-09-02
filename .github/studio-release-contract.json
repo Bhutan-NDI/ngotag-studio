@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "environments": {
+    "qa": {
+      "allowed_branch": "develop",
+      "tag_prefix": "studio-qa-"
+    },
+    "stage": {
+      "allowed_branch": "main",
+      "tag_prefix": "studio-stage-"
+    },
+    "prod": {
+      "allowed_branch": "main",
+      "tag_prefix": "studio-prod-"
+    }
+  },
+  "ci": {
+    "check_name": "Lint & Build",
+    "app_slug": "github-actions"
+  }
+}

@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   validate:
+    # Keep this check name synchronized with ci.check_name in the release contract.
     name: Lint & Build
     runs-on: ubuntu-latest
     env:
