@@ -28,7 +28,7 @@ import {
  * Each real deployment only ever ships one theme, so a build-time check is
  * the correct granularity for gating an entire reskinned component tree.
  */
-export const DEFAULT_THEME = 'phenix'
+export const DEFAULT_THEME = 'bhutanndi' // Phenix default is "bhutanndi" for now, but this may change in the future.
 
 /** Resolves the active theme name purely from NEXT_PUBLIC_ACTIVE_THEME, falling back to DEFAULT_THEME. */
 export function getActiveTheme(): string {
