@@ -2,7 +2,7 @@ name: Deploy Studio
 run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
-  # Keep only these unavoidable trigger globs synchronized with
+  # Keep these trigger globs synchronized with the environment keys in
   # .github/studio-release-contract.json. Every job-level environment decision
   # is derived once by jobs.resolve and consumed through needs.resolve.outputs.
   push:
@@ -21,6 +21,11 @@ jobs:
   resolve:
     name: Resolve Studio release target
     runs-on: ubuntu-latest
+    concurrency:
+      group: studio-release-resolver
+      cancel-in-progress: false
+      # Retain burst traffic instead of replacing the existing pending release.
+      queue: max
     outputs:
       target_environment: ${{ steps.release.outputs.target_environment }}
       expected_branch: ${{ steps.release.outputs.expected_branch }}
@@ -32,13 +37,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Validate and resolve Makefile release trigger
         id: release
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           contract=.github/studio-release-contract.json
@@ -72,7 +76,10 @@ jobs:
             exit 1
           }
 
-          branch_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${expected_branch}" --jq '.object.sha')"
+          branch_sha="$(git rev-parse --verify "refs/remotes/origin/${expected_branch}^{commit}")" || {
+            echo "could not resolve the current $expected_branch branch head" >&2
+            exit 1
+          }
           test "$GITHUB_SHA" = "$branch_sha" || {
             echo "$target_environment releases must use the current $expected_branch head" >&2
             exit 1
@@ -124,20 +131,13 @@ jobs:
           app_slug="$(jq -er '.ci.app_slug' "$contract")"
           for attempt in $(seq 1 120); do
             check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/check-runs")"
-            state="$(jq -r --arg check_name "$check_name" --arg app_slug "$app_slug" '
-              [.check_runs[] | select(.name == $check_name and .app.slug == $app_slug)]
-              | sort_by(.started_at)
-              | last
-              | if . == null then "waiting"
-                elif .status != "completed" then "waiting"
-                elif .conclusion == "success" then "success"
-                else "failed:" + (.conclusion // "unknown")
-                end
-            ' <<<"$check_runs")"
+            state="$(jq -r --arg check_name "$check_name" --arg app_slug "$app_slug" \
+              -f .github/scripts/select-studio-ci-state.jq <<<"$check_runs")"
             case "$state" in
               success) break ;;
               failed:*) echo "CI did not pass for $source_sha ($state)" >&2; exit 1 ;;
-              waiting) ;;
+              missing|pending) ;;
+              *) echo "unexpected CI state for $source_sha: $state" >&2; exit 1 ;;
             esac
             if [ "$attempt" -eq 120 ]; then
               echo "timed out waiting for $check_name on $source_sha" >&2

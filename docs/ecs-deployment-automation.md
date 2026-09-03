@@ -35,6 +35,8 @@ Environment branches, release-tag prefixes, and the required CI check identity a
 defined once in `.github/studio-release-contract.json`. A secret-free resolver job
 validates the immutable tag and exposes that policy as job outputs; only the selected,
 protected deployment job receives GitHub Environment secrets and OIDC permission.
+Adding or removing an environment also requires a matching public Make target and
+workflow trigger glob; neither location redefines its branch or tag-prefix policy.
 
 The workflow derives the ECR image tag itself from the approved SemVer release,
 the exact source commit, and a hash of the approved private manifest. It will never
