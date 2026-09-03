@@ -12,11 +12,13 @@ import { Card } from '@/components/ui/card'
 import DedicatedAgentForm from './DedicatedAgentForm'
 import { Label } from '@/components/ui/label'
 import { Loader } from 'lucide-react'
+import { BhutanndiWalletSetup } from './BhutanndiWalletSetup'
 import PageContainer from '@/components/layout/page-container'
 import SharedAgentForm from './SharedAgentForm'
 import Stepper from '@/components/StepperComponent'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 const isValidUuid = (value: string): boolean =>
@@ -100,6 +102,50 @@ const WalletSetup = (): React.JSX.Element => {
   const isAnyWalletCreated = Boolean(
     sharedWalletResponse || dedicatedWalletResponse,
   )
+
+  if (isBhutanndiTheme()) {
+    return (
+      <PageContainer>
+        <BhutanndiWalletSetup
+          agentType={agentType}
+          onSelectAgentType={(type) => {
+            if (!isAnyWalletCreated) {
+              setAgentType(type as AgentType)
+            }
+          }}
+          dedicatedDisabled={Boolean(clientAlias)}
+          interactionDisabled={isAnyWalletCreated}
+          alert={alert}
+          onDismissAlert={() => setAlert(null)}
+          isDialogOpen={isDialogOpen}
+          showSkip={!redirectTo && !clientAlias}
+          activeButton={activeButton}
+          onSkip={() => {
+            setActiveButton('skip')
+            hardNavigate('/dashboard')
+          }}
+          onContinue={() => {
+            setActiveButton('continue')
+            handleContinue()
+          }}
+        >
+          {agentType === AgentType.DEDICATED ? (
+            <DedicatedAgentForm
+              orgId={orgId}
+              onSuccess={handleDedicatedWalletCreated}
+              disabled={!orgId || !isValidUuid(orgId)}
+            />
+          ) : (
+            <SharedAgentForm
+              orgId={orgId}
+              onSuccess={handleSharedWalletCreated}
+              disabled={!orgId || !isValidUuid(orgId)}
+            />
+          )}
+        </BhutanndiWalletSetup>
+      </PageContainer>
+    )
+  }
 
   return (
     <PageContainer>

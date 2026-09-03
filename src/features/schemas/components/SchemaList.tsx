@@ -16,6 +16,7 @@ import { getAllSchemas, getAllSchemasByOrgId } from '@/app/api/schema'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AxiosResponse } from 'axios'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { EmptyMessage } from '@/components/EmptyMessage'
 import { GetAllSchemaListParameter } from '@/features/dashboard/type/schema'
@@ -31,6 +32,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { getOrganizationById } from '@/app/api/organization'
 import { getUserProfile } from '@/app/api/Auth'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 const generatePaginationNumbers = (
   currentPage: number,
@@ -266,6 +268,13 @@ const SchemaList = (props: {
   useEffect(() => {
     if (organizationId) {
       getSchemaList(schemaListAPIParameter, allSchemaFlag)
+    } else {
+      // No active organization to scope the schema list to (e.g. a
+      // brand-new account with none yet) — nothing will ever fetch, so
+      // loading (initialized true) must be cleared here or the skeleton
+      // grid spins forever instead of showing the empty state.
+      setSchemaList([])
+      setLoading(false)
     }
   }, [
     allSchemaFlag,
@@ -388,6 +397,11 @@ const SchemaList = (props: {
   return (
     <PageContainer>
       <div className="px-4 pt-2">
+        {isBhutanndiTheme() && (
+          <div className="mb-4">
+            <Breadcrumb items={[{ label: 'Schemas' }]} />
+          </div>
+        )}
         <div className="mb-4 grid gap-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
           <h1 className="mr-auto ml-1 text-xl font-semibold sm:text-2xl">
             Schemas

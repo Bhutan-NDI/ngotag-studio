@@ -14,13 +14,19 @@ import {
 import {
   ApiErrorResult,
   createOrganization,
+  getOrgDashboard,
   getOrganizationById,
   getOrganizations,
   updateOrganization,
 } from '@/app/api/organization'
+import {
+  deleteOrganization,
+  getOrganizationReferences,
+} from '@/app/api/deleteorganization'
 import { getOrgEntitlements } from '@/app/api/marketplace'
 import { fetchCities, fetchCountries, fetchStates } from '../helper/geoHelpers'
 import {
+  resetOrgState,
   setOrgId,
   setOrgInfo,
   setSelectedOrgId,
@@ -33,11 +39,17 @@ import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { IOrgFormValues } from './interfaces/organization'
+import {
+  IOrgDashboard,
+  IOrgFormValues,
+  IOrganisation,
+} from './interfaces/organization'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import LogoUploader from './LogoUploader'
+import { BhutanndiCreateOrganization } from './BhutanndiCreateOrganization'
+import { BhutanndiOrganizationProfile } from './BhutanndiOrganizationProfile'
 import PageContainer from '@/components/layout/page-container'
 import { PlanLimitNotice } from '@/components/Marketplace/PlanLimitNotice'
 import Stepper from '@/components/StepperComponent'
@@ -45,6 +57,9 @@ import { SubscribeRequired } from '@/components/Marketplace/SubscribeRequired'
 import { isMarketplaceLimitError } from '@/config/marketplaceErrors'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
+import { pathRoutes } from '@/config/pathRoutes'
+import { toast } from 'sonner'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 type Countries = {
@@ -93,6 +108,33 @@ export default function OrganizationOnboarding(): React.JSX.Element {
   const [initializing, setInitializing] = useState<boolean>(true)
   const [isBackLoading, setIsBackLoading] = useState(false)
 
+  // Bhutanndi-only extras for the unified "Organization profile" page (edit
+  // mode). Fetched only under isBhutanndiTheme() so no other white-label build
+  // pays for the extra requests. Counts mirror OrganizationAtAGlance's real
+  // source (getOrgDashboard); reference counts mirror DeleteOrganization.tsx's
+  // real safety checks so the danger-zone panel here never allows deleting an
+  // org that still has verification/issuance/connection records or a wallet —
+  // same real blocking rule, just surfaced inline instead of as a 5-step wizard.
+  const [orgDashboard, setOrgDashboard] = useState<IOrgDashboard | null>(null)
+  const [orgRefCounts, setOrgRefCounts] = useState({
+    verificationRecordsCount: 0,
+    issuanceRecordsCount: 0,
+    connectionRecordsCount: 0,
+  })
+  // getOrgDashboard/getOrganizationReferences resolve to an error *string*
+  // rather than rejecting on failure, so Promise.allSettled sees them as
+  // 'fulfilled' either way — orgRefCounts would otherwise silently stay at
+  // its {0,0,0} default and canDeleteNow would read that as "safe to
+  // delete" with no visible error. This tracks whether the counts fetch
+  // actually succeeded, so the delete gate can require that explicitly.
+  const [refCountsStatus, setRefCountsStatus] = useState<
+    'loading' | 'loaded' | 'error'
+  >('loading')
+  const [isWalletPresent, setIsWalletPresent] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
   const searchParams = useSearchParams()
   const orgId = searchParams.get('orgId')
   const redirectTo = searchParams.get('redirectTo')
@@ -119,6 +161,9 @@ export default function OrganizationOnboarding(): React.JSX.Element {
         const org = data?.data
         setOrgData(org)
         setIsPublic(org.publicProfile)
+        // Same wallet-presence check DeleteOrganization.tsx uses to block
+        // deleting the org until its wallet is cleared first.
+        setIsWalletPresent(Boolean(org?.org_agents?.[0]?.walletName))
         if (org?.countryId) {
           setSelectedCountryId(org.countryId)
           const fetchedStates = await fetchStates(org.countryId)
@@ -191,6 +236,13 @@ export default function OrganizationOnboarding(): React.JSX.Element {
           setIsEditMode(true)
           await fetchOrganizationDetails()
         } else {
+          // Bhutanndi's create-mode Visibility cards need a pre-selected option
+          // (screenshot shows "Public" checked by default); other themes'
+          // create form never renders a visibility control at all, so this
+          // is a no-op for them.
+          if (isBhutanndiTheme()) {
+            setIsPublic(true)
+          }
           // Surface the upgrade CTA immediately if the limit is already hit,
           // so the user never fills out the form only to get blocked on submit.
           await checkOrgLimit()
@@ -209,6 +261,19 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgId, checkOrgLimit])
 
+  // The browser's one-shot #danger-zone hash scroll fires on initial
+  // navigation, before this loads — the DOM only has a Loader until
+  // dataLoaded flips true. Once the real content (and #danger-zone) is
+  // actually mounted, finish that scroll ourselves.
+  useEffect(() => {
+    if (!dataLoaded || window.location.hash !== '#danger-zone') {
+      return
+    }
+    document
+      .getElementById('danger-zone')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [dataLoaded])
+
   // These useEffects handle state/city loading when user changes selections
   useEffect(() => {
     if (selectedCountryId) {
@@ -221,6 +286,66 @@ export default function OrganizationOnboarding(): React.JSX.Element {
       fetchCities(selectedCountryId, selectedStateId).then(setCities)
     }
   }, [selectedStateId, selectedCountryId])
+
+  // Bhutanndi-only: the profile page's stat tiles (members/schemas/credentials,
+  // same real source as OrganizationAtAGlance) and the danger-zone's
+  // delete-safety counts (same real source as DeleteOrganization.tsx's
+  // fetchOrganizationReferences). Skipped entirely for other white-label
+  // builds and for create-mode (no orgId yet to look up).
+  useEffect(() => {
+    if (!isBhutanndiTheme() || !orgId) {
+      return
+    }
+    let cancelled = false
+
+    const fetchBhutanndiExtras = async (): Promise<void> => {
+      const [dashboardRes, refsRes] = await Promise.allSettled([
+        getOrgDashboard(orgId),
+        getOrganizationReferences(orgId),
+      ])
+
+      if (cancelled) {
+        return
+      }
+
+      if (dashboardRes.status === 'fulfilled') {
+        const res = dashboardRes.value
+        if (typeof res !== 'string') {
+          const { data } = res as AxiosResponse
+          if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+            setOrgDashboard(data?.data)
+          }
+        }
+      }
+
+      if (refsRes.status === 'fulfilled') {
+        const res = refsRes.value
+        if (typeof res !== 'string') {
+          const { data } = res as AxiosResponse
+          if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+            setOrgRefCounts({
+              verificationRecordsCount:
+                data?.data?.verificationRecordsCount ?? 0,
+              issuanceRecordsCount: data?.data?.issuanceRecordsCount ?? 0,
+              connectionRecordsCount: data?.data?.connectionRecordsCount ?? 0,
+            })
+            setRefCountsStatus('loaded')
+          } else {
+            setRefCountsStatus('error')
+          }
+        } else {
+          setRefCountsStatus('error')
+        }
+      } else {
+        setRefCountsStatus('error')
+      }
+    }
+
+    fetchBhutanndiExtras()
+    return (): void => {
+      cancelled = true
+    }
+  }, [orgId])
 
   const validationSchema = yup.object().shape({
     name: yup
@@ -403,6 +528,61 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     }
   }
 
+  // Real delete-safety gate: same blocking order DeleteOrganizationPage's
+  // step cards enforce (verifications → issuance → connections → wallet)
+  // before the org itself may be deleted. Blocked by default until the
+  // counts fetch actually succeeds — never inferred from the {0,0,0}
+  // default, which would otherwise read as "nothing to block on".
+  const blockedReason =
+    refCountsStatus === 'loading'
+      ? 'Checking delete eligibility…'
+      : refCountsStatus === 'error'
+        ? 'Could not verify it is safe to delete this organization. Refresh and try again.'
+        : orgRefCounts.connectionRecordsCount > 0
+          ? 'Delete connection records first.'
+          : orgRefCounts.issuanceRecordsCount > 0
+            ? 'Delete issuance records first.'
+            : orgRefCounts.verificationRecordsCount > 0
+              ? 'Delete verification records first.'
+              : isWalletPresent
+                ? 'Delete the organization wallet first.'
+                : null
+  const canDeleteNow = blockedReason === null
+
+  // Same real deleteOrganization API call, dispatch sequence and redirect as
+  // DeleteOrganization.tsx's step-5 "Organization" card — only reachable here
+  // once the safety gate above is clear.
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!orgId) {
+      return
+    }
+    setDeleteLoading(true)
+    setDeleteError(null)
+    try {
+      const response = await deleteOrganization(orgId)
+      const { data } = response as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+        toast.success(data?.message)
+        dispatch(resetOrgState())
+        dispatch(setTenantData(null))
+        setShowDeleteConfirm(false)
+        hardNavigate(pathRoutes.organizations.root, true)
+      } else {
+        throw new Error(data?.message || 'Failed to delete organization')
+      }
+    } catch (error) {
+      console.error('Error deleting organization:', error)
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to delete organization',
+      )
+    } finally {
+      setDeleteLoading(false)
+    }
+  }
+
   if (subscriptionRequired) {
     return <SubscribeRequired />
   }
@@ -427,6 +607,200 @@ export default function OrganizationOnboarding(): React.JSX.Element {
         <div className="flex min-h-screen items-center justify-center">
           <Loader />
         </div>
+      ) : isBhutanndiTheme() && isEditMode ? (
+        <Formik
+          enableReinitialize
+          initialValues={{
+            name: orgData?.name || '',
+            description: orgData?.description || '',
+            countryId: orgData?.countryId ?? null,
+            stateId: orgData?.stateId ?? null,
+            cityId: orgData?.cityId ?? null,
+            website: orgData?.website || '',
+          }}
+          validationSchema={validationSchema}
+          onSubmit={() => {
+            /* This page saves via the "Save changes" button (onSave), not a
+               form submit — kept as a no-op so Formik still owns validation
+               and field state the same way the generic edit form does. */
+          }}
+        >
+          {({ errors, touched, setFieldValue, values, handleBlur }) => {
+            const orgDetails = orgData as unknown as IOrganisation | null
+            const roleLabels =
+              orgDetails?.userOrgRoles?.map((role) => role.orgRole.name) ??
+              orgDetails?.roles ??
+              []
+            const saveDisabled =
+              !values.name ||
+              !values.description ||
+              !values.countryId ||
+              (states.length > 0 && !values.stateId) ||
+              (cities.length > 0 && !values.cityId) ||
+              loading ||
+              createLoading
+
+            return (
+              <BhutanndiOrganizationProfile
+                orgId={orgId as string}
+                orgName={orgDetails?.name ?? ''}
+                orgLogoUrl={orgDetails?.logoUrl}
+                roleLabels={roleLabels}
+                createDateTime={orgDetails?.createDateTime}
+                values={values}
+                errors={errors}
+                touched={touched}
+                setFieldValue={setFieldValue}
+                handleBlur={handleBlur}
+                countries={countries}
+                states={states}
+                cities={cities}
+                onCountryChange={(countryId) => {
+                  setSelectedCountryId(countryId)
+                  setSelectedStateId(null)
+                  setCities([])
+                  setStates([])
+                  setFieldValue('countryId', countryId)
+                  setFieldValue('stateId', null)
+                  setFieldValue('cityId', null)
+                  if (countryId) {
+                    fetchStates(countryId)
+                  }
+                }}
+                onStateChange={(stateId) => {
+                  setSelectedStateId(stateId)
+                  setFieldValue('stateId', stateId)
+                  setFieldValue('cityId', null)
+                  setCities([])
+                  if (selectedCountryId && stateId) {
+                    fetchCities(selectedCountryId, stateId)
+                  }
+                }}
+                onCityChange={(cityId) => setFieldValue('cityId', cityId)}
+                logoPreview={logoPreview}
+                setLogoPreview={setLogoPreview}
+                imgError={imgError}
+                setImgError={setImgError}
+                isPublic={isPublic}
+                onTogglePublic={() => setIsPublic(!isPublic)}
+                onSave={() =>
+                  handleUpdateOrganization({
+                    ...values,
+                    logoFile: null,
+                    logoUrl: null,
+                  })
+                }
+                saveDisabled={saveDisabled}
+                saveLoading={createLoading}
+                success={success}
+                failure={failure}
+                onDismissSuccess={() => setSuccess(null)}
+                onDismissFailure={() => setFailure(null)}
+                membersCount={orgDashboard?.usersCount}
+                schemasCount={orgDashboard?.schemasCount}
+                credentialsCount={orgDashboard?.credentialsCount}
+                canDeleteNow={canDeleteNow}
+                blockedReason={blockedReason}
+                showDeleteConfirm={showDeleteConfirm}
+                onOpenDeleteConfirm={() => setShowDeleteConfirm(true)}
+                onCloseDeleteConfirm={() => setShowDeleteConfirm(false)}
+                onConfirmDelete={handleConfirmDelete}
+                deleteLoading={deleteLoading}
+                deleteError={deleteError}
+                onDismissDeleteError={() => setDeleteError(null)}
+              />
+            )
+          }}
+        </Formik>
+      ) : isBhutanndiTheme() && !isEditMode ? (
+        <Formik
+          enableReinitialize
+          initialValues={{
+            name: '',
+            description: '',
+            countryId: null,
+            stateId: null,
+            cityId: null,
+            website: '',
+          }}
+          validationSchema={validationSchema}
+          onSubmit={() => {
+            /* Submission is triggered by the "Create organization" button's
+               onClick (handleCreateAndContinue below), not a native form
+               submit — kept as a no-op so Formik still owns validation and
+               field state the same way the bhutanndi edit-mode form does. */
+          }}
+        >
+          {({ errors, touched, setFieldValue, values, handleBlur }) => {
+            const createDisabled =
+              !values.name ||
+              !values.description ||
+              !values.countryId ||
+              (states.length > 0 && !values.stateId) ||
+              (cities.length > 0 && !values.cityId) ||
+              loading ||
+              createLoading
+
+            return (
+              <BhutanndiCreateOrganization
+                values={values}
+                errors={errors}
+                touched={touched}
+                setFieldValue={setFieldValue}
+                handleBlur={handleBlur}
+                countries={countries}
+                states={states}
+                cities={cities}
+                onCountryChange={(countryId) => {
+                  setSelectedCountryId(countryId)
+                  setSelectedStateId(null)
+                  setCities([])
+                  setStates([])
+                  setFieldValue('countryId', countryId)
+                  setFieldValue('stateId', null)
+                  setFieldValue('cityId', null)
+                  if (countryId) {
+                    fetchStates(countryId)
+                  }
+                }}
+                onStateChange={(stateId) => {
+                  setSelectedStateId(stateId)
+                  setFieldValue('stateId', stateId)
+                  setFieldValue('cityId', null)
+                  setCities([])
+                  if (selectedCountryId && stateId) {
+                    fetchCities(selectedCountryId, stateId)
+                  }
+                }}
+                onCityChange={(cityId) => setFieldValue('cityId', cityId)}
+                logoPreview={logoPreview}
+                setLogoPreview={setLogoPreview}
+                imgError={imgError}
+                setImgError={setImgError}
+                isPublic={isPublic}
+                onSelectVisibility={(value) => setIsPublic(value)}
+                onCreate={() =>
+                  handleCreateAndContinue({
+                    ...values,
+                    logoFile: null,
+                    logoUrl: null,
+                  })
+                }
+                createDisabled={createDisabled}
+                createLoading={createLoading}
+                onCancel={() => {
+                  setIsBackLoading(true)
+                  hardNavigate('/dashboard')
+                }}
+                cancelLoading={isBackLoading}
+                success={success}
+                failure={failure}
+                onDismissSuccess={() => setSuccess(null)}
+                onDismissFailure={() => setFailure(null)}
+              />
+            )
+          }}
+        </Formik>
       ) : (
         <div className="flex min-h-screen items-start justify-center p-6">
           <Card className="border-border relative w-full max-w-[800px] min-w-[700px] overflow-hidden rounded-xl border p-8 py-12 shadow-xl transition-transform duration-300">

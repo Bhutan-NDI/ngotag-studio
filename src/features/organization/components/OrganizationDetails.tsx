@@ -180,7 +180,6 @@ const OrganizationDetails = ({
                 <CopyDid
                   value={agentData?.orgDid}
                   className="font-mono font-semibold"
-                  ellipsis={false}
                   setCopied={setCopied}
                   copied={copied}
                 />
@@ -215,7 +214,7 @@ const OrganizationDetails = ({
         },
         {
           data: (
-            <Button className="" onClick={() => setOpenModal(true)}>
+            <Button className="w-28" onClick={() => setOpenModal(true)}>
               Scan QR
             </Button>
           ),
@@ -228,7 +227,12 @@ const OrganizationDetails = ({
     <div className="">
       <div className="flex justify-between">
         <h2 className="pb-4 text-2xl font-bold">Wallet Details</h2>
-        <Button onClick={() => setIsDrawerOpen(true)}>Did List</Button>
+        {/* mr-4 matches the DataTable's <td> p-4 padding, so this button's
+            right edge lines up with the Scan QR button's right edge below
+            (that one sits 16px in from the table's own edge). */}
+        <Button className="mr-6 w-28" onClick={() => setIsDrawerOpen(true)}>
+          Did List
+        </Button>
       </div>
 
       <DataTable

@@ -9,6 +9,7 @@ import {
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import ConfirmationModal from '@/components/confirmation-modal'
 import EditUserRoleModal from './EditUserRoleModal'
 import { Invitation } from '@/features/invitations/interfaces/invitation-interface'
@@ -18,6 +19,7 @@ import SendInvitationModal from '@/features/invitations/components/sendInvitatio
 import TabData from './TabData'
 import { User } from './users-interface'
 import { getOrganizationInvitations } from '@/app/api/Invitation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 const initialPageState = {
@@ -285,6 +287,11 @@ export default function Members(): React.JSX.Element {
     <PageContainer>
       <div className="p-5">
         <div className="mb-6">
+          {isBhutanndiTheme() && (
+            <div className="mb-4">
+              <Breadcrumb items={[{ label: 'Users' }]} />
+            </div>
+          )}
           <div className="mb-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold">Organization Members</h1>
           </div>

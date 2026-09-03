@@ -145,6 +145,33 @@ export const appFaviconPath = `${logoBasePath}/favicon.png`
 export const appLogoAltText = 'PHENIX ID Logo'
 export const appLogoWidth = 781
 export const appLogoHeight = 204
+
+export const bhutanndiLogoLightPath = `${logoBasePath}/ndi-studio-on-light.svg`
+export const bhutanndiLogoDarkPath = `${logoBasePath}/ndi-studio-on-dark.svg`
+export const bhutanndiLogoAltText = 'Bhutan NDI Studio Logo'
+export const bhutanndiLogoWidth = 1456
+export const bhutanndiLogoHeight = 400
+
+export const credeblLogoLightPath = `${imageBasePath}/CREDEBL_Logo_Web.svg`
+export const credeblLogoDarkPath = `${imageBasePath}/CREDEBL_Logo_Web_Dark.svg`
+export const credeblLogoAltText = 'CREDEBL Logo'
+export const credeblLogoWidth = 439
+export const credeblLogoHeight = 89
+
+export const sovioLogoLightPath = `${imageBasePath}/sovio_logo.svg`
+export const sovioLogoDarkPath = `${imageBasePath}/sovio_dark_theme_logo.svg`
+export const sovioLogoAltText = 'SOVIO Logo'
+export const sovioLogoWidth = 98
+export const sovioLogoHeight = 34
+
+// Per-brand favicons / loading-screen marks, read via getActiveFaviconPath()
+// in src/lib/active-theme.ts (browser tab icon in src/app/layout.tsx +
+// src/components/FaviconUpdater.tsx, and the splash/auth-gate loading marks
+// in src/app/page.tsx + src/features/components/SessionManager.tsx).
+export const bhutanndiFaviconPath = `${logoBasePath}/ndi-mark-mint.png`
+export const credeblFaviconPath = '/favicons/favicon-credebl.ico'
+export const sovioFaviconPath = '/favicons/favicon-sovio.ico'
+
 export const CredeblLogo = appLogoPath
 export const signInImg = `${imageBasePath}/signin.svg`
 export const closeIconImg = `${imageBasePath}/close_icon.svg`

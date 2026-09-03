@@ -10,9 +10,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { type AxiosResponse } from 'axios'
+import { BhutanndiUserInfoCard } from '@/components/bhutanndi/auth/BhutanndiUserInfoCard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { addPasswordDetails } from '@/app/api/Auth'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { passwordValueEncryption } from '@/utils/passwordEncryption'
 
 interface StepUserInfoProps {
@@ -47,6 +49,7 @@ const validationSchema = Yup.object().shape({
 
 export default function UserInfoForm({
   email,
+  goBack,
 }: StepUserInfoProps): JSX.Element {
   const [loading, setLoading] = useState(false)
   const [serverError, setServerError] = useState('')
@@ -123,132 +126,166 @@ export default function UserInfoForm({
       validationSchema={validationSchema}
       onSubmit={onSubmit}
     >
-      {({ errors, touched, handleChange, handleBlur, values }) => (
-        <FormikForm className="space-y-4">
-          {success && (
-            <div className="w-full" role="alert">
-              <AlertComponent
-                message={success}
-                type={'success'}
-                onAlertClose={() => setSuccess(null)}
-              />
-            </div>
-          )}
-          {failure && (
-            <div className="w-full" role="alert">
-              <AlertComponent
-                message={failure}
-                type={'failure'}
-                onAlertClose={() => setFailure(null)}
-              />
-            </div>
-          )}
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Input
-                placeholder="First name"
-                name="firstName"
-                value={values.firstName}
+      {({ errors, touched, handleChange, handleBlur, values }) => {
+        if (isBhutanndiTheme()) {
+          return (
+            <FormikForm
+              noValidate
+              className="relative z-[4] flex flex-col gap-[18px]"
+            >
+              <BhutanndiUserInfoCard
+                email={email}
+                values={values}
+                errors={errors}
+                touched={touched}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
+                showPassword={showPassword}
+                onToggleShowPassword={() => setShowPassword(!showPassword)}
+                showConfirmPassword={showConfirmPassword}
+                onToggleShowConfirmPassword={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
+                success={success}
+                onDismissSuccess={() => setSuccess(null)}
+                failure={failure}
+                onDismissFailure={() => setFailure(null)}
+                onChangeEmail={goBack}
+                loading={loading}
               />
-              {errors.firstName && touched.firstName && (
+            </FormikForm>
+          )
+        }
+
+        return (
+          <FormikForm className="space-y-4">
+            {success && (
+              <div className="w-full" role="alert">
+                <AlertComponent
+                  message={success}
+                  type={'success'}
+                  onAlertClose={() => setSuccess(null)}
+                />
+              </div>
+            )}
+            {failure && (
+              <div className="w-full" role="alert">
+                <AlertComponent
+                  message={failure}
+                  type={'failure'}
+                  onAlertClose={() => setFailure(null)}
+                />
+              </div>
+            )}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <Input
+                  placeholder="First name"
+                  name="firstName"
+                  value={values.firstName}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className="bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
+                />
+                {errors.firstName && touched.firstName && (
+                  <p className="text-destructive mt-1 text-sm">
+                    {errors.firstName}
+                  </p>
+                )}
+              </div>
+              <div className="flex-1">
+                <Input
+                  placeholder="Last name"
+                  name="lastName"
+                  value={values.lastName}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className="bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
+                />
+                {errors.lastName && touched.lastName && (
+                  <p className="text-destructive mt-1 text-sm">
+                    {errors.lastName}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="relative">
+              <Input
+                placeholder="Email address"
+                value={email}
+                readOnly
+                className="bg-[var(--color-bg-muted)] text-[var(--color-text-primary)]"
+              />
+              <CheckCircle className="absolute top-3 right-3 h-5 w-5 text-[var(--color-bg-success)]" />
+            </div>
+
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Create password"
+                name="password"
+                value={values.password}
+                onChange={handleChange}
+                onBlur={handleBlur}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-muted-foreground absolute top-2.5 right-3 focus:outline-none"
+              >
+                {showPassword ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
+              </button>
+              {errors.password && touched.password && (
                 <p className="text-destructive mt-1 text-sm">
-                  {errors.firstName}
+                  {errors.password}
                 </p>
               )}
             </div>
-            <div className="flex-1">
+
+            <div className="relative">
               <Input
-                placeholder="Last name"
-                name="lastName"
-                value={values.lastName}
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="Confirm password"
+                name="confirmPassword"
+                value={values.confirmPassword}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                className="bg-[var(--color-bg-primary)] text-[var(--color-text-primary)]"
               />
-              {errors.lastName && touched.lastName && (
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="text-muted-foreground absolute top-2.5 right-3 focus:outline-none"
+              >
+                {showConfirmPassword ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
+              </button>
+              {errors.confirmPassword && touched.confirmPassword && (
                 <p className="text-destructive mt-1 text-sm">
-                  {errors.lastName}
+                  {errors.confirmPassword}
                 </p>
               )}
             </div>
-          </div>
 
-          <div className="relative">
-            <Input
-              placeholder="Email address"
-              value={email}
-              readOnly
-              className="bg-[var(--color-bg-muted)] text-[var(--color-text-primary)]"
-            />
-            <CheckCircle className="absolute top-3 right-3 h-5 w-5 text-[var(--color-bg-success)]" />
-          </div>
-
-          <div className="relative">
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Create password"
-              name="password"
-              value={values.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="text-muted-foreground absolute top-2.5 right-3 focus:outline-none"
-            >
-              {showPassword ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-            </button>
-            {errors.password && touched.password && (
-              <p className="text-destructive mt-1 text-sm">{errors.password}</p>
+            {serverError && (
+              <div className="text-destructive text-center">{serverError}</div>
             )}
-          </div>
 
-          <div className="relative">
-            <Input
-              type={showConfirmPassword ? 'text' : 'password'}
-              placeholder="Confirm password"
-              name="confirmPassword"
-              value={values.confirmPassword}
-              onChange={handleChange}
-              onBlur={handleBlur}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="text-muted-foreground absolute top-2.5 right-3 focus:outline-none"
-            >
-              {showConfirmPassword ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-            </button>
-            {errors.confirmPassword && touched.confirmPassword && (
-              <p className="text-destructive mt-1 text-sm">
-                {errors.confirmPassword}
-              </p>
-            )}
-          </div>
-
-          {serverError && (
-            <div className="text-destructive text-center">{serverError}</div>
-          )}
-
-          <div className="flex justify-center gap-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating account...' : 'Create account'}
-            </Button>
-          </div>
-        </FormikForm>
-      )}
+            <div className="flex justify-center gap-2">
+              <Button type="submit" disabled={loading}>
+                {loading ? 'Creating account...' : 'Create account'}
+              </Button>
+            </div>
+          </FormikForm>
+        )
+      }}
     </Formik>
   )
 }

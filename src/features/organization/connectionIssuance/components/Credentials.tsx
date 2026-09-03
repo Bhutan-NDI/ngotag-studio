@@ -17,6 +17,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { CellContext } from '@tanstack/react-table'
 import { ConnectionApiSortFields } from '@/features/connections/types/connections-interface'
 import { DataTable } from '../../../../components/ui/generic-table-component/data-table'
@@ -32,6 +33,7 @@ import SidePanelComponent from '@/config/SidePanelCommon'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getIssuedCredentials } from '@/app/api/Issuance'
 import { getOrganizationById } from '@/app/api/organization'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { issuanceSvgComponent } from '@/config/svgs/issuanceSvgComponent'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetSchemaDetails } from '@/lib/schemaStorageSlice'
@@ -350,6 +352,11 @@ const Credentials = (): JSX.Element => {
 
   return (
     <PageContainer>
+      {isBhutanndiTheme() && (
+        <div className="mb-4">
+          <Breadcrumb items={[{ label: 'Credentials' }, { label: 'Issue' }]} />
+        </div>
+      )}
       <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Credentials</h2>

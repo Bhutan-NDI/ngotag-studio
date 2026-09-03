@@ -1,0 +1,646 @@
+/* ==============================================================
+   Bhutanndi ("Bhutan NDI") theme.
+   Ported from https://github.com/KezangLoday/BhutanNDI_Studio
+   (src/app/globals.css there — mint #5ac994/#1d7d57, obsidian
+   #0c111b/#232e40, teal #124143).
+
+   Two layers live in this file:
+
+   1. The STANDARD shadcn/Tailwind token set (--background, --card,
+      --primary, --sidebar, ...) that every `<name>_theme.css` file in this
+      directory defines — this is what makes the swap in
+      `src/components/active-theme.tsx` ("dynamic-theme-css" link swap)
+      work uniformly for any brand, and what any *not-yet-reskinned*
+      shared/generic component still renders with under the bhutanndi theme.
+
+   2. A fully `--bhutanndi-`-prefixed raw token set that mirrors the
+      reference's own vocabulary (mint ramp, ink ramp, surfaces, text,
+      borders, accent, glow, gradients, motion, atmosphere). This is
+      deliberately namespaced rather than reusing bare names like
+      `--muted` / `--ring` / `--accent`: several of those already carry a
+      different shape or meaning for existing shared shadcn components
+      (e.g. this app's `--ring` is a solid colour consumed by Tailwind's
+      `ring-*` utilities; the reference's is a full box-shadow value) —
+      reusing them verbatim would silently break existing generic
+      components still rendered under this theme. Only `--bhutanndi-`-only
+      components (src/components/bhutanndi/**) and the `.theme-bhutanndi`-scoped
+      rules in `src/styles/bhutanndi-effects.css` read this set, via the
+      matching Tailwind bridge in `src/app/globals.css`.
+
+   `:root` below holds the LIGHT values (this app's convention — see
+   phenix_theme.css/credebl_theme.css: `:root` = light, `.dark` = dark).
+   The reference's own convention is inverted (`:root` = dark by default,
+   `[data-theme="light"]` = light override), so the two blocks below are
+   swapped relative to the reference source: `.dark` carries the
+   reference's plain `:root` (its primary, dark-first palette) and `:root`
+   carries the reference's `[data-theme="light"]` overrides.
+   ============================================================== */
+
+:root {
+  /* ---- Standard shadcn set (light) ------------------------ */
+  --background: #f5f8f7;
+  --foreground: #26313f;
+  --card: #ffffff;
+  --card-foreground: #26313f;
+  --popover: #ffffff;
+  --popover-foreground: #26313f;
+  --primary: #1d7d57;
+  --primary-foreground: #ffffff;
+  --secondary: #e4ecea;
+  --secondary-foreground: #26313f;
+  --muted: #f5f8f7;
+  --muted-foreground: #4a5768;
+  --accent: rgba(29, 125, 87, 0.13);
+  --accent-foreground: #1d7d57;
+  --destructive: #c0392b;
+  --destructive-foreground: #ffffff;
+  --border: #cfdad6;
+  --input: #cfdad6;
+  --ring: #1d7d57;
+  --chart-1: #1d7d57;
+  --chart-2: #2c9a6c;
+  --chart-3: #17694a;
+  --chart-4: #124143;
+  --chart-5: #1a585b;
+  --sidebar: #f5f8f7;
+  --sidebar-foreground: #26313f;
+  --sidebar-primary: #1d7d57;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(29, 125, 87, 0.13);
+  --sidebar-accent-foreground: #1d7d57;
+  --sidebar-border: #cfdad6;
+  --sidebar-ring: #1d7d57;
+
+  --font-serif: Source Serif 4, serif;
+  --radius: 0.75rem;
+
+  --shadow-2xs: 0 1px 2px rgba(22, 32, 46, 0.06);
+  --shadow-xs: 0 1px 2px rgba(22, 32, 46, 0.08);
+  --shadow-sm: 0 1px 2px rgba(22, 32, 46, 0.08);
+  --shadow: 0 8px 24px rgba(22, 32, 46, 0.1);
+  --shadow-md: 0 8px 24px rgba(22, 32, 46, 0.1);
+  --shadow-lg: 0 24px 60px rgba(22, 32, 46, 0.14);
+  --shadow-xl: 0 24px 60px rgba(22, 32, 46, 0.16);
+  --shadow-2xl: 0 24px 60px rgba(22, 32, 46, 0.2);
+
+  --logo-light: '/themes/bhutanndi/logo.svg';
+  --logo-dark: '/themes/bhutanndi/logo-white.svg';
+  --favicon: '/themes/bhutanndi/favicon.png';
+
+  /* ---- Bhutanndi raw tokens (light) --------------------------- */
+  --bhutanndi-mint: #5ac994;
+  --bhutanndi-mint-bright: #6fe0a9;
+  --bhutanndi-mint-deep: #3da876;
+  --bhutanndi-mint-ink: #1d7d57;
+  --bhutanndi-teal: #124143;
+  --bhutanndi-teal-soft: #1a585b;
+  --bhutanndi-obsidian: #141b29;
+
+  --bhutanndi-ink-900: #0c111b;
+  --bhutanndi-ink-800: #141b29;
+  --bhutanndi-ink-700: #1b2433;
+  --bhutanndi-ink-600: #232e40;
+  --bhutanndi-ink-500: #2e3a4f;
+  --bhutanndi-ink-400: #3b495f;
+  --bhutanndi-300: #7c828a;
+  --bhutanndi-200: #8b95a5;
+  --bhutanndi-100: #c5ccd8;
+  --bhutanndi-000: #ffffff;
+
+  --bhutanndi-mint-04: rgba(29, 125, 87, 0.05);
+  --bhutanndi-mint-08: rgba(29, 125, 87, 0.08);
+  --bhutanndi-mint-12: rgba(29, 125, 87, 0.13);
+  --bhutanndi-mint-15: rgba(29, 125, 87, 0.2);
+  --bhutanndi-mint-25: rgba(29, 125, 87, 0.3);
+  --bhutanndi-mint-40: rgba(29, 125, 87, 0.42);
+
+  --bhutanndi-success: #5ac994;
+  --bhutanndi-info: #4aa3ff;
+  --bhutanndi-warning: #f5b740;
+  --bhutanndi-danger: #c0392b;
+
+  --bhutanndi-surface-canvas: #f5f8f7;
+  --bhutanndi-surface-sunken: #eef3f2;
+  --bhutanndi-surface-raised: #ffffff;
+  --bhutanndi-surface-card: #ffffff;
+  --bhutanndi-surface-hover: #e4ecea;
+  --bhutanndi-surface-glass: rgba(29, 125, 87, 0.06);
+  --bhutanndi-surface-glass-strong: rgba(29, 125, 87, 0.12);
+
+  --bhutanndi-fill-panel: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.62) 46%,
+    rgba(255, 255, 255, 0.82) 100%
+  );
+  --bhutanndi-fill-card: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.72) 46%,
+    rgba(29, 125, 87, 0.04) 100%
+  );
+  --bhutanndi-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 1px 0 0 rgba(255, 255, 255, 0.5),
+    inset 0 -20px 34px -24px rgba(29, 125, 87, 0.08),
+    0 18px 40px -28px rgba(22, 32, 46, 0.32);
+
+  --bhutanndi-text-strong: #0c111b;
+  --bhutanndi-text-body: #26313f;
+  --bhutanndi-text-muted: #4a5768;
+  --bhutanndi-text-faint: #5f6b7c;
+  --bhutanndi-text-accent: var(--bhutanndi-mint-ink);
+  --bhutanndi-text-on-mint: #ffffff;
+
+  --bhutanndi-border-grid: rgba(29, 125, 87, 0.22);
+  --bhutanndi-border-subtle: rgba(12, 17, 27, 0.1);
+  --bhutanndi-border-strong: rgba(29, 125, 87, 0.38);
+  --bhutanndi-border-divider: #cfdad6;
+
+  --bhutanndi-accent: var(--bhutanndi-mint-ink);
+  --bhutanndi-accent-hover: #17694a;
+  --bhutanndi-accent-press: #12553b;
+  --bhutanndi-focus-ring: rgba(29, 125, 87, 0.24);
+
+  --bhutanndi-shadow-sm: 0 1px 2px rgba(22, 32, 46, 0.08);
+  --bhutanndi-shadow-md: 0 8px 24px rgba(22, 32, 46, 0.1);
+  --bhutanndi-shadow-lg: 0 24px 60px rgba(22, 32, 46, 0.14);
+  --bhutanndi-glow-sm: 0 0 0 1px rgba(29, 125, 87, 0.28),
+    0 0 14px rgba(29, 125, 87, 0.14);
+  --bhutanndi-glow-md: 0 0 22px rgba(29, 125, 87, 0.16);
+  --bhutanndi-glow-lg: 0 0 44px rgba(29, 125, 87, 0.18);
+  --bhutanndi-glow-text: 0 0 20px rgba(29, 125, 87, 0.18);
+  --bhutanndi-ring: 0 0 0 2px var(--bhutanndi-focus-ring);
+  --bhutanndi-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --bhutanndi-blur-glass: 18px;
+
+  --bhutanndi-grad-depth: radial-gradient(
+    120% 120% at 50% -10%,
+    #dceee5 0%,
+    #eaf2f0 46%,
+    #f5f8f7 100%
+  );
+  --bhutanndi-grad-card: linear-gradient(
+    160deg,
+    rgba(29, 125, 87, 0.07) 0%,
+    rgba(255, 255, 255, 0.85) 60%
+  );
+  --bhutanndi-grad-mint: linear-gradient(
+    135deg,
+    #6fe0a9 0%,
+    #5ac994 55%,
+    #3da876 100%
+  );
+  --bhutanndi-grad-cta: linear-gradient(
+    115deg,
+    #63d6a2 0%,
+    #4cbf8c 55%,
+    #38a97d 100%
+  );
+  --bhutanndi-grad-text: linear-gradient(
+    92deg,
+    #1d7d57 0%,
+    #17694a 60%,
+    #145d55 100%
+  );
+  --bhutanndi-grad-wave: linear-gradient(
+    105deg,
+    #145d43 0%,
+    #1d7d57 25%,
+    #2c9a6c 42%,
+    #3fb37f 50%,
+    #2c9a6c 58%,
+    #1d7d57 75%,
+    #145d43 100%
+  );
+
+  --bhutanndi-grid-line: rgba(29, 125, 87, 0.1);
+  --bhutanndi-grid-bg: linear-gradient(
+      rgba(29, 125, 87, 0.1) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(29, 125, 87, 0.1) 1px, transparent 1px);
+  --bhutanndi-grid-size: 48px 48px;
+
+  --bhutanndi-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --bhutanndi-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --bhutanndi-ease-glide: cubic-bezier(0.33, 1, 0.68, 1);
+  --bhutanndi-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bhutanndi-dur-fast: 140ms;
+  --bhutanndi-dur: 220ms;
+  --bhutanndi-dur-slow: 400ms;
+
+  --bhutanndi-tint: 12 17 27;
+  --bhutanndi-shade: 22 32 46;
+  --bhutanndi-gloss: 255 255 255;
+
+  --bhutanndi-chrome-fill: rgba(245, 248, 247, 0.76);
+  --bhutanndi-chrome-fill-strong: rgba(245, 248, 247, 0.92);
+  --bhutanndi-scrim: rgba(22, 32, 46, 0.34);
+  --bhutanndi-surface-menu: #ffffff;
+  --bhutanndi-surface-tooltip: #1b2433;
+  --bhutanndi-text-tooltip: #e9eef6;
+  --bhutanndi-surface-cta: #ffffff;
+  --bhutanndi-surface-cta-subtle: #eaf2f0;
+  --bhutanndi-scene-knockout: rgba(255, 255, 255, 0.94);
+  --bhutanndi-fill-sunk: rgba(255, 255, 255, 0.72);
+  --bhutanndi-text-danger: #c0392b;
+  --bhutanndi-scrollbar-thumb: #c2cfcb;
+  --bhutanndi-scrollbar-thumb-hover: #a9b9b4;
+
+  --bhutanndi-atmos-pools: radial-gradient(
+      ellipse 62% 13% at -4% 1%,
+      rgba(29, 125, 87, 0.1) 0%,
+      rgba(29, 125, 87, 0.04) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 12% at 104% 15%,
+      rgba(18, 65, 67, 0.09) 0%,
+      rgba(18, 65, 67, 0.03) 38%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 60% 12% at -6% 36%,
+      rgba(29, 125, 87, 0.07) 0%,
+      rgba(29, 125, 87, 0.03) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 11% at 106% 56%,
+      rgba(18, 65, 67, 0.07) 0%,
+      rgba(18, 65, 67, 0.025) 38%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 60% 12% at -4% 76%,
+      rgba(29, 125, 87, 0.06) 0%,
+      rgba(29, 125, 87, 0.02) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 11% at 104% 95%,
+      rgba(18, 65, 67, 0.06) 0%,
+      rgba(18, 65, 67, 0.02) 38%,
+      transparent 76%
+    );
+}
+
+/* Dark mode overrides */
+.dark {
+  /* ---- Standard shadcn set (dark) -------------------------- */
+  --background: #0c111b;
+  --foreground: #c5ccd8;
+  --card: #232e40;
+  --card-foreground: #c5ccd8;
+  --popover: #0f1522;
+  --popover-foreground: #c5ccd8;
+  --primary: #5ac994;
+  --primary-foreground: #06241a;
+  --secondary: #2e3a4f;
+  --secondary-foreground: #c5ccd8;
+  --muted: #1b2433;
+  --muted-foreground: #8b95a5;
+  --accent: rgba(90, 201, 148, 0.12);
+  --accent-foreground: #5ac994;
+  --destructive: #e1493e;
+  --destructive-foreground: #ffffff;
+  --border: #3b495f;
+  --input: #3b495f;
+  --ring: #5ac994;
+  --chart-1: #5ac994;
+  --chart-2: #6fe0a9;
+  --chart-3: #3da876;
+  --chart-4: #124143;
+  --chart-5: #1a585b;
+  --sidebar: #141b29;
+  --sidebar-foreground: #c5ccd8;
+  --sidebar-primary: #5ac994;
+  --sidebar-primary-foreground: #06241a;
+  --sidebar-accent: rgba(90, 201, 148, 0.12);
+  --sidebar-accent-foreground: #5ac994;
+  --sidebar-border: #3b495f;
+  --sidebar-ring: #5ac994;
+
+  --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+  --radius: 0.75rem;
+
+  --shadow-2xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --shadow-2xl: 0 24px 60px rgba(0, 0, 0, 0.7);
+
+  --logo-light: '/themes/bhutanndi/logo-white.svg';
+  --logo-dark: '/themes/bhutanndi/logo-white.svg';
+  --favicon: '/themes/bhutanndi/favicon.png';
+
+  /* ---- Bhutanndi raw tokens (dark, the reference's primary palette) */
+  --bhutanndi-mint: #5ac994;
+  --bhutanndi-mint-bright: #6fe0a9;
+  --bhutanndi-mint-deep: #3da876;
+  --bhutanndi-mint-ink: #5ac994;
+  --bhutanndi-teal: #124143;
+  --bhutanndi-teal-soft: #1a585b;
+  --bhutanndi-obsidian: #141b29;
+
+  --bhutanndi-ink-900: #0c111b;
+  --bhutanndi-ink-800: #141b29;
+  --bhutanndi-ink-700: #1b2433;
+  --bhutanndi-ink-600: #232e40;
+  --bhutanndi-ink-500: #2e3a4f;
+  --bhutanndi-ink-400: #3b495f;
+  --bhutanndi-300: #7c828a;
+  --bhutanndi-200: #8b95a5;
+  --bhutanndi-100: #c5ccd8;
+  --bhutanndi-000: #ffffff;
+
+  --bhutanndi-mint-04: rgba(90, 201, 148, 0.04);
+  --bhutanndi-mint-08: rgba(90, 201, 148, 0.08);
+  --bhutanndi-mint-12: rgba(90, 201, 148, 0.12);
+  --bhutanndi-mint-15: rgba(90, 201, 148, 0.15);
+  --bhutanndi-mint-25: rgba(90, 201, 148, 0.25);
+  --bhutanndi-mint-40: rgba(90, 201, 148, 0.4);
+
+  --bhutanndi-success: #5ac994;
+  --bhutanndi-info: #4aa3ff;
+  --bhutanndi-warning: #f5b740;
+  --bhutanndi-danger: #e1493e;
+
+  --bhutanndi-surface-canvas: #141b29;
+  --bhutanndi-surface-sunken: #0c111b;
+  --bhutanndi-surface-raised: #1b2433;
+  --bhutanndi-surface-card: #232e40;
+  --bhutanndi-surface-hover: #2e3a4f;
+  --bhutanndi-surface-glass: rgba(18, 65, 67, 0.35);
+  --bhutanndi-surface-glass-strong: rgba(18, 65, 67, 0.55);
+
+  --bhutanndi-fill-panel: linear-gradient(
+    158deg,
+    rgba(15, 20, 32, 0.62) 0%,
+    rgba(15, 20, 32, 0.46) 46%,
+    rgba(15, 20, 32, 0.62) 100%
+  );
+  --bhutanndi-fill-card: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.006) 46%,
+    rgba(90, 201, 148, 0.03) 100%
+  );
+  --bhutanndi-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 1px 0 0 rgba(255, 255, 255, 0.04),
+    inset 0 -20px 34px -24px rgba(255, 255, 255, 0.07),
+    0 18px 40px -26px rgba(0, 0, 0, 0.9);
+
+  --bhutanndi-text-strong: #ffffff;
+  --bhutanndi-text-body: #c5ccd8;
+  --bhutanndi-text-muted: #8b95a5;
+  --bhutanndi-text-faint: #7c828a;
+  --bhutanndi-text-accent: var(--bhutanndi-mint);
+  --bhutanndi-text-on-mint: #06241a;
+
+  --bhutanndi-border-grid: rgba(90, 201, 148, 0.15);
+  --bhutanndi-border-subtle: rgba(255, 255, 255, 0.06);
+  --bhutanndi-border-strong: rgba(90, 201, 148, 0.25);
+  --bhutanndi-border-divider: #3b495f;
+
+  --bhutanndi-accent: var(--bhutanndi-mint);
+  --bhutanndi-accent-hover: #6fe0a9;
+  --bhutanndi-accent-press: #3da876;
+  --bhutanndi-focus-ring: rgba(90, 201, 148, 0.3);
+
+  --bhutanndi-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --bhutanndi-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --bhutanndi-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --bhutanndi-glow-sm: 0 0 0 1px var(--bhutanndi-mint-25),
+    0 0 16px rgba(90, 201, 148, 0.25);
+  --bhutanndi-glow-md: 0 0 24px rgba(90, 201, 148, 0.35);
+  --bhutanndi-glow-lg: 0 0 48px rgba(90, 201, 148, 0.4);
+  --bhutanndi-glow-text: 0 0 24px rgba(90, 201, 148, 0.45);
+  --bhutanndi-ring: 0 0 0 2px var(--bhutanndi-focus-ring);
+  --bhutanndi-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --bhutanndi-blur-glass: 18px;
+
+  --bhutanndi-grad-depth: radial-gradient(
+    120% 120% at 50% -10%,
+    #163a3c 0%,
+    #141b29 46%,
+    #0c111b 100%
+  );
+  --bhutanndi-grad-card: linear-gradient(
+    160deg,
+    rgba(26, 88, 91, 0.28) 0%,
+    rgba(35, 46, 64, 0.5) 60%
+  );
+  --bhutanndi-grad-mint: linear-gradient(
+    135deg,
+    #6fe0a9 0%,
+    #5ac994 55%,
+    #3da876 100%
+  );
+  --bhutanndi-grad-cta: linear-gradient(
+    115deg,
+    #8cf0c0 0%,
+    #6fe0a9 24%,
+    #4fc091 56%,
+    #2fa189 80%,
+    #1e8189 100%
+  );
+  --bhutanndi-grad-text: linear-gradient(
+    92deg,
+    #6fe0a9 0%,
+    #5ac994 60%,
+    #2e8d8f 100%
+  );
+  --bhutanndi-grad-wave: linear-gradient(
+    105deg,
+    #2f8f6b 0%,
+    #5ac994 25%,
+    #7ddcac 42%,
+    #9deec4 50%,
+    #7ddcac 58%,
+    #5ac994 75%,
+    #2f8f6b 100%
+  );
+
+  --bhutanndi-grid-line: rgba(90, 201, 148, 0.08);
+  --bhutanndi-grid-bg: linear-gradient(
+      rgba(90, 201, 148, 0.08) 1px,
+      transparent 1px
+    ),
+    linear-gradient(90deg, rgba(90, 201, 148, 0.08) 1px, transparent 1px);
+  --bhutanndi-grid-size: 48px 48px;
+
+  --bhutanndi-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --bhutanndi-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --bhutanndi-ease-glide: cubic-bezier(0.33, 1, 0.68, 1);
+  --bhutanndi-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --bhutanndi-dur-fast: 140ms;
+  --bhutanndi-dur: 220ms;
+  --bhutanndi-dur-slow: 400ms;
+
+  --bhutanndi-tint: 255 255 255;
+  --bhutanndi-shade: 0 0 0;
+  --bhutanndi-gloss: 255 255 255;
+
+  --bhutanndi-chrome-fill: rgba(12, 17, 27, 0.72);
+  --bhutanndi-chrome-fill-strong: rgba(12, 17, 27, 0.86);
+  --bhutanndi-scrim: rgba(6, 10, 16, 0.62);
+  --bhutanndi-surface-menu: #0f1522;
+  --bhutanndi-surface-tooltip: #101827;
+  --bhutanndi-text-tooltip: #e9eef6;
+  --bhutanndi-surface-cta: #0e1622;
+  --bhutanndi-surface-cta-subtle: #16202e;
+  --bhutanndi-scene-knockout: rgba(12, 17, 27, 0.92);
+  --bhutanndi-fill-sunk: rgba(12, 17, 27, 0.5);
+  --bhutanndi-text-danger: #f0866b;
+  --bhutanndi-scrollbar-thumb: #2e3a4f;
+  --bhutanndi-scrollbar-thumb-hover: #3b495f;
+
+  --bhutanndi-atmos-pools: radial-gradient(
+      ellipse 62% 13% at -4% 1%,
+      rgba(90, 201, 148, 0.15) 0%,
+      rgba(90, 201, 148, 0.055) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 12% at 104% 15%,
+      rgba(18, 65, 67, 0.4) 0%,
+      rgba(18, 65, 67, 0.13) 38%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 60% 12% at -6% 36%,
+      rgba(90, 201, 148, 0.1) 0%,
+      rgba(90, 201, 148, 0.04) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 11% at 106% 56%,
+      rgba(18, 65, 67, 0.32) 0%,
+      rgba(18, 65, 67, 0.11) 38%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 60% 12% at -4% 76%,
+      rgba(90, 201, 148, 0.09) 0%,
+      rgba(90, 201, 148, 0.035) 36%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 58% 11% at 104% 95%,
+      rgba(18, 65, 67, 0.28) 0%,
+      rgba(18, 65, 67, 0.09) 38%,
+      transparent 76%
+    );
+}
+
+/* ─── Structural component overrides (dark mode only) ──────────────────────
+   phenix_theme.css (the statically-imported base stylesheet — see
+   src/app/globals.css) gives every Radix Dialog/AlertDialog a Phenix-purple
+   glow via a plain `.dark [data-slot='dialog-content']` rule. That selector
+   isn't scoped to any theme, so it keeps applying even when this file is
+   the active dynamically-loaded override (src/components/active-theme.tsx
+   appends this file's <link> to <head> AFTER the static phenix import, so
+   this rule wins the cascade for the same selector/specificity — same
+   mechanism the --primary/--border/--ring overrides above rely on). Any
+   dialog rendered under bhutanndi dark mode — e.g. the "Scan QR" create-
+   connection modal (src/features/connections/components/Connections.tsx,
+   via the shared DialogContent in src/components/ui/dialog.tsx) — would
+   otherwise still show the purple glow. Restore bhutanndi's own obsidian/mint
+   surface language instead: no purple anywhere. */
+.dark [data-slot='dialog-content'],
+.dark [data-slot='alert-dialog-content'] {
+  background-color: var(--bhutanndi-surface-raised);
+  border-color: var(--bhutanndi-border-grid);
+  box-shadow: var(--bhutanndi-shadow-lg);
+}
+
+/* ==============================================================
+   Tailwind bridge — standard shadcn slice. Mirrors the shape every
+   sibling `<name>_theme.css` file carries; only relevant if this file is
+   ever the statically-imported default in `src/app/globals.css` (today
+   that import points at `phenix_theme.css` — see the additive
+   `bhutanndi`-prefixed bridge added directly to globals.css for what
+   actually takes effect in the current build).
+   ============================================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* ---- Bhutanndi-prefixed slice (see src/app/globals.css for the copy that
+     actually takes effect in this build) --------------------- */
+  --font-display: var(--font-bhutanndi-display);
+  --font-bhutanndi-body: var(--font-bhutanndi-body);
+  --font-bhutanndi-mono: var(--font-bhutanndi-mono);
+
+  --color-bhutanndi-canvas: var(--bhutanndi-surface-canvas);
+  --color-bhutanndi-sunken: var(--bhutanndi-surface-sunken);
+  --color-bhutanndi-raised: var(--bhutanndi-surface-raised);
+  --color-bhutanndi-card: var(--bhutanndi-surface-card);
+  --color-bhutanndi-hover: var(--bhutanndi-surface-hover);
+  --color-bhutanndi-strong: var(--bhutanndi-text-strong);
+  --color-bhutanndi-body: var(--bhutanndi-text-body);
+  --color-bhutanndi-muted: var(--bhutanndi-text-muted);
+  --color-bhutanndi-faint: var(--bhutanndi-text-faint);
+  --color-bhutanndi-accent: var(--bhutanndi-accent);
+  --color-bhutanndi-accent-hover: var(--bhutanndi-accent-hover);
+  --color-bhutanndi-accent-press: var(--bhutanndi-accent-press);
+  --color-bhutanndi-teal: var(--bhutanndi-teal);
+  --color-bhutanndi-grid: var(--bhutanndi-border-grid);
+  --color-bhutanndi-subtle: var(--bhutanndi-border-subtle);
+  --color-bhutanndi-divider: var(--bhutanndi-border-divider);
+  --radius-bhutanndi-card: 16px;
+  --ease-bhutanndi: var(--bhutanndi-ease-out);
+}

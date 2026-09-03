@@ -4,8 +4,49 @@
 
 @import '../../public/themes/phenix_theme.css';
 
+/* Bhutanndi ("Bhutan NDI") theme — additive only, see src/lib/active-theme.ts.
+   `bhutanndi-effects.css` is entirely scoped under `.theme-bhutanndi` (the body
+   class `src/components/active-theme.tsx` applies when that theme is
+   active), so it is inert markup for every other brand. */
+@import '../styles/bhutanndi-effects.css';
+
 /* Tell Tailwind v4 to use the .dark class (from next-themes) for dark: utilities */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ────────────────────────────────────────────────────────────────────────
+   Bhutanndi theme bridge — additive Tailwind utility registrations.
+   These only produce visible output once `public/themes/bhutanndi_theme.css`
+   is the active dynamically-loaded stylesheet (see active-theme.tsx) and
+   defines the `--bhutanndi-*` custom properties referenced below; for every
+   other theme these variables are undefined, so the utilities they back
+   (bg-bhutanndi-canvas, text-bhutanndi-muted, font-display, ...) resolve to
+   nothing and are safe no-ops. Only src/components/bhutanndi/** and
+   src/styles/bhutanndi-effects.css use these classes.
+   ──────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --font-display: var(--font-bhutanndi-display);
+  --font-bhutanndi-body: var(--font-bhutanndi-body);
+  --font-bhutanndi-mono: var(--font-bhutanndi-mono);
+
+  --color-bhutanndi-canvas: var(--bhutanndi-surface-canvas);
+  --color-bhutanndi-sunken: var(--bhutanndi-surface-sunken);
+  --color-bhutanndi-raised: var(--bhutanndi-surface-raised);
+  --color-bhutanndi-card: var(--bhutanndi-surface-card);
+  --color-bhutanndi-hover: var(--bhutanndi-surface-hover);
+  --color-bhutanndi-strong: var(--bhutanndi-text-strong);
+  --color-bhutanndi-body: var(--bhutanndi-text-body);
+  --color-bhutanndi-muted: var(--bhutanndi-text-muted);
+  --color-bhutanndi-faint: var(--bhutanndi-text-faint);
+  --color-bhutanndi-accent: var(--bhutanndi-accent);
+  --color-bhutanndi-accent-hover: var(--bhutanndi-accent-hover);
+  --color-bhutanndi-accent-press: var(--bhutanndi-accent-press);
+  --color-bhutanndi-teal: var(--bhutanndi-teal);
+  --color-bhutanndi-grid: var(--bhutanndi-border-grid);
+  --color-bhutanndi-subtle: var(--bhutanndi-border-subtle);
+  --color-bhutanndi-divider: var(--bhutanndi-border-divider);
+  --radius-bhutanndi-card: 16px;
+  --ease-bhutanndi: var(--bhutanndi-ease-out);
+}
 
 /* Cursor pointer globally for buttons */
 button:not(:disabled),
@@ -190,8 +231,8 @@ button {
 
 .method-card:not(:disabled):hover {
   transform: translateY(-3px);
-  border-color: rgba(87, 29, 247, 0.4);
-  box-shadow: 0 12px 30px rgba(87, 29, 247, 0.12);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--primary) 12%, transparent);
 }
 
 /* Glass backdrop for dark-mode cards */
@@ -204,8 +245,8 @@ button {
 
 .dark .method-card:not(:disabled):hover {
   box-shadow:
-    0 12px 30px rgba(87, 29, 247, 0.12),
-    0 0 26px rgba(87, 29, 247, 0.28);
+    0 12px 30px color-mix(in srgb, var(--primary) 12%, transparent),
+    0 0 26px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 /* Honour reduced-motion preference — keep colour transitions, drop translate */
@@ -228,7 +269,7 @@ button {
 
 .qr-modal-content {
   background-color: #ffffff;
-  border: 0.5px solid rgba(87, 29, 247, 0.1);
+  border: 0.5px solid color-mix(in srgb, var(--primary) 10%, transparent);
   box-shadow: 0 24px 70px rgba(12, 12, 26, 0.28);
 }
 

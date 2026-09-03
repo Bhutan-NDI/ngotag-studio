@@ -235,17 +235,42 @@ const EditUserRoleModal = ({
                 {roles && (
                   <div className="grid grid-cols-2 space-y-3">
                     {roles.map((role) => (
-                      <button
+                      // A native <button> can't be used here — the Checkbox
+                      // below is itself a real <button role="checkbox">
+                      // (Radix), and a button can't contain another button:
+                      // invalid HTML, a hydration warning, and a real bug
+                      // where clicking the checkbox bubbles up and double-
+                      // toggles it via this row's own click handler.
+                      <div
                         key={role.id}
-                        type="button"
-                        disabled={role.disabled}
-                        onClick={() => handleRoleChange(!role.checked, role)}
-                        className="flex w-full items-center rounded-md p-3 text-left transition-all"
+                        role="button"
+                        tabIndex={role.disabled ? -1 : 0}
+                        aria-disabled={role.disabled}
+                        onClick={() => {
+                          if (!role.disabled) {
+                            handleRoleChange(!role.checked, role)
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (role.disabled) {
+                            return
+                          }
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleRoleChange(!role.checked, role)
+                          }
+                        }}
+                        className={`flex w-full items-center rounded-md p-3 text-left transition-all ${
+                          role.disabled
+                            ? 'cursor-not-allowed opacity-50'
+                            : 'cursor-pointer'
+                        }`}
                       >
                         <Checkbox
                           id={`checkbox-${role.id}`}
                           checked={role.checked}
                           disabled={role.disabled}
+                          onClick={(e) => e.stopPropagation()}
                           onCheckedChange={(checked) =>
                             handleRoleChange(checked as boolean, role)
                           }
@@ -256,6 +281,7 @@ const EditUserRoleModal = ({
                         <div className="flex flex-grow items-center justify-between">
                           <Label
                             htmlFor={`checkbox-${role.id}`}
+                            onClick={(e) => e.stopPropagation()}
                             className={`${
                               role.disabled
                                 ? 'text-muted-foreground/60'
@@ -265,7 +291,7 @@ const EditUserRoleModal = ({
                             {TextTitlecase(role.name)}
                           </Label>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 )}

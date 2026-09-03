@@ -22,7 +22,6 @@ import {
   SidebarRail,
 } from '@/components/ui/sidebar'
 import {
-  appFaviconPath,
   appLogoAltText,
   appLogoDarkPath,
   appLogoPath,
@@ -49,6 +48,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { NavItem } from '../../../types'
 import { Organization } from '@/features/dashboard/type/organization'
+import { getActiveFaviconPath } from '@/lib/active-theme'
 import { getOrganizations } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
 import { navItems } from '@/constants/data'
@@ -57,7 +57,7 @@ import { setSidebarCollapsed } from '@/lib/sidebarSlice'
 const APP_CONFIG = {
   logo: appLogoPath,
   logoDark: appLogoDarkPath,
-  collapsedLogo: appFaviconPath,
+  collapsedLogo: getActiveFaviconPath(),
 }
 
 export default function AppSidebar(): React.JSX.Element {

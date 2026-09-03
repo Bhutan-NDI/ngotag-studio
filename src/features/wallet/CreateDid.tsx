@@ -41,8 +41,10 @@ import { createDid, generateDidWeb } from '@/app/api/Agent'
 import { formatDidWebError } from './formatDidWebError'
 import { getOrganizationById } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 import { nanoid } from 'nanoid'
+import { BhutanndiCreateDid } from './BhutanndiCreateDid'
 
 const isValidUuid = (value: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -358,6 +360,197 @@ const CreateDid = (): React.JSX.Element => {
   // non-interactive so the user isn't shown a clickable card with nothing to switch to.
   const activeProtocols = protocolOptions.filter((o) => !o.disabled)
   const activeSubOptions = subOptions.filter((o) => !o.disabled)
+
+  // Extracted into its own local function (rather than inlined into the
+  // `if` below) purely so its many bhutanndi-branch conditionals are counted
+  // by ESLint's complexity rule against a separate function node instead of
+  // pushing CreateDid's own already-large complexity over the limit.
+  const renderBhutanndiCreateDid = (): React.JSX.Element => {
+    const isDidWeb = selectedDid === 'did:web'
+    const showBackToEdit = isDidWeb && webFlowState === 'generated'
+    const submitDisabled =
+      isApiInProgress || (showBackToEdit && !isHostingConfirmed)
+    const submitLabel = isApiInProgress
+      ? webFlowState === 'generating'
+        ? 'Generating...'
+        : 'Creating DID...'
+      : isDidWeb && webFlowState === 'idle'
+        ? 'Generate DID Document'
+        : 'Create DID'
+
+    const showPolygonConfig =
+      selectedDid === 'did:polygon:testnet' ||
+      selectedDid === 'did:polygon:mainnet'
+    const showEthereumConfig =
+      selectedDid === 'did:ethr:sepolia' || selectedDid === 'did:ethr:mainnet'
+
+    return (
+      <PageContainer>
+        <BhutanndiCreateDid
+          step={step}
+          totalSteps={totalSteps}
+          activeProtocols={activeProtocols}
+          protocolOptions={protocolOptions}
+          selectedProtocol={selectedProtocol}
+          onSelectProtocol={(id) => {
+            setSelectedProtocol(id as Protocol)
+            setSelectedOption(null)
+            setSelectedDid(null)
+            setDomainError(null)
+          }}
+          selectedProtocolTitle={selectedProtocolTitle}
+          subOptions={subOptions}
+          activeSubOptions={activeSubOptions}
+          selectedOption={selectedOption}
+          onSelectOption={(id) => {
+            setSelectedOption(id)
+            setSelectedDid(null)
+            setDomainError(null)
+          }}
+          didOptions={didOptions}
+          selectedDid={selectedDid}
+          didExample={selectedDid ? didExamples[selectedDid] : undefined}
+          onSelectDid={(value) => {
+            setSelectedDid(value)
+            setDomainError(null)
+            setWebFlowState('idle')
+            setGeneratedDidDoc(null)
+            setIsHostingConfirmed(false)
+          }}
+          isDidWeb={isDidWeb}
+          domainValue={domainValue}
+          domainError={domainError}
+          onDomainChange={handleDomainChange}
+          polygonConfig={
+            showPolygonConfig ? (
+              <div className="space-y-6">
+                <SetPrivateKeyValueInput
+                  key={selectedDid}
+                  orgId={orgId || ''}
+                  privateKeyValue={privateKeyValue}
+                  setPrivateKeyValue={setPrivateKeyValue}
+                  didMethod={DidMethod.POLYGON}
+                  network={selectedDidNetwork}
+                />
+                <div className="space-y-4">
+                  <h4 className="text-bhutanndi-strong text-[13px] font-medium">
+                    {selectedDid === 'did:polygon:mainnet'
+                      ? 'Steps to fund your Polygon Mainnet wallet'
+                      : 'Steps to get Polygon Testnet Tokens'}
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
+                          Step 1
+                        </span>
+                        <div className="text-bhutanndi-muted text-[13px]">
+                          {selectedDid === 'did:polygon:mainnet'
+                            ? 'Copy your address and fund it with POL.'
+                            : 'Copy your address and claim test tokens.'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
+                          Step 2
+                        </span>
+                        <div className="text-bhutanndi-muted text-[13px]">
+                          Verify the balance using Polygon Scan.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          }
+          ethereumConfig={
+            showEthereumConfig ? (
+              <div className="space-y-6">
+                <SetPrivateKeyValueInput
+                  key={selectedDid}
+                  orgId={orgId || ''}
+                  privateKeyValue={privateKeyValue}
+                  setPrivateKeyValue={setPrivateKeyValue}
+                  didMethod={DidMethod.ETHR}
+                  network={selectedDidNetwork}
+                />
+                <div className="space-y-4">
+                  <h4 className="text-bhutanndi-strong text-[13px] font-medium">
+                    {selectedDid === 'did:ethr:mainnet'
+                      ? 'Steps to fund your wallet for schema creation (Ethereum Mainnet)'
+                      : 'Steps to get Ethereum Sepolia tokens for schema creation'}
+                  </h4>
+                  <p className="text-bhutanndi-muted text-[13px]">
+                    Creating this DID is free — no funds are needed for that
+                    step. The wallet below only needs to be funded before you
+                    create schemas with this DID.
+                  </p>
+                  <div className="space-y-3">
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
+                          Step 1
+                        </span>
+                        <div className="text-bhutanndi-muted text-[13px]">
+                          {selectedDid === 'did:ethr:mainnet'
+                            ? 'Copy your address and fund it with ETH.'
+                            : 'Copy your address and claim test tokens.'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-bhutanndi-grid bg-bhutanndi-raised rounded-[10px] border p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="text-bhutanndi-accent text-[13px] font-semibold">
+                          Step 2
+                        </span>
+                        <div className="text-bhutanndi-muted text-[13px]">
+                          Verify the balance using Etherscan.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null
+          }
+          didWebHosting={
+            isDidWeb && webFlowState === 'generated' && generatedDidDoc
+              ? {
+                  domainValue,
+                  generatedDidDoc,
+                  didDocCopied,
+                  onCopy: copyDidDocument,
+                  onDownload: downloadDidDocument,
+                  isHostingConfirmed,
+                  onHostingConfirmedChange: setIsHostingConfirmed,
+                }
+              : null
+          }
+          alert={alert}
+          onDismissAlert={() => setAlert(null)}
+          success={success}
+          onDismissSuccess={() => setSuccess(null)}
+          showBackToEdit={showBackToEdit}
+          onBackToEdit={() => {
+            setWebFlowState('idle')
+            setGeneratedDidDoc(null)
+            setIsHostingConfirmed(false)
+          }}
+          onSubmit={handleSubmit}
+          submitDisabled={submitDisabled}
+          submitting={isApiInProgress}
+          submitLabel={submitLabel}
+        />
+      </PageContainer>
+    )
+  }
+
+  if (isBhutanndiTheme()) {
+    return renderBhutanndiCreateDid()
+  }
 
   return (
     <PageContainer>

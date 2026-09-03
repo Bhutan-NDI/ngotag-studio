@@ -2,7 +2,15 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  CredDefData,
+  IssuedCredential,
+} from '../connectionIssuance/type/Issuance'
 import { IOrgDashboard, IOrganisation } from './interfaces/organization'
+import {
+  OrganizationAtAGlance,
+  SchemaPreviewItem,
+} from './OrganizationAtAGlance'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Tooltip,
@@ -10,14 +18,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { getOrgDashboard, getOrganizationById } from '@/app/api/organization'
+import { apiStatusCodes, currentPageNumber } from '@/config/CommonConstant'
+import { getAllCredDef, getAllSchemasByOrgId } from '@/app/api/schema'
+import {
+  getOrgDashboard,
+  getOrganizationById,
+  getOrganizations,
+} from '@/app/api/organization'
 
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { DeleteIcon } from '@/config/svgs/DeleteIcon'
 import { Edit } from 'lucide-react'
-import { apiStatusCodes } from '@/config/CommonConstant'
+import { Organisation as OrgListItem } from '@/features/dashboard/type/organization'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
+import { getIssuedCredentials } from '@/app/api/Issuance'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 type OrganizationDashboardProps = {
@@ -36,6 +53,23 @@ export const OrganizationDashboard = ({
   const [orgDashboard, setOrgDashboard] = useState<IOrgDashboard | null>(null)
   const [, setLoading] = useState(true)
   const [walletStatus, setWalletStatus] = useState<boolean>(false)
+  // "At a glance" preview data for the bhutanndi Organizations/Schemas/Credential
+  // definitions/Credentials issued cards. Fetched only for the bhutanndi theme —
+  // no other white-label build renders this row, so no other build should
+  // pay for these extra requests.
+  const [orgList, setOrgList] = useState<OrgListItem[]>([])
+  // Real total organization count — orgList itself is only the first page
+  // (getOrganizations(currentPageNumber, 10)), so it under-reports for
+  // anyone in more than 10 organizations.
+  const [orgTotalCount, setOrgTotalCount] = useState<number>(0)
+  const [schemaPreview, setSchemaPreview] = useState<SchemaPreviewItem[]>([])
+  // Card removed from OrganizationAtAGlance's grid, but the real
+  // getAllCredDef fetch below (batched with the other real Overview data)
+  // is left as-is rather than removed — only the display was asked to go.
+  const [, setCredDefPreview] = useState<CredDefData[]>([])
+  const [issuedCredPreview, setIssuedCredPreview] = useState<
+    IssuedCredential[]
+  >([])
 
   const selectedDropdownOrgId = useAppSelector(
     (state) => state.organization.orgId,
@@ -79,6 +113,69 @@ export const OrganizationDashboard = ({
       }
     }, [activeOrgId])
 
+  // The user's organization-membership list — unlike the other "at a
+  // glance" data below, this isn't scoped to activeOrgId at all (it's the
+  // same list regardless of which org is active), so it's fetched
+  // separately rather than being tied to a callback that re-runs on every
+  // org switch.
+  const fetchOrgMembershipList = useCallback(async (): Promise<void> => {
+    if (!isBhutanndiTheme()) {
+      return
+    }
+
+    const response = await getOrganizations(currentPageNumber, 10)
+    if (typeof response !== 'string' && response?.data?.data?.organizations) {
+      setOrgList(response.data.data.organizations)
+      setOrgTotalCount(
+        response.data.data.totalCount ??
+          response.data.data.organizations.length,
+      )
+    }
+  }, [])
+
+  const fetchAtAGlanceData = useCallback(async (): Promise<void> => {
+    if (!isBhutanndiTheme() || !activeOrgId) {
+      return
+    }
+
+    const [schemasRes, credDefsRes, issuedRes] = await Promise.allSettled([
+      getAllSchemasByOrgId(
+        { search: '', itemPerPage: 5, page: currentPageNumber },
+        activeOrgId,
+      ),
+      getAllCredDef(activeOrgId),
+      getIssuedCredentials({
+        page: currentPageNumber,
+        itemPerPage: 5,
+        search: '',
+        sortBy: 'createDateTime',
+        sortingOrder: 'desc',
+        orgId: activeOrgId,
+      }),
+    ])
+
+    if (schemasRes.status === 'fulfilled') {
+      const response = schemasRes.value
+      if (typeof response !== 'string' && response?.data?.data?.data) {
+        setSchemaPreview(response.data.data.data)
+      }
+    }
+
+    if (credDefsRes.status === 'fulfilled') {
+      const response = credDefsRes.value
+      if (typeof response !== 'string' && response?.data?.data?.data) {
+        setCredDefPreview(response.data.data.data)
+      }
+    }
+
+    if (issuedRes.status === 'fulfilled') {
+      const response = issuedRes.value
+      if (typeof response !== 'string' && response?.data?.data?.data) {
+        setIssuedCredPreview(response.data.data.data)
+      }
+    }
+  }, [activeOrgId])
+
   const handleEditOrg = (): void => {
     hardNavigate(`/create-organization?orgId=${activeOrgId}`)
   }
@@ -90,12 +187,99 @@ export const OrganizationDashboard = ({
   useEffect(() => {
     async function loadData(): Promise<void> {
       setLoading(true)
-      await fetchOrganizationDetails()
-      await fetchOrganizationDashboardDetails()
+      // None of these three depend on each other's results — each only
+      // needs activeOrgId, already known up front — so run them together
+      // instead of paying for three sequential round trips.
+      await Promise.all([
+        fetchOrganizationDetails(),
+        fetchOrganizationDashboardDetails(),
+        fetchAtAGlanceData(),
+      ])
       setLoading(false)
     }
     loadData()
-  }, [fetchOrganizationDetails, fetchOrganizationDashboardDetails])
+  }, [
+    fetchOrganizationDetails,
+    fetchOrganizationDashboardDetails,
+    fetchAtAGlanceData,
+  ])
+
+  // Not org-scoped, so this doesn't belong in the activeOrgId-keyed effect
+  // above — otherwise it refetches from the network on every org switch for
+  // no reason.
+  useEffect(() => {
+    fetchOrgMembershipList()
+  }, [fetchOrgMembershipList])
+
+  if (isBhutanndiTheme()) {
+    return (
+      <div className="space-y-5">
+        <Panel>
+          {selectedDropdownOrgId === '' || !selectedDropdownOrgId ? (
+            <span className="text-bhutanndi-muted text-[13.5px]">
+              No organization Data
+            </span>
+          ) : (
+            <div className="relative z-[4] flex min-w-0 cursor-default items-center gap-4">
+              <Avatar className="h-16 w-16 rounded-xl">
+                {orgData?.logoUrl ? (
+                  <AvatarImage src={orgData?.logoUrl} alt={orgData?.name} />
+                ) : (
+                  <AvatarFallback
+                    className="font-display text-bhutanndi-accent rounded-xl text-2xl font-bold"
+                    style={{ background: 'var(--bhutanndi-mint-08)' }}
+                  >
+                    {orgData?.name.substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                )}
+              </Avatar>
+              <div className="min-w-0 space-y-1">
+                <h2 className="font-display text-bhutanndi-strong truncate text-[19px] font-semibold tracking-[-0.02em]">
+                  {orgData?.name}
+                </h2>
+                <div className="text-bhutanndi-muted text-[13.5px] break-all">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="m-0">
+                          {typeof orgData?.description === 'string' &&
+                          orgData?.description?.length > 150
+                            ? `${orgData?.description.substring(0, 150)}...`
+                            : orgData?.description}{' '}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        sideOffset={4}
+                        className="max-w-3xl"
+                      >
+                        <div>{orgData?.description}</div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-bhutanndi-faint mt-2 text-[12.5px]">
+                  Profile view:{' '}
+                  <span className="text-bhutanndi-body font-medium">
+                    {orgData?.publicProfile ? 'public' : 'private'}
+                  </span>
+                </p>
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <OrganizationAtAGlance
+          orgList={orgList}
+          orgTotalCount={orgTotalCount}
+          schemasCount={orgDashboard?.schemasCount ?? 0}
+          schemaPreview={schemaPreview}
+          credentialsCount={orgDashboard?.credentialsCount ?? 0}
+          issuedCredPreview={issuedCredPreview}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="container mx-auto space-y-6 px-4 py-6">

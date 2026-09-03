@@ -22,7 +22,9 @@ import DateTooltip from '@/components/DateTooltip'
 import Loader from '@/components/Loader'
 import { dateConversion } from '@/utils/DateConversion'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { limitedAttributesLength } from '@/config/CommonConstant'
+import BhutanndiSchemaCard from './BhutanndiSchemaCard'
 import { pathRoutes } from '@/config/pathRoutes'
 import { setSchemaDetails } from '@/lib/schemaStorageSlice'
 import { useAppDispatch } from '@/lib/hooks'
@@ -171,6 +173,45 @@ const SchemaCard = (props: Readonly<ISchemaCardProps>): React.JSX.Element => {
     props.w3cSchema &&
     !props.isVerification &&
     !props.isVerificationUsingEmail
+
+  if (isBhutanndiTheme()) {
+    return (
+      <BhutanndiSchemaCard
+        className={props.className}
+        schemaName={props.schemaName}
+        version={props.version}
+        schemaId={props.schemaId}
+        created={props.created}
+        issuerName={props.issuerName}
+        ledgerDisplay={ledgerDisplay}
+        noLedger={props.noLedger}
+        w3cSchema={props.w3cSchema}
+        displayedAttributes={displayedAttributes}
+        extraCount={extraCount}
+        hasNestedAttributes={Boolean(hasNestedAttributes)}
+        isInteractive={isInteractive}
+        isSelectable={Boolean(isSelectable)}
+        isSelected={isSelected}
+        isNavigable={isNavigable}
+        showIssueButton={Boolean(showIssueButton)}
+        isLoading={isLoading}
+        onCardClick={handleCardClick}
+        onIssueClick={(e: React.MouseEvent) => {
+          e.stopPropagation()
+          setIsLoading(true)
+          handleButtonClick()
+        }}
+        onTitleClick={props.onTitleClick}
+        showCheckbox={props.showCheckbox}
+        onCheckboxChange={handleCheckboxChange}
+        checkboxSchemaData={{
+          schemaId: props.schemaId,
+          schemaName: props.schemaName,
+          attributes: props.attributes,
+        }}
+      />
+    )
+  }
 
   return (
     <div

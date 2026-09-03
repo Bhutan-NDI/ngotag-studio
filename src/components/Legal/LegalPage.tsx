@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { marketplaceLegal } from '@/config/marketplaceLegal'
 
 interface LegalSection {
@@ -18,7 +19,13 @@ export function LegalPage({
   sections,
 }: LegalPageProps): React.JSX.Element {
   return (
-    <main className="bg-background h-screen overflow-y-auto">
+    <main
+      className={
+        isBhutanndiTheme()
+          ? 'min-h-full overflow-y-auto'
+          : 'bg-background h-screen overflow-y-auto'
+      }
+    >
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-12">
         <header className="space-y-3">
           <Link
