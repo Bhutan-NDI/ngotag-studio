@@ -13,6 +13,7 @@ concurrency:
 
 jobs:
   validate:
+    # Keep this check name synchronized with ci.check_name in the release contract.
     name: Lint & Build
     runs-on: ubuntu-latest
     env:
@@ -21,6 +22,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate release automation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n .github/scripts/validate-studio-release-contract.sh
+          sh -n .github/scripts/validate-studio-manifest.sh
+          sh -n .github/scripts/validate-studio-workflow-contract.sh
+          sh -n .github/scripts/wait-for-studio-ci.sh
+          sh -n .github/scripts/test-studio-release-selectors.sh
+          sh .github/scripts/validate-studio-release-contract.sh \
+            .github/studio-release-contract.json
+          sh .github/scripts/validate-studio-workflow-contract.sh \
+            .github/studio-release-contract.json \
+            .github/workflows/deploy-studio.yml
+          sh .github/scripts/test-studio-release-selectors.sh
+          make --dry-run _release DEPLOY_ENV=qa \
+            DEPLOYMENT_CONFIG_REPOSITORY=example/manifests | /bin/sh -n
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

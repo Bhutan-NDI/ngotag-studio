@@ -1,48 +1,109 @@
 .PHONY: deploy-qa deploy-stage deploy-prod
 
-DEPLOY_WORKFLOW ?= deploy-studio.yml
 DEPLOY_WAIT ?= true
+DEPLOYMENT_CONFIG_REPOSITORY ?=
+RELEASE_CONTRACT := .github/studio-release-contract.json
+CONTRACT_VALIDATOR := .github/scripts/validate-studio-release-contract.sh
+MANIFEST_VALIDATOR := .github/scripts/validate-studio-manifest.sh
+CI_WAIT_SCRIPT := .github/scripts/wait-for-studio-ci.sh
+WORKFLOW_RUN_FILTER := .github/scripts/select-studio-workflow-run.jq
 
-# These targets only dispatch a GitHub Actions workflow. The workflow repeats every
-# branch/environment check, so bypassing Make cannot bypass the release policy.
-# The mapping is deliberately repeated in the manifest dispatcher, GitHub
-# Environment restrictions, and deployment workflow as independent security gates.
+# A DevOps operator starts every release through one of these targets. Make pins the
+# exact reviewed manifest and source commits in an immutable tag; the workflow then
+# repeats every policy check before it can obtain AWS credentials.
+# Environment branches, tag prefixes, and the required CI check are defined once in
+# RELEASE_CONTRACT. CI verifies that the workflow trigger and resolver-concurrency
+# mappings stay synchronized; keep the operator targets explicit so every supported
+# release remains discoverable.
 deploy-qa:
-	@$(MAKE) --no-print-directory _dispatch DEPLOY_ENV=qa REQUIRED_BRANCH=develop
+	@$(MAKE) --no-print-directory _release DEPLOY_ENV=qa
 
 deploy-stage:
-	@$(MAKE) --no-print-directory _dispatch DEPLOY_ENV=stage REQUIRED_BRANCH=main
+	@$(MAKE) --no-print-directory _release DEPLOY_ENV=stage
 
 deploy-prod:
-	@$(MAKE) --no-print-directory _dispatch DEPLOY_ENV=prod REQUIRED_BRANCH=main
+	@$(MAKE) --no-print-directory _release DEPLOY_ENV=prod
 
-.PHONY: _dispatch
-_dispatch:
-	@test "$$(git rev-parse --abbrev-ref HEAD)" = "$(REQUIRED_BRANCH)" || (echo "deploy-$(DEPLOY_ENV) must be run from $(REQUIRED_BRANCH)" && exit 1)
-	@test -z "$$(git status --porcelain)" || (echo "working tree must be clean before deployment" && exit 1)
-	@git fetch origin "$(REQUIRED_BRANCH)" --tags
-	@test "$$(git rev-parse HEAD)" = "$$(git rev-parse origin/$(REQUIRED_BRANCH))" || (echo "local HEAD must exactly match origin/$(REQUIRED_BRANCH)" && exit 1)
+.PHONY: _release
+_release:
 	@command -v gh >/dev/null || (echo "GitHub CLI (gh) is required" && exit 1)
 	@command -v jq >/dev/null || (echo "jq is required" && exit 1)
+	@command -v base64 >/dev/null || (echo "base64 is required" && exit 1)
+	@command -v cut >/dev/null || (echo "cut is required" && exit 1)
 	@set -eu; \
-		request_id="manual-$(DEPLOY_ENV)-$$(date -u +%Y%m%dT%H%M%SZ)-$$(git rev-parse --short=12 HEAD)"; \
-		gh workflow run "$(DEPLOY_WORKFLOW)" --ref "$(REQUIRED_BRANCH)" \
-			-f environment="$(DEPLOY_ENV)" \
-			-f source_sha="$$(git rev-parse HEAD)" \
-			-f request_id="$$request_id"; \
-		echo "Deployment dispatched: $$request_id"; \
+		test -f "$(RELEASE_CONTRACT)" || { echo "release contract is missing" >&2; exit 1; }; \
+		test -f "$(CONTRACT_VALIDATOR)" || { echo "release contract validator is missing" >&2; exit 1; }; \
+		test -f "$(MANIFEST_VALIDATOR)" || { echo "manifest validator is missing" >&2; exit 1; }; \
+		test -f "$(CI_WAIT_SCRIPT)" || { echo "CI wait script is missing" >&2; exit 1; }; \
+		test -f "$(WORKFLOW_RUN_FILTER)" || { echo "workflow-run filter is missing" >&2; exit 1; }; \
+		sh "$(CONTRACT_VALIDATOR)" "$(RELEASE_CONTRACT)"; \
+		required_branch="$$(jq -er --arg environment "$(DEPLOY_ENV)" \
+			'.environments[$$environment].allowed_branch // empty' "$(RELEASE_CONTRACT)")"; \
+		tag_prefix="$$(jq -er --arg environment "$(DEPLOY_ENV)" \
+			'.environments[$$environment].tag_prefix // empty' "$(RELEASE_CONTRACT)")"; \
+		test "$$(git rev-parse --abbrev-ref HEAD)" = "$$required_branch" || { \
+			echo "deploy-$(DEPLOY_ENV) must be run from $$required_branch" >&2; \
+			exit 1; \
+		}; \
+		test -z "$$(git status --porcelain)" || { echo "working tree must be clean before deployment" >&2; exit 1; }; \
+		git fetch origin "$$required_branch" --tags; \
+		test "$$(git rev-parse HEAD)" = "$$(git rev-parse "origin/$$required_branch")" || { \
+			echo "local HEAD must exactly match origin/$$required_branch" >&2; \
+			exit 1; \
+		}; \
+		config_repository="$(DEPLOYMENT_CONFIG_REPOSITORY)"; \
+		test -n "$$config_repository" || { \
+			echo "DEPLOYMENT_CONFIG_REPOSITORY is required" >&2; \
+			exit 1; \
+		}; \
+		studio_repository="$$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"; \
+		source_sha="$$(git rev-parse HEAD)"; \
+		source_short="$$(printf '%s' "$$source_sha" | cut -c1-12)"; \
+		manifest_ref="$$(gh api "repos/$${config_repository}/git/ref/heads/main" --jq '.object.sha')"; \
+		manifest_content="$$(gh api "repos/$${config_repository}/contents/studio/environments/$(DEPLOY_ENV).json?ref=$${manifest_ref}" --jq '.content')"; \
+		manifest_file="$$(mktemp)"; \
+		trap 'rm -f "$$manifest_file"' EXIT HUP INT TERM; \
+		printf '%s' "$$manifest_content" | base64 --decode > "$$manifest_file"; \
+		sh "$(MANIFEST_VALIDATOR)" "$(DEPLOY_ENV)" "$$required_branch" "$$manifest_file"; \
+		sh "$(CI_WAIT_SCRIPT)" "$$studio_repository" "$$source_sha" "$(RELEASE_CONTRACT)"; \
+		release_tag="$${tag_prefix}$${manifest_ref}-$${source_short}-$$(date -u +%Y%m%dT%H%M%SZ)"; \
+		git check-ref-format "refs/tags/$${release_tag}" >/dev/null; \
+		set +e; \
+		git ls-remote --exit-code --tags origin "refs/tags/$${release_tag}" >/dev/null 2>&1; \
+		remote_tag_status=$$?; \
+		set -e; \
+		case "$$remote_tag_status" in \
+			2) ;; \
+			0) echo "release trigger tag already exists: $$release_tag" >&2; exit 1 ;; \
+			*) echo "could not verify release trigger tag absence" >&2; exit "$$remote_tag_status" ;; \
+		esac; \
+		git tag "$$release_tag" "$$source_sha" || { \
+			echo "release trigger tag already exists locally or was created concurrently: $$release_tag" >&2; \
+			exit 1; \
+		}; \
+		set +e; \
+		git push origin "refs/tags/$${release_tag}:refs/tags/$${release_tag}"; \
+		push_status=$$?; \
+		set -e; \
+		if [ "$$push_status" -ne 0 ]; then \
+			git tag -d "$$release_tag" >/dev/null 2>&1 || \
+				echo "warning: could not remove failed local release trigger tag: $$release_tag" >&2; \
+			echo "failed to push release trigger tag (git exit $$push_status): $$release_tag" >&2; \
+			echo "the git error above may indicate a transport/authentication failure or a concurrent remote tag creation; verify the remote before retrying" >&2; \
+			exit "$$push_status"; \
+		fi; \
+		echo "Release triggered: $$release_tag"; \
 		if [ "$(DEPLOY_WAIT)" = "true" ]; then \
 			run_id=""; attempts=0; \
 			while [ -z "$$run_id" ] && [ "$$attempts" -lt 90 ]; do \
-				run_id="$$(gh run list --workflow "$(DEPLOY_WORKFLOW)" --branch "$(REQUIRED_BRANCH)" \
-					--event workflow_dispatch --limit 30 --json databaseId,displayTitle \
-					| jq -r --arg request "$$request_id" '.[] | select(.displayTitle | contains($$request)) | .databaseId' \
-					| head -n 1)"; \
+				workflow_runs="$$(gh api --paginate "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; \
+				run_id="$$(printf '%s' "$$workflow_runs" | jq -sr --arg tag "$$release_tag" \
+					--arg source_sha "$$source_sha" -f "$(WORKFLOW_RUN_FILTER)")"; \
 				[ -n "$$run_id" ] || sleep 2; \
 				attempts=$$((attempts + 1)); \
 			done; \
 			test -n "$$run_id" || { echo "could not locate dispatched workflow run" >&2; exit 1; }; \
-			gh run watch "$$run_id" --exit-status; \
+			gh run watch "$$run_id" --repo "$$studio_repository" --exit-status; \
 		else \
-			echo "Track it with: gh run list --workflow $(DEPLOY_WORKFLOW) --limit 1"; \
+			echo "Track the release tag in the repository Actions page: $$release_tag"; \
 		fi

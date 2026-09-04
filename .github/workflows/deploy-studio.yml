@@ -1,111 +1,134 @@
 name: Deploy Studio
-run-name: Deploy Studio (${{ inputs.environment }}) [${{ inputs.request_id || github.run_id }}]
+run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: Target environment
-        required: true
-        type: choice
-        options: [qa, stage, prod]
-      manifest_ref:
-        description: Exact approved manifest commit; defaults to manifest main
-        required: false
-        type: string
-        default: main
-      request_id:
-        description: Non-secret dispatch correlation identifier
-        required: false
-        type: string
-      source_sha:
-        description: Exact source commit expected by a Makefile dispatch
-        required: false
-        type: string
+  # CI enforces exact synchronization between these trigger globs and
+  # .github/studio-release-contract.json. Every job-level environment decision
+  # is derived once by jobs.resolve and consumed through needs.resolve.outputs.
+  push:
+    tags:
+      - studio-qa-*
+      - studio-stage-*
+      - studio-prod-*
 
 # The default GITHUB_TOKEN is deliberately read-only. AWS access is obtained only
 # through short-lived OIDC credentials after the branch and config checks pass.
 permissions:
   checks: read
   contents: read
-  id-token: write
-
-concurrency:
-  group: studio-${{ inputs.environment }}
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy Studio (${{ inputs.environment }})
+  resolve:
+    name: Resolve Studio release target
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    timeout-minutes: 30
-    env:
-      CONFIG_REPOSITORY: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY }}
-      CONFIG_PATH: studio/environments/${{ inputs.environment }}.json
-      TARGET_ENVIRONMENT: ${{ inputs.environment }}
+    # CI verifies this pre-resolution mapping against the release contract. It
+    # limits same-environment bursts without blocking releases for other environments.
+    concurrency:
+      group: studio-release-resolver-${{ startsWith(github.ref_name, 'studio-qa-') && 'qa' || startsWith(github.ref_name, 'studio-stage-') && 'stage' || startsWith(github.ref_name, 'studio-prod-') && 'prod' || 'invalid' }}
+      cancel-in-progress: false
+      queue: max
+    outputs:
+      target_environment: ${{ steps.release.outputs.target_environment }}
+      expected_branch: ${{ steps.release.outputs.expected_branch }}
+      config_path: ${{ steps.release.outputs.config_path }}
+      manifest_ref: ${{ steps.release.outputs.manifest_ref }}
+      source_sha: ${{ steps.release.outputs.source_sha }}
     steps:
-      - name: Enforce branch policy
+      - name: Check out tagged Studio source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate and resolve Makefile release trigger
+        id: release
         shell: bash
-        env:
-          EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
-          # This trusted mapping is intentionally independent of the private
-          # manifest. The manifest must agree with it; it cannot redefine it.
-          case "$TARGET_ENVIRONMENT" in
-            qa) expected_branch=develop ;;
-            stage|prod) expected_branch=main ;;
-            *) echo "unsupported environment" >&2; exit 1 ;;
-          esac
-          test "$GITHUB_REF_NAME" = "$expected_branch" || {
-            echo "$TARGET_ENVIRONMENT releases must run from $expected_branch; got $GITHUB_REF_NAME" >&2
+          contract=.github/studio-release-contract.json
+
+          sh .github/scripts/validate-studio-release-contract.sh "$contract"
+
+          target_environment="$(jq -er --arg tag "$GITHUB_REF_NAME" '
+            [.environments | to_entries[]
+              | select(.value.tag_prefix as $prefix | $tag | startswith($prefix))
+              | .key]
+            | if length == 1 then .[0] else empty end
+          ' "$contract")" || {
+            echo "unsupported Studio release tag" >&2
             exit 1
           }
-          if [ -n "$EXPECTED_SOURCE_SHA" ]; then
-            test "$EXPECTED_SOURCE_SHA" = "$GITHUB_SHA" || {
-              echo "source branch advanced after the Makefile preflight; re-run the deployment" >&2
-              exit 1
-            }
-          fi
-          echo "EXPECTED_BRANCH=$expected_branch" >> "$GITHUB_ENV"
+          expected_branch="$(jq -er --arg environment "$target_environment" \
+            '.environments[$environment].allowed_branch' "$contract")"
+          tag_prefix="$(jq -er --arg environment "$target_environment" \
+            '.environments[$environment].tag_prefix' "$contract")"
+          tag_suffix="${GITHUB_REF_NAME#"$tag_prefix"}"
+
+          tag_pattern='^([0-9a-f]{40})-([0-9a-f]{12})-([0-9]{8}T[0-9]{6}Z)$'
+          [[ "$tag_suffix" =~ $tag_pattern ]] || {
+            echo "release tag does not match the Makefile contract" >&2
+            exit 1
+          }
+          manifest_ref="${BASH_REMATCH[1]}"
+          expected_source_short="${BASH_REMATCH[2]}"
+          test "${GITHUB_SHA:0:12}" = "$expected_source_short" || {
+            echo "tag-embedded source commit does not match the tagged commit" >&2
+            exit 1
+          }
+
+          branch_sha="$(git rev-parse --verify "refs/remotes/origin/${expected_branch}^{commit}")" || {
+            echo "could not resolve the current $expected_branch branch head" >&2
+            exit 1
+          }
+          test "$GITHUB_SHA" = "$branch_sha" || {
+            echo "$target_environment releases must use the current $expected_branch head" >&2
+            exit 1
+          }
+
+          {
+            echo "target_environment=$target_environment"
+            echo "expected_branch=$expected_branch"
+            echo "config_path=studio/environments/${target_environment}.json"
+            echo "manifest_ref=$manifest_ref"
+            echo "source_sha=$GITHUB_SHA"
+          } >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: resolve
+    name: Deploy Studio (${{ needs.resolve.outputs.target_environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ needs.resolve.outputs.target_environment }}
+    concurrency:
+      group: studio-${{ needs.resolve.outputs.target_environment }}
+      cancel-in-progress: false
+    timeout-minutes: 30
+    permissions:
+      checks: read
+      contents: read
+      id-token: write
+    env:
+      CONFIG_REPOSITORY: ${{ secrets.DEPLOYMENT_CONFIG_REPOSITORY }}
+      TARGET_ENVIRONMENT: ${{ needs.resolve.outputs.target_environment }}
+      EXPECTED_BRANCH: ${{ needs.resolve.outputs.expected_branch }}
+      CONFIG_PATH: ${{ needs.resolve.outputs.config_path }}
+    steps:
       - name: Check out Studio source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.source_sha || github.sha }}
+          ref: ${{ needs.resolve.outputs.source_sha }}
           fetch-depth: 0
 
       - name: Require successful CI for the exact source commit
-        shell: bash
+        shell: sh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -eu
           source_sha="$(git rev-parse HEAD)"
           test "$source_sha" = "$GITHUB_SHA"
-          for attempt in $(seq 1 120); do
-            check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/check-runs")"
-            state="$(jq -r '
-              [.check_runs[] | select(.name == "Lint & Build" and .app.slug == "github-actions")]
-              | sort_by(.started_at)
-              | last
-              | if . == null then "waiting"
-                elif .status != "completed" then "waiting"
-                elif .conclusion == "success" then "success"
-                else "failed:" + (.conclusion // "unknown")
-                end
-            ' <<<"$check_runs")"
-            case "$state" in
-              success) break ;;
-              failed:*) echo "CI did not pass for $source_sha ($state)" >&2; exit 1 ;;
-              waiting) ;;
-            esac
-            if [ "$attempt" -eq 120 ]; then
-              echo "timed out waiting for Lint & Build on $source_sha" >&2
-              exit 1
-            fi
-            sleep 5
-          done
+          sh .github/scripts/wait-for-studio-ci.sh \
+            "$GITHUB_REPOSITORY" "$source_sha" .github/studio-release-contract.json
 
       # This token is scoped to the private configuration repository and revoked
       # automatically after the job.
@@ -123,7 +146,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.CONFIG_REPOSITORY }}
-          ref: ${{ inputs.manifest_ref || 'main' }}
+          ref: ${{ needs.resolve.outputs.manifest_ref }}
           token: ${{ steps.manifest_token.outputs.token }}
           path: deployment-config
           fetch-depth: 0
@@ -145,56 +168,20 @@ jobs:
             echo "selected manifest differs from the current main copy; dispatch the current approved manifest" >&2
             exit 1
           }
-          jq -e --arg environment "$TARGET_ENVIRONMENT" --arg expected_branch "$EXPECTED_BRANCH" '
-            .schema_version == 1 and
-            .environment == $environment and
-            .enabled == true and
-            (.release.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")) and
-            (.release.state == "pending") and
-            (.deployment | type == "object") and
-            ([.deployment[] | select(type != "string" or test("[\\r\\n]"))] | length == 0) and
-            (.deployment.allowed_branch == $expected_branch) and
-            (.deployment.aws_region | test("^[a-z]+-[a-z]+-[0-9]+$")) and
-            (.deployment.cluster | length > 0) and
-            (.deployment.service | length > 0) and
-            (.deployment.task_definition_family | length > 0) and
-            (.deployment.container_name | length > 0) and
-            (.deployment.ecr_repository | length > 0) and
-            ([.deployment | to_entries[] | select(
-              (.value | type) == "string" and (.value | startswith("REVIEW_AND_SET_"))
-            )] | length == 0) and
-            (.build_args | type == "object") and
-            (.release.version == .build_args.NEXT_PUBLIC_CURRENT_RELEASE) and
-            ([
-              "NEXT_PUBLIC_MODE", "NEXT_PUBLIC_BASE_URL",
-              "NEXT_PUBLIC_ECOSYSTEM_FRONT_END_URL", "NEXT_PUBLIC_PLATFORM_NAME",
-              "NEXT_PUBLIC_ACTIVE_THEME", "NEXT_PUBLIC_APP_TITLE",
-              "NEXT_PUBLIC_FOOTER_TEXT", "NEXT_PUBLIC_LOGO_BASE_URL",
-              "NEXT_PUBLIC_CURRENT_RELEASE", "NEXT_PUBLIC_ENABLE_APP_LAUNCHER",
-              "NEXT_PUBLIC_APP_NAME", "NEXT_PUBLIC_ENABLE_SOCIAL_LOGIN",
-              "NEXT_PUBLIC_ENABLE_BILLING_OPTION", "NEXT_PUBLIC_SOVIO_LANDINGPAGE_URL",
-              "NEXT_PUBLIC_LANDINGPAGE_URL", "NEXT_PUBLIC_POLYGON_TESTNET_URL",
-              "NEXT_PUBLIC_POLYGON_MAINNET_URL", "NEXT_PUBLIC_MARKETPLACE_MANAGE_URL",
-              "NEXT_PUBLIC_MARKETPLACE_OFFER_URL", "NEXT_PUBLIC_MARKETPLACE_REQUIRED",
-              "NEXT_PUBLIC_MARKETPLACE_PRODUCT_NAME", "NEXT_PUBLIC_MARKETPLACE_PUBLISHER_NAME",
-              "NEXT_PUBLIC_MARKETPLACE_SUPPORT_EMAIL", "NEXT_PUBLIC_MARKETPLACE_PRIVACY_EMAIL",
-              "NEXT_PUBLIC_ADMIN_PORTAL_CLIENT_ID", "NEXT_PUBLIC_ETHEREUM_TESTNET_URL",
-              "NEXT_PUBLIC_ETHEREUM_MAINNET_URL", "NEXT_PUBLIC_DOCS_URL"
-            ] - (.build_args | keys) | length == 0) and
-            ([.build_args | keys[] | select(test("^NEXT_PUBLIC_[A-Z0-9_]+$") | not)] | length == 0) and
-            ([.build_args | keys[] | select(test("(SECRET|PASSWORD|PRIVATE|TOKEN|ACCESS_KEY)") )] | length == 0) and
-            ([.build_args[] | select(type != "string" or test("[\\r\\n]"))] | length == 0)
-          ' "$config" >/dev/null
+          sh .github/scripts/validate-studio-manifest.sh \
+            "$TARGET_ENVIRONMENT" "$EXPECTED_BRANCH" "$config"
           release_version="$(jq -r '.release.version' "$config")"
           config_hash="$(sha256sum "$config" | awk '{print $1}')"
-          image_tag="studio-v${release_version}-$(git rev-parse --short=12 HEAD)-${config_hash:0:12}"
+          image_tag="studio-v${release_version}-${GITHUB_SHA:0:12}-${config_hash:0:12}"
           manifest_commit="$(git -C deployment-config rev-parse HEAD)"
-          echo "config=$config" >> "$GITHUB_OUTPUT"
-          echo "aws_region=$(jq -r '.deployment.aws_region' "$config")" >> "$GITHUB_OUTPUT"
-          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
-          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
-          echo "config_hash=$config_hash" >> "$GITHUB_OUTPUT"
-          echo "manifest_commit=$manifest_commit" >> "$GITHUB_OUTPUT"
+          {
+            echo "config=$config"
+            echo "aws_region=$(jq -r '.deployment.aws_region' "$config")"
+            echo "release_version=$release_version"
+            echo "image_tag=$image_tag"
+            echo "config_hash=$config_hash"
+            echo "manifest_commit=$manifest_commit"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials through GitHub OIDC
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -348,17 +335,19 @@ jobs:
           case "$TARGET_ENVIRONMENT" in
             qa)
               release_tag="v${RELEASE_VERSION}-qa.${release_suffix}"
-              prerelease_flag=--prerelease
+              release_args=(--prerelease)
               ;;
             stage)
               release_tag="v${RELEASE_VERSION}-rc.${release_suffix}"
-              prerelease_flag=--prerelease
+              release_args=(--prerelease)
               ;;
             prod)
               release_tag="v${RELEASE_VERSION}"
-              prerelease_flag=
+              release_args=()
               ;;
           esac
+          # printf intentionally interprets the escaped newlines in this static format.
+          # shellcheck disable=SC2016
           notes=$(printf 'Environment: `%s`\n\nSource commit: `%s`\n\nManifest commit: `%s`\n\nImage: `%s@%s`\n\nTask definition: `%s`\n' \
             "$TARGET_ENVIRONMENT" "$GITHUB_SHA" "${{ steps.config.outputs.manifest_commit }}" \
             "$image" "$image_digest" "${{ steps.ecs.outputs.task_definition_arn }}")
@@ -376,7 +365,7 @@ jobs:
             echo "Reusing matching release $release_tag after a safe retry"
           else
             gh release create "$release_tag" --target "$GITHUB_SHA" \
-              --title "NGOTAG Studio $release_tag" --notes "$notes" $prerelease_flag
+              --title "NGOTAG Studio $release_tag" --notes "$notes" "${release_args[@]}"
           fi
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 

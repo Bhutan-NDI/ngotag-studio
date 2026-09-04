@@ -31,26 +31,49 @@ configuration is therefore rejected before any image or ECS mutation.
 The release workflow enforces the organization’s branch policy, authenticates to
 cloud resources using short-lived GitHub OIDC credentials, and uses narrowly scoped
 GitHub App tokens for private configuration reads/writes and Release creation.
+Environment branches, release-tag prefixes, and the required CI check identity are
+defined once in `.github/studio-release-contract.json`. A secret-free resolver job
+validates the immutable tag and exposes that policy as job outputs; only the selected,
+protected deployment job receives GitHub Environment secrets and OIDC permission.
+Adding or removing an environment also requires a matching public Make target and
+workflow trigger glob; the workflow's pre-resolution concurrency group also names
+the environment because step outputs are not available yet. CI rejects drift in
+both workflow-level mappings. The exact GitHub Environment is also a required
+provisioning point: it must exist with the matching branch restriction, required
+Environment secrets, and the approved reviewer/protection policy before the
+manifest can be enabled. The corresponding OIDC/deployer configuration remains
+owned by the restricted Terraform repository. None of these locations redefines
+the contract's branch or tag-prefix policy.
 
 The workflow derives the ECR image tag itself from the approved SemVer release,
 the exact source commit, and a hash of the approved private manifest. It will never
 accept a caller-provided image tag or overwrite an existing tag. This keeps a
 configuration-only release just as traceable as a source-code release.
 
-`make deploy-qa`, `make deploy-stage`, and `make deploy-prod` dispatch only from
-their permitted source branch, pin the exact preflight source commit, and wait for
-the resulting workflow to finish. Before obtaining AWS credentials, the workflow
-requires the GitHub Actions `Lint & Build` check to have succeeded for that exact
-commit. It then builds and pushes the image using an environment-scoped GitHub
-Actions layer cache, clones the task definition currently
+`make deploy-qa`, `make deploy-stage`, and `make deploy-prod` are the only supported
+operator entry points. A DevOps operator supplies the restricted configuration
+repository locator through `DEPLOYMENT_CONFIG_REPOSITORY`; Make verifies the current
+manifest is enabled and pending, confirms the exact permitted source-branch head and
+waits for its successful `Lint & Build` check, and pushes an immutable
+release-trigger tag. The operator path and deployment workflow use the same bounded
+CI-wait implementation, so a release requested moments after a branch push does not
+fail merely because the required check is still queued or running.
+Make and the workflow invoke the same
+`.github/scripts/validate-studio-manifest.sh` policy, so an ineligible manifest is
+rejected before tag creation as well as before AWS access.
+The tag pins both the full manifest commit and the source commit. The workflow
+rejects malformed tags and repeats the manifest, branch, source, and CI checks
+before obtaining AWS credentials. It then builds and pushes the image using an
+environment-scoped GitHub Actions layer cache, clones the task definition currently
 used by the service, registers a new revision with only the intended container
 image changed, deploys it, and verifies that ECS stabilized on that exact revision
 before publishing the release ledger.
 
 A reviewed public-build configuration change in the private manifest repository
-also prepares and dispatches a release automatically. Disabled environments never
-dispatch. Deployment-ledger updates are ignored, preventing a successful release
-record from triggering another image build.
+prepares a pending release but never deploys it. Disabled environments never prepare
+a release, and deployment-ledger updates are ignored. A DevOps operator must still
+run the matching Make target from the permitted Studio branch; pushing release tags
+or invoking the workflow directly is not an approved release path.
 
 Operational setup and environment details are intentionally maintained in the
 private infrastructure repositories.
