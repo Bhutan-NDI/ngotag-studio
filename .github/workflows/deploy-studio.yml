@@ -2,7 +2,7 @@ name: Deploy Studio
 run-name: Deploy Studio [${{ github.ref_name }}]
 
 on:
-  # Keep these trigger globs synchronized with the environment keys in
+  # CI enforces exact synchronization between these trigger globs and
   # .github/studio-release-contract.json. Every job-level environment decision
   # is derived once by jobs.resolve and consumed through needs.resolve.outputs.
   push:
@@ -21,10 +21,11 @@ jobs:
   resolve:
     name: Resolve Studio release target
     runs-on: ubuntu-latest
+    # CI verifies this pre-resolution mapping against the release contract. It
+    # limits same-environment bursts without blocking releases for other environments.
     concurrency:
-      group: studio-release-resolver
+      group: studio-release-resolver-${{ startsWith(github.ref_name, 'studio-qa-') && 'qa' || startsWith(github.ref_name, 'studio-stage-') && 'stage' || startsWith(github.ref_name, 'studio-prod-') && 'prod' || 'invalid' }}
       cancel-in-progress: false
-      # Retain burst traffic instead of replacing the existing pending release.
       queue: max
     outputs:
       target_environment: ${{ steps.release.outputs.target_environment }}
@@ -119,32 +120,15 @@ jobs:
           fetch-depth: 0
 
       - name: Require successful CI for the exact source commit
-        shell: bash
+        shell: sh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          set -euo pipefail
+          set -eu
           source_sha="$(git rev-parse HEAD)"
           test "$source_sha" = "$GITHUB_SHA"
-          contract=.github/studio-release-contract.json
-          check_name="$(jq -er '.ci.check_name' "$contract")"
-          app_slug="$(jq -er '.ci.app_slug' "$contract")"
-          for attempt in $(seq 1 120); do
-            check_runs="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${source_sha}/check-runs")"
-            state="$(jq -r --arg check_name "$check_name" --arg app_slug "$app_slug" \
-              -f .github/scripts/select-studio-ci-state.jq <<<"$check_runs")"
-            case "$state" in
-              success) break ;;
-              failed:*) echo "CI did not pass for $source_sha ($state)" >&2; exit 1 ;;
-              missing|pending) ;;
-              *) echo "unexpected CI state for $source_sha: $state" >&2; exit 1 ;;
-            esac
-            if [ "$attempt" -eq 120 ]; then
-              echo "timed out waiting for $check_name on $source_sha" >&2
-              exit 1
-            fi
-            sleep 5
-          done
+          sh .github/scripts/wait-for-studio-ci.sh \
+            "$GITHUB_REPOSITORY" "$source_sha" .github/studio-release-contract.json
 
       # This token is scoped to the private configuration repository and revoked
       # automatically after the job.

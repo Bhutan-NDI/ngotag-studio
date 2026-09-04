@@ -7,7 +7,8 @@ else
     .[].workflow_runs[]
     | select(
         .path == ".github/workflows/deploy-studio.yml" and
-          ((.display_title // "") | contains($tag))
+          .display_title == ("Deploy Studio [" + $tag + "]") and
+          .head_sha == $source_sha
       )
   ]
   | sort_by(.created_at // "")

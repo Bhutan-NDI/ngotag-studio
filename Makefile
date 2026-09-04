@@ -5,15 +5,16 @@ DEPLOYMENT_CONFIG_REPOSITORY ?=
 RELEASE_CONTRACT := .github/studio-release-contract.json
 CONTRACT_VALIDATOR := .github/scripts/validate-studio-release-contract.sh
 MANIFEST_VALIDATOR := .github/scripts/validate-studio-manifest.sh
-CI_STATE_FILTER := .github/scripts/select-studio-ci-state.jq
+CI_WAIT_SCRIPT := .github/scripts/wait-for-studio-ci.sh
 WORKFLOW_RUN_FILTER := .github/scripts/select-studio-workflow-run.jq
 
 # A DevOps operator starts every release through one of these targets. Make pins the
 # exact reviewed manifest and source commits in an immutable tag; the workflow then
 # repeats every policy check before it can obtain AWS credentials.
 # Environment branches, tag prefixes, and the required CI check are defined once in
-# RELEASE_CONTRACT. When the environment set changes, keep these operator targets and
-# deploy-studio.yml's trigger globs synchronized with the contract keys.
+# RELEASE_CONTRACT. CI verifies that the workflow trigger and resolver-concurrency
+# mappings stay synchronized; keep the operator targets explicit so every supported
+# release remains discoverable.
 deploy-qa:
 	@$(MAKE) --no-print-directory _release DEPLOY_ENV=qa
 
@@ -33,15 +34,13 @@ _release:
 		test -f "$(RELEASE_CONTRACT)" || { echo "release contract is missing" >&2; exit 1; }; \
 		test -f "$(CONTRACT_VALIDATOR)" || { echo "release contract validator is missing" >&2; exit 1; }; \
 		test -f "$(MANIFEST_VALIDATOR)" || { echo "manifest validator is missing" >&2; exit 1; }; \
-		test -f "$(CI_STATE_FILTER)" || { echo "CI state filter is missing" >&2; exit 1; }; \
+		test -f "$(CI_WAIT_SCRIPT)" || { echo "CI wait script is missing" >&2; exit 1; }; \
 		test -f "$(WORKFLOW_RUN_FILTER)" || { echo "workflow-run filter is missing" >&2; exit 1; }; \
 		sh "$(CONTRACT_VALIDATOR)" "$(RELEASE_CONTRACT)"; \
 		required_branch="$$(jq -er --arg environment "$(DEPLOY_ENV)" \
 			'.environments[$$environment].allowed_branch // empty' "$(RELEASE_CONTRACT)")"; \
 		tag_prefix="$$(jq -er --arg environment "$(DEPLOY_ENV)" \
 			'.environments[$$environment].tag_prefix // empty' "$(RELEASE_CONTRACT)")"; \
-		ci_check_name="$$(jq -er '.ci.check_name // empty' "$(RELEASE_CONTRACT)")"; \
-		ci_app_slug="$$(jq -er '.ci.app_slug // empty' "$(RELEASE_CONTRACT)")"; \
 		test "$$(git rev-parse --abbrev-ref HEAD)" = "$$required_branch" || { \
 			echo "deploy-$(DEPLOY_ENV) must be run from $$required_branch" >&2; \
 			exit 1; \
@@ -66,12 +65,7 @@ _release:
 		trap 'rm -f "$$manifest_file"' EXIT HUP INT TERM; \
 		printf '%s' "$$manifest_content" | base64 --decode > "$$manifest_file"; \
 		sh "$(MANIFEST_VALIDATOR)" "$(DEPLOY_ENV)" "$$required_branch" "$$manifest_file"; \
-		check_runs="$$(gh api "repos/$${studio_repository}/commits/$${source_sha}/check-runs")"; \
-		ci_state="$$(printf '%s' "$$check_runs" | jq -r --arg check_name "$$ci_check_name" --arg app_slug "$$ci_app_slug" -f "$(CI_STATE_FILTER)")"; \
-		test "$$ci_state" = "success" || { \
-			echo "$$ci_check_name has not succeeded for $$source_sha ($$ci_state)" >&2; \
-			exit 1; \
-		}; \
+		sh "$(CI_WAIT_SCRIPT)" "$$studio_repository" "$$source_sha" "$(RELEASE_CONTRACT)"; \
 		release_tag="$${tag_prefix}$${manifest_ref}-$${source_short}-$$(date -u +%Y%m%dT%H%M%SZ)"; \
 		git check-ref-format "refs/tags/$${release_tag}" >/dev/null; \
 		set +e; \
@@ -103,7 +97,8 @@ _release:
 			run_id=""; attempts=0; \
 			while [ -z "$$run_id" ] && [ "$$attempts" -lt 90 ]; do \
 				workflow_runs="$$(gh api --paginate "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; \
-				run_id="$$(printf '%s' "$$workflow_runs" | jq -sr --arg tag "$$release_tag" -f "$(WORKFLOW_RUN_FILTER)")"; \
+				run_id="$$(printf '%s' "$$workflow_runs" | jq -sr --arg tag "$$release_tag" \
+					--arg source_sha "$$source_sha" -f "$(WORKFLOW_RUN_FILTER)")"; \
 				[ -n "$$run_id" ] || sleep 2; \
 				attempts=$$((attempts + 1)); \
 			done; \

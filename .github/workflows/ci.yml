@@ -29,15 +29,17 @@ jobs:
           set -euo pipefail
           sh -n .github/scripts/validate-studio-release-contract.sh
           sh -n .github/scripts/validate-studio-manifest.sh
+          sh -n .github/scripts/validate-studio-workflow-contract.sh
+          sh -n .github/scripts/wait-for-studio-ci.sh
+          sh -n .github/scripts/test-studio-release-selectors.sh
           sh .github/scripts/validate-studio-release-contract.sh \
             .github/studio-release-contract.json
+          sh .github/scripts/validate-studio-workflow-contract.sh \
+            .github/studio-release-contract.json \
+            .github/workflows/deploy-studio.yml
+          sh .github/scripts/test-studio-release-selectors.sh
           make --dry-run _release DEPLOY_ENV=qa \
             DEPLOYMENT_CONFIG_REPOSITORY=example/manifests | /bin/sh -n
-          jq -n '{check_runs: []}' | jq -r \
-              --arg check_name "Lint & Build" --arg app_slug "github-actions" \
-              -f .github/scripts/select-studio-ci-state.jq >/dev/null
-          jq -n '{workflow_runs: []}' | jq -sr --arg tag example \
-            -f .github/scripts/select-studio-workflow-run.jq >/dev/null
 
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

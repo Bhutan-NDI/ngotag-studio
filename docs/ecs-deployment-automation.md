@@ -36,7 +36,14 @@ defined once in `.github/studio-release-contract.json`. A secret-free resolver j
 validates the immutable tag and exposes that policy as job outputs; only the selected,
 protected deployment job receives GitHub Environment secrets and OIDC permission.
 Adding or removing an environment also requires a matching public Make target and
-workflow trigger glob; neither location redefines its branch or tag-prefix policy.
+workflow trigger glob; the workflow's pre-resolution concurrency group also names
+the environment because step outputs are not available yet. CI rejects drift in
+both workflow-level mappings. The exact GitHub Environment is also a required
+provisioning point: it must exist with the matching branch restriction, required
+Environment secrets, and the approved reviewer/protection policy before the
+manifest can be enabled. The corresponding OIDC/deployer configuration remains
+owned by the restricted Terraform repository. None of these locations redefines
+the contract's branch or tag-prefix policy.
 
 The workflow derives the ECR image tag itself from the approved SemVer release,
 the exact source commit, and a hash of the approved private manifest. It will never
@@ -47,7 +54,10 @@ configuration-only release just as traceable as a source-code release.
 operator entry points. A DevOps operator supplies the restricted configuration
 repository locator through `DEPLOYMENT_CONFIG_REPOSITORY`; Make verifies the current
 manifest is enabled and pending, confirms the exact permitted source-branch head and
-its successful `Lint & Build` check, and pushes an immutable release-trigger tag.
+waits for its successful `Lint & Build` check, and pushes an immutable
+release-trigger tag. The operator path and deployment workflow use the same bounded
+CI-wait implementation, so a release requested moments after a branch push does not
+fail merely because the required check is still queued or running.
 Make and the workflow invoke the same
 `.github/scripts/validate-studio-manifest.sh` policy, so an ineligible manifest is
 rejected before tag creation as well as before AWS access.
