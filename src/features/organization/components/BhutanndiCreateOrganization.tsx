@@ -202,7 +202,12 @@ export function BhutanndiCreateOrganization({
             </label>
 
             <div className={FIELD_BLOCK_CLASS}>
-              <span className={LABEL_CLASS}>Location</span>
+              <span className={LABEL_CLASS}>
+                Location{' '}
+                <span className="text-bhutanndi-faint tracking-normal normal-case">
+                  (optional)
+                </span>
+              </span>
               <div className="grid grid-cols-3 gap-2">
                 <BhutanndiSelect
                   label="Country"

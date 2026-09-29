@@ -30,7 +30,7 @@ import Loader from '@/components/Loader'
 import { QrCode } from 'lucide-react'
 import PageContainer from '@/components/layout/page-container'
 import SidePanelComponent from '@/config/SidePanelCommon'
-import { createConnection } from '@/app/api/organization'
+import { createConnection, getOrganizationById } from '@/app/api/organization'
 import { dateConversion } from '@/utils/DateConversion'
 import { getConnectionsByOrg } from '@/app/api/connection'
 import { useAppSelector } from '@/lib/hooks'
@@ -63,9 +63,19 @@ export default function Connections(): JSX.Element {
     setIsQrLoading(true)
     setQrError(null)
     try {
+      const orgResponse = await getOrganizationById(orgId)
+      const { data: orgData } = orgResponse as AxiosResponse
+      type OrgAgent = { orgDid: string; isDidPublic: boolean }
+      const orgAgents = (orgData?.data?.org_agents ?? []) as OrgAgent[]
+      const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+      const goalCode = isBhutanndiTheme()
+        ? (publicAgent?.orgDid ?? null)
+        : 'connection'
+
       const response = await createConnection(
         orgId,
         (orgInfo as { name?: string })?.name || '',
+        goalCode,
       )
 
       if (typeof response === 'string') {
@@ -284,8 +294,8 @@ export default function Connections(): JSX.Element {
   const column = getColumns<Connection>(tableStyling)
 
   const scanQrButton = (
-    <Button variant="outline" size="sm" onClick={handleOpenQrModal}>
-      <QrCode className="mr-2 h-4 w-4" />
+    <Button onClick={handleOpenQrModal} className="gap-2">
+      <QrCode className="h-4 w-4" />
       Create Connection
     </Button>
   )
@@ -344,7 +354,7 @@ export default function Connections(): JSX.Element {
       {/* Scan QR dialog */}
       <Dialog open={openQrModal} onOpenChange={setOpenQrModal}>
         <DialogContent
-          className="sm:max-w-sm"
+          className="sm:max-w-md"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>

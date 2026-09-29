@@ -66,7 +66,7 @@ const SelectionDashboardData = (): JSX.Element => {
         'Generate a scannable QR code that issues on scan — no prior connection needed.',
       path: pathRoutes.organizations.Issuance.connectionOob,
       tag: 'No connection needed',
-      tagVariant: 'green',
+      tagVariant: 'neutral',
       isRecommended: true,
     },
   ]
@@ -107,7 +107,7 @@ const SelectionDashboardData = (): JSX.Element => {
         'Generate a scannable QR code that requests a proof — no prior connection needed.',
       path: pathRoutes.organizations.verification.email,
       tag: 'No connection needed',
-      tagVariant: 'green',
+      tagVariant: 'neutral',
       isRecommended: true,
     },
   ]

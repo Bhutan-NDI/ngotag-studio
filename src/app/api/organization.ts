@@ -154,10 +154,12 @@ export const getOrganizationRoles = async (
 export const createConnection = async (
   orgId: string,
   orgName: string,
+  goalCode: string | null,
 ): Promise<AxiosResponse | string> => {
   const url = `${apiRoutes.organizations.root}/${orgId}${apiRoutes.connection.create}`
 
   const data = {
+    goalCode,
     label: orgName,
     multiUseInvitation: true,
     autoAcceptConnection: true,

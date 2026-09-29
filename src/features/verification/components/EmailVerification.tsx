@@ -29,6 +29,7 @@ import { apiStatusCodes } from '@/config/CommonConstant'
 import { createOobProofRequest } from '@/app/api/verification'
 import delSvg from '@/../public/svgs/del.svg'
 import { getOrganizationById } from '@/app/api/organization'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetAttributeData } from '@/lib/verificationSlice'
 import { useRouter } from 'next/navigation'
@@ -43,11 +44,17 @@ type GroupedSchema = {
   purpose: string
 }
 
+interface IOrgAgentData {
+  orgDid: string
+  isDidPublic: boolean
+}
+
 const EmailVerification = (): JSX.Element => {
   const [loading, setLoading] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [emailInputs, setEmailInputs] = useState([{ value: '' }])
   const [w3cSchema, setW3cSchema] = useState<boolean>(false)
+  const [orgDid, setOrgDid] = useState<string | null>(null)
 
   const router = useRouter()
   const dispatch = useAppDispatch()
@@ -82,17 +89,20 @@ const EmailVerification = (): JSX.Element => {
     const response = await getOrganizationById(orgId)
     const { data } = response as AxiosResponse
     if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-      const did = data?.data?.org_agents?.[0]?.orgDid
+      const orgAgents = (data?.data?.org_agents ?? []) as IOrgAgentData[]
+      const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+      const did = publicAgent?.orgDid
+      setOrgDid(did ?? null)
 
       if (
-        did.includes(DidMethod.POLYGON) ||
-        did.includes(DidMethod.ETHR) ||
-        did.includes(DidMethod.KEY) ||
-        did.includes(DidMethod.WEB)
+        did?.includes(DidMethod.POLYGON) ||
+        did?.includes(DidMethod.ETHR) ||
+        did?.includes(DidMethod.KEY) ||
+        did?.includes(DidMethod.WEB)
       ) {
         setW3cSchema(true)
       }
-      if (did.includes(DidMethod.INDY)) {
+      if (did?.includes(DidMethod.INDY)) {
         setW3cSchema(false)
       }
     }
@@ -147,8 +157,10 @@ const EmailVerification = (): JSX.Element => {
           }),
         )
 
+        const goalCode = isBhutanndiTheme() ? orgDid : 'verification'
+
         payload = {
-          goalCode: 'verification',
+          goalCode,
           willConfirm: true,
           protocolVersion: ProtocolVersion.V2,
           presentationDefinition: {
@@ -262,8 +274,10 @@ const EmailVerification = (): JSX.Element => {
           },
         }
 
+        const goalCode = isBhutanndiTheme() ? orgDid : 'verification'
+
         payload = {
-          goalCode: 'verification',
+          goalCode,
           reuseConnection: true,
           protocolVersion: ProtocolVersion.V1,
           isShortenUrl: true,

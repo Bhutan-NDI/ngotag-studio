@@ -160,7 +160,7 @@
   --error-text: #ff8a8a;
 
   /* ── Badge tokens ── */
-  --badge-success-bg: rgba(90, 201, 148, 0.15);
+  --badge-success-bg: rgba(90, 201, 148, 0.22);
   --badge-success-text: #5ac994;
   --badge-warning-bg: rgba(245, 166, 35, 0.12);
   --badge-warning-text: #f5a623;

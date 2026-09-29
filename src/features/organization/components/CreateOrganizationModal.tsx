@@ -359,7 +359,12 @@ export default function OrganizationOnboarding(): React.JSX.Element {
       .max(500)
       .required('Description is required'),
     website: yup.string().url('Enter a valid URL').nullable(),
-    countryId: yup.number().required('Country is required'),
+    // Location is optional in the bhutanndi theme's forms; every other
+    // theme's form (the generic Card/Stepper fallback below) keeps country
+    // required, as it did before.
+    countryId: isBhutanndiTheme()
+      ? yup.number().nullable()
+      : yup.number().required('Country is required'),
     stateId: yup.number().nullable(),
     cityId: yup.number().nullable(),
   })
@@ -632,13 +637,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
               orgDetails?.roles ??
               []
             const saveDisabled =
-              !values.name ||
-              !values.description ||
-              !values.countryId ||
-              (states.length > 0 && !values.stateId) ||
-              (cities.length > 0 && !values.cityId) ||
-              loading ||
-              createLoading
+              !values.name || !values.description || loading || createLoading
 
             return (
               <BhutanndiOrganizationProfile
@@ -733,13 +732,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
         >
           {({ errors, touched, setFieldValue, values, handleBlur }) => {
             const createDisabled =
-              !values.name ||
-              !values.description ||
-              !values.countryId ||
-              (states.length > 0 && !values.stateId) ||
-              (cities.length > 0 && !values.cityId) ||
-              loading ||
-              createLoading
+              !values.name || !values.description || loading || createLoading
 
             return (
               <BhutanndiCreateOrganization

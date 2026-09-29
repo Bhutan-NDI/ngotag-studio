@@ -17,6 +17,7 @@ import { CredentialType, ProofType, SchemaTypeValue } from '@/common/enums'
 import { setSelectedConnection, setSelectedUser } from '@/lib/storageKeys'
 
 import { AxiosResponse } from 'axios'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { issueCredential } from '@/app/api/Issuance'
 import { pathRoutes } from '@/config/pathRoutes'
 import { store } from '@/lib/store'
@@ -35,8 +36,11 @@ export const handleSubmit = async ({
 }: IHandleSubmit): Promise<void> => {
   let issuancePayload = null
 
+  const goalCode = isBhutanndiTheme() ? orgDid : 'issuance'
+
   if (!w3cSchema) {
     issuancePayload = {
+      goalCode,
       credentialData: values.credentialData.map((item: ICredentialdata) => ({
         ...item,
         attributes: item?.attributes?.map((attr: IAttributesData) => ({
@@ -51,6 +55,7 @@ export const handleSubmit = async ({
   }
   if (w3cSchema) {
     issuancePayload = {
+      goalCode,
       credentialData: values?.credentialData.map((item: ICredentialdata) => ({
         connectionId: item.connectionId,
         credential: {

@@ -209,6 +209,7 @@ export interface IOptionData {
 }
 
 export interface ITransformedData {
+  goalCode?: string | null
   credentialOffer: ICredentialOffer[]
   credentialDefinitionId?: string
   protocolVersion?: string

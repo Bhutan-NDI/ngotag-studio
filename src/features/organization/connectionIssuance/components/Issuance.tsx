@@ -233,7 +233,10 @@ const IssueCred = (): React.JSX.Element => {
       const response = await getOrganizationById(orgId)
       const { data } = response as AxiosResponse
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const did = data?.data?.org_agents?.[0]?.orgDid
+        type OrgAgent = { orgDid: string; isDidPublic: boolean }
+        const orgAgents = (data?.data?.org_agents ?? []) as OrgAgent[]
+        const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+        const did = publicAgent?.orgDid
 
         if (did?.includes(DidMethod.POLYGON)) {
           setw3cSchema(true)
