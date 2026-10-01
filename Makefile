@@ -96,9 +96,12 @@ _release:
 		if [ "$(DEPLOY_WAIT)" = "true" ]; then \
 			run_id=""; attempts=0; \
 			while [ -z "$$run_id" ] && [ "$$attempts" -lt 90 ]; do \
-				workflow_runs="$$(gh api --paginate "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; \
-				run_id="$$(printf '%s' "$$workflow_runs" | jq -sr --arg tag "$$release_tag" \
-					--arg source_sha "$$source_sha" -f "$(WORKFLOW_RUN_FILTER)")"; \
+				if workflow_runs="$$(gh api --paginate "repos/$${studio_repository}/actions/runs?head_sha=$${source_sha}&event=push&per_page=100")"; then \
+					run_id="$$(printf '%s' "$$workflow_runs" | jq -sr --arg tag "$$release_tag" \
+						--arg source_sha "$$source_sha" -f "$(WORKFLOW_RUN_FILTER)")"; \
+				else \
+					echo "warning: GitHub API request failed while locating the release run; retrying" >&2; \
+				fi; \
 				[ -n "$$run_id" ] || sleep 2; \
 				attempts=$$((attempts + 1)); \
 			done; \

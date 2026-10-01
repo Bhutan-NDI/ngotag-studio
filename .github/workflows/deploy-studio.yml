@@ -23,6 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     # CI verifies this pre-resolution mapping against the release contract. It
     # limits same-environment bursts without blocking releases for other environments.
+    # The group runs before any job output exists, so it can only use github.ref_name.
+    # queue: max keeps up to 100 pending resolver runs per group in FIFO order instead
+    # of the default, where a newer pending run cancels the older pending one. Runs
+    # beyond 100 are canceled; cancel-in-progress: false never stops a running resolver.
     concurrency:
       group: studio-release-resolver-${{ startsWith(github.ref_name, 'studio-qa-') && 'qa' || startsWith(github.ref_name, 'studio-stage-') && 'stage' || startsWith(github.ref_name, 'studio-prod-') && 'prod' || 'invalid' }}
       cancel-in-progress: false

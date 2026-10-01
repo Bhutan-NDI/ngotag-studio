@@ -13,6 +13,10 @@ contract=$3
 state_filter=.github/scripts/select-studio-ci-state.jq
 max_attempts=120
 wait_seconds=5
+# Transient GitHub API errors are retried; persistent ones (e.g. authentication)
+# fail after this many consecutive failed requests.
+max_api_failures=6
+api_failures=0
 
 test -f "$contract" || {
   echo "Studio release contract does not exist: $contract" >&2
@@ -28,12 +32,22 @@ app_slug=$(jq -er '.ci.app_slug // empty' "$contract")
 attempt=1
 
 while [ "$attempt" -le "$max_attempts" ]; do
-  check_runs=$(gh api --paginate --slurp \
-    "repos/${repository}/commits/${source_sha}/check-runs?per_page=100")
-  state=$(printf '%s' "$check_runs" | jq -r \
-    --arg check_name "$check_name" \
-    --arg app_slug "$app_slug" \
-    -f "$state_filter")
+  if check_runs=$(gh api --paginate --slurp \
+    "repos/${repository}/commits/${source_sha}/check-runs?per_page=100"); then
+    api_failures=0
+    state=$(printf '%s' "$check_runs" | jq -r \
+      --arg check_name "$check_name" \
+      --arg app_slug "$app_slug" \
+      -f "$state_filter")
+  else
+    api_failures=$((api_failures + 1))
+    if [ "$api_failures" -ge "$max_api_failures" ]; then
+      echo "GitHub API failed $api_failures consecutive times while checking CI for $source_sha" >&2
+      exit 1
+    fi
+    echo "warning: GitHub API request failed; retrying ($api_failures/$max_api_failures)" >&2
+    state=pending
+  fi
 
   case "$state" in
     success)
