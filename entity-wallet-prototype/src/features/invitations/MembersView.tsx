@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
+import { roleIn, type OrgInvitation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { PendingInvitations } from "./PendingInvitations";
@@ -33,30 +34,65 @@ import { PendingInvitations } from "./PendingInvitations";
  * will refuse to grant them authority until it has.
  */
 export function MembersView() {
-  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson } = useDemo();
+  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson, delegatedAuthorities } = useDemo();
 
-  const forced = useScreenState("SCR-INV-03", ["default", "loading", "empty", "offline", "read_only"]);
+  const forced = useScreenState("SCR-INV-03", ["default", "loading", "empty", "delivery_failed", "offline", "read_only"]);
 
   const org = organizations.find((o) => o.id === activeOrgId);
-  const members = people.filter((p) => p.memberRole);
-  const canInvite =
-    forced !== "read_only" &&
-    (currentPerson.memberRole === "Owner" || currentPerson.memberRole === "Admin");
+  /* This organisation's members, each at the role they hold *here* (roleIn).
+     It used to be everyone with a role anywhere, which on a
+     multi-organisation platform (AC-10) is somebody else's staff. */
+  const members = people
+    .filter((p) => p.hasAccount !== false && roleIn(org, p))
+    .map((p) => ({ ...p, role: roleIn(org, p) }));
+  const myRole = roleIn(org, currentPerson);
+  const canInvite = forced !== "read_only" && (myRole === "Owner" || myRole === "Admin");
 
+  const live = orgInvitations.filter(
+    (i) => i.kind === "M" && i.orgId === activeOrgId && (i.state === "PENDING" || i.state === "PENDING_APPROVAL"),
+  );
+  /* E8 is only ever seen here, and on a first day nothing has bounced — so
+     the state switcher shows one bounced invitation for review, rather than
+     leaving the one failure this list exists to surface unreachable. */
+  const bounced: OrgInvitation = {
+    id: "inv-review-bounce",
+    kind: "M",
+    email: "tashi.dema@pelden-trading.bt",
+    orgId: activeOrgId,
+    role: "Member",
+    legalName: null,
+    legalIdentity: null,
+    purpose: null,
+    needsSecondApproval: false,
+    invitedBy: currentPerson.id,
+    approvedBy: null,
+    createdAt: live[0]?.createdAt ?? new Date().toISOString().slice(0, 10),
+    sentAt: new Date().toISOString().slice(0, 10),
+    expiresAt: new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10),
+    state: "PENDING",
+    delivery: "failed",
+    decidedAt: null,
+    acceptedName: null,
+  };
   const pending =
-    forced === "empty"
-      ? []
-      : orgInvitations.filter(
-          (i) =>
-            i.kind === "M" &&
-            i.orgId === activeOrgId &&
-            (i.state === "PENDING" || i.state === "PENDING_APPROVAL"),
-        );
+    forced === "empty" ? [] : forced === "delivery_failed" && !live.some((i) => i.delivery === "failed") ? [bounced, ...live] : live;
 
+  /* Membership and authority side by side: what each person may do for the
+     organisation, by whichever route it was granted — a controllership they
+     accepted, or a role or capability in their own wallet — and an
+     appointment still waiting on them, so the owner can see it is not yet in
+     force. */
   const authorityOf = (personId: string) => {
     const r = relations.find((rel) => rel.personId === personId && rel.state === "ACTIVE");
-    if (!r) return null;
-    return r.isRootAuthority ? "Root authority" : "Controller";
+    if (r) return r.isRootAuthority ? "Root authority" : "Controller";
+    const held = delegatedAuthorities.filter(
+      (a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "accepted",
+    );
+    if (held.length) return `Delegate · ${held.map((a) => a.title).join(", ")}`;
+    const waiting =
+      relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE") ||
+      delegatedAuthorities.some((a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "sent");
+    return waiting ? "Appointed — waiting for them to accept" : null;
   };
 
   const inviteButton = canInvite ? (
@@ -97,7 +133,7 @@ export function MembersView() {
                         <span className="text-[12px] text-faint">{m.email}</span>
                       </span>
                     </td>
-                    <td className="text-body">{m.memberRole}</td>
+                    <td className="text-body">{m.role}</td>
                     <td>
                       <StatusPill
                         status={m.cidVerified ? "verified" : "pending"}
@@ -106,7 +142,10 @@ export function MembersView() {
                     </td>
                     <td>
                       {authority ? (
-                        <Link href="/controllership/relations" className="ndi-plainlink text-body">
+                        <Link
+                          href={authority.startsWith("Delegate") ? "/delegated-authority" : "/controllership/relations"}
+                          className="ndi-plainlink text-body"
+                        >
                           {authority}
                         </Link>
                       ) : (
@@ -131,7 +170,7 @@ export function MembersView() {
                 kind="M"
                 readOnly={!canInvite}
                 offline={forced === "offline"}
-                emptyAction={inviteButton}
+                compactEmpty
               />
             )}
           </Panel>
