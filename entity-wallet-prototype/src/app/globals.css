@@ -1,0 +1,463 @@
+@import "tailwindcss";
+@import "../styles/ndi-effects.css";
+
+/* ============================================================ */
+/* Bhutan NDI — design tokens. Mirrors the website's
+   src/app/(frontend)/globals.css so the Studio and the site stay in step. */
+
+:root {
+  /* ---- Brand primitives ---------------------------------- */
+  --ndi-mint: #5ac994;
+  --ndi-mint-bright: #6fe0a9;
+  --ndi-mint-deep: #3da876;
+  --ndi-teal: #124143;
+  --ndi-teal-soft: #1a585b;
+  --ndi-obsidian: #141b29;
+
+  /* ---- Neutral ramp -------------------------------------- */
+  --ndi-ink-900: #0c111b;
+  --ndi-ink-800: #141b29;
+  --ndi-ink-700: #1b2433;
+  --ndi-ink-600: #232e40;
+  --ndi-ink-500: #2e3a4f;
+  --ndi-ink-400: #3b495f;
+  /* Lifted from the design's #62676d, which measured 3.31:1 against the page ground. */
+  --ndi-300: #7c828a;
+  --ndi-200: #8b95a5;
+  --ndi-100: #c5ccd8;
+  --ndi-000: #ffffff;
+
+  /* ---- Mint alpha set ------------------------------------ */
+  --ndi-mint-04: rgba(90, 201, 148, 0.04);
+  --ndi-mint-08: rgba(90, 201, 148, 0.08);
+  --ndi-mint-12: rgba(90, 201, 148, 0.12);
+  --ndi-mint-15: rgba(90, 201, 148, 0.15);
+  --ndi-mint-25: rgba(90, 201, 148, 0.25);
+  --ndi-mint-40: rgba(90, 201, 148, 0.4);
+
+  /* ---- The wallet scan card ------------------------------ */
+  /* Mirrors the NDI integration page every relying party embeds, so the
+     console's hand-off looks like the one people meet on other sites. The QR
+     paper and ink never follow the theme: a code has to be dark-on-light to
+     scan, and a dark-mode QR is the classic way to ship one that doesn't.
+     Store badges are black in both themes, as the stores require; in dark
+     they need an outline or they vanish into the card. */
+  --scan-card: var(--surface-raised);
+  --qr-paper: #ffffff;
+  --qr-ink: #0c111b;
+  --ndi-mark-disc: var(--ndi-teal);
+  --store-badge: #000000;
+  --store-badge-ink: #ffffff;
+  --store-badge-edge: rgba(255, 255, 255, 0.28);
+
+  /* ---- Semantic status ----------------------------------- */
+  --ndi-success: #5ac994;
+  --ndi-info: #4aa3ff;
+  --ndi-warning: #f5b740;
+  --ndi-danger: #e1493e;
+
+  /* ---- Surfaces ------------------------------------------ */
+  --surface-canvas: var(--ndi-ink-800);
+  --surface-sunken: var(--ndi-ink-900);
+  --surface-raised: var(--ndi-ink-700);
+  --surface-card: var(--ndi-ink-600);
+  --surface-hover: var(--ndi-ink-500);
+  --surface-glass: rgba(18, 65, 67, 0.35);
+  /* The panel fill — the website's contact card wears this; the auth card does too. */
+  --fill-panel: linear-gradient(
+    158deg,
+    rgba(15, 20, 32, 0.62) 0%,
+    rgba(15, 20, 32, 0.46) 46%,
+    rgba(15, 20, 32, 0.62) 100%
+  );
+  --surface-glass-strong: rgba(18, 65, 67, 0.55);
+  /* The card material. */
+  --fill-card: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.006) 46%,
+    rgba(90, 201, 148, 0.03) 100%
+  );
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 1px 0 0 rgba(255, 255, 255, 0.04),
+    inset 0 -20px 34px -24px rgba(255, 255, 255, 0.07),
+    0 18px 40px -26px rgba(0, 0, 0, 0.9);
+
+  /* ---- Text ---------------------------------------------- */
+  --text-strong: var(--ndi-000);
+  --text-body: var(--ndi-100);
+  --text-muted: var(--ndi-200);
+  --text-faint: var(--ndi-300);
+  --text-accent: var(--ndi-mint);
+  --text-on-mint: #06241a;
+
+  /* ---- Borders ------------------------------------------- */
+  --border-grid: var(--ndi-mint-15);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-strong: var(--ndi-mint-25);
+  --border-divider: var(--ndi-ink-400);
+
+  /* ---- Accent -------------------------------------------- */
+  --accent: var(--ndi-mint);
+  --accent-hover: var(--ndi-mint-bright);
+  --accent-press: var(--ndi-mint-deep);
+  /* The field's border already goes solid accent on focus, so the halo is the
+     second signal, not the only one. 3px of it at 40% read as a slab. */
+  --focus-ring: rgba(90, 201, 148, 0.3);
+
+  /* ---- Elevation & glow ---------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --glow-sm: 0 0 0 1px var(--ndi-mint-25), 0 0 16px rgba(90, 201, 148, 0.25);
+  --glow-md: 0 0 24px rgba(90, 201, 148, 0.35);
+  --glow-lg: 0 0 48px rgba(90, 201, 148, 0.4);
+  --glow-text: 0 0 24px rgba(90, 201, 148, 0.45);
+  --ring: 0 0 0 2px var(--focus-ring);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --blur-glass: 18px;
+
+  /* ---- Signature gradients ------------------------------- */
+  --grad-depth: radial-gradient(120% 120% at 50% -10%, #163a3c 0%, #141b29 46%, #0c111b 100%);
+  --grad-card: linear-gradient(160deg, rgba(26, 88, 91, 0.28) 0%, rgba(35, 46, 64, 0.5) 60%);
+  --grad-mint: linear-gradient(135deg, #6fe0a9 0%, #5ac994 55%, #3da876 100%);
+  /* The filled CTA. Travels from luminance 214 down to 109 — on the dark
+     ground that reads as depth, which is what it was drawn for. */
+  --grad-cta: linear-gradient(
+    115deg,
+    #8cf0c0 0%,
+    #6fe0a9 24%,
+    #4fc091 56%,
+    #2fa189 80%,
+    #1e8189 100%
+  );
+  --grad-text: linear-gradient(92deg, #6fe0a9 0%, #5ac994 60%, #2e8d8f 100%);
+
+  /* ---- Wireframe grid ------------------------------------ */
+  --grid-line: var(--ndi-mint-08);
+  --grid-bg:
+    linear-gradient(var(--ndi-mint-08) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ndi-mint-08) 1px, transparent 1px);
+  --grid-size: 48px 48px;
+
+  /* ---- Motion -------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-glide: cubic-bezier(0.33, 1, 0.68, 1);
+  /* Overshoots by about 10% and settles back — the bounce. */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur: 220ms;
+  --dur-slow: 400ms;
+
+  /* ---- Overlay polarity ---------------------------------- */
+  /* Surfaces lift off the ground with a tint and seat with a shade. Dark
+     lifts with white, light lifts with ink. Writing those fills as
+     rgb(var(--tint) / a) lets one channel flip both themes, instead of every
+     rim and wash needing a light twin further down the file. --gloss stays
+     white in both: it is specular, and it only ever travels across the mint
+     gradients, which stay dark enough to carry it either way. */
+  --tint: 255 255 255;
+  --shade: 0 0 0;
+  --gloss: 255 255 255;
+
+  /* ---- Named surfaces ------------------------------------ */
+  /* The chrome, the popovers and the illustrations used to hardcode these,
+     which is precisely what a second theme cannot do. */
+  --chrome-fill: rgba(12, 17, 27, 0.72);
+  --chrome-fill-strong: rgba(12, 17, 27, 0.86);
+  --scrim: rgba(6, 10, 16, 0.62);
+  --surface-menu: #0f1522;
+  --surface-tooltip: #101827;
+  --text-tooltip: #e9eef6;
+  --surface-cta: #0e1622;
+  --surface-cta-subtle: #16202e;
+  /* The disc the scene illustrations knock out of their own strokes. */
+  --scene-knockout: rgba(12, 17, 27, 0.92);
+  --fill-sunk: rgba(12, 17, 27, 0.5);
+  --text-danger: #f0866b;
+  --scrollbar-thumb: var(--ndi-ink-500);
+  --scrollbar-thumb-hover: var(--ndi-ink-400);
+
+  /* ---- Emphasised phrase --------------------------------- */
+  --grad-wave: linear-gradient(
+    105deg,
+    #2f8f6b 0%,
+    #5ac994 25%,
+    #7ddcac 42%,
+    #9deec4 50%,
+    #7ddcac 58%,
+    #5ac994 75%,
+    #2f8f6b 100%
+  );
+
+  /* ---- Atmosphere ---------------------------------------- */
+  /* The ambient edge pools. A token rather than a literal in the component,
+     so the light theme can cool them down without a second element. */
+  --atmos-pools:
+    radial-gradient(ellipse 62% 13% at -4% 1%, rgba(90, 201, 148, 0.15) 0%, rgba(90, 201, 148, 0.055) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 12% at 104% 15%, rgba(18, 65, 67, 0.4) 0%, rgba(18, 65, 67, 0.13) 38%, transparent 76%),
+    radial-gradient(ellipse 60% 12% at -6% 36%, rgba(90, 201, 148, 0.1) 0%, rgba(90, 201, 148, 0.04) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 11% at 106% 56%, rgba(18, 65, 67, 0.32) 0%, rgba(18, 65, 67, 0.11) 38%, transparent 76%),
+    radial-gradient(ellipse 60% 12% at -4% 76%, rgba(90, 201, 148, 0.09) 0%, rgba(90, 201, 148, 0.035) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 11% at 104% 95%, rgba(18, 65, 67, 0.28) 0%, rgba(18, 65, 67, 0.09) 38%, transparent 76%);
+}
+
+/* ============================================================ */
+/* Light theme.
+   Only the semantic layer is restated — the brand primitives above stay put,
+   because the mint is the mint in either theme. What changes is which end of
+   the ramp is the ground and which is the ink, and the mint has to deepen to
+   carry text: #5ac994 measures about 2:1 on white, well under the floor, so
+   text and icons switch to a deep mint while the gradients keep the bright
+   one. Applied on an attribute rather than a media query, so the toggle in
+   the top bar wins over the OS. */
+
+:root[data-theme="light"] {
+  /* ---- Overlay polarity ---------------------------------- */
+  --tint: 12 17 27;
+  --shade: 22 32 46;
+
+  /* ---- Deep mint, for anything that has to be read -------- */
+  --ndi-mint-ink: #1d7d57;
+  --ndi-mint-04: rgba(29, 125, 87, 0.05);
+  --ndi-mint-08: rgba(29, 125, 87, 0.08);
+  --ndi-mint-12: rgba(29, 125, 87, 0.13);
+  --ndi-mint-15: rgba(29, 125, 87, 0.2);
+  --ndi-mint-25: rgba(29, 125, 87, 0.3);
+  --ndi-mint-40: rgba(29, 125, 87, 0.42);
+
+  /* ---- Surfaces ------------------------------------------ */
+  --surface-sunken: #eef3f2;
+  --surface-canvas: #f5f8f7;
+  --surface-raised: #ffffff;
+  --surface-card: #ffffff;
+  --surface-hover: #e4ecea;
+  --surface-glass: rgba(29, 125, 87, 0.06);
+  --surface-glass-strong: rgba(29, 125, 87, 0.12);
+  --scan-card: #f6f7f7;
+  --store-badge-edge: transparent;
+
+  --fill-panel: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.62) 46%,
+    rgba(255, 255, 255, 0.82) 100%
+  );
+  --fill-card: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.72) 46%,
+    rgba(29, 125, 87, 0.04) 100%
+  );
+  --shadow-card:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 1px 0 0 rgba(255, 255, 255, 0.5),
+    inset 0 -20px 34px -24px rgba(29, 125, 87, 0.08),
+    0 18px 40px -28px rgba(22, 32, 46, 0.32);
+
+  /* ---- Text ---------------------------------------------- */
+  --text-strong: #0c111b;
+  --text-body: #26313f;
+  --text-muted: #4a5768;
+  /* Measured 4.36:1 on the light ground at #667283 — under the 4.5 floor
+     for the footer and hint text that use it, so it steps down a notch. */
+  --text-faint: #5f6b7c;
+  --text-accent: var(--ndi-mint-ink);
+  --text-on-mint: #06241a;
+
+  /* ---- Borders ------------------------------------------- */
+  --border-grid: rgba(29, 125, 87, 0.22);
+  --border-subtle: rgba(12, 17, 27, 0.1);
+  --border-strong: rgba(29, 125, 87, 0.38);
+  --border-divider: #cfdad6;
+
+  /* ---- Accent -------------------------------------------- */
+  /* Inverted travel: dark deepens the mint on press, light darkens on hover,
+     because the ground it sits on moved to the other end of the ramp. */
+  --accent: var(--ndi-mint-ink);
+  --accent-hover: #17694a;
+  --accent-press: #12553b;
+  --focus-ring: rgba(29, 125, 87, 0.24);
+
+  /* ---- Elevation & glow ---------------------------------- */
+  /* Glows are the first thing that reads as grubby on a light ground, so
+     they drop to a fraction of their dark strength rather than carrying
+     over. */
+  --shadow-sm: 0 1px 2px rgba(22, 32, 46, 0.08);
+  --shadow-md: 0 8px 24px rgba(22, 32, 46, 0.1);
+  --shadow-lg: 0 24px 60px rgba(22, 32, 46, 0.14);
+  --glow-sm: 0 0 0 1px rgba(29, 125, 87, 0.28), 0 0 14px rgba(29, 125, 87, 0.14);
+  --glow-md: 0 0 22px rgba(29, 125, 87, 0.16);
+  --glow-lg: 0 0 44px rgba(29, 125, 87, 0.18);
+  --glow-text: 0 0 20px rgba(29, 125, 87, 0.18);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* ---- Signature gradients ------------------------------- */
+  --grad-depth: radial-gradient(120% 120% at 50% -10%, #dceee5 0%, #eaf2f0 46%, #f5f8f7 100%);
+  --grad-card: linear-gradient(160deg, rgba(29, 125, 87, 0.07) 0%, rgba(255, 255, 255, 0.85) 60%);
+  --grad-text: linear-gradient(92deg, #1d7d57 0%, #17694a 60%, #145d55 100%);
+  /* The dark end of the CTA ramp is depth against ink and a smudge against
+     paper — on a light panel the button stopped looking like one colour with
+     a sheen and started looking like a rendering fault. Same family, a third
+     of the luminance travel. */
+  --grad-cta: linear-gradient(115deg, #63d6a2 0%, #4cbf8c 55%, #38a97d 100%);
+  --grad-wave: linear-gradient(
+    105deg,
+    #145d43 0%,
+    #1d7d57 25%,
+    #2c9a6c 42%,
+    #3fb37f 50%,
+    #2c9a6c 58%,
+    #1d7d57 75%,
+    #145d43 100%
+  );
+
+  /* ---- Wireframe grid ------------------------------------ */
+  --grid-line: rgba(29, 125, 87, 0.1);
+  --grid-bg:
+    linear-gradient(rgba(29, 125, 87, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29, 125, 87, 0.1) 1px, transparent 1px);
+
+  /* ---- Named surfaces ------------------------------------ */
+  --chrome-fill: rgba(245, 248, 247, 0.76);
+  --chrome-fill-strong: rgba(245, 248, 247, 0.92);
+  --scrim: rgba(22, 32, 46, 0.34);
+  --surface-menu: #ffffff;
+  /* The tooltip stays dark. A pale bubble on a pale panel needs a border to
+     be found at all, and the inversion is the usual signal that the thing is
+     transient rather than part of the page. */
+  --surface-tooltip: #1b2433;
+  --text-tooltip: #e9eef6;
+  --surface-cta: #ffffff;
+  --surface-cta-subtle: #eaf2f0;
+  --scene-knockout: rgba(255, 255, 255, 0.94);
+  --fill-sunk: rgba(255, 255, 255, 0.72);
+  --text-danger: #c0392b;
+  --scrollbar-thumb: #c2cfcb;
+  --scrollbar-thumb-hover: #a9b9b4;
+
+  /* ---- Atmosphere ---------------------------------------- */
+  --atmos-pools:
+    radial-gradient(ellipse 62% 13% at -4% 1%, rgba(29, 125, 87, 0.1) 0%, rgba(29, 125, 87, 0.04) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 12% at 104% 15%, rgba(18, 65, 67, 0.09) 0%, rgba(18, 65, 67, 0.03) 38%, transparent 76%),
+    radial-gradient(ellipse 60% 12% at -6% 36%, rgba(29, 125, 87, 0.07) 0%, rgba(29, 125, 87, 0.03) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 11% at 106% 56%, rgba(18, 65, 67, 0.07) 0%, rgba(18, 65, 67, 0.025) 38%, transparent 76%),
+    radial-gradient(ellipse 60% 12% at -4% 76%, rgba(29, 125, 87, 0.06) 0%, rgba(29, 125, 87, 0.02) 36%, transparent 74%),
+    radial-gradient(ellipse 58% 11% at 104% 95%, rgba(18, 65, 67, 0.06) 0%, rgba(18, 65, 67, 0.02) 38%, transparent 76%);
+}
+
+/* ============================================================ */
+/* Tailwind theme bridge — exposes the tokens above as utilities
+   (bg-canvas, text-muted, border-grid, font-display, …). */
+
+@theme inline {
+  --color-canvas: var(--surface-canvas);
+  --color-sunken: var(--surface-sunken);
+  --color-raised: var(--surface-raised);
+  --color-card: var(--surface-card);
+  --color-hover: var(--surface-hover);
+
+  --color-strong: var(--text-strong);
+  --color-body: var(--text-body);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-press: var(--accent-press);
+  --color-teal: var(--ndi-teal);
+
+  --color-grid: var(--border-grid);
+  --color-subtle: var(--border-subtle);
+  --color-divider: var(--border-divider);
+
+  --radius-card: 16px;
+
+  --ease-ndi: var(--ease-out);
+}
+
+@theme {
+  --font-display: var(--font-host-grotesk), "Inter", system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-dm-mono), ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* ============================================================ */
+/* Base */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--surface-sunken);
+  color: var(--text-body);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+*::selection {
+  background: var(--ndi-mint-25);
+  color: var(--text-strong);
+}
+
+/* ---- Theme-conditional assets ------------------------------------ */
+/* The lockup ships as two cuts — one drawn in ink for a light ground, one in
+   white for a dark one — and the right one is picked in CSS rather than in
+   React. A JS swap would have to wait for hydration, which is the one moment
+   a logo must not flicker. Attribute + class outranks Tailwind's single-class
+   `block`, so these still win over a responsive display utility. */
+[data-theme="dark"] .on-light-only {
+  display: none;
+}
+[data-theme="light"] .on-dark-only {
+  display: none;
+}
+
+/* In @layer base so a `text-*` utility on an anchor still wins. */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+/* Custom scrollbar — engineered feel */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+[id] {
+  scroll-margin-top: 108px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

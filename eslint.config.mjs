@@ -6,7 +6,7 @@ import pluginReact from 'eslint-plugin-react'
 export default defineConfig([
   {
     // Ignore files and folders globally
-    ignores: ['build/**/*', 'src/components/ui/**', '/src/hooks/*'],
+    ignores: ['build/**/*', 'src/components/ui/**', '/src/hooks/*', 'entity-wallet-prototype/**'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx}'],
