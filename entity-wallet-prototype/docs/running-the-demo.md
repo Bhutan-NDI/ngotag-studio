@@ -16,7 +16,7 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **This branch is Flow 1 — how people get onto the platform** — and the guide
-walks exactly that: five chapters, 13 steps, starting on the platform's day
+walks exactly that: five chapters, 12 steps, starting on the platform's day
 zero:
 
 1. **Root admin onboarding** — NDI's root administrator, Anand Acharya, signs
