@@ -259,6 +259,7 @@ const IssueCred = (): React.JSX.Element => {
         } else if (did?.includes(DidMethod.INDY)) {
           setw3cSchema(false)
           setSchemaType(SchemaTypeValue.INDY)
+          setOrgDid(did)
           return false
         }
       }

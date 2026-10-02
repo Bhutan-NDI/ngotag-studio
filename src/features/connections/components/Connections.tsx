@@ -63,14 +63,27 @@ export default function Connections(): JSX.Element {
     setIsQrLoading(true)
     setQrError(null)
     try {
-      const orgResponse = await getOrganizationById(orgId)
-      const { data: orgData } = orgResponse as AxiosResponse
-      type OrgAgent = { orgDid: string; isDidPublic: boolean }
-      const orgAgents = (orgData?.data?.org_agents ?? []) as OrgAgent[]
-      const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
-      const goalCode = isBhutanndiTheme()
-        ? (publicAgent?.orgDid ?? null)
-        : 'connection'
+      let goalCode: string | null = 'connection'
+      if (isBhutanndiTheme()) {
+        const orgResponse = await getOrganizationById(orgId)
+        if (typeof orgResponse === 'string') {
+          setQrError(orgResponse || 'Failed to fetch organization details')
+          return
+        }
+        const { data: orgData } = orgResponse as AxiosResponse
+        if (orgData?.statusCode !== apiStatusCodes.API_STATUS_SUCCESS) {
+          setQrError(orgData?.message || 'Failed to fetch organization details')
+          return
+        }
+        type OrgAgent = { orgDid: string; isDidPublic: boolean }
+        const orgAgents = (orgData?.data?.org_agents ?? []) as OrgAgent[]
+        const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+        if (!publicAgent?.orgDid) {
+          setQrError('Organization DID not found')
+          return
+        }
+        goalCode = publicAgent.orgDid
+      }
 
       const response = await createConnection(
         orgId,
