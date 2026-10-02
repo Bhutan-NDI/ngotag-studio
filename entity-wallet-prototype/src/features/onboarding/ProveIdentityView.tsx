@@ -4,13 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
-import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Panel } from "@/components/ui/Panel";
 import { WalletHandoff, type HandoffStatus } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
+import { useReveal } from "@/components/ui/useReveal";
 import { useDemo } from "@/lib/demoStore";
-import { SKIP_AFTER_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
+import { AUTO_ADVANCE_MS, SKIP_AFTER_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
 import { OnboardingShell } from "./OnboardingShell";
 import { kindOf } from "./orgKinds";
@@ -41,7 +41,7 @@ type Stage = "idle" | "wallet" | "proved" | "mismatch" | "expired";
 
 export function ProveIdentityView() {
   const router = useRouter();
-  const { signup, orgOnboarding, recordIdentityProof } = useDemo();
+  const { signup, orgOnboarding, orgInvitations, people, recordIdentityProof } = useDemo();
 
   const screenState = useScreenState("A2", [
     "awaiting_scan",
@@ -61,7 +61,11 @@ export function ProveIdentityView() {
   /* The wallet in this prototype answers as whoever holds the account — or
      as Dorji, the story's director, when the flow is run without one. The
      mismatch path answers as somebody else on purpose. */
-  const provedName = accountName || "Dorji Wangchuk";
+  /* Invited to an organisation already on NDI, the invitee has had an
+     account for years — the wallet answers as them. */
+  const invitation = orgInvitations.find((i) => i.id === orgOnboarding?.invitationId);
+  const invitee = invitation?.kind === "W" ? people.find((p) => p.email === invitation.email) : undefined;
+  const provedName = invitee?.name || accountName || "Dorji Wangchuk";
   const kind = kindOf(orgOnboarding?.kind);
 
   const start = (outcome: "proved" | "mismatch") => {
@@ -88,6 +92,24 @@ export function ProveIdentityView() {
             : "expired";
   const shown = forced ?? stage;
 
+  /* Once the proof is in, move on by itself after a beat (see
+     AUTO_ADVANCE_MS). Only for a proof that really happened: the state
+     switcher's "proved" is for reviewing this screen, and a screen that
+     leaves the moment you ask to see it cannot be reviewed. */
+  /* The confirmation goes above the scan card, straight under the heading.
+     It used to sit under the card — 300px below the fold at laptop height —
+     and was scrolled to, but a page that scrolls itself and then leaves by
+     itself two seconds later gave nobody time to read it. Above the card
+     it is on screen from the moment it appears; useReveal only has to act
+     if someone had scrolled down to press the scan. */
+  const provedRef = useReveal<HTMLDivElement>(shown === "proved");
+  const mismatchRef = useReveal<HTMLDivElement>(shown === "mismatch");
+  useEffect(() => {
+    if (stage !== "proved" || forced) return;
+    const t = setTimeout(() => router.push("/onboarding/choose"), AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [stage, forced, router]);
+
   const handoffStatus: HandoffStatus =
     shown === "idle"
       ? "awaiting_scan"
@@ -113,6 +135,67 @@ export function ProveIdentityView() {
           Nothing about any organisation is asked yet.
         </p>
       </div>
+
+      {shown === "proved" ? (
+        <div ref={provedRef}>
+        <Panel>
+          <div className="relative z-[4] flex flex-col gap-3">
+            <div className="flex items-start gap-3">
+              <Icon name="check" size={18} strokeWidth={2.4} className="mt-0.5 flex-none text-accent" />
+              <div className="flex flex-col gap-1">
+                <p className="font-display text-[14.5px] font-semibold text-strong">
+                  You&rsquo;ve proved you are {provedName}
+                </p>
+                <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+                  {kind.register
+                    ? `Next, the ${kind.register} is asked which organisations it lists you as representing.`
+                    : "Next, tell NDI about the organisation and send what shows you represent it."}
+                </p>
+              </div>
+            </div>
+            <p role="status" className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[30px] text-[12.5px] text-faint">
+              <span className="inline-flex items-center gap-2">
+                <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border-grid)] border-t-[var(--accent)]" />
+                {forced ? "Moves on to the next step by itself" : "Taking you to the next step…"}
+              </span>
+              <button
+                type="button"
+                onClick={() => router.push("/onboarding/choose")}
+                className="ndi-plainlink inline-flex items-center gap-1 font-medium text-accent"
+              >
+                Continue now
+                <Icon name="arrowRight" size={13} strokeWidth={2} />
+              </button>
+            </p>
+          </div>
+        </Panel>
+        </div>
+      ) : null}
+
+      {shown === "mismatch" ? (
+        <div ref={mismatchRef}>
+        <Panel>
+          <div className="relative z-[4] flex items-start gap-3">
+            <Icon name="close" size={18} strokeWidth={2.2} className="mt-0.5 flex-none" style={{ color: "var(--ndi-danger)" }} />
+            <div className="flex flex-col gap-2">
+              <p className="font-display text-[14.5px] font-semibold text-strong">
+                This proof is for someone else
+              </p>
+              <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+                The wallet that answered belongs to Karma Dorji, but this account belongs to{" "}
+                {accountName ?? "someone else"}. An organisation has to be added by the person who
+                represents it, from their own account.
+              </p>
+              <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+                If you were helping someone, they need to create their own account and add the
+                organisation themselves. Nothing has been registered and nothing about either of
+                you has been kept.
+              </p>
+            </div>
+          </div>
+        </Panel>
+        </div>
+      ) : null}
 
       <Panel>
         <WalletHandoff
@@ -143,55 +226,6 @@ export function ProveIdentityView() {
           }
         />
       </Panel>
-
-      {shown === "proved" ? (
-        <Panel>
-          <div className="relative z-[4] flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-              <Icon name="check" size={18} strokeWidth={2.4} className="mt-0.5 flex-none text-accent" />
-              <div className="flex flex-col gap-1">
-                <p className="font-display text-[14.5px] font-semibold text-strong">
-                  You&rsquo;ve proved you are {provedName}
-                </p>
-                <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
-                  {kind.register
-                    ? `Next, the ${kind.register} is asked which organisations it lists you as representing.`
-                    : "Next, tell NDI about the organisation and send what shows you represent it."}
-                </p>
-              </div>
-            </div>
-            <div>
-              <GradientButton onClick={() => router.push("/onboarding/choose")}>
-                Continue
-                <Icon name="arrowRight" size={15} strokeWidth={2} />
-              </GradientButton>
-            </div>
-          </div>
-        </Panel>
-      ) : null}
-
-      {shown === "mismatch" ? (
-        <Panel>
-          <div className="relative z-[4] flex items-start gap-3">
-            <Icon name="close" size={18} strokeWidth={2.2} className="mt-0.5 flex-none" style={{ color: "var(--ndi-danger)" }} />
-            <div className="flex flex-col gap-2">
-              <p className="font-display text-[14.5px] font-semibold text-strong">
-                This proof is for someone else
-              </p>
-              <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
-                The wallet that answered belongs to Karma Dorji, but this account belongs to{" "}
-                {accountName ?? "someone else"}. An organisation has to be added by the person who
-                represents it, from their own account.
-              </p>
-              <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
-                If you were helping someone, they need to create their own account and add the
-                organisation themselves. Nothing has been registered and nothing about either of
-                you has been kept.
-              </p>
-            </div>
-          </div>
-        </Panel>
-      ) : null}
 
       {shown === "idle" ? (
         <div className="flex flex-wrap items-center gap-2.5">
