@@ -24,25 +24,22 @@ export interface OverlayEntry {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// TODO: Replace with real Phenix App store links before launch
+// TODO: Replace with real store links before launch
 export const GOOGLE_PLAY_URL = '#'
 export const APP_STORE_URL = '#'
 
 export const RING_CLASSES: Record<RingVariant, string> = {
-  purple: [
-    'bg-[#F2ECFF] border-[0.5px] border-[rgba(87,29,247,0.25)]',
-    'dark:bg-[rgba(87,29,247,0.20)] dark:border-[rgba(154,107,251,0.35)]',
-  ].join(' '),
+  purple: 'bg-accent border-primary/25 border-[0.5px]',
   green: [
-    'bg-[#EAFAF3] border-[0.5px] border-[rgba(90,201,148,0.35)]',
-    'shadow-[0_0_30px_rgba(90,201,148,0.30)]',
+    'bg-[var(--badge-success-bg)] border-[0.5px] border-[var(--badge-success-text)]/35',
+    'shadow-[0_0_30px_color-mix(in_srgb,var(--badge-success-text)_30%,transparent)]',
   ].join(' '),
   red: 'bg-destructive/10 border-[0.5px] border-destructive/30',
 }
 
 export const ICON_COLOR: Record<RingVariant, string> = {
-  purple: 'text-[#571DF7] dark:text-[#9E6BFB]',
-  green: 'text-[#1E784B]',
+  purple: 'text-accent-foreground',
+  green: 'text-[var(--badge-success-text)]',
   red: 'text-destructive',
 }
 
@@ -55,32 +52,32 @@ export const CornerBrackets = (): JSX.Element => (
       aria-hidden="true"
       className="absolute top-[9px] left-[9px] h-[26px] w-[26px] rounded-tl-[9px]"
       style={{
-        borderTop: '3.5px solid #571DF7',
-        borderLeft: '3.5px solid #571DF7',
+        borderTop: '3.5px solid var(--primary)',
+        borderLeft: '3.5px solid var(--primary)',
       }}
     />
     <div
       aria-hidden="true"
       className="absolute top-[9px] right-[9px] h-[26px] w-[26px] rounded-tr-[9px]"
       style={{
-        borderTop: '3.5px solid #571DF7',
-        borderRight: '3.5px solid #571DF7',
+        borderTop: '3.5px solid var(--primary)',
+        borderRight: '3.5px solid var(--primary)',
       }}
     />
     <div
       aria-hidden="true"
       className="absolute bottom-[9px] left-[9px] h-[26px] w-[26px] rounded-bl-[9px]"
       style={{
-        borderBottom: '3.5px solid #571DF7',
-        borderLeft: '3.5px solid #571DF7',
+        borderBottom: '3.5px solid var(--primary)',
+        borderLeft: '3.5px solid var(--primary)',
       }}
     />
     <div
       aria-hidden="true"
       className="absolute right-[9px] bottom-[9px] h-[26px] w-[26px] rounded-br-[9px]"
       style={{
-        borderBottom: '3.5px solid #571DF7',
-        borderRight: '3.5px solid #571DF7',
+        borderBottom: '3.5px solid var(--primary)',
+        borderRight: '3.5px solid var(--primary)',
       }}
     />
   </>
@@ -145,13 +142,13 @@ export const StateOverlay = ({
 
 /** Pulsing purple pill — only visible in the waiting state */
 export const StatusPill = (): JSX.Element => (
-  <div className="self-center rounded-full border-[0.5px] border-[rgba(87,29,247,0.30)] bg-[#F2ECFF] px-[15px] py-[7px]">
+  <div className="border-primary/30 bg-accent self-center rounded-full border-[0.5px] px-[15px] py-[7px]">
     <div className="flex items-center gap-2">
       <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-[#571DF7] opacity-75 motion-safe:animate-ping" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-[#571DF7]" />
+        <span className="bg-primary absolute inline-flex h-full w-full rounded-full opacity-75 motion-safe:animate-ping" />
+        <span className="bg-primary relative inline-flex h-2 w-2 rounded-full" />
       </span>
-      <span className="text-[12.5px] font-[600] text-[#571DF7]">
+      <span className="text-accent-foreground text-[12.5px] font-[600]">
         Waiting for scan...
       </span>
     </div>
@@ -165,11 +162,11 @@ export const Countdown = ({ seconds }: { seconds: number }): JSX.Element => {
     .padStart(2, '0')
   const s = (seconds % 60).toString().padStart(2, '0')
   return (
-    <div className="flex items-center justify-center gap-1.5 text-[12px] text-[rgba(12,12,26,0.32)] dark:text-[rgba(255,255,255,0.30)]">
+    <div className="text-muted-foreground/70 flex items-center justify-center gap-1.5 text-[12px]">
       <Clock className="h-[13px] w-[13px]" strokeWidth={1.5} />
       <span>
         Expires in{' '}
-        <span className="font-[600] text-[rgba(12,12,26,0.55)] tabular-nums dark:text-[rgba(255,255,255,0.55)]">
+        <span className="text-muted-foreground font-[600] tabular-nums">
           {m}:{s}
         </span>
       </span>
@@ -195,12 +192,12 @@ export const ActionButton = ({
     disabled={disabled}
     className={[
       'flex flex-1 items-center justify-center gap-2 rounded-[10px] py-[9px]',
-      'text-[13px] font-[500] text-[#0C0C1A] dark:text-white',
-      'border-[0.5px] border-[rgba(87,29,247,0.10)] bg-white',
+      'text-foreground text-[13px] font-[500]',
+      'border-primary/10 border-[0.5px] bg-white',
       'transition-colors duration-200 hover:bg-[#FAFAFD]',
       'dark:border-[rgba(255,255,255,0.16)] dark:bg-[rgba(255,255,255,0.05)]',
       'dark:backdrop-blur-[16px] dark:hover:bg-[rgba(255,255,255,0.09)]',
-      'focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(87,29,247,0.6)] focus-visible:ring-offset-2',
+      'focus-visible:ring-primary/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
       disabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
     ].join(' ')}
   >
@@ -228,7 +225,7 @@ export const StoreBadge = ({
       'border-[rgba(255,255,255,0.10)] bg-[#161628] text-white',
       'shadow-[0_4px_16px_rgba(12,12,26,0.18),inset_0_1px_0_rgba(255,255,255,0.08)]',
       'dark:border-[rgba(255,255,255,0.14)] dark:bg-[rgba(255,255,255,0.07)] dark:backdrop-blur-[20px]',
-      'hover:border-[rgba(87,29,247,0.55)] hover:shadow-[0_4px_16px_rgba(87,29,247,0.18)]',
+      'hover:border-primary/55 hover:shadow-[0_4px_16px_color-mix(in_srgb,var(--primary)_18%,transparent)]',
     ].join(' ')}
   >
     {store === 'google' ? (

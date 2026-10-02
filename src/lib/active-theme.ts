@@ -1,6 +1,9 @@
 import {
   appFaviconPath,
+  appWalletAppName,
   bhutanndiFaviconPath,
+  bhutanndiQrMarkPath,
+  bhutanndiWalletAppName,
   credeblFaviconPath,
   sovioFaviconPath,
 } from '@/config/CommonConstant'
@@ -50,4 +53,22 @@ const FAVICON_BY_THEME: Record<string, string> = {
 /** Resolves the browser tab / loading-screen mark for the active theme, falling back to the Phenix default. */
 export function getActiveFaviconPath(): string {
   return FAVICON_BY_THEME[getActiveTheme()] ?? appFaviconPath
+}
+
+const WALLET_APP_NAME_BY_THEME: Record<string, string> = {
+  bhutanndi: bhutanndiWalletAppName,
+}
+
+/** Resolves the holder wallet app name for the active theme, falling back to the Phenix default. */
+export function getActiveWalletAppName(): string {
+  return WALLET_APP_NAME_BY_THEME[getActiveTheme()] ?? appWalletAppName
+}
+
+const QR_MARK_BY_THEME: Record<string, string> = {
+  bhutanndi: bhutanndiQrMarkPath,
+}
+
+/** Resolves the small centered mark shown inside a QR code frame, falling back to the theme's favicon. */
+export function getActiveQrMarkPath(): string {
+  return QR_MARK_BY_THEME[getActiveTheme()] ?? getActiveFaviconPath()
 }

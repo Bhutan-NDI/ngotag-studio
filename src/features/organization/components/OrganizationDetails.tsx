@@ -30,6 +30,7 @@ import Loader from '@/components/Loader'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { createConnection } from '@/app/api/organization'
 import { dateConversion } from '@/utils/DateConversion'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 const CopyDid = ({
@@ -135,7 +136,16 @@ const OrganizationDetails = ({
 
   const createQrConnection = async (): Promise<void> => {
     setLoading(true)
-    const response = await createConnection(orgId, orgData?.name as string)
+    // eslint-disable-next-line camelcase
+    const publicAgent = org_agents.find((a) => a.isDidPublic) ?? org_agents[0]
+    const goalCode = isBhutanndiTheme()
+      ? (publicAgent?.orgDid ?? null)
+      : 'connection'
+    const response = await createConnection(
+      orgId,
+      orgData?.name as string,
+      goalCode,
+    )
     const { data } = response as AxiosResponse
 
     if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
@@ -251,13 +261,15 @@ const OrganizationDetails = ({
 
       <Dialog open={openModal} onOpenChange={setOpenModal}>
         <DialogContent
-          className="h-90 w-90 sm:max-w-2xl"
+          className="sm:max-w-md"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader>
             <DialogTitle className="text-center">Scan QR</DialogTitle>
           </DialogHeader>
-          <div className={`w-48 ${loading ? 'border' : ''} m-auto`}>
+          <div
+            className={`w-full max-w-[340px] ${loading ? 'border' : ''} m-auto`}
+          >
             {loading ? (
               <div className="flex h-48 w-48 items-center justify-center">
                 <Loader />

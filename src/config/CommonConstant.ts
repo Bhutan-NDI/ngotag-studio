@@ -172,6 +172,16 @@ export const bhutanndiFaviconPath = `${logoBasePath}/ndi-mark-mint.png`
 export const credeblFaviconPath = '/favicons/favicon-credebl.ico'
 export const sovioFaviconPath = '/favicons/favicon-sovio.ico'
 
+// Per-brand holder wallet app name, read via getActiveWalletAppName() in
+// src/lib/active-theme.ts (QrScanDialog's "receive credential" copy).
+export const appWalletAppName = 'PHENIX ID App'
+export const bhutanndiWalletAppName = 'Bhutan NDI Wallet'
+
+// Small centered mark shown inside the QR code frame (QrScanDialog) — a
+// self-contained badge (white circle + ring + icon), not just a bare brand
+// mark. Themes without a dedicated badge fall back to getActiveFaviconPath().
+export const bhutanndiQrMarkPath = `${logoBasePath}/QRlogo.svg`
+
 export const CredeblLogo = appLogoPath
 export const signInImg = `${imageBasePath}/signin.svg`
 export const closeIconImg = `${imageBasePath}/close_icon.svg`

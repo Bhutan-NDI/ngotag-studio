@@ -23,6 +23,7 @@ export interface IOobAttribute {
  * orgId is NOT included — backend sets it from the URL path param.
  */
 export interface IOobIssuancePayload {
+  goalCode: string | null
   credentialDefinitionId: string
   attributes: { name: string; value: string }[]
   isShortenUrl: true
@@ -38,6 +39,7 @@ export interface IOobIssuancePayload {
  * ⚠️ Exact credential body shape to be confirmed with backend before enabling W3C branch.
  */
 export interface IOobW3cIssuancePayload {
+  goalCode: string | null
   credential: {
     '@context': string[]
     type: string[]

@@ -24,6 +24,7 @@ import Loader from '@/components/Loader'
 import { QrCode } from 'lucide-react'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getOrganizationById } from '@/app/api/organization'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetAttributeData } from '@/lib/verificationSlice'
 import { useRouter } from 'next/navigation'
@@ -50,6 +51,11 @@ interface OobProofResponse {
 interface ProofPollData {
   state?: string
   isVerified?: boolean
+}
+
+interface IOrgAgentData {
+  orgDid: string
+  isDidPublic: boolean
 }
 
 // ─── Module-level constants / helpers ────────────────────────────────────────
@@ -85,6 +91,7 @@ const OobQrVerification = (): JSX.Element => {
   const [loading, setLoading] = useState<boolean>(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [w3cSchema, setW3cSchema] = useState<boolean>(false)
+  const [orgDid, setOrgDid] = useState<string | null>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [invitationUrl, setInvitationUrl] = useState<string | null>(null)
   const [deepLinkURL, setDeepLinkURL] = useState<string | null>(null)
@@ -99,7 +106,7 @@ const OobQrVerification = (): JSX.Element => {
 
   // ── Payload builders ────────────────────────────────────────────────────────
 
-  const buildW3cPayload = (): object => {
+  const buildW3cPayload = (did: string | null): object => {
     const groupedAttributes = attributeData
       .filter((attribute) => attribute.isChecked)
       .reduce<Record<string, GroupedSchema>>((acc, attribute) => {
@@ -141,7 +148,10 @@ const OobQrVerification = (): JSX.Element => {
     const definitionName =
       Object.values(groupedAttributes)[0]?.name ?? 'Proof Request'
 
+    const goalCode = isBhutanndiTheme() ? did : 'verification'
+
     return {
+      goalCode,
       protocolVersion: ProtocolVersion.V2,
       isShortenUrl: true,
       reuseConnection: true,
@@ -155,7 +165,7 @@ const OobQrVerification = (): JSX.Element => {
     }
   }
 
-  const buildIndyPayload = (): object => {
+  const buildIndyPayload = (did: string | null): object => {
     const selectedAttributesDetails = attributeData.filter(
       (attr: ISelectedAttributes) =>
         attr.isChecked && attr.dataType !== 'number',
@@ -239,8 +249,10 @@ const OobQrVerification = (): JSX.Element => {
       }
     })
 
+    const goalCode = isBhutanndiTheme() ? did : 'verification'
+
     return {
-      goalCode: 'verification',
+      goalCode,
       reuseConnection: true,
       protocolVersion: ProtocolVersion.V1,
       isShortenUrl: true,
@@ -260,12 +272,15 @@ const OobQrVerification = (): JSX.Element => {
 
   // ── QR generation ───────────────────────────────────────────────────────────
 
-  const generateQr = async (isW3c: boolean): Promise<void> => {
+  const generateQr = async (
+    isW3c: boolean,
+    did: string | null,
+  ): Promise<void> => {
     setLoading(true)
     setErrorMessage(null)
 
     try {
-      const payload = isW3c ? buildW3cPayload() : buildIndyPayload()
+      const payload = isW3c ? buildW3cPayload(did) : buildIndyPayload(did)
       const requestType = isW3c
         ? RequestType.PRESENTATION_EXCHANGE
         : RequestType.INDY
@@ -309,19 +324,24 @@ const OobQrVerification = (): JSX.Element => {
   const initialize = async (): Promise<void> => {
     setLoading(true)
     let isW3c = false
+    let did: string | null = null
 
     try {
       const orgResponse = await getOrganizationById(orgId)
       const { data: orgData } = orgResponse as AxiosResponse
 
       if (orgData?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const did = orgData?.data?.org_agents?.[0]?.orgDid as string | undefined
+        const orgAgents = (orgData?.data?.org_agents ?? []) as IOrgAgentData[]
+        const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+        did = publicAgent?.orgDid ?? null
         if (did) {
           isW3c =
             did.includes(DidMethod.POLYGON) ||
             did.includes(DidMethod.KEY) ||
-            did.includes(DidMethod.WEB)
+            did.includes(DidMethod.WEB) ||
+            did.includes(DidMethod.ETHR)
           setW3cSchema(isW3c)
+          setOrgDid(did)
         }
       }
     } catch {
@@ -330,7 +350,7 @@ const OobQrVerification = (): JSX.Element => {
       return
     }
 
-    await generateQr(isW3c)
+    await generateQr(isW3c, did)
   }
 
   useEffect(() => {
@@ -341,7 +361,7 @@ const OobQrVerification = (): JSX.Element => {
 
   const handleRegenerate = async (): Promise<void> => {
     setQrOpen(false)
-    await generateQr(w3cSchema)
+    await generateQr(w3cSchema, orgDid)
   }
 
   const handleSuccess = (): void => {
@@ -374,7 +394,7 @@ const OobQrVerification = (): JSX.Element => {
           <div className="mt-3 flex justify-end">
             <button
               type="button"
-              onClick={() => generateQr(w3cSchema)}
+              onClick={() => generateQr(w3cSchema, orgDid)}
               className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium"
             >
               <QrCode className="h-4 w-4" />
