@@ -14,9 +14,12 @@ import { Panel } from "@/components/ui/Panel";
 import { ScopeSummary } from "@/components/ui/ScopeSummary";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { DetailList } from "@/components/ui/DetailList";
+import { WalletHandoff, type HandoffStatus } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
+import { useReveal } from "@/components/ui/useReveal";
 import { useDemo } from "@/lib/demoStore";
 import { PERSONAS } from "@/lib/demoData";
+import { WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
 import { formatDate, legalBasisLabel } from "./scopeModel";
 
@@ -71,14 +74,18 @@ const DUTIES = [
 ];
 
 export function AcceptDutiesView({ relationId }: { relationId: string }) {
-  const { relations, personById, acceptRelation, declineRelation, harness, setPersona } = useDemo();
+  const { relations, personById, acceptRelation, declineRelation, harness, setPersona, confirmIdentity } = useDemo();
 
   const screenState = useScreenState("C4", ["pending", "accepted", "declined"]);
 
   const [declineOpen, setDeclineOpen] = useState(false);
   const [asked, setAsked] = useState(false);
+  const [proof, setProof] = useState<"idle" | "waiting" | "proved">("idle");
 
   const relation = relations.find((r) => r.id === relationId);
+  /* Accept sits at the foot of a long page and the confirmation at its head,
+     so the page goes back up to say it worked — the button is gone. */
+  const acceptedRef = useReveal<HTMLDivElement>(relation?.state === "ACTIVE" && screenState === "pending", { focus: true });
 
   if (!relation) {
     return (
@@ -113,7 +120,8 @@ export function AcceptDutiesView({ relationId }: { relationId: string }) {
   /* Only a drivable persona can be switched to. A relation proposed to
      someone the demo is never driven as (Sonam, say) still shows the mismatch
      notice, just without an offer to become them. */
-  const switchable = PERSONAS.find((id) => id === relation.personId);
+  const switchable =
+    PERSONAS.find((id) => id === relation.personId) ?? (person.joinedBy && person.hasAccount !== false ? person.id : undefined);
 
   /* The screen's own state wins over the stored one, so the switcher can show
      the accepted and declined faces without the demo having to be walked into
@@ -242,7 +250,7 @@ export function AcceptDutiesView({ relationId }: { relationId: string }) {
 
         {decided === "accepted" ? (
           <Panel>
-            <div className="relative z-[4] flex items-start gap-3">
+            <div ref={acceptedRef} tabIndex={-1} className="relative z-[4] flex items-start gap-3 outline-none">
               <Icon name="check" size={18} strokeWidth={2.4} className="mt-0.5 flex-none text-accent" />
               <div className="flex flex-col gap-1">
                 <p className="font-display text-[14.5px] font-semibold text-strong">
@@ -352,6 +360,48 @@ export function AcceptDutiesView({ relationId }: { relationId: string }) {
           </ul>
         </Panel>
 
+        {/* ---- Who is accepting ----
+            Identity is anchored here, at appointment (FLOW-ONB-02 §7.3): a
+            colleague who joined by invitation has never been asked who they
+            are, and acting for the organisation is where it starts to
+            matter. The proof is the same scan card onboarding used; the
+            store refuses the acceptance without it. */}
+        {!decided && isAddressee && !person.cidVerified ? (
+          <Panel>
+            <div className="relative z-[4] mb-4 flex flex-col gap-1">
+              <h2 className="font-display text-[15px] font-semibold text-strong">First, prove it&rsquo;s you</h2>
+              <p className="max-w-[62ch] text-[12.5px] leading-[1.5] text-faint">
+                Joining Pelden never asked who you are. Acting for it does — once, with your own
+                Bhutan NDI Wallet, before you accept.
+              </p>
+            </div>
+            <WalletHandoff
+              value={`ndi-appointment-${relation.id}`}
+              title="Prove who you are with your NDI Wallet"
+              purpose="Confirms you are the person this authority is proposed to."
+              sharing={[
+                "Your full name, as it appears on your citizen credential",
+                "Your citizenship number, to the platform only",
+              ]}
+              status={(proof === "waiting" ? "waiting" : "awaiting_scan") as HandoffStatus}
+              onSimulateScan={() => {
+                setProof("waiting");
+                window.setTimeout(() => {
+                  confirmIdentity(person.id);
+                  setProof("proved");
+                }, WALLET_HANDOFF_MS);
+              }}
+            />
+          </Panel>
+        ) : null}
+
+        {!decided && isAddressee && proof === "proved" ? (
+          <p role="status" className="m-0 flex items-center gap-2 text-[13px] text-accent">
+            <Icon name="check" size={14} strokeWidth={2.4} className="flex-none" />
+            Identity confirmed — you can accept.
+          </p>
+        ) : null}
+
         {!decided ? (
           <>
             {asked ? (
@@ -371,7 +421,7 @@ export function AcceptDutiesView({ relationId }: { relationId: string }) {
             <div className="flex flex-wrap items-center gap-2.5">
               <GradientButton
                 onClick={() => acceptRelation(relation.id)}
-                disabled={!isAddressee}
+                disabled={!isAddressee || !person.cidVerified}
               >
                 <Icon name="check" size={15} strokeWidth={2.2} />
                 Accept these duties

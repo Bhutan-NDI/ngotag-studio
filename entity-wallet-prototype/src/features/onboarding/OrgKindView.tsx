@@ -33,10 +33,34 @@ import { ORG_KINDS } from "./orgKinds";
  */
 export function OrgKindView() {
   const router = useRouter();
-  const { startOrgOnboarding, orgOnboarding } = useDemo();
+  const { startOrgOnboarding, orgOnboarding, people, hydrated } = useDemo();
   const [kind, setKind] = useState<OrgKind>(orgOnboarding?.kind ?? "company");
 
   const chosen = ORG_KINDS.find((k) => k.value === kind)!;
+
+  /* Nobody can bring an organisation on until NDI has someone to review
+     it: the register may not match, and a manual review needs a person.
+     Until root has made at least one platform admin, the door is shut — and
+     says why, rather than taking an application nobody can decide. */
+  const platformOpen = people.some((p) => p.platformRole === "admin" && p.hasAccount !== false);
+  if (hydrated && !platformOpen) {
+    return (
+      <OnboardingShell current={0}>
+        <Panel>
+          <div className="relative z-[4] flex flex-col gap-3" role="status">
+            <p className="font-display text-[15px] font-semibold text-strong">
+              Organisations can&rsquo;t be added yet
+            </p>
+            <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+              NDI is still setting up the platform: nobody is in place yet to review an
+              organisation the register can&rsquo;t confirm. Your account is ready — come back once
+              NDI has opened it.
+            </p>
+          </div>
+        </Panel>
+      </OnboardingShell>
+    );
+  }
 
   return (
     <OnboardingShell current={0}>
