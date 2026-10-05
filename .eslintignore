@@ -9,3 +9,7 @@ yarn.lock
 pnpm-lock.yaml
 src/components/ui/**
 /src/hooks/*
+
+# The Entity Wallet prototype is a separate Next app with its own
+# toolchain; Studio must not lint, format, build or ship it.
+entity-wallet-prototype

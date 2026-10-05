@@ -1,0 +1,862 @@
+/* ============================================================
+   NDI signature effects — the auth-relevant subset of the website's
+   src/styles/ndi-effects.css, ported verbatim so the Studio's controls
+   behave identically to the site's. Section names match the source.
+   ============================================================ */
+
+/* ---- Keyframes --------------------------------------------- */
+@keyframes ndiWave {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes gradient-angle {
+  to {
+    --gradient-angle: 360deg;
+  }
+}
+@keyframes shimmer {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes breathe {
+  from,
+  to {
+    scale: 1;
+  }
+  50% {
+    scale: 1.2;
+  }
+}
+
+/* ---- Emphasised phrase ------------------------------------- */
+.ndi-wave-text {
+  background: var(--grad-wave);
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: ndiWave 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+/* A one-word emphasis needs the ramp pulled in, or it shows a single flat
+   band of the gradient rather than the sweep. */
+.ndi-wave-tight {
+  background-size: 138% 100%;
+}
+
+/* ---- Scroll reveal ----------------------------------------- */
+/* Transform only, opacity committed to 1, so content is never left hidden
+   if a transition is throttled. */
+[data-reveal] {
+  transform: translateY(26px);
+  transition: transform 0.7s var(--ease-out);
+}
+[data-reveal][data-revealed="true"] {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    transform: none;
+  }
+}
+
+/* ---- Button sweep / glow machinery ------------------------- */
+.ndi-store-sweep {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--gloss) / 0.14), transparent);
+  transform: translateX(-100%);
+  transition: transform 1s var(--ease-out);
+}
+.ndi-store-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--gloss) / 0.07),
+    rgb(var(--gloss) / 0.02) 50%,
+    rgb(var(--gloss) / 0.07)
+  );
+  transition: opacity 0.5s var(--ease-out);
+}
+
+/* The full-width CTA submit button. */
+.ndi-sweepbtn {
+  transition: transform 0.16s var(--ease-out), box-shadow 0.5s var(--ease-out);
+}
+.ndi-sweepbtn:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glow-md);
+}
+.ndi-sweepbtn:active {
+  transform: scale(0.99) translateY(0);
+}
+.ndi-sweepbtn:hover .ndi-store-sweep {
+  transform: translateX(100%);
+}
+.ndi-sweepbtn:hover .ndi-store-glow {
+  opacity: 1;
+}
+/* A disabled CTA must not still lift or sweep — it would read as accepting
+   the click it is refusing. */
+.ndi-sweepbtn:disabled:hover {
+  transform: none;
+  box-shadow: var(--glow-sm);
+}
+.ndi-sweepbtn:disabled:hover .ndi-store-sweep {
+  transform: translateX(-100%);
+}
+.ndi-sweepbtn:disabled:hover .ndi-store-glow {
+  opacity: 0;
+}
+
+/* The arrow on a forward CTA nudges toward where it goes. */
+.ndi-sendnudge {
+  transition: transform 0.24s var(--ease-out);
+}
+.ndi-sweepbtn:hover .ndi-sendnudge {
+  transform: translateX(4px);
+}
+
+/* ---- Form controls ---------------------------------------- */
+.ndi-chip {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.ndi-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ndi-chip span {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid var(--border-grid);
+  background: rgb(var(--tint) / 0.03);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: color 0.2s var(--ease-out), border-color 0.2s var(--ease-out),
+    background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.ndi-chip:hover span {
+  color: var(--text-body);
+  border-color: var(--border-strong);
+}
+.ndi-chip input:checked + span {
+  color: var(--accent);
+  border-color: var(--ndi-mint-40);
+  background: var(--ndi-mint-08);
+  box-shadow: var(--glow-sm);
+}
+.ndi-chip input:focus-visible + span {
+  box-shadow: var(--ring);
+}
+
+.ndi-field {
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out),
+    background 0.2s var(--ease-out);
+}
+.ndi-field::placeholder {
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.ndi-field:hover {
+  border-color: var(--border-strong);
+}
+.ndi-field:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* Muted link that brightens on hover. */
+.ndi-plainlink {
+  transition: color var(--dur);
+}
+.ndi-plainlink:hover {
+  color: var(--text-strong);
+}
+
+/* The consent checkbox, themed rather than left as the platform default. */
+.ndi-check {
+  appearance: none;
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  border-radius: 5px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  transition: background 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+}
+.ndi-check:hover {
+  border-color: var(--accent);
+}
+.ndi-check:focus-visible {
+  box-shadow: var(--ring);
+  outline: none;
+}
+.ndi-check:checked {
+  border-color: var(--accent);
+  background: var(--accent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306241a' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 12px no-repeat;
+}
+
+/* ---- Glass panel pass -------------------------------------- */
+/* These surfaces carry no fill of their own — they are a blurred,
+   slightly brightened view of the atmosphere behind, plus an inner rim. */
+[data-cta-form] {
+  background: var(--fill-panel);
+  -webkit-backdrop-filter: blur(12px) saturate(140%) brightness(1.03);
+  backdrop-filter: blur(12px) saturate(140%) brightness(1.03);
+  box-shadow: var(--shadow-card);
+}
+/* The lens rim: a 1px conic highlight travelling the panel's edge. */
+[data-cta-form]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  opacity: 0.45;
+  background: conic-gradient(
+    from 205deg at 50% 50%,
+    rgb(var(--tint) / 0.22),
+    rgb(var(--tint) / 0.02) 26%,
+    rgb(var(--tint) / 0.13) 52%,
+    rgb(var(--tint) / 0.02) 78%,
+    rgb(var(--tint) / 0.22)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+/* ---- ShinyButton ------------------------------------------- */
+/* The shadcn ShinyButton, themed to NDI mint. The @property
+   registrations are load-bearing: without them the conic angle jumps
+   instead of interpolating. */
+@property --gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --gradient-angle-offset {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --gradient-percent {
+  syntax: "<percentage>";
+  initial-value: 5%;
+  inherits: false;
+}
+@property --gradient-shine {
+  syntax: "<color>";
+  initial-value: #cffce6;
+  inherits: false;
+}
+
+.shiny-cta {
+  --shiny-cta-bg: var(--surface-cta);
+  --shiny-cta-bg-subtle: var(--surface-cta-subtle);
+  --shiny-cta-fg: var(--text-strong);
+  --shiny-cta-highlight: var(--accent);
+  --shiny-cta-highlight-subtle: #8be3b8;
+  --shiny-cta-px: 2.5rem;
+  --shiny-cta-py: 1.25rem;
+  --shiny-cta-fs: 1.125rem;
+  --shiny-cta-fw: 600;
+  --shiny-cta-glow: 1;
+  --shiny-cta-glow-x: 3.4rem;
+  --shiny-cta-glow-y: 1.6rem;
+  --animation: gradient-angle linear infinite;
+  --duration: 3s;
+  --shadow-size: 2px;
+  --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  outline-offset: 4px;
+  padding: var(--shiny-cta-py) var(--shiny-cta-px);
+  font-family: var(--font-display);
+  font-size: var(--shiny-cta-fs);
+  font-weight: var(--shiny-cta-fw);
+  line-height: 1.2;
+  border: 1px solid transparent;
+  border-radius: 360px;
+  color: var(--shiny-cta-fg);
+  background:
+    linear-gradient(var(--shiny-cta-bg), var(--shiny-cta-bg)) padding-box,
+    conic-gradient(
+        from calc(var(--gradient-angle) - var(--gradient-angle-offset)),
+        transparent,
+        var(--shiny-cta-highlight) var(--gradient-percent),
+        var(--gradient-shine) calc(var(--gradient-percent) * 2),
+        var(--shiny-cta-highlight) calc(var(--gradient-percent) * 3),
+        transparent calc(var(--gradient-percent) * 4)
+      )
+      border-box;
+  box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle);
+  transition: var(--transition);
+  transition-property: --gradient-angle-offset, --gradient-percent, --gradient-shine;
+}
+.shiny-cta::before,
+.shiny-cta::after,
+.shiny-cta span::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset-inline-start: 50%;
+  inset-block-start: 50%;
+  translate: -50% -50%;
+  z-index: -1;
+}
+.shiny-cta:active {
+  translate: 0 1px;
+}
+.shiny-cta::before {
+  --size: calc(100% - var(--shadow-size) * 3);
+  --position: 2px;
+  --space: calc(var(--position) * 2);
+  width: var(--size);
+  height: var(--size);
+  background: radial-gradient(
+      circle at var(--position) var(--position),
+      white calc(var(--position) / 4),
+      transparent 0
+    )
+    padding-box;
+  background-size: var(--space) var(--space);
+  background-repeat: space;
+  mask-image: conic-gradient(
+    from calc(var(--gradient-angle) + 45deg),
+    black,
+    transparent 10% 90%,
+    black
+  );
+  border-radius: inherit;
+  opacity: 0.4;
+  z-index: -1;
+}
+.shiny-cta::after {
+  --animation: shimmer linear infinite;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(-50deg, transparent, var(--shiny-cta-highlight), transparent);
+  mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+  opacity: 0.6;
+}
+.shiny-cta span {
+  z-index: 1;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.shiny-cta span::before {
+  width: calc(100% + var(--shiny-cta-glow-x));
+  height: calc(100% + var(--shiny-cta-glow-y));
+  border-radius: 360px;
+  box-shadow: inset 0 -1ex 1.2rem -2px var(--shiny-cta-highlight);
+  opacity: 0;
+  transition: opacity var(--transition);
+  animation: calc(var(--duration) * 1.5) breathe linear infinite;
+}
+.shiny-cta,
+.shiny-cta::before,
+.shiny-cta::after {
+  animation: var(--animation) var(--duration),
+    var(--animation) calc(var(--duration) / 0.4) reverse paused;
+  animation-composition: add;
+}
+.shiny-cta:is(:hover, :focus-visible) {
+  --gradient-percent: 20%;
+  --gradient-angle-offset: 95deg;
+  --gradient-shine: var(--shiny-cta-highlight-subtle);
+}
+.shiny-cta:is(:hover, :focus-visible),
+.shiny-cta:is(:hover, :focus-visible)::before,
+.shiny-cta:is(:hover, :focus-visible)::after {
+  animation-play-state: running;
+}
+.shiny-cta:is(:hover, :focus-visible) span::before {
+  opacity: var(--shiny-cta-glow);
+}
+
+/* ---- Secondary / hairline control -------------------------- */
+/* The website has no outline button — its hairline vocabulary is the chip's
+   checked state and the mobile sheet's social tiles. This applies that same
+   treatment to a full-width secondary control (the auth method choice). */
+.ndi-hairline-btn {
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+.ndi-hairline-btn:hover {
+  color: var(--text-strong);
+  border-color: var(--ndi-mint-40);
+  background: var(--ndi-mint-08);
+  box-shadow: var(--glow-sm);
+}
+.ndi-hairline-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+/* Back control: the icon travels toward where it goes. */
+.ndi-backbtn {
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.ndi-backbtn:hover {
+  background: var(--ndi-mint-08);
+  border-color: var(--ndi-mint-40);
+  color: var(--text-strong);
+  box-shadow: var(--glow-sm);
+}
+.ndi-backbtn svg {
+  transition: transform var(--dur) var(--ease-out);
+}
+.ndi-backbtn:hover svg {
+  transform: translateX(-3px);
+}
+
+/* ---- Native control colours -------------------------------- */
+select option {
+  background: var(--surface-menu);
+  color: var(--text-body);
+}
+
+/* Cards that are whole-card links lift on hover. */
+.ndi-lift {
+  transition: transform var(--dur), box-shadow var(--dur);
+}
+.ndi-lift:hover {
+  transform: translateY(-3px);
+}
+
+/* ---- Hover motion on touch -------------------------------- */
+/* A tap on a touch screen applies :hover and leaves it applied until you tap
+   something else, so every hover-only displacement sticks. */
+@media (hover: none) {
+  .ndi-sweepbtn:hover,
+  .ndi-lift:hover,
+  .ndi-hairline-btn:hover,
+  .ndi-backbtn:hover svg,
+  .ndi-sweepbtn:hover .ndi-sendnudge {
+    transform: none;
+  }
+}
+
+/* ---- Auth rail scenes -------------------------------------- */
+.ndi-scene {
+  animation: ndiSceneIn var(--dur-slow) var(--ease-out);
+}
+@keyframes ndiSceneIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ndi-scene__scan {
+  animation: ndiScan 2.8s var(--ease-in-out) infinite;
+}
+.ndi-scene__scan-wide {
+  animation: ndiScanWide 3.2s var(--ease-in-out) infinite;
+}
+@keyframes ndiScan {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(64px);
+    opacity: 1;
+  }
+}
+@keyframes ndiScanWide {
+  0%,
+  100% {
+    transform: translateY(-38px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(38px);
+    opacity: 1;
+  }
+}
+.ndi-scene__seal {
+  animation: ndiSealFloat 5s var(--ease-in-out) infinite alternate;
+}
+@keyframes ndiSealFloat {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+/* ---- Sidebar nav rows -------------------------------------- */
+/* The same active treatment as the site's nav — a mint gradient on the label
+   — but on a filled row, since a sidebar row is a target, not a link in prose. */
+.ndi-navrow {
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  transition: color var(--dur) var(--ease-out), background var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+.ndi-navrow:hover {
+  color: var(--text-strong);
+  background: rgb(var(--tint) / 0.05);
+}
+.ndi-navrow:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.ndi-navrow[data-active="1"] {
+  color: var(--accent);
+  border-color: var(--border-strong);
+  background: var(--ndi-mint-12);
+}
+.ndi-navrow[data-active="1"] svg {
+  color: var(--accent);
+}
+
+.ndi-navdot {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+/* ---- Info tooltip ------------------------------------------ */
+.ndi-tip {
+  position: relative;
+  display: inline-flex;
+}
+.ndi-tip__bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 240px;
+  transform: translateX(-50%) translateY(4px);
+  padding: 8px 11px;
+  border-radius: 9px;
+  border: 1px solid rgba(90, 201, 148, 0.22);
+  background: var(--surface-tooltip);
+  box-shadow: 0 14px 34px rgb(var(--shade) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: var(--text-tooltip);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.18s var(--ease-out), transform 0.18s var(--ease-out),
+    visibility 0s linear 0.18s;
+}
+.ndi-tip:hover .ndi-tip__bubble,
+.ndi-tip:focus-within .ndi-tip__bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0s;
+}
+
+/* ---- Sidebar drawer, mobile -------------------------------- */
+@media (max-width: 900px) {
+  aside[data-open="0"] {
+    transform: translateX(-100%);
+  }
+}
+
+/* ---- Segmented tabs --------------------------------------- */
+.ndi-tab {
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--dur) var(--ease-out), background var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+.ndi-tab:hover {
+  color: var(--text-body);
+}
+.ndi-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.ndi-tab[data-active="1"] {
+  color: var(--text-strong);
+  border-color: var(--border-strong);
+  background: var(--ndi-mint-12);
+}
+.ndi-tab[data-active="1"] svg {
+  color: var(--accent);
+}
+
+/* ---- Data table ------------------------------------------- */
+.ndi-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ndi-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+.ndi-table td {
+  padding: 14px 16px;
+  font-size: 13.5px;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.ndi-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.ndi-table tbody tr {
+  transition: background var(--dur) var(--ease-out);
+}
+.ndi-table tbody tr:hover {
+  background: rgb(var(--tint) / 0.04);
+}
+
+/* ---- Select ------------------------------------------------ */
+/* The trigger for the Select component. Same material as .ndi-field so a row
+   of inputs and selects sits on one line without a seam; the chevron is a
+   real icon in the component rather than a background image, so there is no
+   background-position to keep in step with the padding. */
+.ndi-select-trigger {
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-grid);
+  background: var(--surface-raised);
+  color: var(--text-body);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out),
+    background 0.2s var(--ease-out);
+}
+.ndi-select-trigger:hover:not(:disabled) {
+  border-color: var(--border-strong);
+}
+.ndi-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.ndi-select-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.ndi-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ---- Native select, themed -------------------------------- */
+/* Kept for any remaining native control; the popup is drawn by the OS and
+   takes no styling beyond these two, which is why Select exists. */
+.ndi-select {
+  appearance: none;
+  height: 44px;
+  padding: 0 38px 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border-grid);
+  background-color: var(--surface-raised);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c828a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 15px;
+  color: var(--text-body);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+.ndi-select:hover {
+  border-color: var(--border-strong);
+}
+.ndi-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* An icon-only control that matches the field height beside it. */
+.ndi-iconbtn {
+  cursor: pointer;
+  border: 1px solid var(--border-grid);
+  background: rgb(var(--tint) / 0.03);
+  color: var(--text-muted);
+  transition: color var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.ndi-iconbtn:hover {
+  color: var(--accent);
+  border-color: var(--ndi-mint-40);
+  background: var(--ndi-mint-08);
+}
+.ndi-iconbtn:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+/* ---- Modal dialog ------------------------------------------ */
+/* Native <dialog> + showModal(). The element sits in the top layer, so it
+   needs no z-index against the sidebar, the harness bar or the atmosphere —
+   but that also means the usual centring utilities do not apply, and the
+   backdrop can only be reached through ::backdrop. */
+.ndi-dialog {
+  margin: auto;
+  max-height: calc(100dvh - 2rem);
+  /* auto, not visible: a terminate confirmation lists everything the action
+     will stop, and on a short viewport that list is taller than the dialog.
+     With overflow visible it was simply cut off — the worst possible place to
+     hide content, since the list is the whole reason the dialog exists. */
+  overflow: auto;
+  background: var(--surface-canvas);
+  box-shadow: var(--shadow-card);
+}
+.ndi-dialog::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(5px);
+}
+/* The open state animates; the closed state must not, or a dialog that has
+   never been opened plays its entrance on first paint. */
+@media (prefers-reduced-motion: no-preference) {
+  .ndi-dialog[open] {
+    animation: ndi-dialog-in var(--dur) var(--ease-out);
+  }
+  .ndi-dialog[open]::backdrop {
+    animation: ndi-fade-in var(--dur) var(--ease-out);
+  }
+}
+@keyframes ndi-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ndi-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The dialog's confirm control. Default carries the gradient the primary CTA
+   wears; danger drops it for an outlined red, because a filled red button is
+   the loudest thing on the screen and this is a decision to be read, not a
+   button to be hit reflexively. */
+.ndi-dialog-confirm {
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--ndi-mint-deep), var(--ndi-mint));
+  color: var(--ndi-ink-900);
+  transition: filter var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out),
+    background var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+.ndi-dialog-confirm:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: var(--glow-sm);
+}
+.ndi-dialog-confirm:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.ndi-dialog-confirm[data-tone="danger"] {
+  background: rgb(225 73 62 / 0.1);
+  border-color: rgb(225 73 62 / 0.45);
+  color: var(--ndi-danger);
+}
+.ndi-dialog-confirm[data-tone="danger"]:hover:not(:disabled) {
+  filter: none;
+  background: rgb(225 73 62 / 0.16);
+  border-color: var(--ndi-danger);
+  box-shadow: none;
+}
+.ndi-dialog-confirm:disabled {
+  cursor: not-allowed;
+  /* Matches the disabled CTA elsewhere: the gradient goes, so a permanently
+     disabled control does not read as merely dimmed and still pressable. */
+  background: var(--surface-raised);
+  border-color: var(--border-grid);
+  color: var(--text-faint);
+  filter: none;
+  box-shadow: none;
+}
+
+/* ---- Switch ------------------------------------------------ */
+.ndi-switch {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+}
+.ndi-switch:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.ndi-switch:disabled {
+  cursor: not-allowed;
+}
+
+/* The demo harness clears the sidebar rather than sitting on top of it.
+
+   Keyed off the shell's presence in the document, not off the route: the
+   verifier, the onboarding flow and the what's-real page all render without a
+   rail, and a list of routes here would be wrong the first time one is added.
+   Below 901px the rail is a drawer and there is nothing to clear. */
+@media (min-width: 901px) {
+  body:has([data-app-shell]) .ndi-demo-harness {
+    padding-left: 264px;
+  }
+}

@@ -24,3 +24,7 @@ node_modules
 .env.development
 .env.production
 .env.test
+
+# The Entity Wallet prototype is a separate Next app with its own
+# toolchain; Studio must not lint, format, build or ship it.
+entity-wallet-prototype
