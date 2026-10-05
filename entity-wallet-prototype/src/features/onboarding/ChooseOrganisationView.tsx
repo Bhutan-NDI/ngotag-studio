@@ -18,6 +18,11 @@ import { LOCAL_MS, REGISTER_CHECK_MS, ROUND_TRIP_MS, SKIP_AFTER_MS } from "@/lib
 import { OnboardingShell } from "./OnboardingShell";
 import { kindOf } from "./orgKinds";
 
+/* What the register lists against a person. An organisation reached only
+   by an invitation naming it (Bank of Bhutan's) is looked up by name, and
+   never appears in anyone's list. */
+const LISTED = REGISTER_LISTINGS.filter((l) => !l.invitedOnly);
+
 type Stage = "looking_up" | "listed" | "none_found" | "register_unavailable" | "confirming" | "provisioning" | "review_form";
 
 /**
@@ -108,7 +113,7 @@ function ChooseOrganisation() {
 
   const [stage, setStage] = useState<Stage>(kind.register && !refused ? "looking_up" : "review_form");
   const [skippable, setSkippable] = useState(false);
-  const [choice, setChoice] = useState<string>(REGISTER_LISTINGS.find((l) => !l.onPlatform)?.ref ?? "");
+  const [choice, setChoice] = useState<string>(LISTED.find((l) => !l.onPlatform)?.ref ?? "");
   const [reviewReason, setReviewReason] = useState<"none" | "not_listed" | "no_register">(
     kind.register ? "none" : "no_register",
   );
@@ -190,15 +195,14 @@ function ChooseOrganisation() {
 
   const toReview = (why: "none" | "not_listed") => {
     setReviewReason(why);
-    /* When the register lists nothing, the organisation is almost always the
-       one the story is about — Pelden, whose register entry is behind — so
-       the form starts with it, and the presenter is not typing on stage. A
-       listed-but-not-this-one case is a different organisation by
-       definition, so that form starts empty. */
-    if (why === "none" && !legalName) {
-      setLegalName(invitedName ?? "Pelden Trading Pvt. Ltd.");
-      setNumber(invitedName && !invitedName.startsWith("Pelden") ? "" : "CRA-2019-04477");
-    }
+    /* The form starts empty, with the placeholders showing the shape of an
+       answer. It used to start filled in with Pelden's name and number so
+       the presenter was not typing on stage — which on a first run read as
+       the platform already knowing the organisation it was being asked
+       about, the opposite of what a manual review is for. The one thing
+       carried in is a name the invitation itself gave (Kind O), since that
+       came from NDI rather than from the demo. */
+    if (why === "none" && !legalName && invitedName) setLegalName(invitedName);
     setStage("review_form");
   };
 
@@ -206,7 +210,7 @@ function ChooseOrganisation() {
     reviewReason === "no_register"
       ? "No register can confirm this kind of organisation automatically."
       : reviewReason === "not_listed"
-        ? `The ${register} listed ${REGISTER_LISTINGS.length} organisations for this person, but not this one.`
+        ? `The ${register} listed ${LISTED.length} organisations for this person, but not this one.`
         : `The ${register} listed no organisations for this person.`;
 
   const submit = () => {
@@ -297,9 +301,9 @@ function ChooseOrganisation() {
           <Panel>
             <fieldset className="relative z-[4] m-0 flex flex-col gap-2 border-0 p-0">
               <legend className={`${LABEL_CLASS} mb-2 p-0`}>
-                The {register} lists you against {REGISTER_LISTINGS.length} organisations
+                The {register} lists you against {LISTED.length} organisations
               </legend>
-              {REGISTER_LISTINGS.map((l) => {
+              {LISTED.map((l) => {
                 const on = choice === l.ref;
                 return (
                   <label
