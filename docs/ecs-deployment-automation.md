@@ -39,9 +39,12 @@ Adding or removing an environment also requires a matching public Make target an
 workflow trigger glob; the workflow's pre-resolution concurrency group also names
 the environment because step outputs are not available yet. CI rejects drift in
 both workflow-level mappings. The exact GitHub Environment is also a required
-provisioning point: it must exist with the matching branch restriction, required
+provisioning point: it must exist with a deployment policy that allows the
+environment's release-tag pattern (for example `studio-prod-*`), required
 Environment secrets, and the approved reviewer/protection policy before the
-manifest can be enabled. The corresponding OIDC/deployer configuration remains
+manifest can be enabled. Deployments run on the release tag, and GitHub checks
+the Environment policy against that tag ref, so a branch-only policy rejects
+them; the resolver still enforces the source-branch head. The corresponding OIDC/deployer configuration remains
 owned by the restricted Terraform repository. None of these locations redefines
 the contract's branch or tag-prefix policy.
 
