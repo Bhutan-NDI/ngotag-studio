@@ -32,12 +32,15 @@ jobs:
           sh -n .github/scripts/validate-studio-workflow-contract.sh
           sh -n .github/scripts/wait-for-studio-ci.sh
           sh -n .github/scripts/test-studio-release-selectors.sh
+          sh -n .github/scripts/prepare-studio-manifest.sh
+          sh -n .github/scripts/test-prepare-studio-manifest.sh
           sh .github/scripts/validate-studio-release-contract.sh \
             .github/studio-release-contract.json
           sh .github/scripts/validate-studio-workflow-contract.sh \
             .github/studio-release-contract.json \
             .github/workflows/deploy-studio.yml
           sh .github/scripts/test-studio-release-selectors.sh
+          sh .github/scripts/test-prepare-studio-manifest.sh
           make --dry-run _release DEPLOY_ENV=qa \
             DEPLOYMENT_CONFIG_REPOSITORY=example/manifests | /bin/sh -n
 

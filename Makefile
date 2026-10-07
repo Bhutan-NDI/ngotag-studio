@@ -1,11 +1,16 @@
 .PHONY: deploy-qa deploy-stage deploy-prod
 
 DEPLOY_WAIT ?= true
+RELEASE_SAME_SOURCE ?= false
 DEPLOYMENT_CONFIG_REPOSITORY ?=
 RELEASE_CONTRACT := .github/studio-release-contract.json
 CONTRACT_VALIDATOR := .github/scripts/validate-studio-release-contract.sh
 MANIFEST_VALIDATOR := .github/scripts/validate-studio-manifest.sh
 CI_WAIT_SCRIPT := .github/scripts/wait-for-studio-ci.sh
+MANIFEST_PREPARE_SCRIPT := .github/scripts/prepare-studio-manifest.sh
+# Workflow in the private manifest repository that advances a deployed manifest to
+# a new pending version. Make runs it only when the manifest is not already pending.
+MANIFEST_PREPARE_WORKFLOW ?= dispatch-studio-release.yml
 WORKFLOW_RUN_FILTER := .github/scripts/select-studio-workflow-run.jq
 
 # A DevOps operator starts every release through one of these targets. Make pins the
@@ -35,6 +40,7 @@ _release:
 		test -f "$(CONTRACT_VALIDATOR)" || { echo "release contract validator is missing" >&2; exit 1; }; \
 		test -f "$(MANIFEST_VALIDATOR)" || { echo "manifest validator is missing" >&2; exit 1; }; \
 		test -f "$(CI_WAIT_SCRIPT)" || { echo "CI wait script is missing" >&2; exit 1; }; \
+		test -f "$(MANIFEST_PREPARE_SCRIPT)" || { echo "manifest prepare script is missing" >&2; exit 1; }; \
 		test -f "$(WORKFLOW_RUN_FILTER)" || { echo "workflow-run filter is missing" >&2; exit 1; }; \
 		sh "$(CONTRACT_VALIDATOR)" "$(RELEASE_CONTRACT)"; \
 		required_branch="$$(jq -er --arg environment "$(DEPLOY_ENV)" \
@@ -59,13 +65,15 @@ _release:
 		studio_repository="$$(gh repo view --json nameWithOwner --jq '.nameWithOwner')"; \
 		source_sha="$$(git rev-parse HEAD)"; \
 		source_short="$$(printf '%s' "$$source_sha" | cut -c1-12)"; \
+		sh "$(CI_WAIT_SCRIPT)" "$$studio_repository" "$$source_sha" "$(RELEASE_CONTRACT)"; \
+		RELEASE_SAME_SOURCE="$(RELEASE_SAME_SOURCE)" sh "$(MANIFEST_PREPARE_SCRIPT)" \
+			"$$config_repository" "$(DEPLOY_ENV)" "$$source_sha" "$(MANIFEST_PREPARE_WORKFLOW)"; \
 		manifest_ref="$$(gh api "repos/$${config_repository}/git/ref/heads/main" --jq '.object.sha')"; \
 		manifest_content="$$(gh api "repos/$${config_repository}/contents/studio/environments/$(DEPLOY_ENV).json?ref=$${manifest_ref}" --jq '.content')"; \
 		manifest_file="$$(mktemp)"; \
 		trap 'rm -f "$$manifest_file"' EXIT HUP INT TERM; \
 		printf '%s' "$$manifest_content" | base64 --decode > "$$manifest_file"; \
 		sh "$(MANIFEST_VALIDATOR)" "$(DEPLOY_ENV)" "$$required_branch" "$$manifest_file"; \
-		sh "$(CI_WAIT_SCRIPT)" "$$studio_repository" "$$source_sha" "$(RELEASE_CONTRACT)"; \
 		release_tag="$${tag_prefix}$${manifest_ref}-$${source_short}-$$(date -u +%Y%m%dT%H%M%SZ)"; \
 		git check-ref-format "refs/tags/$${release_tag}" >/dev/null; \
 		set +e; \
