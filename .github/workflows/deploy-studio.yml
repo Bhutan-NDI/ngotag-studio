@@ -323,53 +323,62 @@ jobs:
           repositories: ${{ github.event.repository.name }}
           permission-contents: write
 
+      # This repository is public. Release notes carry only the version, environment,
+      # source commit, and generated change list. Never add image, registry, account,
+      # task-definition, cluster, bucket, configuration, or rollback details; those
+      # belong only in the private deployment manifest ledger.
       - name: Create immutable GitHub Release
         id: release
         shell: bash
         env:
           GH_TOKEN: ${{ steps.release_token.outputs.token }}
           RELEASE_VERSION: ${{ steps.config.outputs.release_version }}
-          REGISTRY: ${{ steps.deployment.outputs.registry }}
         run: |
           set -euo pipefail
-          image="${{ steps.image.outputs.image }}"
-          image_digest="${{ steps.image.outputs.digest }}"
           release_suffix="${GITHUB_SHA:0:8}.${{ steps.config.outputs.config_hash }}"
           release_suffix="${release_suffix:0:17}"
           case "$TARGET_ENVIRONMENT" in
             qa)
               release_tag="v${RELEASE_VERSION}-qa.${release_suffix}"
               release_args=(--prerelease)
+              release_label="QA prerelease"
+              previous_pattern='^v[0-9]+\.[0-9]+\.[0-9]+-qa\.'
               ;;
             stage)
               release_tag="v${RELEASE_VERSION}-rc.${release_suffix}"
               release_args=(--prerelease)
+              release_label="release candidate"
+              previous_pattern='^v[0-9]+\.[0-9]+\.[0-9]+-rc\.'
               ;;
             prod)
               release_tag="v${RELEASE_VERSION}"
               release_args=()
+              release_label="production release"
+              previous_pattern='^v[0-9]+\.[0-9]+\.[0-9]+$'
               ;;
           esac
-          # printf intentionally interprets the escaped newlines in this static format.
-          # shellcheck disable=SC2016
-          notes=$(printf 'Environment: `%s`\n\nSource commit: `%s`\n\nManifest commit: `%s`\n\nImage: `%s@%s`\n\nTask definition: `%s`\n' \
-            "$TARGET_ENVIRONMENT" "$GITHUB_SHA" "${{ steps.config.outputs.manifest_commit }}" \
-            "$image" "$image_digest" "${{ steps.ecs.outputs.task_definition_arn }}")
           if gh release view "$release_tag" >/dev/null 2>&1; then
-            existing="$(gh release view "$release_tag" --json targetCommitish,body)"
-            existing_commit="$(jq -r '.targetCommitish' <<<"$existing")"
+            # The prepared manifest version changes with every effective request, so
+            # the same tag on the same commit is this deployment's earlier attempt.
+            existing_commit="$(gh release view "$release_tag" --json targetCommitish --jq '.targetCommitish')"
             test "$existing_commit" = "$GITHUB_SHA" || {
               echo "existing release $release_tag belongs to $existing_commit, not $GITHUB_SHA" >&2
               exit 1
             }
-            jq -e --arg digest "$image_digest" '.body | contains($digest)' <<<"$existing" >/dev/null || {
-              echo "existing release $release_tag does not record the deployed digest" >&2
-              exit 1
-            }
             echo "Reusing matching release $release_tag after a safe retry"
           else
+            # Generate the change list since the previous release of this environment.
+            previous_tag="$(gh release list --limit 100 --exclude-drafts --json tagName \
+              | jq -r --arg pattern "$previous_pattern" \
+                  '[.[].tagName | select(test($pattern))] | first // empty')"
+            if [ -n "$previous_tag" ]; then
+              release_args+=(--notes-start-tag "$previous_tag")
+            fi
+            notes="$(printf '## NGOTAG Studio %s (%s)\n\n**Source commit:** %s\n' \
+              "$RELEASE_VERSION" "$release_label" "$GITHUB_SHA")"
             gh release create "$release_tag" --target "$GITHUB_SHA" \
-              --title "NGOTAG Studio $release_tag" --notes "$notes" "${release_args[@]}"
+              --title "NGOTAG Studio $release_tag" --notes "$notes" --generate-notes \
+              "${release_args[@]}"
           fi
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
 
