@@ -32,10 +32,11 @@ app_slug=$(jq -er '.ci.app_slug // empty' "$contract")
 attempt=1
 
 while [ "$attempt" -le "$max_attempts" ]; do
-  if check_runs=$(gh api --paginate --slurp \
+  # Slurp pages with jq rather than `gh api --slurp`, which needs gh 2.48+.
+  if check_runs=$(gh api --paginate \
     "repos/${repository}/commits/${source_sha}/check-runs?per_page=100"); then
     api_failures=0
-    state=$(printf '%s' "$check_runs" | jq -r \
+    state=$(printf '%s' "$check_runs" | jq -sr \
       --arg check_name "$check_name" \
       --arg app_slug "$app_slug" \
       -f "$state_filter")
