@@ -44,8 +44,14 @@ environment's release-tag pattern (for example `studio-prod-*`), required
 Environment secrets, and the approved reviewer/protection policy before the
 manifest can be enabled. Deployments run on the release tag, and GitHub checks
 the Environment policy against that tag ref, so a branch-only policy rejects
-them; the resolver still enforces the source-branch head. The corresponding OIDC/deployer configuration remains
-owned by the restricted Terraform repository. None of these locations redefines
+them; the resolver still enforces the source-branch head. The same applies to the
+environment's AWS deploy role: its OIDC trust must accept that release-tag ref
+(for example `refs/tags/studio-prod-*`), because a role that trusts only
+`refs/heads/main` refuses credentials to tag-triggered runs. Because the workflow
+that runs is the one in the tagged commit, `studio-*` tag creation should be
+restricted to release operators before an environment trusts its tags. The
+corresponding OIDC/deployer configuration remains owned by the restricted
+Terraform repository. None of these locations redefines
 the contract's branch or tag-prefix policy.
 
 The workflow derives the ECR image tag itself from the approved SemVer release,
