@@ -61,10 +61,15 @@ configuration-only release just as traceable as a source-code release.
 
 `make deploy-qa`, `make deploy-stage`, and `make deploy-prod` are the only supported
 operator entry points. A DevOps operator supplies the restricted configuration
-repository locator through `DEPLOYMENT_CONFIG_REPOSITORY`; Make verifies the current
-manifest is enabled and pending, confirms the exact permitted source-branch head and
-waits for its successful `Lint & Build` check, and pushes an immutable
-release-trigger tag. The operator path and deployment workflow use the same bounded
+repository locator through `DEPLOYMENT_CONFIG_REPOSITORY`; Make confirms the exact
+permitted source-branch head and waits for its successful `Lint & Build` check. If
+the environment's manifest is enabled but not pending, Make starts the private
+manifest repository's prepare workflow (`MANIFEST_PREPARE_WORKFLOW`) and waits for it
+to record a new pending version, so no separate preparation step is needed. It
+refuses to prepare a new version when the manifest is disabled, or when the current
+release is already deployed from the same source commit unless
+`RELEASE_SAME_SOURCE=true` is set. Make then validates the pending manifest and pushes
+an immutable release-trigger tag. The operator path and deployment workflow use the same bounded
 CI-wait implementation, so a release requested moments after a branch push does not
 fail merely because the required check is still queued or running.
 Make and the workflow invoke the same
@@ -81,8 +86,9 @@ before publishing the release ledger.
 A reviewed public-build configuration change in the private manifest repository
 prepares a pending release but never deploys it. Disabled environments never prepare
 a release, and deployment-ledger updates are ignored. A DevOps operator must still
-run the matching Make target from the permitted Studio branch; pushing release tags
-or invoking the workflow directly is not an approved release path.
+run the matching Make target from the permitted Studio branch, which also prepares a
+new version when nothing is pending; pushing release tags or invoking the deployment
+workflow directly is not an approved release path.
 
 Operational setup and environment details are intentionally maintained in the
 private infrastructure repositories.
