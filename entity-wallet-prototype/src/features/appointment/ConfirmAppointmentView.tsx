@@ -168,6 +168,10 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
               statusDetail={shown === "declined" ? "You declined in the wallet. Nothing was shared." : undefined}
               onSimulateScan={() => start("proved")}
               onCancel={() => router.push(`/appointments/${relationId}`)}
+              onResend={() => {
+                timers.current.forEach(clearTimeout);
+                setStage("idle");
+              }}
               onSkip={
                 skippable && shown === "wallet"
                   ? () => {

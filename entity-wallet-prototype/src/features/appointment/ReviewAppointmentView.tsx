@@ -41,12 +41,12 @@ import { FullTerms, Responsibilities } from "./Responsibilities";
  * before they press it that their NDI wallet is needed. Everyone scans,
  * whoever they are: the approval is the acceptance, not only the proof.
  */
-type Face = "default" | "expired" | "declined" | "no_longer_valid" | "offline" | "not_yours";
+type Face = "default" | "expired" | "declined" | "registration_lost" | "no_longer_valid" | "offline" | "not_yours";
 
 export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   const router = useRouter();
   const { relations, people, organizations, harness, declineAppointment, setPersona, hydrated } = useDemo();
-  const forced = useScreenState("SCR-DEL-03", ["live", "default", "expired", "declined", "no_longer_valid", "offline"]);
+  const forced = useScreenState("SCR-DEL-03", ["live", "default", "expired", "declined", "registration_lost", "no_longer_valid", "offline"]);
   const [declined, setDeclined] = useState(false);
 
   const r = relations.find((x) => x.id === relationId);
@@ -61,6 +61,8 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   const uniqueShare = shareWith.filter((v, i, a) => a.indexOf(v) === i);
   const now = new Date().toISOString().slice(0, 10);
 
+  /* E8 and E9 are both "the basis was lost", and the screen says which in
+     plain words: the organisation's registration, or the representative. */
   const natural: Face = !r
     ? "no_longer_valid"
     : declined || (r.state === "TERMINATED" && r.endedReason === "declined")
@@ -68,7 +70,9 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
       : r.state === "EXPIRED" || (r.state === "PENDING_ACCEPTANCE" && r.expiresAt && r.expiresAt < now)
         ? "expired"
         : r.state !== "PENDING_ACCEPTANCE" && r.state !== "ACTIVE"
-          ? "no_longer_valid"
+          ? org && !org.capabilities.includes("holder")
+            ? "registration_lost"
+            : "no_longer_valid"
           : r.personId !== harness.persona
             ? "not_yours"
             : "default";
@@ -103,11 +107,12 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
 
   if (face === "expired") return outcome(<>This appointment has expired. Ask {repName} to make it again.</>);
   if (face === "declined") return outcome(<>You&rsquo;ve declined. Nothing has changed.</>);
+  if (face === "registration_lost")
+    return outcome(<>This appointment can&rsquo;t go ahead because {orgName}&rsquo;s registration can&rsquo;t be confirmed.</>);
   if (face === "no_longer_valid")
     return outcome(
       <>
-        {repName} is no longer recorded as {orgName}&rsquo;s representative, so this appointment can&rsquo;t
-        go ahead.
+        This appointment is no longer valid because {repName} is no longer {orgName}&rsquo;s representative.
       </>,
     );
   if (face === "not_yours")
