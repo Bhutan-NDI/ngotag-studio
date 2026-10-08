@@ -143,10 +143,8 @@ act that establishes the product is not self-certifying.
 
 ### 1 · What kind of organisation — `/onboarding`
 
-Each type names *the authority that registered it*, which is who checks it.
-Civil society organisations and cooperatives are listed but disabled, with
-the reason: their authority isn't connected yet. **Tell us you're waiting**
-beside them records interest — and says plainly that nothing is pending.
+Each type — registered company, sole proprietorship, partnership — names
+*the authority that registered it*, which is who checks it.
 
 > "The authority decides, not NDI. You can read that off this list before
 > you've typed anything."
@@ -367,12 +365,13 @@ first, or the first screen says nothing can be verified yet.
    verifying carry on throughout, and the screen says that instead of the
    negative clause.
 
-### Flow 2 · A type that can't be verified yet
+### Flow 2 · Before any authority is connected
 
-On the first screen, **Tell us you're waiting** beside **Civil society
-organisation**. The screen names the Civil Society Organisations Authority as
-not connected, asks for nothing about the organisation, and once pressed says
-nothing is pending — no application, no queue.
+From day zero, before the platform-admin flow, open `/onboarding`. The first
+screen says organisations can't be verified yet because no authority is
+connected. **Tell us you're waiting** asks for nothing about the
+organisation, and once pressed says nothing is pending — no application, no
+queue.
 
 ---
 

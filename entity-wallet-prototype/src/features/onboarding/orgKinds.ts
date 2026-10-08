@@ -4,14 +4,14 @@ import type { OrgKind } from "@/lib/demoData";
  * The entity types, the authority that registers each, and what that
  * authority's identifier looks like (Flow 2 solution design §2.2).
  *
- * WHY EVERY TYPE IS LISTED, CONNECTED OR NOT
+ * WHICH TYPES ARE LISTED
  *
- * SCR-ORG-01 shows unsupported types and disables them with the reason —
- * never hides them (UXD-11). Hiding them makes a deliberate limit look like
- * a missing feature: the secretary of a civil society organisation concludes
- * the platform is broken, rather than that their authority is not connected
- * yet. Naming the authority against every type also teaches, at a glance,
- * the model the product rests on: the authority decides, not NDI.
+ * Only registered companies, sole proprietorships and partnerships are in
+ * scope; civil society organisations and cooperatives are not offered at all.
+ * A listed type whose authority isn't connected (P3) is still shown, disabled
+ * with the reason — never hidden (UXD-11). Naming the authority against every
+ * type also teaches, at a glance, the model the product rests on: the
+ * authority decides, not NDI.
  *
  * Which types are connected is the server's answer (`connectedKinds` in the
  * store), not this list's. This list only says who the authority *is*, so
@@ -64,8 +64,6 @@ export const ORG_KINDS: OrgKindInfo[] = [
     example: "BL-THIMPHU-2018-1142",
     pattern: /^BL-[A-Z]+-\d{4}-\d{4}$/,
   },
-  { value: "cso", label: "Civil society organisation", authority: "Civil Society Organisations Authority" },
-  { value: "cooperative", label: "Cooperative", authority: "Department of Agricultural Marketing and Cooperatives" },
 ];
 
 export const kindOf = (value: OrgKind | undefined) => ORG_KINDS.find((k) => k.value === value) ?? ORG_KINDS[0];

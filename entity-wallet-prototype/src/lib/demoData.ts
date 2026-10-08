@@ -851,7 +851,7 @@ export interface OrgInvitation {
  * Which register verifies each one, and whether it is connected yet, is in
  * `features/onboarding/orgKinds.ts`; this is only the set of names.
  */
-export type OrgKind = "company" | "sole_proprietorship" | "partnership" | "cso" | "cooperative";
+export type OrgKind = "company" | "sole_proprietorship" | "partnership";
 
 /**
  * Where a verification record is (FLOW-ORG-01 §4 steps 3–11).

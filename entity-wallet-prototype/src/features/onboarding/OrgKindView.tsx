@@ -27,12 +27,10 @@ import { ORG_KINDS, kindOf } from "./orgKinds";
  *
  * UNSUPPORTED TYPES ARE SHOWN, DISABLED, WITH THE REASON
  *
- * A civil society organisation or a cooperative cannot be verified yet —
- * its authority is not connected. It is still listed (UXD-11), disabled,
- * with the reason and the authority named, and with the one thing that can
- * be done about it: say you're waiting (SCR-ORG-06). This used to route
- * those types to a review by NDI instead; the specification has no such
- * route, and NDI does not decide who represents an organisation.
+ * A type whose authority is not connected is still listed (UXD-11),
+ * disabled, with the reason and the authority named, and with the one thing
+ * that can be done about it: say you're waiting (SCR-ORG-06). NDI does not
+ * decide who represents an organisation, so there is no route to a review.
  *
  * Why a type is unsupported has four possible causes on the server (P3) and
  * one message on the screen. Which cause applies is an authority's
