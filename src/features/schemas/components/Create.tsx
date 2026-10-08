@@ -89,6 +89,9 @@ const CreateSchema = (): React.JSX.Element => {
         } else if (did.includes(DidMethod.POLYGON)) {
           setType(SchemaType.W3C)
           setSchemaTypeValues(SchemaTypeValue.POLYGON)
+        } else if (did.includes(DidMethod.ETHR)) {
+          setType(SchemaType.W3C)
+          setSchemaTypeValues(SchemaTypeValue.ETHEREUM)
         } else if (did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
           setType(SchemaType.W3C)
           setSchemaTypeValues(SchemaTypeValue.NO_LEDGER)
@@ -286,6 +289,7 @@ const CreateSchema = (): React.JSX.Element => {
   const filteredOptions = useMemo(() => {
     if (
       schemaTypeValues === SchemaTypeValue.POLYGON ||
+      schemaTypeValues === SchemaTypeValue.ETHEREUM ||
       schemaTypeValues === SchemaTypeValue.NO_LEDGER
     ) {
       return options.filter(

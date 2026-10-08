@@ -1,17 +1,20 @@
 'use client'
 
-import { CommonConstants, Network } from '../common/enum'
+import { CommonConstants, DidMethod, Network } from '../common/enum'
 import React, { ChangeEvent, useEffect, useState } from 'react'
+import {
+  createEthereumKeyValuePair,
+  createPolygonKeyValuePair,
+} from '@/app/api/Agent'
 
 import type { AxiosResponse } from 'axios'
 import { Checkbox } from '@/components/ui/checkbox'
 import CopyDid from './CopyDid'
-import GenerateBtnPolygon from './GenerateBtnPolygon'
+import GenerateBtn from './GenerateBtn'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import TokenWarningMessage from './TokenWarningMessage'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { createPolygonKeyValuePair } from '@/app/api/Agent'
 import { ethers } from 'ethers'
 
 export interface IPolygonKeys {
@@ -24,12 +27,16 @@ interface IProps {
   orgId?: string
   privateKeyValue: string
   setPrivateKeyValue: (val: string) => void
+  didMethod: DidMethod
+  network: Network
 }
 
 const SetPrivateKeyValueInput = ({
   orgId,
   privateKeyValue,
   setPrivateKeyValue,
+  didMethod,
+  network,
 }: IProps): React.JSX.Element => {
   const [havePrivateKey, setHavePrivateKey] = useState(false)
   const [generatedKeys, setGeneratedKeys] = useState<IPolygonKeys | null>(null)
@@ -38,15 +45,38 @@ const SetPrivateKeyValueInput = ({
 
   const checkWalletBalance = async (
     privateKey: string,
-    network: Network,
+    balanceNetwork: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (didMethod === DidMethod.ETHR) {
+      setErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
-        testnet: process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
-        mainnet: process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
+        testnet:
+          didMethod === DidMethod.POLYGON
+            ? process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL
+            : '',
+        mainnet:
+          didMethod === DidMethod.POLYGON
+            ? process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL
+            : '',
       }
 
-      const provider = new ethers.JsonRpcProvider(rpcUrls[network])
+      const rpcUrl = rpcUrls[balanceNetwork]
+      if (!rpcUrl) {
+        setErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
+      const provider = new ethers.JsonRpcProvider(rpcUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const balance = await provider.getBalance(await wallet.getAddress())
       const etherBalance = ethers.formatEther(balance)
@@ -60,16 +90,17 @@ const SetPrivateKeyValueInput = ({
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
   useEffect(() => {
     if (privateKeyValue?.length === 64) {
-      checkWalletBalance(privateKeyValue, Network.TESTNET)
+      checkWalletBalance(privateKeyValue, network)
     } else {
       setErrorMessage(null)
     }
-  }, [privateKeyValue])
+  }, [privateKeyValue, network])
 
   useEffect(() => {
     setPrivateKeyValue('')
@@ -91,11 +122,32 @@ const SetPrivateKeyValueInput = ({
         setGeneratedKeys(data?.data)
         setLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKey || privateKeyValue)
-        await checkWalletBalance(privateKey || privateKeyValue, Network.TESTNET)
+        setPrivateKeyValue(privateKey)
+        await checkWalletBalance(privateKey, network)
       }
     } catch (err) {
       console.error('Generate private key ERROR::::', err)
+      setLoading(false)
+    }
+  }
+
+  const generateEthereumKeyValuePair = async (): Promise<void> => {
+    setLoading(true)
+    try {
+      const resCreateEthereumKeys = await createEthereumKeyValuePair(
+        orgId as string,
+      )
+      const { data } = resCreateEthereumKeys as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+        setGeneratedKeys(data?.data)
+        setLoading(false)
+        const privateKey = data?.data?.privateKey.slice(2)
+        setPrivateKeyValue(privateKey)
+        await checkWalletBalance(privateKey, network)
+      }
+    } catch (err) {
+      console.error('Generate private key ERROR:', err)
       setLoading(false)
     }
   }
@@ -113,10 +165,18 @@ const SetPrivateKeyValueInput = ({
 
       {!havePrivateKey ? (
         <>
-          <GenerateBtnPolygon
-            generatePolygonKeyValuePair={generatePolygonKeyValuePair}
-            loading={loading}
-          />
+          {didMethod === DidMethod.POLYGON && (
+            <GenerateBtn
+              generateKeyValuePair={generatePolygonKeyValuePair}
+              loading={loading}
+            />
+          )}
+          {didMethod === DidMethod.ETHR && (
+            <GenerateBtn
+              generateKeyValuePair={generateEthereumKeyValuePair}
+              loading={loading}
+            />
+          )}
 
           {generatedKeys && (
             <>
@@ -140,7 +200,11 @@ const SetPrivateKeyValueInput = ({
                 </span>
               )}
 
-              <TokenWarningMessage mode="generated" />
+              <TokenWarningMessage
+                mode="generated"
+                didMethod={didMethod}
+                network={network}
+              />
             </>
           )}
         </>
@@ -165,7 +229,11 @@ const SetPrivateKeyValueInput = ({
             </span>
           )}
 
-          <TokenWarningMessage mode="existing" />
+          <TokenWarningMessage
+            mode="existing"
+            didMethod={didMethod}
+            network={network}
+          />
         </>
       )}
     </div>

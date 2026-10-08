@@ -1,14 +1,17 @@
 'use client'
 
-import { appFaviconPath, appLogoAltText } from '@/config/CommonConstant'
 import { setRefreshToken, setSessionId, setToken } from '@/lib/authSlice'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Loader from '@/components/Loader'
+import { appLogoAltText } from '@/config/CommonConstant'
 import { generateAccessToken } from '@/utils/session'
+import { getActiveFaviconPath } from '@/lib/active-theme'
 import { safeInternalRedirect } from '@/utils/safeRedirect'
 import { useSession } from 'next-auth/react'
+
+const activeFaviconPath = getActiveFaviconPath()
 
 const preventRedirectOnPaths = [
   '/create-organization',
@@ -159,7 +162,7 @@ export const SessionManager = ({
           <Loader size={90} />
           <div className="absolute inset-0 flex items-center justify-center">
             <img
-              src={appFaviconPath}
+              src={activeFaviconPath}
               alt={appLogoAltText}
               className="h-14 w-14 object-contain"
             />

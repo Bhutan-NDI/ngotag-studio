@@ -13,13 +13,16 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 // Passkey feature — hidden until ready for release
 // import AddPasskey from '@/features/passkey/AddPasskey'
+import { Tabs as BhutanndiTabs } from '@/components/bhutanndi/ui/Tabs'
 import DisplayUserProfile from './DisplayUserProfile'
 import EditUserProfile from './EditUserProfile'
 import { IUserProfile } from '@/components/profile/interfaces'
 import Loader from '@/components/Loader'
+import { PageHeader } from '@/components/bhutanndi/ui/PageHeader'
 import Sessions from './Sessions'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getUserProfile } from '@/app/api/Auth'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 export default function UserProfile(): React.JSX.Element {
   const token = useAppSelector((state) => state.auth.token)
@@ -30,7 +33,9 @@ export default function UserProfile(): React.JSX.Element {
   const [userEmail, setUserEmail] = useState('')
   const [prePopulatedUserProfile, setPrePopulatedUserProfile] =
     useState<IUserProfile | null>(null)
-  const [activeTab, setActiveTab] = useState<'profile' | 'passkey'>('profile')
+  const [activeTab, setActiveTab] = useState<
+    'profile' | 'passkey' | 'sessions'
+  >('profile')
   const [isLoading, setIsLoading] = useState(false)
   const dispatch = useAppDispatch()
 
@@ -74,7 +79,7 @@ export default function UserProfile(): React.JSX.Element {
   }
 
   const handleTabChange = (value: string): void => {
-    setActiveTab(value as 'profile' | 'passkey')
+    setActiveTab(value as 'profile' | 'passkey' | 'sessions')
     // Close edit mode when switching tabs
     if (isEditProfileOpen) {
       setIsEditProfileOpen(false)
@@ -96,6 +101,53 @@ export default function UserProfile(): React.JSX.Element {
         toggleEditProfile={toggleEditProfile}
         userProfileInfo={prePopulatedUserProfile}
       />
+    )
+  }
+
+  const editDrawer = prePopulatedUserProfile ? (
+    <Sheet open={isEditProfileOpen} onOpenChange={toggleEditProfile}>
+      <SheetContent
+        side="right"
+        className="w-[500px] overflow-y-auto sm:w-[600px]"
+      >
+        <SheetHeader>
+          <SheetTitle>Edit Profile</SheetTitle>
+        </SheetHeader>
+        <EditUserProfile
+          toggleEditProfile={toggleEditProfile}
+          userProfileInfo={prePopulatedUserProfile}
+          updateProfile={updateProfile}
+        />
+      </SheetContent>
+    </Sheet>
+  ) : null
+
+  if (isBhutanndiTheme()) {
+    return (
+      <div className="p-6">
+        <PageHeader crumbs={[{ label: 'Profile' }]} title="Profile" />
+
+        <div className="mt-6 mb-8">
+          <BhutanndiTabs
+            label="Profile sections"
+            tabs={[
+              { id: 'profile', label: 'Profile', icon: 'user' },
+              { id: 'sessions', label: 'Sessions', icon: 'shieldCheck' },
+            ]}
+            active={activeTab}
+            onChange={handleTabChange}
+          />
+        </div>
+
+        {activeTab === 'sessions' ? (
+          <Sessions />
+        ) : (
+          <>
+            {renderProfileContent()}
+            {editDrawer}
+          </>
+        )}
+      </div>
     )
   }
 
@@ -124,23 +176,7 @@ export default function UserProfile(): React.JSX.Element {
             {renderProfileContent()}
 
             {/* ✅ Drawer always rendered, controlled by open state */}
-            {prePopulatedUserProfile && (
-              <Sheet open={isEditProfileOpen} onOpenChange={toggleEditProfile}>
-                <SheetContent
-                  side="right"
-                  className="w-[500px] overflow-y-auto sm:w-[600px]"
-                >
-                  <SheetHeader>
-                    <SheetTitle>Edit Profile</SheetTitle>
-                  </SheetHeader>
-                  <EditUserProfile
-                    toggleEditProfile={toggleEditProfile}
-                    userProfileInfo={prePopulatedUserProfile}
-                    updateProfile={updateProfile}
-                  />
-                </SheetContent>
-              </Sheet>
-            )}
+            {editDrawer}
           </>
         </TabsContent>
 

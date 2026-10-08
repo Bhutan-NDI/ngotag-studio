@@ -40,20 +40,20 @@ const MethodCard = ({ option, onClick }: MethodCardProps): JSX.Element => {
         'border-[0.5px] p-[22px] text-left',
         'bg-card text-card-foreground',
         'focus:outline-none focus-visible:ring-2',
-        'focus-visible:ring-[rgba(87,29,247,0.6)] focus-visible:ring-offset-2',
+        'focus-visible:ring-[var(--ring)]/60 focus-visible:ring-offset-2',
         option.isRecommended
-          ? 'border-[rgba(87,29,247,0.30)]'
+          ? 'border-[var(--ring)]/30'
           : 'border-[var(--border)]',
         isDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer',
       ].join(' ')}
     >
-      {/* Radial purple wash — fades in on hover */}
+      {/* Radial brand wash — fades in on hover */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 rounded-[14px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         style={{
           background:
-            'radial-gradient(ellipse 55% 65% at 100% 0%, rgba(87,29,247,0.07) 0%, transparent 70%)',
+            'radial-gradient(ellipse 55% 65% at 100% 0%, color-mix(in srgb, var(--primary) 7%, transparent) 0%, transparent 70%)',
         }}
       />
 
@@ -64,14 +64,14 @@ const MethodCard = ({ option, onClick }: MethodCardProps): JSX.Element => {
           className={[
             'flex h-[46px] w-[46px] flex-shrink-0 items-center justify-center rounded-[12px]',
             'transition-all duration-200',
-            'bg-[#F2ECFF] group-hover:bg-[#571DF7]',
-            'dark:border-[0.5px] dark:border-[rgba(154,107,251,0.35)]',
-            'dark:bg-[rgba(87,29,247,0.20)] dark:group-hover:bg-[#571DF7]',
+            'bg-[var(--primary)]/10 group-hover:bg-[var(--primary)]',
+            'dark:border-[0.5px] dark:border-[var(--primary)]/35',
+            'dark:bg-[var(--primary)]/20 dark:group-hover:bg-[var(--primary)]',
           ].join(' ')}
         >
           {Icon && (
             <Icon
-              className="h-5 w-5 text-[#571DF7] transition-colors duration-200 group-hover:text-white dark:text-[#9E6BFB] dark:group-hover:text-white"
+              className="h-5 w-5 text-[var(--primary)] transition-colors duration-200 group-hover:text-white dark:text-[var(--primary)] dark:group-hover:text-white"
               strokeWidth={1.5}
             />
           )}
@@ -79,7 +79,7 @@ const MethodCard = ({ option, onClick }: MethodCardProps): JSX.Element => {
 
         {/* FASTEST flag — only on recommended cards */}
         {option.isRecommended && (
-          <span className="rounded-full bg-[#F2ECFF] px-2 py-[3px] text-[9.5px] font-[700] tracking-[0.06em] text-[#571DF7] uppercase dark:bg-[rgba(87,29,247,0.20)] dark:text-[#9E6BFB]">
+          <span className="rounded-full bg-[var(--primary)]/10 px-2 py-[3px] text-[9.5px] font-[700] tracking-[0.06em] text-[var(--primary)] uppercase dark:bg-[var(--primary)]/20">
             FASTEST
           </span>
         )}
@@ -96,7 +96,7 @@ const MethodCard = ({ option, onClick }: MethodCardProps): JSX.Element => {
       </p>
 
       {/* Footer */}
-      <div className="relative mt-[18px] flex items-center justify-between border-t border-[rgba(87,29,247,0.08)] pt-[14px]">
+      <div className="relative mt-[18px] flex items-center justify-between border-t border-[var(--primary)]/8 pt-[14px]">
         {option.tag && (
           <span
             className={`rounded-full px-2 py-[3px] text-[10.5px] font-[600] ${tagClass}`}
@@ -104,7 +104,7 @@ const MethodCard = ({ option, onClick }: MethodCardProps): JSX.Element => {
             {option.tag}
           </span>
         )}
-        <span className="text-muted-foreground/50 ml-auto flex items-center gap-0.5 text-[12.5px] font-[600] transition-colors duration-200 group-hover:text-[#571DF7]">
+        <span className="text-muted-foreground/50 ml-auto flex items-center gap-0.5 text-[12.5px] font-[600] transition-colors duration-200 group-hover:text-[var(--primary)]">
           Select
           <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
             &nbsp;→
@@ -141,7 +141,7 @@ const SelectionDashboard = ({
       <div className="mb-[22px] flex items-start justify-between gap-6">
         {/* Left: eyebrow + H1 + subtitle */}
         <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-[600] tracking-[0.08em] text-[#571DF7] uppercase">
+          <span className="text-[11px] font-[600] tracking-[0.08em] text-[var(--primary)] uppercase">
             {eyebrow}
           </span>
           <h1 className="text-foreground font-serif text-[30px] leading-tight font-[700] tracking-[-0.025em]">

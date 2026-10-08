@@ -2,12 +2,16 @@
 
 import { JSX, useEffect } from 'react'
 
-import { appFaviconPath } from '@/config/CommonConstant'
+import { getActiveFaviconPath } from '@/lib/active-theme'
 
 const APP_TITLE = process.env.NEXT_PUBLIC_APP_TITLE?.trim()
+const activeFaviconPath = getActiveFaviconPath()
 
 const DEFAULT_CONFIG = {
-  favicon: appFaviconPath,
+  favicon: activeFaviconPath,
+  faviconType: activeFaviconPath.endsWith('.ico')
+    ? 'image/x-icon'
+    : 'image/png',
   title: APP_TITLE ? APP_TITLE : 'PHENIX ID',
 }
 
@@ -21,14 +25,14 @@ export function FaviconUpdater(): JSX.Element | null {
     let managedLink: HTMLLinkElement | null = null
 
     const updateFaviconAndTitle = (): void => {
-      const { favicon, title } = DEFAULT_CONFIG
+      const { favicon, faviconType, title } = DEFAULT_CONFIG
 
       if (!managedLink) {
         managedLink = document.createElement('link')
         managedLink.rel = 'icon'
-        managedLink.type = 'image/png'
         document.head.appendChild(managedLink)
       }
+      managedLink.type = faviconType
       managedLink.href = favicon
       document.title = title
     }

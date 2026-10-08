@@ -1,10 +1,13 @@
 'use client'
 
 import { JSX, useEffect } from 'react'
-import { appFaviconPath, appLogoAltText } from '@/config/CommonConstant'
 import Loader from '@/components/Loader'
+import { appLogoAltText } from '@/config/CommonConstant'
+import { getActiveFaviconPath } from '@/lib/active-theme'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+
+const activeFaviconPath = getActiveFaviconPath()
 
 export default function Home(): JSX.Element {
   const { data: session, status } = useSession()
@@ -35,7 +38,7 @@ export default function Home(): JSX.Element {
         <Loader size={90} />
         <div className="absolute inset-0 flex items-center justify-center">
           <img
-            src={appFaviconPath}
+            src={activeFaviconPath}
             alt={appLogoAltText}
             className="h-14 w-14 object-contain"
           />

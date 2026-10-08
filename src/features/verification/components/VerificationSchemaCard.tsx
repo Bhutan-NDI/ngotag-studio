@@ -54,16 +54,16 @@ const VerificationSchemaCard = ({
       'bg-card text-card-foreground cursor-pointer',
       'transition-[transform,border-color,box-shadow] duration-200',
       'focus:outline-none focus-visible:ring-2',
-      'focus-visible:ring-[rgba(87,29,247,0.6)] focus-visible:ring-offset-2',
+      'focus-visible:ring-primary/60 focus-visible:ring-offset-2',
       isSelected
         ? [
-            'border-[rgba(87,29,247,0.70)]',
-            'shadow-[0_0_0_2px_rgba(87,29,247,0.20),0_8px_32px_rgba(87,29,247,0.18)]',
+            'border-primary/70',
+            'shadow-[0_0_0_2px_color-mix(in_srgb,var(--primary)_20%,transparent),0_8px_32px_color-mix(in_srgb,var(--primary)_18%,transparent)]',
           ].join(' ')
         : [
             'border-[var(--border)]',
-            'hover:-translate-y-[3px] hover:border-[rgba(87,29,247,0.40)]',
-            'hover:shadow-[0_12px_30px_rgba(87,29,247,0.12)]',
+            'hover:border-primary/40 hover:-translate-y-[3px]',
+            'hover:shadow-[0_12px_30px_color-mix(in_srgb,var(--primary)_12%,transparent)]',
           ].join(' '),
     ].join(' ')}
   >
@@ -74,7 +74,7 @@ const VerificationSchemaCard = ({
         className="pointer-events-none absolute inset-0 rounded-[14px] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
         style={{
           background:
-            'radial-gradient(ellipse 55% 65% at 100% 0%, rgba(87,29,247,0.07) 0%, transparent 70%)',
+            'radial-gradient(ellipse 55% 65% at 100% 0%, color-mix(in srgb, var(--primary) 7%, transparent) 0%, transparent 70%)',
         }}
       />
     )}
@@ -84,7 +84,7 @@ const VerificationSchemaCard = ({
       <span
         className={
           isW3c
-            ? 'rounded-md border border-[rgba(87,29,247,0.20)] bg-[#F2ECFF] px-[7px] py-[2px] text-[10px] font-[700] tracking-[0.05em] text-[#571DF7] uppercase dark:bg-[rgba(87,29,247,0.20)] dark:text-[#9E6BFB]'
+            ? 'border-primary/20 bg-accent text-accent-foreground rounded-md border px-[7px] py-[2px] text-[10px] font-[700] tracking-[0.05em] uppercase'
             : 'bg-secondary text-secondary-foreground rounded-md border px-[7px] py-[2px] text-[10px] font-[700] tracking-[0.05em] uppercase'
         }
       >
@@ -146,22 +146,22 @@ const VerificationSchemaCard = ({
     </div>
 
     {/* ── Footer ── */}
-    <div className="relative mt-[16px] flex items-center justify-between border-t border-[rgba(87,29,247,0.08)] pt-[12px]">
+    <div className="border-primary/8 relative mt-[16px] flex items-center justify-between border-t pt-[12px]">
       <span
         className={`text-[11px] font-[600] transition-colors duration-200 ${
           isSelected
-            ? 'text-[#571DF7]'
-            : 'text-muted-foreground/50 group-hover:text-[#571DF7]'
+            ? 'text-primary'
+            : 'text-muted-foreground/50 group-hover:text-primary'
         }`}
       >
         {isSelected ? 'Selected' : 'Click to select'}
       </span>
       {isSelected ? (
-        <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#571DF7]">
+        <span className="bg-primary flex h-[22px] w-[22px] items-center justify-center rounded-full">
           <Check className="h-3 w-3 text-white" strokeWidth={2.5} />
         </span>
       ) : (
-        <span className="text-muted-foreground/50 text-[12.5px] font-[600] transition-colors duration-200 group-hover:text-[#571DF7]">
+        <span className="text-muted-foreground/50 group-hover:text-primary text-[12.5px] font-[600] transition-colors duration-200">
           Select →
         </span>
       )}

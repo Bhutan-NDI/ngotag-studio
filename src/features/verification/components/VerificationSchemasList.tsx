@@ -260,7 +260,7 @@ const VerificationSchemasList = (): JSX.Element => {
         {/* ── Hero header ─────────────────────────────────────────────────── */}
         <div className="mb-[22px] flex flex-wrap items-start justify-between gap-6">
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-[600] tracking-[0.08em] text-[#571DF7] uppercase">
+            <span className="text-primary text-[11px] font-[600] tracking-[0.08em] uppercase">
               VERIFY CREDENTIAL
             </span>
             <h1 className="text-foreground font-serif text-[28px] leading-tight font-[700] tracking-[-0.025em] sm:text-[30px]">

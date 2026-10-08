@@ -21,6 +21,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { JSX, useEffect, useRef, useState } from 'react'
+import {
+  getActiveQrMarkPath,
+  getActiveTheme,
+  getActiveWalletAppName,
+  isBhutanndiTheme,
+} from '@/lib/active-theme'
 import { AxiosResponse } from 'axios'
 import QRCode from 'react-qr-code'
 
@@ -85,6 +91,8 @@ const TERMINAL_STATES: QrScanStatus[] = [
 ]
 const SUCCESS_STATES: QrScanStatus[] = ['done', 'verified']
 
+const WALLET_APP_NAME = getActiveWalletAppName()
+
 const BASE_OVERLAY_CONFIG: Partial<Record<QrScanStatus, OverlayEntry>> = {
   'offer-sent': {
     ring: 'purple',
@@ -102,7 +110,7 @@ const BASE_OVERLAY_CONFIG: Partial<Record<QrScanStatus, OverlayEntry>> = {
     ring: 'green',
     icon: 'check',
     caption: 'Credential received',
-    subtext: 'Stored in the PHENIX ID App',
+    subtext: `Stored in the ${WALLET_APP_NAME}`,
   },
   verified: {
     ring: 'green',
@@ -259,7 +267,7 @@ const QrScanDialog = ({
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = 'phenix-qr.svg'
+    link.download = `${getActiveTheme()}-qr.svg`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -292,10 +300,10 @@ const QrScanDialog = ({
         >
           {/* Header */}
           <div className="flex items-center justify-between px-[22px] pt-[20px] pb-[16px]">
-            <DialogTitle className="font-serif text-[17px] leading-tight font-[700] tracking-[-0.01em] text-[#0C0C1A] dark:text-white">
+            <DialogTitle className="text-foreground font-serif text-[17px] leading-tight font-[700] tracking-[-0.01em]">
               {resolvedTitle}
             </DialogTitle>
-            <DialogClose className="ml-2 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] text-[rgba(12,12,26,0.55)] transition-colors duration-200 hover:bg-[rgba(12,12,26,0.06)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(87,29,247,0.6)] focus-visible:ring-offset-2 dark:text-[rgba(255,255,255,0.55)] dark:hover:bg-[rgba(255,255,255,0.08)]">
+            <DialogClose className="text-muted-foreground hover:bg-accent focus-visible:ring-primary/60 ml-2 flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2">
               <X className="h-[14px] w-[14px]" strokeWidth={2} />
               <span className="sr-only">Close</span>
             </DialogClose>
@@ -305,20 +313,18 @@ const QrScanDialog = ({
           <div className="flex flex-col gap-[18px] px-[22px] pt-0 pb-[22px]">
             {/* ① Intro */}
             {description ? (
-              <p className="text-[13px] leading-[1.55] text-[rgba(12,12,26,0.55)] dark:text-[rgba(255,255,255,0.55)]">
+              <p className="text-muted-foreground text-[13px] leading-[1.55]">
                 {description}
               </p>
             ) : (
-              <p className="text-[13px] leading-[1.55] text-[rgba(12,12,26,0.55)] dark:text-[rgba(255,255,255,0.55)]">
+              <p className="text-muted-foreground text-[13px] leading-[1.55]">
                 Open your{' '}
-                <strong className="font-[600] text-[#0C0C1A] dark:text-white">
-                  PHENIX ID App
+                <strong className="text-foreground font-[600]">
+                  {WALLET_APP_NAME}
                 </strong>
                 , tap{' '}
-                <strong className="font-[600] text-[#0C0C1A] dark:text-white">
-                  Scan
-                </strong>
-                , and point it at this code to {resolvedIntro}.
+                <strong className="text-foreground font-[600]">Scan</strong>,
+                and point it at this code to {resolvedIntro}.
               </p>
             )}
 
@@ -328,7 +334,7 @@ const QrScanDialog = ({
               className="relative mx-auto flex h-[244px] w-[244px] shrink-0 items-center justify-center rounded-[18px] bg-white p-[18px]"
               style={{
                 boxShadow:
-                  'inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 22px rgba(87,29,247,0.10), 0 0 40px rgba(87,29,247,0.08)',
+                  'inset 0 1px 0 rgba(255,255,255,0.6), 0 6px 22px color-mix(in srgb, var(--primary) 10%, transparent), 0 0 40px color-mix(in srgb, var(--primary) 8%, transparent)',
               }}
             >
               <CornerBrackets />
@@ -339,22 +345,35 @@ const QrScanDialog = ({
                 bgColor="#ffffff"
                 style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
               />
-              {/* Center logo — 58×58 white circle, absolutely centered */}
+              {/* Center logo — bhutanndi's mark is a self-contained badge
+                  (white circle + ring + icon); every other theme's mark is a
+                  bare brand asset (e.g. Phenix's favicon.png), so it needs
+                  its own white-circle backdrop, absolutely centered */}
               <div
                 className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                 style={{
                   filter: 'drop-shadow(0 2px 12px rgba(12,12,26,0.20))',
                 }}
               >
-                <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full bg-white p-[5px]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                {isBhutanndiTheme() ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src="/logos/favicon.png"
+                    src={getActiveQrMarkPath()}
                     alt=""
                     aria-hidden="true"
-                    className="h-full w-full rounded-full object-contain"
+                    className="h-[58px] w-[58px] object-contain"
                   />
-                </div>
+                ) : (
+                  <div className="flex h-[58px] w-[58px] items-center justify-center rounded-full bg-white p-[5px]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={getActiveQrMarkPath()}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-full w-full rounded-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
               {overlayEntry && <StateOverlay entry={overlayEntry} />}
             </div>
@@ -390,18 +409,18 @@ const QrScanDialog = ({
               <button
                 type="button"
                 onClick={onRegenerate}
-                className="flex items-center justify-center gap-2 rounded-[10px] border-[0.5px] border-[rgba(87,29,247,0.25)] bg-[#F2ECFF] px-4 py-2 text-[13px] font-[600] text-[#571DF7] transition-colors duration-200 hover:bg-[rgba(87,29,247,0.12)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(87,29,247,0.6)] focus-visible:ring-offset-2"
+                className="border-primary/25 bg-accent text-accent-foreground hover:bg-primary/12 focus-visible:ring-primary/60 flex items-center justify-center gap-2 rounded-[10px] border-[0.5px] px-4 py-2 text-[13px] font-[600] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               >
                 Generate new QR
               </button>
             )}
 
             {/* ⑥ App Store CTA */}
-            <div className="flex flex-col gap-[12px] border-t border-[rgba(87,29,247,0.08)] pt-[16px] dark:border-[rgba(255,255,255,0.08)]">
-              <p className="text-center text-[12.5px] text-[rgba(12,12,26,0.55)] dark:text-[rgba(255,255,255,0.45)]">
+            <div className="border-border flex flex-col gap-[12px] border-t pt-[16px]">
+              <p className="text-muted-foreground text-center text-[12.5px]">
                 {"Don't have the "}
-                <strong className="font-[600] text-[#0C0C1A] dark:text-white">
-                  PHENIX ID App
+                <strong className="text-foreground font-[600]">
+                  {WALLET_APP_NAME}
                 </strong>
                 {'? Get it free to hold your credentials.'}
               </p>

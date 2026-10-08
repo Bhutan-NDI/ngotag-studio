@@ -14,16 +14,23 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
+import { Tabs as BhutanndiTabs } from '@/components/bhutanndi/ui/Tabs'
 import { Button } from '@/components/ui/button'
 import { CreateWalletIcon } from '@/components/iconsSvg'
+import { EmptyState } from '@/components/bhutanndi/ui/EmptyState'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
+import { Icon } from '@/components/bhutanndi/ui/icons'
 import Loader from '@/components/Loader'
 import { OrganizationDashboard } from '@/features/organization/components/OrganizationDashboard'
 import OrganizationDetails from '@/features/organization/components/OrganizationDetails'
 import PageContainer from '@/components/layout/page-container'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
+import { WaveBanner } from '@/components/bhutanndi/ui/WaveBanner'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getEcosystemEnableStausApi } from '@/app/api/ecosystem'
 import { getOrganizationById } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { pathRoutes } from '@/config/pathRoutes'
 import { setEcosystemEnableStatus } from '@/lib/ecosystemSlice'
 import { setLedgerId } from '@/lib/orgSlice'
@@ -49,7 +56,12 @@ export default function Dashboard(): React.JSX.Element {
   const orgId = useAppSelector((state) => state?.organization.orgId)
 
   const dispatch = useAppDispatch()
-  const firstName = useAppSelector((state) => state.profile.firstName)
+  // state.profile.firstName is only ever populated by the (currently
+  // disabled) passkey sign-in flow; the normal password flow never
+  // dispatches it. state.user.userInfo.firstName is the slice UserNav
+  // (the topbar account menu) actually fetches into on every login via its
+  // own getUserProfile call, so it's the reliable source here too.
+  const firstName = useAppSelector((state) => state.user.userInfo.firstName)
 
   const getAllInvitations = useCallback(async (): Promise<void> => {
     try {
@@ -182,7 +194,15 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (!hasOrganization) {
-    walletSection = (
+    walletSection = isBhutanndiTheme() ? (
+      <Panel className="mb-6">
+        <EmptyState
+          icon="building"
+          title="No organization found"
+          message="Please create an organization to get started."
+        />
+      </Panel>
+    ) : (
       <div className="relative mb-6 flex min-h-[150px] flex-col justify-center overflow-hidden rounded-md bg-[url('/images/bg-lightwallet.png')] bg-cover bg-center bg-no-repeat p-6 shadow-sm dark:bg-[url('/images/bg-darkwallet.png')] dark:bg-cover">
         <div className="flex flex-col items-start">
           <h3 className="text-xl font-semibold">No Organization Found</h3>
@@ -193,7 +213,30 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (walletData.length === 0) {
-    walletSection = (
+    walletSection = isBhutanndiTheme() ? (
+      <Panel className="mb-6">
+        <div className="relative z-[4] flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start">
+            <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+              Wallet lets you create schemas and credential definitions
+            </h3>
+            <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
+              Please create a wallet for your organization to issue and verify
+              credentials.
+            </p>
+          </div>
+          <GradientButton
+            disabled={isWalletSetupLoading}
+            onClick={handleCreateWallet}
+            className="min-w-[180px]"
+          >
+            {isWalletSetupLoading && <Loader />}
+            Setup Your Wallet
+            <Icon name="wallet" size={16} strokeWidth={2} />
+          </GradientButton>
+        </div>
+      </Panel>
+    ) : (
       <div className="relative mb-6 flex min-h-[150px] flex-col justify-center overflow-hidden rounded-md bg-[url('/images/bg-lightwallet.png')] bg-cover bg-center bg-no-repeat p-6 shadow-sm dark:bg-[url('/images/bg-darkwallet.png')] dark:bg-cover">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-col items-start">
@@ -218,7 +261,18 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else if (currentWallet?.orgDid) {
-    walletSection = (
+    walletSection = isBhutanndiTheme() ? (
+      <Panel className="mb-6">
+        <div className="relative z-[4] flex flex-col items-start">
+          <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+            Wallet Details
+          </h3>
+          <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
+            DID is already created for your organization.
+          </p>
+        </div>
+      </Panel>
+    ) : (
       <div className="relative mb-6 flex min-h-[150px] flex-col justify-center overflow-hidden rounded-md bg-[url('/images/bg-lightwallet.png')] bg-cover bg-center bg-no-repeat p-6 shadow-sm dark:bg-[url('/images/bg-darkwallet.png')] dark:bg-cover">
         <div className="flex flex-col items-start">
           <h3 className="text-xl font-semibold">Wallet Details</h3>
@@ -229,7 +283,30 @@ export default function Dashboard(): React.JSX.Element {
       </div>
     )
   } else {
-    walletSection = (
+    walletSection = isBhutanndiTheme() ? (
+      <Panel className="mb-6">
+        <div className="relative z-[4] flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
+          <div className="flex flex-col items-start">
+            <h3 className="font-display text-bhutanndi-strong text-[17px] leading-[1.25] font-semibold tracking-[-0.01em]">
+              Setup your DID
+            </h3>
+            <p className="text-bhutanndi-muted mt-2 text-[13.5px] leading-[1.6]">
+              Your wallet is ready! Now set up a DID for issuing and verifying
+              credentials.
+            </p>
+          </div>
+          <GradientButton
+            onClick={() =>
+              hardNavigate(`/create-did?orgId=${encodeURIComponent(orgId)}`)
+            }
+            className="min-w-[180px]"
+          >
+            Setup Your DID
+            <Icon name="key" size={16} strokeWidth={2} />
+          </GradientButton>
+        </div>
+      </Panel>
+    ) : (
       <div className="relative mb-6 flex min-h-[150px] flex-col justify-center overflow-hidden rounded-md bg-[url('/images/bg-lightwallet.png')] bg-cover bg-center bg-no-repeat p-6 shadow-sm dark:bg-[url('/images/bg-darkwallet.png')] dark:bg-cover">
         <div className="flex flex-col items-center justify-between gap-4 sm:flex-row sm:items-center">
           <div className="flex flex-col items-start">
@@ -255,7 +332,7 @@ export default function Dashboard(): React.JSX.Element {
 
   return (
     <PageContainer>
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         {(informativeMessage || ecoMessage) && (
           <div className="mb-4 flex flex-col space-y-4">
             {informativeMessage && (
@@ -279,41 +356,117 @@ export default function Dashboard(): React.JSX.Element {
           </div>
         )}
 
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-2xl font-bold tracking-tight">
-            Hi, Welcome {firstName} 👋
-          </h2>
-        </div>
+        {isBhutanndiTheme() ? (
+          <div className="mb-6">
+            <WaveBanner
+              eyebrow="— Dashboard"
+              title={
+                <>
+                  Welcome back,{' '}
+                  <span className="ndi-wave-text ndi-wave-tight">
+                    {firstName}
+                  </span>
+                </>
+              }
+              lead={
+                hasOrganization
+                  ? 'Issue and verify credentials for your organization.'
+                  : 'Create an organization to start issuing and verifying credentials.'
+              }
+              action={
+                hasOrganization ? (
+                  <GradientButton
+                    onClick={() =>
+                      hardNavigate(pathRoutes.organizations.Issuance.issue)
+                    }
+                  >
+                    <Icon name="issue" size={17} strokeWidth={1.8} />
+                    Issue credential
+                  </GradientButton>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : (
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Hi, Welcome {firstName} 👋
+            </h2>
+          </div>
+        )}
         {walletSection}
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList>
-            <TabsTrigger value="Overview" className="relative">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="Wallet" disabled={walletData.length === 0}>
-              Wallet
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent
-            value="Overview"
-            className="mt-2 space-y-4 rounded-md border"
-          >
-            <OrganizationDashboard
-              orgId={orgId}
-              setOrgDataForDetails={setOrgData}
+        {isBhutanndiTheme() ? (
+          // min-w-0 on both wrappers: without it, a flex item's default
+          // min-width:auto means it won't shrink below its content's natural
+          // width even when that content (the Wallet tab's wallet/DID
+          // DataTable) has its own overflow-x-auto scroller — so the wide
+          // table was forcing this whole flex-col wider, stretching the
+          // WaveBanner/wallet-status Panel siblings above it along with it
+          // (align-items: stretch) the moment the Wallet tab mounted.
+          <div className="w-full min-w-0">
+            <BhutanndiTabs
+              label="Dashboard sections"
+              active={activeTab}
+              onChange={(id) => {
+                if (id !== 'Wallet' || walletData.length !== 0) {
+                  setActiveTab(id)
+                }
+              }}
+              tabs={[
+                { id: 'Overview', label: 'Overview', icon: 'dashboard' },
+                { id: 'Wallet', label: 'Wallet', icon: 'wallet' },
+              ]}
             />
-          </TabsContent>
-          <TabsContent
-            value="Wallet"
-            className="mt-2 space-y-4 rounded-md border p-4"
+            <div className="mt-4 min-w-0">
+              {activeTab === 'Overview' && (
+                <OrganizationDashboard
+                  orgId={orgId}
+                  setOrgDataForDetails={setOrgData}
+                />
+              )}
+              {activeTab === 'Wallet' && (
+                <OrganizationDetails
+                  orgData={orgData}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+            </div>
+          </div>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
           >
-            <OrganizationDetails
-              orgData={orgData}
-              setActiveTab={setActiveTab}
-            />
-          </TabsContent>
-        </Tabs>
+            <TabsList>
+              <TabsTrigger value="Overview" className="relative">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="Wallet" disabled={walletData.length === 0}>
+                Wallet
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent
+              value="Overview"
+              className="mt-2 space-y-4 rounded-md border"
+            >
+              <OrganizationDashboard
+                orgId={orgId}
+                setOrgDataForDetails={setOrgData}
+              />
+            </TabsContent>
+            <TabsContent
+              value="Wallet"
+              className="mt-2 space-y-4 rounded-md border p-4"
+            >
+              <OrganizationDetails
+                orgData={orgData}
+                setActiveTab={setActiveTab}
+              />
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </PageContainer>
   )

@@ -250,6 +250,7 @@ const resolveSchemaType = (
 ): SchemaTypes => {
   if (
     orgDid?.includes(DidMethod.POLYGON) ||
+    orgDid?.includes(DidMethod.ETHR) ||
     orgDid?.includes(DidMethod.KEY) ||
     orgDid?.includes(DidMethod.WEB)
   ) {

@@ -27,6 +27,7 @@ import { AxiosResponse } from 'axios'
 import { getAllSchemas } from '@/app/api/schema'
 import { getOrganizationById } from '@/app/api/organization'
 import { getSchemaCredDef } from '@/app/api/BulkIssuance'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { issueOobEmailCredential } from '@/app/api/Issuance'
 import { pathRoutes } from '@/config/pathRoutes'
 
@@ -53,17 +54,12 @@ const fetchOrganizationDetails = async (orgId: string): Promise<string> => {
   const { data } = response as AxiosResponse
 
   if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-    if (
-      data?.data?.org_agents?.length > 0 &&
-      data?.data?.org_agents[0]?.orgDid
-    ) {
-      return data?.data?.org_agents[0]?.orgDid
-    } else {
-      return ''
-    }
-  } else {
-    return ''
+    const orgAgents = data?.data?.org_agents ?? []
+    const publicAgent =
+      orgAgents.find((a: any) => a.isDidPublic) ?? orgAgents[0]
+    return publicAgent?.orgDid ?? ''
   }
+  return ''
 }
 
 const transformIndyData = (
@@ -150,7 +146,9 @@ const transformW3CData = async (
         proofType:
           schemaTypeValue === SchemaTypeValue.POLYGON
             ? ProofType.polygon
-            : ProofType.no_ledger,
+            : schemaTypeValue === SchemaTypeValue.ETHEREUM
+              ? ProofType.ethereum
+              : ProofType.no_ledger,
         proofPurpose,
       },
     }
@@ -160,6 +158,7 @@ const transformW3CData = async (
   transformedData.protocolVersion = 'v2'
   transformedData.isReuseConnection = true
   transformedData.credentialType = CredentialType.JSONLD
+  transformedData.goalCode = isBhutanndiTheme() ? orgDID : 'issuance'
 
   return transformedData
 }
@@ -187,6 +186,8 @@ export const confirmOOBCredentialIssuance = async ({
   if (userData?.formData) {
     if (schemaType === SchemaTypes.schema_INDY) {
       transformedData = transformIndyData(userData, credDefId)
+      const orgDID = await fetchOrganizationDetails(orgId)
+      transformedData.goalCode = isBhutanndiTheme() ? orgDID : 'issuance'
     } else if (schemaType === SchemaTypes.schema_W3C) {
       transformedData = await transformW3CData(
         userData,
@@ -308,6 +309,10 @@ const setSchemaAndCredentialType = (
     setSchemaTypeValue(SchemaTypeValue.POLYGON)
     setCredentialType(CredentialType.JSONLD)
     return SchemaTypes.schema_W3C
+  } else if (orgDid?.includes(DidMethod.ETHR)) {
+    setSchemaTypeValue(SchemaTypeValue.ETHEREUM)
+    setCredentialType(CredentialType.JSONLD)
+    return SchemaTypes.schema_W3C
   } else if (
     orgDid?.includes(DidMethod.KEY) ||
     orgDid?.includes(DidMethod.WEB)
@@ -346,8 +351,10 @@ export const getSchemaCredentials = async ({
       console.error('Error fetching organization:', response)
     } else {
       const { data } = response
-      orgDid = data?.data?.org_agents[0]?.orgDid
-      // proceed with data
+      const orgAgents = data?.data?.org_agents ?? []
+      const publicAgent =
+        orgAgents.find((a: any) => a.isDidPublic) ?? orgAgents[0]
+      orgDid = publicAgent?.orgDid
     }
     const allSchemaSelectedFlag = allSchema
     if (allSchemaSelectedFlag) {

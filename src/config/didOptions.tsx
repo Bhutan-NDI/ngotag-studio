@@ -1,8 +1,13 @@
-const MODE = process.env.MODE || ''
+const MODE = process.env.NEXT_PUBLIC_MODE || ''
 
 const polygonDidOptions = [
   'did:polygon:testnet',
   ...(MODE === 'PROD' ? ['did:polygon:mainnet'] : []),
+]
+
+const ethereumDidOptions = [
+  'did:ethr:sepolia',
+  ...(MODE === 'PROD' ? ['did:ethr:mainnet'] : []),
 ]
 
 export const didExamples: Record<string, string> = {
@@ -12,6 +17,8 @@ export const didExamples: Record<string, string> = {
   'did:indy:indicio:testnet': 'did:indy:indicio:testnet:xyz987abc654',
   'did:polygon:testnet': 'did:polygon:testnet:0xabcdef123456',
   'did:polygon:mainnet': 'did:polygon:mainnet:0x1234abcd5678',
+  'did:ethr:sepolia': 'did:ethr:sepolia:0xabcdef123456',
+  'did:ethr:mainnet': 'did:ethr:mainnet:0x1234abcd5678',
   'did:key': 'did:key:z6MkfExampleAbc123',
   'did:web': 'did:web:example.com',
 }
@@ -93,7 +100,7 @@ export const didOptionsMap: Record<string, string[]> = {
     'did:indy:indicio:testnet',
   ],
 
-  w3c: [...polygonDidOptions, 'did:key', 'did:web'],
-  mdoc: [...polygonDidOptions, 'did:key', 'did:web'],
-  sdjwt: [...polygonDidOptions, 'did:key', 'did:web'],
+  w3c: [...polygonDidOptions, ...ethereumDidOptions, 'did:key', 'did:web'],
+  mdoc: [...polygonDidOptions, ...ethereumDidOptions, 'did:key', 'did:web'],
+  sdjwt: [...polygonDidOptions, ...ethereumDidOptions, 'did:key', 'did:web'],
 }

@@ -27,7 +27,7 @@ const DataTable: React.FC<DataTableProps> = ({
         <Loader />
       </div>
     ) : (
-      <div className="overflow-x-auto rounded-lg">
+      <div className="min-w-0 overflow-x-auto rounded-lg">
         <div className="inline-block min-w-full align-middle">
           <div className="overflow-hidden shadow sm:rounded-lg">
             <table className="divide-muted dark:divide-muted min-w-full divide-y border">

@@ -115,7 +115,10 @@ const OobIssuance = (): React.JSX.Element => {
     const response = await getOrganizationById(orgId)
     const { data } = response as AxiosResponse
     if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-      const did: string = data?.data?.org_agents?.[0]?.orgDid ?? ''
+      type OrgAgent = { orgDid: string; isDidPublic: boolean }
+      const orgAgents = (data?.data?.org_agents ?? []) as OrgAgent[]
+      const publicAgent = orgAgents.find((a) => a.isDidPublic) ?? orgAgents[0]
+      const did: string = publicAgent?.orgDid ?? ''
       setOrgDid(did)
       if (did.includes(DidMethod.POLYGON)) {
         setW3cSchema(true)
@@ -124,6 +127,10 @@ const OobIssuance = (): React.JSX.Element => {
       } else if (did.includes(DidMethod.KEY) || did.includes(DidMethod.WEB)) {
         setW3cSchema(true)
         setSchemaTypeValue(SchemaTypeValue.NO_LEDGER)
+        return true
+      } else if (did.includes(DidMethod.ETHR)) {
+        setW3cSchema(true)
+        setSchemaTypeValue(SchemaTypeValue.ETHEREUM)
         return true
       } else if (did.includes(DidMethod.INDY)) {
         setW3cSchema(false)
@@ -261,7 +268,7 @@ const OobIssuance = (): React.JSX.Element => {
             orgDid,
             schemaTypeValue,
           )
-        : buildIndyPayload(values.attributes, schemaDetails.credDefId)
+        : buildIndyPayload(values.attributes, schemaDetails.credDefId, orgDid)
 
       const credType = w3cSchema ? CredentialType.JSONLD : CredentialType.INDY
       const response = await issueOobQrCredential(payload, credType, orgId)

@@ -20,11 +20,13 @@ import {
 import {
   apiStatusCodes,
   currentPageNumber,
+  ethereumFaucet,
   itemPerPage,
   polygonFaucet,
 } from '@/config/CommonConstant'
 import {
   createDid,
+  createEthereumKeyValuePair,
   createPolygonKeyValuePair,
   generateDidWeb,
   getDids,
@@ -46,6 +48,7 @@ import { CommonConstants } from '../common/enum'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
+import TokenWarningMessage from './TokenWarningMessage'
 import { dateConversion } from '@/utils/DateConversion'
 import { ethers } from 'ethers'
 import { formatDidWebError } from './formatDidWebError'
@@ -234,12 +237,6 @@ const CopyDid = ({
   )
 }
 
-const TokenWarningMessage = (): React.JSX.Element => (
-  <div className="mt-3 text-xs">
-    <p>Note: You need to have tokens in your wallet to create a DID.</p>
-  </div>
-)
-
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -327,7 +324,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       did: Yup.string(),
     })
 
-    if (method === DidMethod.POLYGON) {
+    if (method === DidMethod.POLYGON || method === DidMethod.ETHR) {
       schema = schema.shape({
         privatekey: Yup.string()
           .required('Private key is required')
@@ -423,7 +420,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       setMethod(didMethod)
 
       let ledgerName = ''
-      if (didMethod === DidMethod.INDY || didMethod === DidMethod.POLYGON) {
+      if (
+        didMethod === DidMethod.INDY ||
+        didMethod === DidMethod.POLYGON ||
+        didMethod === DidMethod.ETHR
+      ) {
         ledgerName = data?.data?.org_agents[0]?.orgDid.split(':')[1]
       } else {
         ledgerName = 'No Ledger'
@@ -437,6 +438,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
           .join(':')
       } else if (didMethod === DidMethod.POLYGON) {
         networkName = data?.data?.org_agents[0]?.orgDid.split(':')[2]
+      } else if (didMethod === DidMethod.ETHR) {
+        const ethrDidParts = data?.data?.org_agents[0]?.orgDid.split(':') ?? []
+        // Mainnet ethr DIDs have no network segment (did:ethr:0xADDRESS) —
+        // a 3-segment DID means the "network" position holds the address.
+        networkName = ethrDidParts.length > 3 ? ethrDidParts[2] : 'mainnet'
       }
 
       let completeDidMethod = ''
@@ -481,19 +487,41 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
   }, [])
 
   // ---------------------------------------------------------------------------
-  // Polygon balance check
+  // Polygon / Ethereum balance check
   // ---------------------------------------------------------------------------
+
+  // The org's existing primary-DID network (e.g. 'testnet'/'mainnet' for
+  // polygon, 'sepolia'/'mainnet' for ethr) — a new same-chain DID always
+  // shares it, so balance checks should use it instead of a fixed network.
+  const balanceNetwork =
+    initialValues.network === 'mainnet' ? Network.MAINNET : Network.TESTNET
 
   const checkBalance = async (
     privateKey: string,
     network: Network,
   ): Promise<string | null> => {
+    // did:ethr DID creation needs no funds at all, and public RPC endpoints
+    // like rpc.sepolia.org block browser CORS anyway — attempting this just
+    // makes ethers retry network detection every second forever (it's never
+    // destroyed), so skip it entirely instead of letting it fail silently.
+    if (method === DidMethod.ETHR) {
+      setWalletErrorMessage(null)
+      return null
+    }
+
     try {
       const rpcUrls = {
-        testnet: `${process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL}`,
-        mainnet: `${process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL}`,
+        testnet: process.env.NEXT_PUBLIC_POLYGON_TESTNET_URL,
+        mainnet: process.env.NEXT_PUBLIC_POLYGON_MAINNET_URL,
       }
       const networkUrl = rpcUrls?.[network]
+      if (!networkUrl) {
+        setWalletErrorMessage(
+          'Unable to check wallet balance: RPC URL is not configured for this network.',
+        )
+        return null
+      }
+
       const provider = new ethers.JsonRpcProvider(networkUrl)
       const wallet = new ethers.Wallet(privateKey, provider)
       const address = await wallet.getAddress()
@@ -509,17 +537,18 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       return etherBalance
     } catch (error) {
       console.error('Error checking wallet balance:', error)
+      setWalletErrorMessage('Unable to check wallet balance. Please try again.')
       return null
     }
   }
 
   React.useEffect(() => {
     if (privateKeyValue && privateKeyValue.length === 64) {
-      checkBalance(privateKeyValue, Network.TESTNET)
+      checkBalance(privateKeyValue, balanceNetwork)
     } else {
       setWalletErrorMessage(null)
     }
-  }, [privateKeyValue])
+  }, [privateKeyValue, balanceNetwork])
 
   React.useEffect(() => {
     if (havePrivateKey) {
@@ -541,7 +570,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     setErrMsg(null)
 
     // Only set isCreatingDid for non-Polygon and non-Web methods
-    if (method !== DidMethod.POLYGON && method !== DidMethod.WEB) {
+    if (
+      method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
+      method !== DidMethod.WEB
+    ) {
       setIsCreatingDid(true)
     }
 
@@ -550,16 +583,24 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
       network = values?.network || ''
     } else if (values.method === DidMethod.POLYGON) {
       network = `${values.ledger}:${values.network}`
+    } else if (values.method === DidMethod.ETHR) {
+      network = `${values.ledger}:${values.network}`
     }
 
     const didData = {
-      seed: values.method === DidMethod.POLYGON ? '' : seed,
+      seed:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? ''
+          : seed,
       keyType: 'ed25519',
       method: values.method?.split(':')[1] || '',
       network,
       domain: values.method === DidMethod.WEB ? values.domain : '',
       role: values.method === DidMethod.INDY ? 'endorser' : '',
-      privatekey: values.method === DidMethod.POLYGON ? values.privatekey : '',
+      privatekey:
+        values.method === DidMethod.POLYGON || values.method === DidMethod.ETHR
+          ? values.privatekey
+          : '',
       did: values?.did ?? '',
       endorserDid: values?.endorserDid || '',
       isPrimaryDid: false,
@@ -584,6 +625,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setIsCreatingDid(false)
         if (
           values.method === DidMethod.POLYGON ||
+          values.method === DidMethod.ETHR ||
           values.method === DidMethod.WEB
         ) {
           setShowPopup(true)
@@ -612,9 +654,31 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         setGeneratedKeys(data?.data)
         setIsLoading(false)
         const privateKey = data?.data?.privateKey.slice(2)
-        setPrivateKeyValue(privateKeyValue || privateKey)
+        setPrivateKeyValue(privateKey)
         setFieldValue('privatekey', privateKey)
-        await checkBalance(privateKeyValue || privateKey, Network.TESTNET)
+        await checkBalance(privateKey, balanceNetwork)
+      }
+    } catch (err) {
+      console.error('Generate private key ERROR:', err)
+      setIsLoading(false)
+    }
+  }
+
+  const generateEthereumKeyValuePair = async (
+    setFieldValue: FormikHelpers<IFormValues>['setFieldValue'],
+  ): Promise<void> => {
+    setIsLoading(true)
+    try {
+      const resCreateEthereumKeys = await createEthereumKeyValuePair(orgId)
+      const { data } = resCreateEthereumKeys as AxiosResponse
+
+      if (data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
+        setGeneratedKeys(data?.data)
+        setIsLoading(false)
+        const privateKey = data?.data?.privateKey.slice(2)
+        setPrivateKeyValue(privateKey)
+        setFieldValue('privatekey', privateKey)
+        await checkBalance(privateKey, balanceNetwork)
       }
     } catch (err) {
       console.error('Generate private key ERROR:', err)
@@ -768,6 +832,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
     if (
       isCreatingDid &&
       method !== DidMethod.POLYGON &&
+      method !== DidMethod.ETHR &&
       method !== DidMethod.WEB
     ) {
       return (
@@ -817,7 +882,10 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
             if (method === DidMethod.WEB) {
               resetWebDialog()
               setShowPopup(true)
-            } else if (method === DidMethod.POLYGON) {
+            } else if (
+              method === DidMethod.POLYGON ||
+              method === DidMethod.ETHR
+            ) {
               setShowPopup(true)
             } else {
               setIsCreatingDid(true)
@@ -1088,8 +1156,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         </Dialog>
       )}
 
-      {/* ── Polygon dialog — original Formik ── */}
-      {method === DidMethod.POLYGON && (
+      {/* ── Polygon / Ethereum dialog — original Formik ── */}
+      {(method === DidMethod.POLYGON || method === DidMethod.ETHR) && (
         <Dialog open={showPopup} onOpenChange={setShowPopup}>
           <DialogContent className="max-w-2xl!">
             <DialogHeader>
@@ -1170,9 +1238,13 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                             </Label>
                             <Button
                               type="button"
-                              onClick={() =>
-                                generatePolygonKeyValuePair(setFieldValue)
-                              }
+                              onClick={() => {
+                                if (method === DidMethod.ETHR) {
+                                  generateEthereumKeyValuePair(setFieldValue)
+                                } else {
+                                  generatePolygonKeyValuePair(setFieldValue)
+                                }
+                              }}
                               disabled={isLoading}
                             >
                               {isLoading ? 'Generating...' : 'Generate'}
@@ -1205,7 +1277,11 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                                   </p>
                                 )}
                               </div>
-                              <TokenWarningMessage />
+                              <TokenWarningMessage
+                                mode="generated"
+                                didMethod={method}
+                                network={balanceNetwork}
+                              />
                               <div className="my-3">
                                 <div className="text-sm">
                                   <span className="font-semibold">
@@ -1234,7 +1310,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                               setPrivateKeyValue(e.target.value)
                               setWalletErrorMessage(null)
                               if (e.target.value.length === 64) {
-                                checkBalance(e.target.value, Network.TESTNET)
+                                checkBalance(e.target.value, balanceNetwork)
                               }
                             }}
                           />
@@ -1248,54 +1324,114 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                               {walletErrorMessage}
                             </p>
                           )}
-                          <TokenWarningMessage />
+                          <TokenWarningMessage
+                            mode="existing"
+                            didMethod={method}
+                            network={balanceNetwork}
+                          />
                         </div>
                       )}
                     </div>
 
-                    <div className="col-span-1 sm:col-span-2">
-                      <h3 className="mb-2 text-sm font-semibold">
-                        Follow these instructions to generate polygon tokens:
-                      </h3>
-                      <ol className="space-y-2 text-sm">
-                        <li>
-                          <span className="font-semibold">Step 1:</span>
-                          <div className="ml-4">
-                            Copy the address and get the free tokens for the
-                            testnet.
-                            <div>
-                              For eg. use{' '}
-                              <a
-                                href={polygonFaucet}
-                                className="font-semibold underline"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                {polygonFaucet}
-                              </a>{' '}
-                              to get free token
+                    {method === DidMethod.POLYGON && (
+                      <div className="col-span-1 sm:col-span-2">
+                        <h3 className="mb-2 text-sm font-semibold">
+                          Follow these instructions to generate polygon tokens:
+                        </h3>
+                        <ol className="space-y-2 text-sm">
+                          <li>
+                            <span className="font-semibold">Step 1:</span>
+                            <div className="ml-4">
+                              Copy the address and get the free tokens for the
+                              testnet.
+                              <div>
+                                For eg. use{' '}
+                                <a
+                                  href={polygonFaucet}
+                                  className="font-semibold underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {polygonFaucet}
+                                </a>{' '}
+                                to get free token
+                              </div>
                             </div>
-                          </div>
-                        </li>
-                        <li>
-                          <span className="font-semibold">Step 2:</span>
-                          <div className="ml-4">
-                            Check that you have received the tokens.
-                            <div>
-                              For eg. copy the address and check the balance on{' '}
-                              <a
-                                href="https://mumbai.polygonscan.com/"
-                                className="underline"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                https://mumbai.polygonscan.com/
-                              </a>
+                          </li>
+                          <li>
+                            <span className="font-semibold">Step 2:</span>
+                            <div className="ml-4">
+                              Check that you have received the tokens.
+                              <div>
+                                For eg. copy the address and check the balance
+                                on{' '}
+                                <a
+                                  href="https://mumbai.polygonscan.com/"
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  https://mumbai.polygonscan.com/
+                                </a>
+                              </div>
                             </div>
-                          </div>
-                        </li>
-                      </ol>
-                    </div>
+                          </li>
+                        </ol>
+                      </div>
+                    )}
+
+                    {method === DidMethod.ETHR && (
+                      <div className="col-span-1 sm:col-span-2">
+                        <h3 className="mb-2 text-sm font-semibold">
+                          Follow these instructions to generate Ethereum tokens
+                          for schema creation:
+                        </h3>
+                        <p className="text-muted-foreground mb-2 text-sm">
+                          Creating this DID is free — no funds are needed for
+                          that step. These tokens are only needed before you
+                          create schemas with this DID.
+                        </p>
+                        <ol className="space-y-2 text-sm">
+                          <li>
+                            <span className="font-semibold">Step 1:</span>
+                            <div className="ml-4">
+                              Copy the address and get the free tokens for the
+                              Sepolia testnet.
+                              <div>
+                                For eg. use{' '}
+                                <a
+                                  href={ethereumFaucet}
+                                  className="font-semibold underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  {ethereumFaucet}
+                                </a>{' '}
+                                to get free token
+                              </div>
+                            </div>
+                          </li>
+                          <li>
+                            <span className="font-semibold">Step 2:</span>
+                            <div className="ml-4">
+                              Check that you have received the tokens.
+                              <div>
+                                For eg. copy the address and check the balance
+                                on{' '}
+                                <a
+                                  href="https://sepolia.etherscan.io/"
+                                  className="underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  https://sepolia.etherscan.io
+                                </a>
+                              </div>
+                            </div>
+                          </li>
+                        </ol>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex justify-end">
@@ -1303,7 +1439,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                       type="submit"
                       disabled={
                         loading ||
-                        (method === DidMethod.POLYGON && !values.privatekey)
+                        (method === DidMethod.POLYGON && !values.privatekey) ||
+                        (method === DidMethod.ETHR && !values.privatekey)
                       }
                     >
                       {loading ? 'Submitting...' : 'Submit'}

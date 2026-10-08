@@ -9,11 +9,9 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 
 export default function Providers({
   session,
-  activeThemeValue,
   children,
 }: Readonly<{
   session: SessionProviderProps['session']
-  activeThemeValue: string
   children: React.ReactNode
 }>): React.JSX.Element {
   return (
@@ -24,7 +22,7 @@ export default function Providers({
       disableTransitionOnChange
       enableColorScheme
     >
-      <ActiveThemeProvider initialTheme={activeThemeValue}>
+      <ActiveThemeProvider>
         <SessionProvider
           session={session}
           refetchOnWindowFocus={false}

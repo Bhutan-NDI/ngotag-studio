@@ -2,19 +2,27 @@
 
 import * as yup from 'yup'
 
-import { Field, Form, Formik } from 'formik'
-import React, { useEffect, useState } from 'react'
+import {
+  FIELD_BLOCK_CLASS,
+  FIELD_CLASS,
+  LABEL_CLASS,
+} from '@/components/bhutanndi/ui/formStyles'
+import { Field, FieldProps, Form, Formik } from 'formik'
+import React, { useState } from 'react'
 
 import { AlertComponent } from '@/components/AlertComponent'
+import { AuthAlert } from '@/components/bhutanndi/ui/AuthAlert'
 import type { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
+import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import SOCKET from '@/config/SocketConfig'
 import { apiStatusCodes } from '@/config/CommonConstant'
-import { getOrganizationById } from '@/app/api/organization'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { spinupSharedAgent } from '@/app/api/Agent'
+import { useOrgWalletName } from './useOrgWalletName'
 
 interface SharedAgentFormProps {
   orgId: string
@@ -44,39 +52,7 @@ const SharedAgentForm = ({
 }: SharedAgentFormProps): React.JSX.Element => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [orgName, setOrgName] = useState<string>('')
-
-  const fetchOrganizationDetails = async (): Promise<void> => {
-    if (!orgId) {
-      return
-    }
-    try {
-      const response = await getOrganizationById(orgId)
-      const { data } = response as AxiosResponse
-
-      if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        const name = data?.data?.name || ''
-        setOrgName(name)
-      }
-    } catch (error) {
-      console.error('Error fetching organization:', error)
-    }
-  }
-
-  const generateWalletLabel = (orgName: string): string => {
-    if (!orgName) {
-      return 'Wallet'
-    }
-
-    const words = orgName.split(/\s+/).filter(Boolean)
-
-    const first = words[0] || ''
-    const second = words[1]?.substring(0, 5) || ''
-
-    const label = `${first}${second}Wallet`
-
-    return label.replace(/[^a-zA-Z0-9]/g, '').slice(0, 25)
-  }
+  const walletLabel = useOrgWalletName(orgId)
 
   const validationSchema = yup.object({
     label: yup.string().required('Wallet label is required'),
@@ -111,54 +87,102 @@ const SharedAgentForm = ({
     }
   }
 
-  useEffect(() => {
-    fetchOrganizationDetails()
-  }, [orgId])
+  const bhutanndi = isBhutanndiTheme()
 
   return (
     <div className="mt-6">
       <Formik
         enableReinitialize
-        initialValues={{ label: generateWalletLabel(orgName) }}
+        initialValues={{ label: walletLabel }}
         validationSchema={validationSchema}
         onSubmit={handleSubmit}
       >
-        {({ errors, touched }) => (
-          <Form className="space-y-6">
-            <div>
-              <Label htmlFor="label">Wallet Label</Label>
-              <p className="text-muted-foreground mt-1 text-sm">
-                This label is auto-generated based on your organization name.
-                You can edit it if needed.
-              </p>
-              <Field
-                as={Input}
-                id="label"
-                name="label"
-                placeholder="Enter wallet label"
-                className="mt-2"
-                disabled={disabled}
-              />
-              {errors.label && touched.label && (
-                <p className="text-destructive mt-1 text-sm">{errors.label}</p>
+        {({ errors, touched }) => {
+          if (bhutanndi) {
+            return (
+              <Form className="space-y-6">
+                <label className={FIELD_BLOCK_CLASS}>
+                  <span className={LABEL_CLASS}>Wallet Label</span>
+                  <p className="text-bhutanndi-muted -mt-0.5 text-[13px] leading-[1.5]">
+                    This label is auto-generated based on your organization
+                    name. You can edit it if needed.
+                  </p>
+                  <Field name="label">
+                    {({ field }: FieldProps<string, { label: string }>) => (
+                      <input
+                        {...field}
+                        id="label"
+                        placeholder="Enter wallet label"
+                        className={`${FIELD_CLASS} h-12`}
+                        disabled={disabled}
+                      />
+                    )}
+                  </Field>
+                  {errors.label && touched.label ? (
+                    <p
+                      className="text-[12px]"
+                      style={{ color: 'var(--bhutanndi-text-danger)' }}
+                    >
+                      {errors.label}
+                    </p>
+                  ) : null}
+                </label>
+
+                {error ? (
+                  <AuthAlert
+                    variant="danger"
+                    message={error}
+                    onDismiss={() => setError(null)}
+                  />
+                ) : null}
+
+                <div className="flex justify-end">
+                  <GradientButton type="submit" disabled={loading || disabled}>
+                    {loading ? <Loader /> : 'Create Shared Wallet'}
+                  </GradientButton>
+                </div>
+              </Form>
+            )
+          }
+          return (
+            <Form className="space-y-6">
+              <div>
+                <Label htmlFor="label">Wallet Label</Label>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  This label is auto-generated based on your organization name.
+                  You can edit it if needed.
+                </p>
+                <Field
+                  as={Input}
+                  id="label"
+                  name="label"
+                  placeholder="Enter wallet label"
+                  className="mt-2"
+                  disabled={disabled}
+                />
+                {errors.label && touched.label && (
+                  <p className="text-destructive mt-1 text-sm">
+                    {errors.label}
+                  </p>
+                )}
+              </div>
+
+              {error && (
+                <AlertComponent
+                  message={error}
+                  type="failure"
+                  onAlertClose={() => setError(null)}
+                />
               )}
-            </div>
 
-            {error && (
-              <AlertComponent
-                message={error}
-                type="failure"
-                onAlertClose={() => setError(null)}
-              />
-            )}
-
-            <div className="flex justify-end">
-              <Button type="submit" disabled={loading || disabled}>
-                {loading ? <Loader /> : 'Create Shared Wallet'}
-              </Button>
-            </div>
-          </Form>
-        )}
+              <div className="flex justify-end">
+                <Button type="submit" disabled={loading || disabled}>
+                  {loading ? <Loader /> : 'Create Shared Wallet'}
+                </Button>
+              </div>
+            </Form>
+          )
+        }}
       </Formik>
     </div>
   )

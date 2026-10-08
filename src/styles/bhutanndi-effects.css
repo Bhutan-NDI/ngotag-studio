@@ -1,0 +1,851 @@
+/* ==============================================================
+   Bhutanndi ("Bhutan NDI") signature effects.
+   Ported from https://github.com/KezangLoday/BhutanNDI_Studio
+   (src/styles/ndi-effects.css there). All rules are nested under
+   `.theme-bhutanndi` so this file is a total no-op for every other brand —
+   `.theme-bhutanndi` is the body class `src/components/active-theme.tsx`
+   applies when `getActiveTheme() === 'bhutanndi'`. Custom property names,
+   data-attributes and keyframe/@property names are all `bhutanndi`-prefixed
+   (see public/themes/bhutanndi_theme.css for why) so nothing here can shadow
+   an existing shared token or animation.
+   ============================================================== */
+
+/* ---- Keyframes (kept top-level: @keyframes cannot be meaningfully
+   nested under a selector, but the bhutanndi-prefixed names are globally
+   unique so this is harmless for other themes) ------------------- */
+@keyframes bhutanndiWave {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes bhutanndiGradientAngle {
+  to {
+    --bhutanndi-gradient-angle: 360deg;
+  }
+}
+@keyframes bhutanndiShimmer {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes bhutanndiBreathe {
+  from,
+  to {
+    scale: 1;
+  }
+  50% {
+    scale: 1.2;
+  }
+}
+@keyframes bhutanndiSceneIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bhutanndiScan {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateX(64px);
+    opacity: 1;
+  }
+}
+@keyframes bhutanndiScanWide {
+  0%,
+  100% {
+    transform: translateY(-38px);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(38px);
+    opacity: 1;
+  }
+}
+@keyframes bhutanndiSealFloat {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+/* @property registrations for ShinyButton's conic sweep. Global by spec,
+   bhutanndi-prefixed to avoid shadowing anything else. */
+@property --bhutanndi-gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --bhutanndi-gradient-angle-offset {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --bhutanndi-gradient-percent {
+  syntax: '<percentage>';
+  initial-value: 5%;
+  inherits: false;
+}
+@property --bhutanndi-gradient-shine {
+  syntax: '<color>';
+  initial-value: #cffce6;
+  inherits: false;
+}
+
+.theme-bhutanndi {
+  /* ---- Emphasised phrase ------------------------------------- */
+  .ndi-wave-text {
+    background: var(--bhutanndi-grad-wave);
+    background-size: 220% 100%;
+    background-repeat: no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: bhutanndiWave 6.5s cubic-bezier(0.45, 0, 0.55, 1) infinite
+      alternate;
+  }
+  .ndi-wave-tight {
+    background-size: 138% 100%;
+  }
+
+  /* ---- Scroll reveal ------------------------------------------ */
+  [data-bhutanndi-reveal] {
+    transform: translateY(26px);
+    transition: transform 0.7s var(--bhutanndi-ease-out);
+  }
+  [data-bhutanndi-reveal][data-revealed='true'] {
+    transform: none;
+  }
+
+  /* ---- Button sweep / glow machinery --------------------------- */
+  .ndi-store-sweep {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--bhutanndi-gloss) / 0.14),
+      transparent
+    );
+    transform: translateX(-100%);
+    transition: transform 1s var(--bhutanndi-ease-out);
+  }
+  .ndi-store-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--bhutanndi-gloss) / 0.07),
+      rgb(var(--bhutanndi-gloss) / 0.02) 50%,
+      rgb(var(--bhutanndi-gloss) / 0.07)
+    );
+    transition: opacity 0.5s var(--bhutanndi-ease-out);
+  }
+
+  .ndi-sweepbtn {
+    transition:
+      transform 0.16s var(--bhutanndi-ease-out),
+      box-shadow 0.5s var(--bhutanndi-ease-out);
+  }
+  .ndi-sweepbtn:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--bhutanndi-glow-md);
+  }
+  .ndi-sweepbtn:active {
+    transform: scale(0.99) translateY(0);
+  }
+  .ndi-sweepbtn:hover .ndi-store-sweep {
+    transform: translateX(100%);
+  }
+  .ndi-sweepbtn:hover .ndi-store-glow {
+    opacity: 1;
+  }
+  .ndi-sweepbtn:disabled:hover {
+    transform: none;
+    box-shadow: var(--bhutanndi-glow-sm);
+  }
+  .ndi-sweepbtn:disabled:hover .ndi-store-sweep {
+    transform: translateX(-100%);
+  }
+  .ndi-sweepbtn:disabled:hover .ndi-store-glow {
+    opacity: 0;
+  }
+
+  .ndi-sendnudge {
+    transition: transform 0.24s var(--bhutanndi-ease-out);
+  }
+  .ndi-sweepbtn:hover .ndi-sendnudge {
+    transform: translateX(4px);
+  }
+
+  /* ---- Shared shadcn Button (src/components/ui/button.tsx) ------
+     Every "default"-variant Button across the whole app — reskinned
+     pages and not-yet-reskinned ones alike — picks up the same mint
+     CTA fill as GradientButton, since it's the same shared component
+     everywhere. destructive/outline/secondary/ghost/link/hamburger
+     variants are untouched; only the primary action fill changes. */
+  [data-slot='button'][data-variant='default'] {
+    background: var(--bhutanndi-grad-cta);
+    color: var(--bhutanndi-text-on-mint);
+    border: 1px solid transparent;
+    box-shadow: var(--bhutanndi-glow-sm);
+    transition:
+      box-shadow 0.5s var(--bhutanndi-ease-out),
+      transform 0.16s var(--bhutanndi-ease-out);
+  }
+  [data-slot='button'][data-variant='default']:hover:not(:disabled) {
+    background: var(--bhutanndi-grad-cta);
+    box-shadow: var(--bhutanndi-glow-md);
+    transform: translateY(-2px);
+  }
+  [data-slot='button'][data-variant='default']:active:not(:disabled) {
+    transform: scale(0.99) translateY(0);
+  }
+  [data-slot='button'][data-variant='default']:disabled {
+    background: var(--bhutanndi-surface-raised);
+    color: var(--bhutanndi-text-faint);
+    border: 1px solid var(--bhutanndi-border-subtle);
+    box-shadow: none;
+  }
+
+  /* ---- Form controls -------------------------------------------- */
+  .ndi-chip {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+  }
+  .ndi-chip input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .ndi-chip span {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    padding: 0 15px;
+    border-radius: 999px;
+    border: 1px solid var(--bhutanndi-border-grid);
+    background: rgb(var(--bhutanndi-tint) / 0.03);
+    color: var(--bhutanndi-text-muted);
+    font-family: var(--font-bhutanndi-body);
+    font-size: 13px;
+    transition:
+      color 0.2s var(--bhutanndi-ease-out),
+      border-color 0.2s var(--bhutanndi-ease-out),
+      background 0.2s var(--bhutanndi-ease-out),
+      box-shadow 0.2s var(--bhutanndi-ease-out);
+  }
+  .ndi-chip:hover span {
+    color: var(--bhutanndi-text-body);
+    border-color: var(--bhutanndi-border-strong);
+  }
+  .ndi-chip input:checked + span {
+    color: var(--bhutanndi-accent);
+    border-color: var(--bhutanndi-mint-40);
+    background: var(--bhutanndi-mint-08);
+    box-shadow: var(--bhutanndi-glow-sm);
+  }
+  .ndi-chip input:focus-visible + span {
+    box-shadow: var(--bhutanndi-ring);
+  }
+
+  .ndi-field {
+    transition:
+      border-color 0.2s var(--bhutanndi-ease-out),
+      box-shadow 0.2s var(--bhutanndi-ease-out),
+      background 0.2s var(--bhutanndi-ease-out);
+  }
+  .ndi-field::placeholder {
+    color: var(--bhutanndi-text-faint);
+    opacity: 0.7;
+  }
+  .ndi-field:hover {
+    border-color: var(--bhutanndi-border-strong);
+  }
+  .ndi-field:focus {
+    border-color: var(--bhutanndi-accent);
+    box-shadow: var(--bhutanndi-ring);
+  }
+
+  .ndi-plainlink {
+    transition: color var(--bhutanndi-dur);
+  }
+  .ndi-plainlink:hover {
+    color: var(--bhutanndi-text-strong);
+  }
+
+  .ndi-check {
+    appearance: none;
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    border-radius: 5px;
+    border: 1px solid var(--bhutanndi-border-strong);
+    background: var(--bhutanndi-surface-raised);
+    transition:
+      background 0.18s var(--bhutanndi-ease-out),
+      border-color 0.18s var(--bhutanndi-ease-out);
+  }
+  .ndi-check:hover {
+    border-color: var(--bhutanndi-accent);
+  }
+  .ndi-check:focus-visible {
+    box-shadow: var(--bhutanndi-ring);
+    outline: none;
+  }
+  .ndi-check:checked {
+    border-color: var(--bhutanndi-accent);
+    background: var(--bhutanndi-accent)
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306241a' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+      center / 12px no-repeat;
+  }
+
+  /* ---- Glass panel pass ------------------------------------------ */
+  [data-bhutanndi-panel] {
+    background: var(--bhutanndi-fill-panel);
+    -webkit-backdrop-filter: blur(12px) saturate(140%) brightness(1.03);
+    backdrop-filter: blur(12px) saturate(140%) brightness(1.03);
+    box-shadow: var(--bhutanndi-shadow-card);
+  }
+  [data-bhutanndi-panel]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    border-radius: inherit;
+    padding: 1px;
+    opacity: 0.45;
+    background: conic-gradient(
+      from 205deg at 50% 50%,
+      rgb(var(--bhutanndi-tint) / 0.22),
+      rgb(var(--bhutanndi-tint) / 0.02) 26%,
+      rgb(var(--bhutanndi-tint) / 0.13) 52%,
+      rgb(var(--bhutanndi-tint) / 0.02) 78%,
+      rgb(var(--bhutanndi-tint) / 0.22)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  /* ---- ShinyButton ------------------------------------------------ */
+  .shiny-cta {
+    --shiny-cta-bg: var(--bhutanndi-surface-cta);
+    --shiny-cta-bg-subtle: var(--bhutanndi-surface-cta-subtle);
+    --shiny-cta-fg: var(--bhutanndi-text-strong);
+    --shiny-cta-highlight: var(--bhutanndi-accent);
+    --shiny-cta-highlight-subtle: #8be3b8;
+    --shiny-cta-px: 2.5rem;
+    --shiny-cta-py: 1.25rem;
+    --shiny-cta-fs: 1.125rem;
+    --shiny-cta-fw: 600;
+    --shiny-cta-glow: 1;
+    --shiny-cta-glow-x: 3.4rem;
+    --shiny-cta-glow-y: 1.6rem;
+    --animation: bhutanndiGradientAngle linear infinite;
+    --duration: 3s;
+    --shadow-size: 2px;
+    --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
+    isolation: isolate;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    outline-offset: 4px;
+    padding: var(--shiny-cta-py) var(--shiny-cta-px);
+    font-family: var(--font-display);
+    font-size: var(--shiny-cta-fs);
+    font-weight: var(--shiny-cta-fw);
+    line-height: 1.2;
+    border: 1px solid transparent;
+    border-radius: 360px;
+    color: var(--shiny-cta-fg);
+    background:
+      linear-gradient(var(--shiny-cta-bg), var(--shiny-cta-bg)) padding-box,
+      conic-gradient(
+          from
+            calc(
+              var(--bhutanndi-gradient-angle) -
+                var(--bhutanndi-gradient-angle-offset)
+            ),
+          transparent,
+          var(--shiny-cta-highlight) var(--bhutanndi-gradient-percent),
+          var(--bhutanndi-gradient-shine)
+            calc(var(--bhutanndi-gradient-percent) * 2),
+          var(--shiny-cta-highlight) calc(var(--bhutanndi-gradient-percent) * 3),
+          transparent calc(var(--bhutanndi-gradient-percent) * 4)
+        )
+        border-box;
+    box-shadow: inset 0 0 0 1px var(--shiny-cta-bg-subtle);
+    transition: var(--transition);
+    transition-property: --bhutanndi-gradient-angle-offset,
+      --bhutanndi-gradient-percent, --bhutanndi-gradient-shine;
+  }
+  .shiny-cta::before,
+  .shiny-cta::after,
+  .shiny-cta span::before {
+    content: '';
+    pointer-events: none;
+    position: absolute;
+    inset-inline-start: 50%;
+    inset-block-start: 50%;
+    translate: -50% -50%;
+    z-index: -1;
+  }
+  .shiny-cta:active {
+    translate: 0 1px;
+  }
+  .shiny-cta::before {
+    --size: calc(100% - var(--shadow-size) * 3);
+    --position: 2px;
+    --space: calc(var(--position) * 2);
+    width: var(--size);
+    height: var(--size);
+    background: radial-gradient(
+        circle at var(--position) var(--position),
+        white calc(var(--position) / 4),
+        transparent 0
+      )
+      padding-box;
+    background-size: var(--space) var(--space);
+    background-repeat: space;
+    mask-image: conic-gradient(
+      from calc(var(--bhutanndi-gradient-angle) + 45deg),
+      black,
+      transparent 10% 90%,
+      black
+    );
+    border-radius: inherit;
+    opacity: 0.4;
+    z-index: -1;
+  }
+  .shiny-cta::after {
+    --animation: bhutanndiShimmer linear infinite;
+    width: 100%;
+    aspect-ratio: 1;
+    background: linear-gradient(
+      -50deg,
+      transparent,
+      var(--shiny-cta-highlight),
+      transparent
+    );
+    mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+    opacity: 0.6;
+  }
+  .shiny-cta span {
+    z-index: 1;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .shiny-cta span::before {
+    width: calc(100% + var(--shiny-cta-glow-x));
+    height: calc(100% + var(--shiny-cta-glow-y));
+    border-radius: 360px;
+    box-shadow: inset 0 -1ex 1.2rem -2px var(--shiny-cta-highlight);
+    opacity: 0;
+    transition: opacity var(--transition);
+    animation: calc(var(--duration) * 1.5) bhutanndiBreathe linear infinite;
+  }
+  .shiny-cta,
+  .shiny-cta::before,
+  .shiny-cta::after {
+    animation:
+      var(--animation) var(--duration),
+      var(--animation) calc(var(--duration) / 0.4) reverse paused;
+    animation-composition: add;
+  }
+  .shiny-cta:is(:hover, :focus-visible) {
+    --bhutanndi-gradient-percent: 20%;
+    --bhutanndi-gradient-angle-offset: 95deg;
+    --bhutanndi-gradient-shine: var(--shiny-cta-highlight-subtle);
+  }
+  .shiny-cta:is(:hover, :focus-visible),
+  .shiny-cta:is(:hover, :focus-visible)::before,
+  .shiny-cta:is(:hover, :focus-visible)::after {
+    animation-play-state: running;
+  }
+  .shiny-cta:is(:hover, :focus-visible) span::before {
+    opacity: var(--shiny-cta-glow);
+  }
+
+  /* ---- Secondary / hairline control ------------------------------- */
+  .ndi-hairline-btn {
+    transition:
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      border-color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      box-shadow var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      transform var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-hairline-btn:hover {
+    color: var(--bhutanndi-text-strong);
+    border-color: var(--bhutanndi-mint-40);
+    background: var(--bhutanndi-mint-08);
+    box-shadow: var(--bhutanndi-glow-sm);
+  }
+  .ndi-hairline-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--bhutanndi-ring);
+  }
+
+  .ndi-backbtn {
+    transition:
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      border-color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      box-shadow var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-backbtn:hover {
+    background: var(--bhutanndi-mint-08);
+    border-color: var(--bhutanndi-mint-40);
+    color: var(--bhutanndi-text-strong);
+    box-shadow: var(--bhutanndi-glow-sm);
+  }
+  .ndi-backbtn svg {
+    transition: transform var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-backbtn:hover svg {
+    transform: translateX(-3px);
+  }
+
+  /* ---- Native control colours -------------------------------------- */
+  select option {
+    background: var(--bhutanndi-surface-menu);
+    color: var(--bhutanndi-text-body);
+  }
+
+  .ndi-lift {
+    transition:
+      transform var(--bhutanndi-dur),
+      box-shadow var(--bhutanndi-dur);
+  }
+  .ndi-lift:hover {
+    transform: translateY(-3px);
+  }
+
+  @media (hover: none) {
+    .ndi-sweepbtn:hover,
+    .ndi-lift:hover,
+    .ndi-hairline-btn:hover,
+    .ndi-backbtn:hover svg,
+    .ndi-sweepbtn:hover .ndi-sendnudge {
+      transform: none;
+    }
+  }
+
+  /* ---- Scenes ------------------------------------------------------ */
+  .ndi-scene {
+    animation: bhutanndiSceneIn var(--bhutanndi-dur-slow)
+      var(--bhutanndi-ease-out);
+  }
+  .ndi-scene__scan {
+    animation: bhutanndiScan 2.8s var(--bhutanndi-ease-in-out) infinite;
+  }
+  .ndi-scene__scan-wide {
+    animation: bhutanndiScanWide 3.2s var(--bhutanndi-ease-in-out) infinite;
+  }
+  .ndi-scene__seal {
+    animation: bhutanndiSealFloat 5s var(--bhutanndi-ease-in-out) infinite
+      alternate;
+  }
+
+  /* ---- Sidebar nav rows ---------------------------------------------- */
+  .ndi-navrow {
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--bhutanndi-text-muted);
+    transition:
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      border-color var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-navrow:hover {
+    color: var(--bhutanndi-text-strong);
+    background: rgb(var(--bhutanndi-tint) / 0.05);
+  }
+  .ndi-navrow:focus-visible {
+    outline: none;
+    box-shadow: var(--bhutanndi-ring);
+  }
+  .ndi-navrow[data-active='1'] {
+    color: var(--bhutanndi-accent);
+    border-color: var(--bhutanndi-border-strong);
+    background: var(--bhutanndi-mint-12);
+  }
+  .ndi-navrow[data-active='1'] svg {
+    color: var(--bhutanndi-accent);
+  }
+
+  .ndi-navdot {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.35;
+  }
+
+  /* ---- Info tooltip ---------------------------------------------------- */
+  .ndi-tip {
+    position: relative;
+    display: inline-flex;
+  }
+  .ndi-tip__bubble {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    z-index: 20;
+    width: max-content;
+    max-width: 240px;
+    transform: translateX(-50%) translateY(4px);
+    padding: 8px 11px;
+    border-radius: 9px;
+    border: 1px solid rgba(90, 201, 148, 0.22);
+    background: var(--bhutanndi-surface-tooltip);
+    box-shadow:
+      0 14px 34px rgb(var(--bhutanndi-shade) / 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    color: var(--bhutanndi-text-tooltip);
+    font-size: 12px;
+    line-height: 1.45;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      opacity 0.18s var(--bhutanndi-ease-out),
+      transform 0.18s var(--bhutanndi-ease-out),
+      visibility 0s linear 0.18s;
+  }
+  .ndi-tip:hover .ndi-tip__bubble,
+  .ndi-tip:focus-within .ndi-tip__bubble {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+    transition-delay: 0s;
+  }
+
+  /* ---- Sidebar drawer, mobile ------------------------------------------- */
+  @media (max-width: 900px) {
+    aside[data-open='0'] {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* ---- Segmented tabs ---------------------------------------------------- */
+  .ndi-tab {
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--bhutanndi-text-muted);
+    white-space: nowrap;
+    transition:
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      border-color var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-tab:hover {
+    color: var(--bhutanndi-text-body);
+  }
+  .ndi-tab:focus-visible {
+    outline: none;
+    box-shadow: var(--bhutanndi-ring);
+  }
+  .ndi-tab[data-active='1'] {
+    color: var(--bhutanndi-text-strong);
+    border-color: var(--bhutanndi-border-strong);
+    background: var(--bhutanndi-mint-12);
+  }
+  .ndi-tab[data-active='1'] svg {
+    color: var(--bhutanndi-accent);
+  }
+
+  /* ---- Data table ------------------------------------------------------ */
+  .ndi-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .ndi-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-family: var(--font-bhutanndi-mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--bhutanndi-text-faint);
+    border-bottom: 1px solid var(--bhutanndi-border-subtle);
+    white-space: nowrap;
+  }
+  .ndi-table td {
+    padding: 14px 16px;
+    font-size: 13.5px;
+    color: var(--bhutanndi-text-body);
+    border-bottom: 1px solid var(--bhutanndi-border-subtle);
+  }
+  .ndi-table tbody tr:last-child td {
+    border-bottom: 0;
+  }
+  .ndi-table tbody tr {
+    transition: background var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-table tbody tr:hover {
+    background: rgb(var(--bhutanndi-tint) / 0.04);
+  }
+
+  /* ---- Select ------------------------------------------------------------ */
+  .ndi-select-trigger {
+    box-sizing: border-box;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bhutanndi-border-grid);
+    background: var(--bhutanndi-surface-raised);
+    color: var(--bhutanndi-text-body);
+    font-family: var(--font-bhutanndi-body);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition:
+      border-color 0.2s var(--bhutanndi-ease-out),
+      box-shadow 0.2s var(--bhutanndi-ease-out),
+      background 0.2s var(--bhutanndi-ease-out);
+  }
+  .ndi-select-trigger:hover:not(:disabled) {
+    border-color: var(--bhutanndi-border-strong);
+  }
+  .ndi-select-trigger:focus-visible {
+    outline: none;
+    border-color: var(--bhutanndi-accent);
+    box-shadow: var(--bhutanndi-ring);
+  }
+  .ndi-select-trigger[aria-expanded='true'] {
+    border-color: var(--bhutanndi-accent);
+    box-shadow: var(--bhutanndi-ring);
+  }
+  .ndi-select-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .ndi-select {
+    appearance: none;
+    height: 44px;
+    padding: 0 38px 0 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bhutanndi-border-grid);
+    background-color: var(--bhutanndi-surface-raised);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237c828a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 15px;
+    color: var(--bhutanndi-text-body);
+    font-family: var(--font-bhutanndi-body);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition:
+      border-color 0.2s var(--bhutanndi-ease-out),
+      box-shadow 0.2s var(--bhutanndi-ease-out);
+  }
+  .ndi-select:hover {
+    border-color: var(--bhutanndi-border-strong);
+  }
+  .ndi-select:focus {
+    outline: none;
+    border-color: var(--bhutanndi-accent);
+    box-shadow: var(--bhutanndi-ring);
+  }
+
+  .ndi-iconbtn {
+    cursor: pointer;
+    border: 1px solid var(--bhutanndi-border-grid);
+    background: rgb(var(--bhutanndi-tint) / 0.03);
+    color: var(--bhutanndi-text-muted);
+    transition:
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      border-color var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      box-shadow var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  .ndi-iconbtn:hover {
+    color: var(--bhutanndi-accent);
+    border-color: var(--bhutanndi-mint-40);
+    background: var(--bhutanndi-mint-08);
+  }
+  .ndi-iconbtn:focus-visible {
+    outline: none;
+    box-shadow: var(--bhutanndi-ring);
+  }
+
+  /* ---- Dropdown menus (org switcher, user nav) ----------------------
+     Both are the shared shadcn DropdownMenu primitives, restyled here
+     the same way [data-slot='button'] is above, so the glassy panel
+     look reaches them without forking either component. */
+  [data-slot='dropdown-menu-content'] {
+    min-width: 220px;
+    padding: 6px;
+    border-radius: 14px;
+    border: 1px solid var(--bhutanndi-border-grid);
+    background: var(--bhutanndi-surface-menu);
+    box-shadow: var(--bhutanndi-shadow-card);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    backdrop-filter: blur(20px) saturate(140%);
+  }
+  [data-slot='dropdown-menu-label'] {
+    padding: 8px 10px 4px;
+    color: var(--bhutanndi-text-faint);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+  }
+  [data-slot='dropdown-menu-separator'] {
+    background: var(--bhutanndi-border-subtle);
+    margin: 6px 2px;
+  }
+  [data-slot='dropdown-menu-item'] {
+    border-radius: 9px;
+    padding: 9px 10px;
+    font-size: 13.5px;
+    color: var(--bhutanndi-text-body);
+    transition:
+      background var(--bhutanndi-dur) var(--bhutanndi-ease-out),
+      color var(--bhutanndi-dur) var(--bhutanndi-ease-out);
+  }
+  [data-slot='dropdown-menu-item']:focus,
+  [data-slot='dropdown-menu-item'][data-highlighted] {
+    background: rgb(var(--bhutanndi-tint) / 0.08);
+    color: var(--bhutanndi-text-strong);
+  }
+  [data-slot='dropdown-menu-shortcut'] {
+    color: var(--bhutanndi-text-faint);
+  }
+
+  /* ---- Selection colour, scoped to the theme rather than page-global */
+  *::selection {
+    background: var(--bhutanndi-mint-25);
+    color: var(--bhutanndi-text-strong);
+  }
+}

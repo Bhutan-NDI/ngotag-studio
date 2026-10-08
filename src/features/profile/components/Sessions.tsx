@@ -12,12 +12,15 @@ import ConfirmationModal from '@/components/confirmation-modal'
 import { DeleteIcon } from '@/config/svgs/DeleteIcon'
 import { DestructiveConfirmation } from '@/config/svgs/Auth'
 import Loader from '@/components/Loader'
+import { Panel } from '@/components/bhutanndi/ui/Panel'
 import { RootState } from '@/lib/store'
 import { SESSION_TYPE } from '@/components/types/Sessions'
 import { dateConversion } from '@/utils/DateConversion'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 
 function Sessions(): JSX.Element {
+  const bhutanndi = isBhutanndiTheme()
   const [loading, setLoading] = useState(true)
   const [sessions, setSessions] = useState<Session[]>()
   const [error, setError] = useState<string | null>(null)
@@ -136,9 +139,16 @@ function Sessions(): JSX.Element {
     )
   }
 
-  return (
-    <Card className="border py-6">
-      <CardTitle className="px-4">User Sessions</CardTitle>
+  const title = bhutanndi ? (
+    <CardTitle className="font-display text-bhutanndi-strong px-4">
+      User Sessions
+    </CardTitle>
+  ) : (
+    <CardTitle className="px-4">User Sessions</CardTitle>
+  )
+
+  const body = (
+    <>
       <CardContent className="overflow-y-auto py-4">
         {success && (
           <div className="w-full" role="alert">
@@ -297,6 +307,22 @@ function Sessions(): JSX.Element {
             )
           })}
       </CardContent>
+    </>
+  )
+
+  if (bhutanndi) {
+    return (
+      <Panel padded={false} className="py-6">
+        {title}
+        {body}
+      </Panel>
+    )
+  }
+
+  return (
+    <Card className="border py-6">
+      {title}
+      {body}
     </Card>
   )
 }

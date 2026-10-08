@@ -6,6 +6,7 @@ import {
   IOobW3cIssuancePayload,
 } from '../type/OobIssuance'
 import { ProofType, SchemaTypeValue } from '@/common/enums'
+import { isBhutanndiTheme } from '@/lib/active-theme'
 
 /**
  * Build the INDY OOB credential offer payload.
@@ -18,7 +19,9 @@ import { ProofType, SchemaTypeValue } from '@/common/enums'
 export const buildIndyPayload = (
   attributes: IOobAttribute[],
   credDefId: string,
+  orgDid: string | null,
 ): IOobIssuancePayload => ({
+  goalCode: isBhutanndiTheme() ? orgDid : 'issuance',
   credentialDefinitionId: credDefId,
   attributes: attributes.map((a) => ({
     name: a.name,
@@ -63,6 +66,7 @@ export const buildW3cPayload = (
   }, {})
 
   return {
+    goalCode: isBhutanndiTheme() ? orgDid : 'issuance',
     credential: {
       '@context': [CREDENTIAL_CONTEXT_VALUE, schemaDetails.schemaId],
       type: ['VerifiableCredential', schemaDetails.schemaName],
@@ -74,7 +78,9 @@ export const buildW3cPayload = (
       proofType:
         schemaTypeValue === SchemaTypeValue.POLYGON
           ? ProofType.polygon
-          : ProofType.no_ledger,
+          : schemaTypeValue === SchemaTypeValue.ETHEREUM
+            ? ProofType.ethereum
+            : ProofType.no_ledger,
       proofPurpose,
     },
     isShortenUrl: true,
