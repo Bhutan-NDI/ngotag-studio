@@ -194,7 +194,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 4,
     title: "What kind of organisation",
     happening:
-      "Each type names the authority that registered it, which is who checks it. Civil society organisations and cooperatives are shown but can't be verified yet — their authorities aren't connected — and say so.",
+      "Each type names the authority that registered it, which is who checks it: a registered company, a sole proprietorship or a partnership.",
     doThis: "Leave **Registered company** selected and press **Continue**.",
     route: "/onboarding",
     match: "^/onboarding$",

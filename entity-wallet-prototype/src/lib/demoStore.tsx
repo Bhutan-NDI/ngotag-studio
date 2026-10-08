@@ -276,10 +276,9 @@ function applyPresentation(
 const today = () => new Date().toISOString().slice(0, 10);
 /**
  * FLOW-ORG-01 P3 as the server would answer it: which entity types have a
- * connected authority. Only registered companies, sole proprietorships and
- * partnerships have one (Flow 2 solution design §2.2); the others are shown
- * and refused (SCR-ORG-06). On day zero nobody has designated any authority
- * yet, so nothing is connected — the one condition the demo has for it.
+ * connected authority (Flow 2 solution design §2.2). On day zero nobody has
+ * designated any authority yet, so nothing is connected — the one condition
+ * the demo has for it.
  */
 const ROUTED_KINDS: OrgKind[] = ["company", "sole_proprietorship", "partnership"];
 function connectedKinds(s: DemoState): OrgKind[] {
