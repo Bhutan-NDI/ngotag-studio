@@ -30,7 +30,7 @@ import { useDemo } from "@/lib/demoStore";
  * owner — what has happened.
  */
 export function DashboardView({ firstName }: { firstName?: string } = {}) {
-  const { organizations, activeOrgId, activity, responsibilities, currentPerson, harness, firstRun, people, relations, orgInvitations } =
+  const { organizations, activeOrgId, activity, currentPerson, harness, firstRun, people, relations, orgInvitations } =
     useDemo();
 
   /* The suspended face is a §9 global rather than a fixture state: a
@@ -138,29 +138,6 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
     );
   }
 
-  /* Verified but not yet usable (FLOW-DEL-02): until the representative
-     accepts responsibility, the dashboard offers that and nothing else —
-     the same gate SCR-ORG-07 shows, so leaving that screen doesn't skip it. */
-  const responsibility = responsibilities.find((r) => r.orgId === activeOrgId)?.state;
-  if (responsibility && responsibility !== "ACCEPTED") {
-    return (
-      <AppShell>
-        <Panel>
-          <div className="relative z-[4] flex flex-col gap-3" role="status">
-            <p className="m-0 max-w-[62ch] text-[14px] leading-[1.65] text-body">
-              {orgName} is verified. Before you can use it, accept responsibility for acting on its behalf.
-            </p>
-            <div>
-              <Link href="/onboarding/responsibility">
-                <GradientButton>Accept responsibility</GradientButton>
-              </Link>
-            </div>
-          </div>
-        </Panel>
-      </AppShell>
-    );
-  }
-
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -198,7 +175,9 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
                  the owner most likely came for. Inviting is offered below,
                  and appointing is available but not prompted. */
               <NextCredentialAction orgName={shortOrgName(orgName)} />
-            ) : isOwner ? (
+            ) : isOwner && org?.kind !== "sole_proprietorship" ? (
+              /* UXD-24: never for a sole proprietorship — a proprietor
+                 delegating to themselves is not a task. */
               <Link href="/people-who-can-act/give">
                 <GradientButton>
                   <Icon name="userCheck" size={16} strokeWidth={2} />

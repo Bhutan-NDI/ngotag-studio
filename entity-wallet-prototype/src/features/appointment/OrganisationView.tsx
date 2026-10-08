@@ -83,6 +83,8 @@ export function OrganisationView() {
                   <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
                   It can&rsquo;t issue credentials to others or verify anyone else&rsquo;s.
                 </p>
+                {/* UXD-24: not for a sole proprietorship. */}
+                {org?.kind === "sole_proprietorship" ? null : (
                 <div className="mt-2 flex flex-wrap items-center gap-2.5">
                   <Link href="/people-who-can-act/give">
                     <HairlineButton>Give someone authority to act</HairlineButton>
@@ -91,6 +93,7 @@ export function OrganisationView() {
                     See who can act
                   </Link>
                 </div>
+                )}
               </div>
             </Panel>
           </>

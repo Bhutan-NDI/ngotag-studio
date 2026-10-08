@@ -96,6 +96,12 @@ export type OrgCapability = "issuer" | "verifier" | "holder";
 
 export interface Organization {
   id: string;
+  /**
+   * The entity type its authority verified it as (FLOW-ORG-01). Decides,
+   * among other things, whether giving others authority is offered at all
+   * (UXD-24). Absent on organisations that predate verification.
+   */
+  kind?: OrgKind;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -492,6 +498,17 @@ export interface ControllershipRelation {
  * one, in `features/appointment/presets.ts`.
  */
 export type PresetId = "receive" | "share" | "approve" | "everything";
+
+/**
+ * Whether a relation still stands — in force, or offered and not yet
+ * lapsed. A pending appointment past its 14 days is over (DEL-01/E4) even
+ * before anything records it as EXPIRED, so everything that asks "does this
+ * person already have authority?" asks this, not the raw state. Otherwise an
+ * expired offer would block appointing the same person again.
+ */
+export function standsNow(r: Pick<ControllershipRelation, "state" | "expiresAt">, today: string): boolean {
+  return r.state === "ACTIVE" || (r.state === "PENDING_ACCEPTANCE" && !(r.expiresAt && r.expiresAt < today));
+}
 
 /**
  * The document behind an appointment, if the representative cites one. The

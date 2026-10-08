@@ -53,6 +53,7 @@ import {
   type OrgKind,
   type AppointmentDocument,
   type PresetId,
+  standsNow,
   REGISTER_RECORDS,
   type Verification,
   type VerificationDecision,
@@ -1290,11 +1291,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* DEL-01/P1: the representative, and nobody else, appoints. */
         if (!root || root.personId !== s0.harness.persona) return { ok: false, error: "E1" };
         /* DEL-01/E3: one appointment per person per organisation at a time. */
-        if (
-          s0.relations.some(
-            (r) => inOrg(orgId)(r) && r.personId === personId && (r.state === "ACTIVE" || r.state === "PENDING_ACCEPTANCE"),
-          )
-        )
+        if (s0.relations.some((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today())))
           return { ok: false, error: "E3" };
         if (preset === "share" && shareWith.length === 0) return { ok: false, error: "E12" };
         const id = rid("rel");
@@ -2309,8 +2306,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           setState((s) => ({
             ...s,
             organizations: s.organizations.map((o) =>
-              o.id === orgId && !o.capabilities.includes("holder")
-                ? { ...o, capabilities: [...o.capabilities, "holder" as const] }
+              o.id === orgId
+                ? { ...o, kind: ob.kind, capabilities: o.capabilities.includes("holder") ? o.capabilities : [...o.capabilities, "holder" as const] }
                 : o,
             ),
             heldCredentials: seedCred
@@ -2338,6 +2335,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           const first = firstRunState(s);
           return {
           ...first,
+          organizations: first.organizations.map((o) => (o.id === PELDEN ? { ...o, kind: s.orgOnboarding?.kind ?? "company" } : o)),
           /* The representative's authority is created waiting for them to
              accept responsibility on SCR-DEL-01 (FLOW-DEL-02 step 1). The
              first-run state, which other walks start from, has it already

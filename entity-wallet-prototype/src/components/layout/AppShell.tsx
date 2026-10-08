@@ -2,6 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 
+import { ResponsibilityGate } from "@/features/appointment/ResponsibilityGate";
+
 import { Sidebar } from "./Sidebar";
 import { SiteFooter } from "./SiteFooter";
 import { TopBar } from "./TopBar";
@@ -50,7 +52,7 @@ export function AppShell({ children }: AppShellProps) {
             about 650px; layouts keyed to the viewport still split it in two
             and squeezed a form into a 180px column. */}
         <main className="@container/page mx-auto w-full max-w-[1600px] flex-1 px-4 py-6 min-[641px]:px-6 min-[901px]:px-8 min-[901px]:py-8">
-          {children}
+          <ResponsibilityGate>{children}</ResponsibilityGate>
         </main>
         <SiteFooter />
       </div>

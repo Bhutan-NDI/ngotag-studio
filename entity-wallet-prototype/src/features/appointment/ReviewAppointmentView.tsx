@@ -41,7 +41,7 @@ import { FullTerms, Responsibilities } from "./Responsibilities";
  * before they press it that their NDI wallet is needed. Everyone scans,
  * whoever they are: the approval is the acceptance, not only the proof.
  */
-type Face = "default" | "expired" | "declined" | "registration_lost" | "no_longer_valid" | "offline" | "not_yours";
+type Face = "default" | "already_accepted" | "not_found" | "expired" | "declined" | "registration_lost" | "no_longer_valid" | "offline" | "not_yours";
 
 export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   const router = useRouter();
@@ -63,13 +63,18 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
 
   /* E8 and E9 are both "the basis was lost", and the screen says which in
      plain words: the organisation's registration, or the representative. */
+  /* An appointment already accepted is not offered again — reached by Back
+     after accepting, it would otherwise reopen as pending. An address that
+     matches nothing says so, without claiming anything about anyone. */
   const natural: Face = !r
-    ? "no_longer_valid"
-    : declined || (r.state === "TERMINATED" && r.endedReason === "declined")
+    ? "not_found"
+    : r.state === "ACTIVE" && r.personId === harness.persona
+      ? "already_accepted"
+      : declined || (r.state === "TERMINATED" && r.endedReason === "declined")
       ? "declined"
       : r.state === "EXPIRED" || (r.state === "PENDING_ACCEPTANCE" && r.expiresAt && r.expiresAt < now)
         ? "expired"
-        : r.state !== "PENDING_ACCEPTANCE" && r.state !== "ACTIVE"
+        : r.state !== "PENDING_ACCEPTANCE"
           ? org && !org.capabilities.includes("holder")
             ? "registration_lost"
             : "no_longer_valid"
@@ -105,6 +110,14 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
     </AppShell>
   );
 
+  if (face === "already_accepted")
+    return outcome(
+      <>You&rsquo;ve accepted this. You can act for {orgName} within what it covers.</>,
+      <div>
+        <GradientButton onClick={() => router.push("/organisation")}>See what you can do</GradientButton>
+      </div>,
+    );
+  if (face === "not_found") return outcome(<>We can&rsquo;t find this appointment. Ask the person who appointed you.</>);
   if (face === "expired") return outcome(<>This appointment has expired. Ask {repName} to make it again.</>);
   if (face === "declined") return outcome(<>You&rsquo;ve declined. Nothing has changed.</>);
   if (face === "registration_lost")

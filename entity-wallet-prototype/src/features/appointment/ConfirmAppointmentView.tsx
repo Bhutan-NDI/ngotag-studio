@@ -39,7 +39,7 @@ import { SKIP_AFTER_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
  * neutral and names the representative to contact. Explaining the mismatch
  * would tell whoever is holding the phone what to change.
  */
-type Stage = "idle" | "wallet" | "declined" | "could_not_confirm" | "no_wallet" | "expired";
+type Stage = "idle" | "wallet" | "declined" | "could_not_confirm" | "no_wallet" | "expired" | "not_waiting";
 
 export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
   const router = useRouter();
@@ -60,7 +60,11 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
   const answer = (as: string) => {
     const res = acceptAppointment(relationId, as);
     if (res.ok) router.push("/organisation");
-    else setStage(res.error === "E7" ? "could_not_confirm" : res.error === "E4" ? "expired" : "could_not_confirm");
+    /* Each refusal keeps its own message. E7's neutral wording is for an
+       identity that didn't match and nothing else; an appointment no longer
+       waiting (E8 — already accepted, declined or withdrawn) must not tell a
+       valid appointee their identity failed. */
+    else setStage(res.error === "E7" ? "could_not_confirm" : res.error === "E4" ? "expired" : "not_waiting");
   };
 
   const start = (outcome: "proved" | "declined" | "someone_else") => {
@@ -120,6 +124,18 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
               </HairlineButton>,
             )
           : null}
+        {shown === "not_waiting" ? (
+          <Panel>
+            <div className="relative z-[4] flex flex-col gap-3" role="status">
+              <p className="m-0 text-[14px] leading-[1.6] text-body">
+                This appointment isn&rsquo;t waiting for an answer any more, so nothing has changed.
+              </p>
+              <div>
+                <HairlineButton onClick={() => router.push(`/appointments/${relationId}`)}>See the appointment</HairlineButton>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
         {shown === "expired"
           ? outcome(
               "This appointment has expired",
@@ -155,7 +171,7 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
             )
           : null}
 
-        {shown !== "no_wallet" && shown !== "could_not_confirm" && shown !== "expired" ? (
+        {shown !== "no_wallet" && shown !== "could_not_confirm" && shown !== "expired" && shown !== "not_waiting" ? (
           <Panel>
             <WalletHandoff
               value={`ndi-appointment-${relationId}`}

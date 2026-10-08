@@ -16,7 +16,7 @@ import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { inOrg, roleIn, shortOrgName, type AppointmentDocument, type PresetId } from "@/lib/demoData";
+import { inOrg, roleIn, shortOrgName, standsNow, type AppointmentDocument, type PresetId } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
@@ -85,10 +85,17 @@ export function GiveAuthorityView() {
   const orgName = org?.name ?? "the organisation";
   const short = shortOrgName(orgName);
   const root = relations.find((r) => inOrg(activeOrgId)(r) && r.isRootAuthority && r.state === "ACTIVE");
-  const representative = people.find((p) => p.id === root?.personId);
+  /* Named from the representative's relation whatever its state, so the
+     refusal never falls back to a name from the story. */
+  const representative = people.find(
+    (p) => p.id === relations.find((r) => inOrg(activeOrgId)(r) && r.isRootAuthority)?.personId,
+  );
   const members = people.filter((p) => p.id !== root?.personId && p.hasAccount !== false && roleIn(org, p));
+  const today = new Date().toISOString().slice(0, 10);
+  /* An offer past its 14 days no longer counts (DEL-01/E4), so it doesn't
+     block appointing the same person again. The store applies the same rule. */
   const holds = (id: string) =>
-    relations.some((r) => inOrg(activeOrgId)(r) && r.personId === id && (r.state === "ACTIVE" || r.state === "PENDING_ACCEPTANCE"));
+    relations.some((r) => inOrg(activeOrgId)(r) && r.personId === id && !r.isRootAuthority && standsNow(r, today));
   /* Whether anyone but the representative can approve. If nobody can, a
      share that needs approval falls to the representative (DEL-01/A1). */
   const otherApprover = relations.some(
@@ -105,6 +112,13 @@ export function GiveAuthorityView() {
   const [needsApproval, setNeedsApproval] = useState(true);
   const [until, setUntil] = useState("");
   const [attested, setAttested] = useState(false);
+  /* The statement confirms authority to appoint *this person on these
+     terms* (EW-FLOW3-SD §4.4). Change the person or the terms and it no
+     longer says what was ticked, so it is cleared and must be given again. */
+  const changeTerms = <T,>(set: (v: T) => void) => (v: T) => {
+    set(v);
+    setAttested(false);
+  };
   const [docOpen, setDocOpen] = useState(false);
   const [doc, setDoc] = useState<AppointmentDocument>({ type: "board_resolution", date: "", reference: "", fileName: null });
   const [busy, setBusy] = useState(false);
@@ -117,7 +131,11 @@ export function GiveAuthorityView() {
   const natural: Face = !isRepresentative ? "not_representative" : members.length === 0 ? "no_one_to_choose" : "default";
   const face: Face = forced === "live" ? natural : (forced as Face);
   const showE12 = face === "nothing_to_share_with" || (preset === "share" && shareWith.length === 0);
-  const showA1 = face === "approval_falls_to_you" || (preset === "share" && needsApproval && !otherApprover);
+  /* Both Share and Everything let the appointee share, and both default to
+     a share needing approval (§4.2) — so both show the setting, and both say
+     when the approving would fall to the representative (A1). */
+  const sharing = preset === "share" || preset === "everything";
+  const showA1 = face === "approval_falls_to_you" || (sharing && needsApproval && !otherApprover);
   const effectivePreset: PresetId = face === "nothing_to_share_with" || face === "approval_falls_to_you" ? "share" : preset;
 
   if (!hydrated) {
@@ -218,7 +236,7 @@ export function GiveAuthorityView() {
                     name="appointee"
                     checked={on}
                     disabled={taken}
-                    onChange={() => setPersonId(m.id)}
+                    onChange={() => changeTerms(setPersonId)(m.id)}
                     className="mt-0.5 h-4 w-4 flex-none accent-[var(--ndi-mint)]"
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -254,7 +272,7 @@ export function GiveAuthorityView() {
                     type="radio"
                     name="preset"
                     checked={on}
-                    onChange={() => setPreset(p.id)}
+                    onChange={() => changeTerms(setPreset)(p.id)}
                     className="mt-0.5 h-4 w-4 flex-none accent-[var(--ndi-mint)]"
                   />
                   <span className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -285,7 +303,7 @@ export function GiveAuthorityView() {
                   <Checkbox
                     key={t}
                     checked={shareWith.includes(t)}
-                    onChange={(c) => setShareWith((w) => (c ? [...w, t] : w.filter((x) => x !== t)))}
+                    onChange={(c) => changeTerms(setShareWith)(c ? [...shareWith, t] : shareWith.filter((x) => x !== t))}
                     label={t}
                   />
                 ))}
@@ -295,23 +313,28 @@ export function GiveAuthorityView() {
                   Choose at least one organisation {chosenName} may share credentials with.
                 </p>
               ) : null}
+            </div>
+          ) : null}
+
+          {effectivePreset === "share" || effectivePreset === "everything" ? (
+            <div className="relative z-[4] mt-4 border-t border-subtle pt-4">
               <Checkbox
                 checked={needsApproval}
-                onChange={setNeedsApproval}
+                onChange={changeTerms(setNeedsApproval)}
                 label="Each share needs someone to approve it"
-                description="Recommended. Approving is done by someone who can approve others' actions."
+                description="Recommended, and on unless you turn it off. Approving is done by someone who can approve others' actions."
               />
             </div>
           ) : null}
 
-          {effectivePreset === "share" && showA1 ? (
+          {(effectivePreset === "share" || effectivePreset === "everything") && showA1 ? (
             <div role="status" className="relative z-[4] mt-3 flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
               <p className="m-0 text-[13px] leading-[1.6] text-body">
                 You&rsquo;ll be asked to approve each time {chosenName} shares a credential — nobody else
                 at {short} can approve yet.
               </p>
               <div>
-                <button type="button" onClick={() => setNeedsApproval(false)} className="ndi-plainlink text-[12.5px] font-medium text-accent">
+                <button type="button" onClick={() => changeTerms(setNeedsApproval)(false)} className="ndi-plainlink text-[12.5px] font-medium text-accent">
                   Allow sharing without approval
                 </button>
               </div>
@@ -324,7 +347,7 @@ export function GiveAuthorityView() {
           <div className="relative z-[4] flex flex-col gap-5">
             <label className={`${FIELD_BLOCK_CLASS} max-w-[260px]`}>
               <span className={LABEL_CLASS}>Until (optional)</span>
-              <input type="date" className={`${FIELD_CLASS} h-11`} value={until} onChange={(e) => setUntil(e.target.value)} />
+              <input type="date" className={`${FIELD_CLASS} h-11`} value={until} onChange={(e) => changeTerms(setUntil)(e.target.value)} />
               <span className="text-[12.5px] text-faint">{until ? "" : "No end date. You can end it at any time."}</span>
             </label>
 
