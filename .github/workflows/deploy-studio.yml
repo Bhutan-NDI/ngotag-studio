@@ -286,17 +286,30 @@ jobs:
           aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" \
             --task-definition "$task_definition_arn" --force-new-deployment >/dev/null
           aws ecs wait services-stable --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE"
-          aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
-            --query 'services[0]' --output json > "$service_json"
-          jq -e --arg task_definition "$task_definition_arn" '
-            .taskDefinition == $task_definition and
-            .runningCount == .desiredCount and
-            .pendingCount == 0 and
-            ([.deployments[] | select(.taskDefinition == $task_definition and .rolloutState == "COMPLETED")] | length == 1)
-          ' "$service_json" >/dev/null || {
-            echo "ECS did not stabilize on the newly registered task definition" >&2
-            exit 1
-          }
+          # services-stable can return before ECS marks the rollout COMPLETED, so poll
+          # until it does, and stop early if the rollout failed or was rolled back.
+          attempt=1
+          while :; do
+            aws ecs describe-services --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+              --query 'services[0]' --output json > "$service_json"
+            if jq -e --arg task_definition "$task_definition_arn" '
+              .taskDefinition == $task_definition and
+              .runningCount == .desiredCount and
+              .pendingCount == 0 and
+              ([.deployments[] | select(.taskDefinition == $task_definition and .rolloutState == "COMPLETED")] | length == 1)
+            ' "$service_json" >/dev/null; then
+              break
+            fi
+            if [ "$attempt" -ge 40 ] || jq -e --arg task_definition "$task_definition_arn" '
+              .taskDefinition != $task_definition or
+              ([.deployments[] | select(.taskDefinition == $task_definition and .rolloutState == "FAILED")] | length > 0)
+            ' "$service_json" >/dev/null; then
+              echo "ECS did not stabilize on the newly registered task definition" >&2
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            sleep 15
+          done
           echo "task_definition_arn=$task_definition_arn" >> "$GITHUB_OUTPUT"
           echo "task_definition_revision=${task_definition_arn##*:}" >> "$GITHUB_OUTPUT"
 
