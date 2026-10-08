@@ -201,7 +201,7 @@ function PlatformInvitationView({ id }: { id: string }) {
         router.push("/admin/organisations");
       } else {
         startOrgOnboarding("company", id);
-        router.push("/onboarding/prove");
+        router.push("/onboarding/details");
       }
     }, ROUND_TRIP_MS);
   };

@@ -77,7 +77,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "Root admin onboarding", shows: "NDI's root administrator signs in to a ready organisation" },
   { title: "Platform admin onboarding", shows: "Root invites an admin by email; they set up from the link" },
   { title: "A new company signs up", shows: "A person signs up — nothing about any company yet" },
-  { title: "Register the organisation", shows: "A government register, not NDI, confirms the company" },
+  { title: "Verify the organisation", shows: "The authority that registered it, not NDI, confirms the company" },
   { title: "Pelden brings on its people", shows: "The owner invites a colleague; they join from the link" },
   { title: "Appoint a controller", shows: "A member is given scoped authority, proves who they are, and accepts" },
   { title: "Invite and appoint a delegate", shows: "A clearing agent is invited, then given a role in their own wallet" },
@@ -90,7 +90,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 0,
     title: "Onboarding onto the Entity Wallet",
     happening:
-      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root administrator signs in, root invites a platform admin, a new company — Pelden Trading — signs up and gets its Entity Wallet, and Pelden's owner invites a colleague and appoints them controller, then invites a clearing agent and appoints them delegate. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
+      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root administrator signs in, root invites a platform admin, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden's owner invites a colleague and appoints them controller, then invites a clearing agent and appoints them delegate. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
     doThis:
       "Press **Next**. The guide takes you to each screen and tells you what to press; you do the clicking. **Minimise** tucks this card away when it's in the way.",
   },
@@ -188,40 +188,48 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/welcome",
   },
 
-  /* ---- 4 · Register the organisation ---- */
+  /* ---- 4 · Verify the organisation ---- */
   {
     chapter: 4,
     title: "What kind of organisation",
     happening:
-      "Each kind names the government register that will confirm it. No registration number is asked for — nobody can claim a company just by knowing its number.",
-    doThis: "Leave **Private or public limited company** selected and press **Continue to prove who you are**.",
+      "Each type names the authority that registered it, which is who checks it. Civil society organisations and cooperatives are shown but can't be verified yet — their authorities aren't connected — and say so.",
+    doThis: "Leave **Registered company** selected and press **Continue**.",
     route: "/onboarding",
     match: "^/onboarding$",
   },
   {
     chapter: 4,
-    title: "Prove who you are",
+    title: "Its registration number",
     happening:
-      "Dorji proves who they are with their own Bhutan NDI Wallet, on the same scan card people know from other services. Only Dorji's identity is shared — nothing about the company.",
-    doThis: "Press **Simulate the scan** (the code doesn't really scan). Once it's confirmed, the next step opens by itself.",
+      "The one thing Dorji types. The format is shown before the field, and the button names the authority that will be asked — the same name Dorji's wallet will show.",
+    doThis:
+      "Type **CRA-2019-04477** (or press it in the dashed prototype panel), then press **Verify with Corporate Regulatory Authority**.",
+    route: "/onboarding/details",
+  },
+  {
+    chapter: 4,
+    title: "The authority asks who Dorji is",
+    happening:
+      "The request comes from the Corporate Regulatory Authority, not from NDI. Only Dorji's identity is shared — nothing about the company, and NDI keeps nothing from it.",
+    doThis: "Press **Simulate the scan** (the code doesn't really scan). Once it's answered, the next step opens by itself.",
     route: "/onboarding/prove",
   },
   {
     chapter: 4,
-    title: "The register answers",
+    title: "The authority decides",
     happening:
-      "NDI can't vouch for a company by itself, so it asks the Corporate Regulatory Authority which companies list Dorji as a representative. This wait is deliberately longer than the others.",
-    doThis:
-      "Wait for the list. Druk Valley Hardware is greyed out — another director already added it. Press **Add Pelden Trading Pvt. Ltd.**",
-    say: "This is the moment the platform admits it can't decide who a company is. A register does.",
-    route: "/onboarding/choose",
+      "The CRA checks its own records — NDI never sees them — and decides. Then Pelden's wallet is set up and its registration added. The page could be closed: Dorji's account would show where it's up to.",
+    doThis: "Wait — the next screen opens by itself when it's done.",
+    say: "This is the moment the platform admits it can't decide who a company is. The authority does.",
+    route: "/onboarding/verifying",
   },
   {
     chapter: 4,
-    title: "The company receives its registration",
+    title: "Pelden is verified",
     happening:
-      "Pelden's registration arrives as a credential in the company's own wallet. Everything later — every authority, every check — traces back to it.",
-    doThis: "Press **Accept the registration**, then **Back to your organisations**.",
+      "Pelden holds its registration — added automatically, nobody accepted anything. The next step offered is its tax identity, and the screen says plainly what Pelden can't do: issue credentials or verify anyone.",
+    doThis: "Press **Back to your organisations**.",
     route: "/onboarding/foundational",
   },
   {
@@ -235,7 +243,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 4,
     title: "Pelden's first day",
     happening:
-      "A brand-new organisation: it holds its registration and Dorji's authority to act for it, and nothing else. No colleagues, no tasks, no history — so the first thing it suggests is inviting people.",
+      "A brand-new organisation: it holds its registration and Dorji's authority to act for it, and nothing else. No tasks, no history — so what it suggests first is its tax identity. Inviting colleagues is there too, further down.",
     doThis: "Have a look around, then press **Next**.",
     say: "Nothing has happened here yet, and the console doesn't pretend otherwise.",
     route: "/dashboard",
