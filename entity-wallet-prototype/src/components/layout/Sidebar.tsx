@@ -95,14 +95,14 @@ const PRIMARY: NavItem[] = [
       { label: "Organisations", href: "/admin/organisations", icon: "building" },
       { label: "Invitations", href: "/admin/invitations", icon: "mail" },
       { label: "Approvals", href: "/admin/approvals", icon: "userCheck" },
-      { label: "Manual review", href: "/admin/reviews", icon: "fileText" },
     ],
   },
   /* Root's alone: making administrators. */
   { label: "Platform admins", icon: "users", href: "/admin/team", platform: "root" },
 
-  /* For an organisation already on NDI without a wallet: the way to ask. */
-  { label: "Entity Wallet", icon: "wallet", href: "/entity-wallet", personas: ORG_OWNERS, needs: "no-holder" },
+  /* For an organisation already on NDI that its authority has not yet
+     confirmed: the way to verify it (FLOW-ORG-01 Kind E). */
+  { label: "Verify organisation", icon: "shieldCheck", href: "/entity-wallet", personas: ORG_OWNERS, needs: "no-holder" },
 
   /* ---- Entity wallet ---------------------------------------------------
      The entity-wallet groups sit directly under Dashboard, above the

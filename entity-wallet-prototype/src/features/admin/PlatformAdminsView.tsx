@@ -82,9 +82,9 @@ export function PlatformAdminsView() {
       <div className="mx-auto flex w-full max-w-[900px] flex-col gap-5">
         <PageHeader crumbs={[{ label: "NDI administration" }, { label: "Platform admins" }]} title="Platform admins" />
         <p className="max-w-[68ch] text-[13.5px] leading-[1.65] text-muted">
-          The people who run the platform day to day: they review organisations&rsquo; requests for
-          access and decide them. Nobody can bring an organisation onto the Entity Wallet until at
-          least one of them has accepted.
+          The people who run the platform day to day: they connect the authorities that verify
+          organisations, and decide organisations&rsquo; requests to issue or verify. Until one of
+          them has accepted, no organisation can be verified.
         </p>
 
         {isRoot ? (
