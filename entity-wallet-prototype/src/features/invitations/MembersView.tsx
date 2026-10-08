@@ -11,6 +11,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { roleIn, type OrgInvitation } from "@/lib/demoData";
+import { presetOf } from "@/features/appointment/presets";
 import { useDemo } from "@/lib/demoStore";
 
 import { PendingInvitations } from "./PendingInvitations";
@@ -84,11 +85,11 @@ export function MembersView() {
      force. */
   const authorityOf = (personId: string) => {
     const r = relations.find((rel) => rel.personId === personId && rel.state === "ACTIVE");
-    if (r) return r.isRootAuthority ? "Root authority" : "Controller";
+    if (r) return r.isRootAuthority ? "Representative" : `Can act · ${presetOf(r.preset)?.label ?? "set individually"}`;
     const held = delegatedAuthorities.filter(
       (a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "accepted",
     );
-    if (held.length) return `Delegate · ${held.map((a) => a.title).join(", ")}`;
+    if (held.length) return `Role in their wallet · ${held.map((a) => a.title).join(", ")}`;
     const waiting =
       relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE") ||
       delegatedAuthorities.some((a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "sent");
@@ -111,7 +112,7 @@ export function MembersView() {
 
         <p className="max-w-[70ch] text-[13.5px] leading-[1.65] text-muted">
           Everyone who can sign in and see this organisation. Being a member does not let anyone
-          act for it — that is a separate authority, granted and accepted under Controllership.
+          act for it — that is given separately, and accepted by the person, under People who can act.
         </p>
 
         <Panel padded={false}>
@@ -143,7 +144,7 @@ export function MembersView() {
                     <td>
                       {authority ? (
                         <Link
-                          href={authority.startsWith("Delegate") ? "/delegated-authority" : "/controllership/relations"}
+                          href={authority.startsWith("Role in") ? "/delegated-authority" : "/people-who-can-act"}
                           className="ndi-plainlink text-body"
                         >
                           {authority}

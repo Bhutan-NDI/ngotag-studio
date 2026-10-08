@@ -467,7 +467,64 @@ export interface ControllershipRelation {
   activatedAt: string | null;
   suspendedAt?: string | null;
   endedReason?: string | null;
+  /*
+   * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
+   * older relations, which were authored operation by operation before the
+   * four presets were agreed (EW-FLOW3-SD/D8).
+   */
+  /** Which of the four presets it was made from. */
+  preset?: PresetId;
+  /** For *Share*: whether each share needs someone to approve it. */
+  shareNeedsApproval?: boolean;
+  /** The representative's required statement that they may make it (D5). */
+  attestation?: { attestedBy: PersonId; attestedAt: string };
+  /** The optional authorising document — cited, never uploaded (D5). */
+  document?: AppointmentDocument | null;
+  /** A pending appointment lapses after 14 days (DEL-01/E4). */
+  expiresAt?: string | null;
+  /** The appointee's name as their citizen credential gave it, at acceptance (D6). */
+  verifiedName?: string | null;
 }
+
+/**
+ * The four things a representative can let someone do (EW-FLOW3-SD §4.2,
+ * UXD-22). Raw scope is never authored on a screen; each preset resolves to
+ * one, in `features/appointment/presets.ts`.
+ */
+export type PresetId = "receive" | "share" | "approve" | "everything";
+
+/**
+ * The document behind an appointment, if the representative cites one. The
+ * type, date and where the original is kept — and the file's name, standing
+ * in for the hash the browser would compute. The file never leaves the
+ * device, and NDI never reads it (EW-FLOW3-SD/D5).
+ */
+export interface AppointmentDocument {
+  type: "board_resolution" | "power_of_attorney" | "other";
+  date: string;
+  reference: string;
+  fileName: string | null;
+}
+
+/**
+ * The representative's acceptance of responsibility for an organisation
+ * (FLOW-DEL-02). Written when the authority confirms them, and accepted on
+ * SCR-DEL-01. An organisation with no entry here is one whose
+ * representative accepted long ago — the story's lived-in organisations.
+ */
+export interface Responsibility {
+  orgId: string;
+  state: "PENDING" | "ACCEPTED" | "DECLINED";
+  at: string;
+}
+
+/**
+ * The NDI-operated organisation that sends the appointee's identity request
+ * (EW-FLOW3-SD/D15). Its display name is set when it is seeded and is not
+ * decided yet; this is the prototype's stand-in, and SCR-DEL-04 names it
+ * exactly as the wallet would.
+ */
+export const VERIFICATION_ORG_NAME = "Bhutan NDI Verification";
 
 /** An attribute as it actually arrived, value included. */
 export interface CredentialAttribute {
@@ -1115,6 +1172,8 @@ export interface DemoState {
   orgOnboarding: OrgOnboarding | null;
   /** SCR-ORG-06 — people waiting for an authority to connect. Not applications. */
   orgInterests: OrgInterest[];
+  /** FLOW-DEL-02 — whether each new organisation's representative has accepted. */
+  responsibilities: Responsibility[];
   accessRequests: AccessRequest[];
   /**
    * True from the moment onboarding completes until the story jumps past
@@ -2539,6 +2598,7 @@ export const SEED: DemoState = {
   ],
 
   orgInterests: [],
+  responsibilities: [],
 
   orgInvitations: [
     {
@@ -2844,6 +2904,7 @@ export function dayZeroState(seed: DemoState): DemoState {
     orgInvitations: [],
     orgOnboarding: null,
     orgInterests: [],
+    responsibilities: [],
     /* Nothing waiting. It used to hold one request so the new admin's queue
        was not only the one the story was about to send — but a request
        sitting in a queue on a platform nobody administers yet read as

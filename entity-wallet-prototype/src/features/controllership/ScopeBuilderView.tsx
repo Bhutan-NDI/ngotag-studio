@@ -128,10 +128,10 @@ export function ScopeBuilderView({ relationId }: { relationId: string }) {
         <div className="flex flex-col gap-5">
           <PageHeader
             crumbs={[
-              { label: "Controllership", href: "/controllership/relations" },
+              { label: "People who can act", href: "/people-who-can-act" },
               { label: "Not found" },
             ]}
-            title="Relation not found"
+            title="Appointment not found"
           />
           <Panel>
             <p className="relative z-[4] text-[13.5px] text-muted">
@@ -245,7 +245,7 @@ export function ScopeBuilderView({ relationId }: { relationId: string }) {
       <div className="flex flex-col gap-5">
         <PageHeader
           crumbs={[
-            { label: "Controllership", href: "/controllership/relations" },
+            { label: "People who can act", href: "/people-who-can-act" },
             { label: person.name },
             { label: "Scope" },
           ]}

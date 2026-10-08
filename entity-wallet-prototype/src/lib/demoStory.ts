@@ -125,7 +125,7 @@ export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "admin", code: "FLOW-ONB-02", title: "Platform admin onboarding" },
   { id: "company", code: "FLOW-ONB-01 · Flow 2", title: "New company onboarding" },
   { id: "members", code: "FLOW-ONB-02 · Kind M", title: "Member onboarding" },
-  { id: "appoint", code: "Flow 3 · Story B5", title: "Controller and delegate appointment" },
+  { id: "appoint", code: "Flow 3 · Flow 8 ahead of spec", title: "Giving authority to act" },
 ];
 
 export interface FlowEntry {
@@ -162,6 +162,6 @@ export const FLOW_ENTRIES: FlowEntry[] = [
     start: "platformReady",
   },
   { group: "members", label: "Invite a member", persona: "dorji", route: "/members", start: "firstDay" },
-  { group: "appoint", label: "Appoint a controller", persona: "dorji", route: "/controllership/relations/new", start: "teamReady" },
-  { group: "appoint", label: "Appoint a delegate", persona: "dorji", route: "/delegated-authority/new", start: "teamReady" },
+  { group: "appoint", label: "Give someone authority", persona: "dorji", route: "/people-who-can-act/give", start: "teamReady" },
+  { group: "appoint", label: "A role in a wallet (Flow 8, ahead of spec)", persona: "dorji", route: "/delegated-authority/new", start: "teamReady" },
 ];

@@ -314,9 +314,19 @@ export function IssueAuthorityView() {
           title="Issue authority to a person"
         />
 
+        {/* Said on the screen, not only in the guide: giving someone
+            authority to act (Flow 3) issues nothing into anyone's wallet
+            (EW-FLOW3-SD/D4). This is catalogue Flow 8, which has no
+            specification yet, built from Story B5 so the room can see where
+            the product goes — and must not mistake it for Flow 3. */}
+        <p className="m-0 flex items-center gap-2 self-start rounded-full border border-dashed px-3 py-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted" style={{ borderColor: "var(--border-strong)" }}>
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ndi-warning)" }} />
+          Flow 8 · ahead of spec
+        </p>
+
         <p className="max-w-[68ch] text-[13.5px] leading-[1.65] text-muted">
           This puts a credential in someone&rsquo;s own wallet. They use it at
-          counterparties, who check it themselves — the entity is not asked
+          counterparties, who check it themselves — the organisation is not asked
           each time. That is why the limits below travel with the credential
           and why they matter more than they look.
         </p>
