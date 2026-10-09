@@ -238,15 +238,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Pelden is verified",
     happening:
       "Pelden holds its registration — added automatically, nobody accepted anything. The next step offered is its tax identity, and the screen says plainly what Pelden can't do: issue credentials or verify anyone.",
-    doThis: "Press **Back to your organisations**.",
+    doThis: "Press **Go to Pelden Trading**.",
     route: "/onboarding/foundational",
-  },
-  {
-    chapter: 4,
-    title: "Pelden is on the account",
-    happening: "Dorji's account now lists Pelden Trading, with Dorji as its owner.",
-    doThis: "Press **Open** next to Pelden Trading.",
-    route: "/welcome",
   },
   {
     chapter: 4,
