@@ -241,18 +241,14 @@ export function ProveIdentityView() {
                 </div>
               </div>
               <p role="status" className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[30px] text-[12.5px] text-faint">
+                {/* No button: once the proof is in there is nothing for the
+                    person to decide, so the screen confirms it and moves on
+                    by itself. A "Continue" here only asked for a click that
+                    changed nothing. */}
                 <span className="inline-flex items-center gap-2">
                   <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border-grid)] border-t-[var(--accent)]" />
                   {forced ? "Moves on to the next step by itself" : "Taking you to the next step…"}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => router.push("/onboarding/verifying")}
-                  className="ndi-plainlink inline-flex items-center gap-1 font-medium text-accent"
-                >
-                  Continue now
-                  <Icon name="arrowRight" size={13} strokeWidth={2} />
-                </button>
               </p>
             </div>
           </Panel>
