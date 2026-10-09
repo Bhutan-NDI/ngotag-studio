@@ -27,6 +27,7 @@ import DataTable from '@/components/DataTable'
 import DidPanel from './DidPanel'
 import { ITableData } from '@/components/DataTable/interface'
 import Loader from '@/components/Loader'
+import { MigrationEntry } from '@/features/walletMigration/components/MigrationEntry'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { createConnection } from '@/app/api/organization'
 import { dateConversion } from '@/utils/DateConversion'
@@ -243,6 +244,13 @@ const OrganizationDetails = ({
         <Button className="mr-6 w-28" onClick={() => setIsDrawerOpen(true)}>
           Did List
         </Button>
+      </div>
+
+      <div className="mb-4">
+        <MigrationEntry
+          orgId={orgId}
+          agentType={agentData?.org_agent_type?.agent}
+        />
       </div>
 
       <DataTable
