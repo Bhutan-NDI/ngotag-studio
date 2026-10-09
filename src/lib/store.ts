@@ -13,6 +13,7 @@ import storage from 'redux-persist/lib/storage'
 import storageReducer from './storageKeys'
 import userSlice from './userSlice'
 import verificationSlice from './verificationSlice'
+import walletMigrationSlice from './walletMigrationSlice'
 import walletSpinupSlice from './walletSpinupSlice'
 
 const rootReducer = combineReducers({
@@ -28,6 +29,8 @@ const rootReducer = combineReducers({
   schema: schemaSlice,
   schemaStorage: schemaStorageSlice,
   ecosystem: ecosystemSlice,
+  // Not in the persist whitelist: migration status always comes from the server.
+  walletMigration: walletMigrationSlice,
 })
 
 const persistConfig = {

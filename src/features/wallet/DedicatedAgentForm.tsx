@@ -24,9 +24,9 @@ import { useOrgWalletName } from './useOrgWalletName'
 
 // Mirrors AgentConfigureDto (bhutanndi-platform apps/api-gateway/src/agent-service/dto/agent-configure.dto.ts)
 const WALLET_NAME_REGEX = /^[a-zA-Z0-9]*$/
-const HOST_PORT_REGEX =
+export const HOST_PORT_REGEX =
   /^(http:\/\/|https:\/\/)?(?:(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)):(?:\d{1,5})(\/[^\s]*)?$/
-const DOMAIN_REGEX =
+export const DOMAIN_REGEX =
   /^(http:\/\/|https:\/\/)?(?:localhost|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})(:\d{1,5})?(\/[^\s]*)?$/
 
 interface DedicatedAgentFormProps {

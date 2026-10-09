@@ -34,6 +34,7 @@ const preventRedirectOnPaths = [
   '/schemas',
   '/invitations',
   '/delete-organization',
+  '/wallet-migration',
   '/agent-config',
   '/credentials',
   '/verification',
