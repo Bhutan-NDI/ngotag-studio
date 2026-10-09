@@ -389,7 +389,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "A delegate's authority is a credential in their own NDI Wallet. Its limits — what for, how much, with whom, until when — travel with it and are checked by every counterparty; \"What a counterparty reads\" shows them exactly as a verifier will.",
     doThis:
-      "Leave **Role**, choose **Pema Choden**, name it **Customs clearing agent**, tick **Submit customs declarations**, type **500000** as the cap, choose **Bhutan National Single Window**, and press **Issue to Pema**. Then press **Accept it as Pema** (dashed — it stands in for Pema's phone).",
+      "Leave **Role**, choose **Pema Choden**, name it **Customs clearing agent**, tick **Submit customs declarations**, type **500000** as the cap, tick **Bhutan National Single Window**, and press **Issue to Pema**. Then press **Accept it as Pema** (dashed — it stands in for Pema's phone).",
     say: "Accepting in their own wallet is Pema's consent, and it proves who Pema is — the wallet is bound to Pema's citizen credential.",
     route: "/delegated-authority/new",
     persona: "dorji",

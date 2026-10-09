@@ -573,20 +573,26 @@ export function IssueAuthorityView() {
                       Anyone
                     </label>
                   </div>
+                  {/* Checkboxes, not pills. The pills read as labels: in review
+                      nobody could tell they were choices, or which were chosen.
+                      A checkbox says both before anyone touches it, and it is
+                      the same control "Give someone authority" uses for the
+                      organisations someone may share with. */}
                   {!anyCounterparty ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {COUNTERPARTIES.map((option) => (
-                        <button
-                          key={option}
-                          type="button"
-                          onClick={() => toggleCounterparty(option)}
-                          aria-pressed={counterparties.includes(option)}
-                          className="ndi-navrow rounded-full px-3 py-1.5 text-[12.5px] font-medium"
-                          data-active={counterparties.includes(option) ? "1" : "0"}
-                        >
-                          {option}
-                        </button>
-                      ))}
+                    <div className="flex flex-col gap-2">
+                      <p className="m-0 text-[12.5px] leading-[1.5] text-muted">
+                        Tick each organisation {recipientName} may use it with.
+                      </p>
+                      <div className="grid gap-2 min-[641px]:grid-cols-2">
+                        {COUNTERPARTIES.map((option) => (
+                          <Checkbox
+                            key={option}
+                            checked={counterparties.includes(option)}
+                            onChange={() => toggleCounterparty(option)}
+                            label={option}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <p
