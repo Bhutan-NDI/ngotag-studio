@@ -48,24 +48,52 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "The existing NDI wallet proof-request flow, wired to this console.",
       },
       {
+        shown: "The root administrator signing straight in to NDI's organisation",
+        reality:
+          "Root's account and Bhutan NDI's organisation are fixtures in the demo data. Signing in only matches the address to a person — any password works, and nothing is checked.",
+        needs: "Root and NDI's organisation seeded by the deployment itself, with a hardware-backed second factor on root's account.",
+      },
+      {
+        shown: "Platform admins, access requests and their decisions",
+        reality:
+          "Invitations, requests and approvals live in your browser. \"Only root can make an admin\" and \"only an admin can decide\" are checked by the demo store, which is not a boundary.",
+        needs: "Role checks and the audit of every decision enforced by the platform's services.",
+      },
+      {
+        shown: "Issuer logos on credential cards",
+        reality: "Initials in a seal. No real agency or bank logo is used.",
+        needs: "Issuer display metadata, including logos, from the trust registry.",
+      },
+      {
         shown: "Self-service sign-up switched on or off",
         reality:
           "A demo control, so both ways onto the platform can be shown. In the product it is a deployment setting nobody using the console can change.",
         needs: "The FLOW-ONB-01 P3 setting, read at request time and enforced by the server.",
       },
       {
-        shown: "The Corporate Regulatory Authority listing the organisations a person represents",
+        shown: "The Corporate Regulatory Authority confirming a representative",
         reality:
-          "Two fixed rows and a four-second delay. No register is queried; the same two organisations come back for anyone, and \"lists nothing\" is a button rather than an answer.",
+          "A handful of fixed records and a four-second delay. No register is queried: typing one of the listed registration numbers decides the answer, and \"can't be reached\" or \"setting up stalls\" are buttons rather than faults.",
         needs:
-          "A list-by-person query per register — which not every register offers today — and a governance decision about which register confirms which kind of organisation.",
+          "Each authority's issuer agent raising the identity request and answering from its own register, and the authority designations (which type, which authority) from FLOW-ORG-02.",
       },
       {
-        shown: "An NDI reviewer approving an organisation the register could not match",
+        shown: "Setting up the organisation's wallet \"in a few minutes\"",
         reality:
-          "A queue in your browser. Uploaded files are reduced to their names and never leave the page; the reviewer is whichever administrator you are driving as.",
+          "A couple of seconds, and nothing is created: the registration added automatically is a fixture. Closing the page and coming back works because the stage is kept in your browser.",
+        needs: "Agent and wallet provisioning, the brokered credential offer with automatic acceptance, and completion that survives the page closing.",
+      },
+      {
+        shown: "Accepting an appointment with one NDI wallet approval, from \"Bhutan NDI Verification\"",
+        reality:
+          "No request is sent and nothing is signed. The name is a stand-in — the real one is set when NDI's verification organisation is created — and the acceptance wording is a placeholder awaiting GovTech's drafting.",
         needs:
-          "A case store with document storage, a reviewer role and procedure, and a decision on who issues the registration after a review.",
+          "NDI's dedicated verification organisation, a proof request whose challenge carries the appointment, and the versioned acceptance and attestation texts.",
+      },
+      {
+        shown: "\"Tell us you're waiting\" and \"email me when it's done\"",
+        reality: "Recorded in your browser. Nobody is emailed.",
+        needs: "An interest store keeping the type and an address only, and a notification service.",
       },
     ],
   },
@@ -87,8 +115,17 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "An invitation delivered, bouncing, or accepted",
         reality:
-          "No invitation is sent; the bounce is a seeded fixture, and \"open as the invitee\" stands in for the email. Acceptance re-checks are store logic, not a server.",
-        needs: "Invitation service with expiry, revocation and the acceptance-time re-checks run server-side.",
+          "No invitation is sent; \"open the invitation as …\" stands in for the email, and the bounce in the story three months on is a seeded fixture. Setting up an account from the link keeps only the name — the link is trusted to prove the address because a real one would be single-use and signed. Acceptance re-checks are store logic, not a server.",
+        needs: "Invitation service with expiry, revocation, single-use signed links and the acceptance-time re-checks run server-side.",
+      },
+      {
+        /* Not simulated so much as not specified: these two invitation
+           kinds exist only in the prototype. Listed here, as well as in the
+           PR, so nobody at the showcase takes them as the spec. */
+        shown: "Root inviting a platform admin, and NDI inviting an existing organisation to keep its own records",
+        reality:
+          "Two invitation kinds the prototype added. FLOW-ONB-02 specifies only member and agency invitations; platform admins are a deployment precondition there, and an existing organisation starts verification without being invited. Both reuse the agency invitation's 30-day expiry. Invitees set up their account on the invitation instead of through sign-up — also a departure from FLOW-ONB-02, whose version sends them through sign-up.",
+        needs: "A decision on whether these belong in FLOW-ONB-02 (or another flow), and on the set-up-from-the-link shortcut.",
       },
       {
         shown: "Two administrators designating a foundational issuer",
