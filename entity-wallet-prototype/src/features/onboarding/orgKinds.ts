@@ -37,15 +37,9 @@ export interface OrgKindInfo {
 }
 
 export const ORG_KINDS: OrgKindInfo[] = [
-  {
-    value: "company",
-    label: "Registered company — private, public or state-owned",
-    authority: "Corporate Regulatory Authority",
-    identifierLabel: "Company registration number",
-    format: "CRA, the year of registration and five digits",
-    example: "CRA-2019-04477",
-    pattern: /^CRA-\d{4}-\d{5}$/,
-  },
+  /* Licensed businesses lead: the proprietor is the largest group of users
+     (UX-EW-01 §1.1), so the most common answer comes first. The company is
+     still the default choice, because that is the story the demo walks. */
   {
     value: "sole_proprietorship",
     label: "Sole proprietorship",
@@ -64,6 +58,18 @@ export const ORG_KINDS: OrgKindInfo[] = [
     example: "BL-THIMPHU-2018-1142",
     pattern: /^BL-[A-Z]+-\d{4}-\d{4}$/,
   },
+  {
+    value: "company",
+    label: "Registered company — private, public or state-owned",
+    authority: "Corporate Regulatory Authority",
+    identifierLabel: "Company registration number",
+    format: "CRA, the year of registration and five digits",
+    example: "CRA-2019-04477",
+    pattern: /^CRA-\d{4}-\d{5}$/,
+  },
 ];
 
-export const kindOf = (value: OrgKind | undefined) => ORG_KINDS.find((k) => k.value === value) ?? ORG_KINDS[0];
+/* Falls back to the company — the demo's story — by name, not by position,
+   now that the list no longer starts with it. */
+export const kindOf = (value: OrgKind | undefined) =>
+  ORG_KINDS.find((k) => k.value === value) ?? ORG_KINDS.find((k) => k.value === "company")!;
