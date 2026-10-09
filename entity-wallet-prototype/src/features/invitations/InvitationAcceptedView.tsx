@@ -8,6 +8,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Icon } from "@/components/ui/icons";
 import { SecureSignInScene } from "@/components/ui/scenes";
+import { shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
@@ -31,7 +32,7 @@ import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
  */
 export function InvitationAcceptedView({ id }: { id: string }) {
   const router = useRouter();
-  const { orgInvitations, organizations, setPersona, setActiveOrg, startOrgOnboarding } = useDemo();
+  const { orgInvitations, organizations, people, setPersona, setActiveOrg, startOrgOnboarding } = useDemo();
 
   const forced = useScreenState("SCR-INV-05", ["live", "loading", "member", "agency", "business", "error", "offline"]);
 
@@ -45,11 +46,13 @@ export function InvitationAcceptedView({ id }: { id: string }) {
   const business = forced === "business" || (forced !== "agency" && kind === "O" && inv?.needsSecondApproval === false);
   const name = kind === "M" ? (org?.name ?? "Pelden Trading Pvt. Ltd.") : (inv?.legalName ?? "the organisation");
 
+  /* Whoever accepted: the record the acceptance made or reused for that
+     address (see joinOrganisation in the store). */
+  const member = inv ? people.find((p) => p.email.toLowerCase() === inv.email.toLowerCase() && p.hasAccount !== false) : undefined;
+
   const goToOrg = () => {
+    if (member) setPersona(member.id);
     if (inv?.orgId) setActiveOrg(inv.orgId);
-    /* The persona the prototype uses for whoever last accepted a member
-       invitation — see PERSONAS in demoData. */
-    setPersona("invitee");
     router.push("/dashboard");
   };
 
@@ -86,8 +89,8 @@ export function InvitationAcceptedView({ id }: { id: string }) {
           <AuthCardHeader title={`You've joined ${name}`} />
           <div className="relative z-[4] flex flex-col gap-4">
             <p role="status" className="m-0 text-center text-[14px] leading-[1.6] text-muted">
-              You can now see {name}&rsquo;s information. You can&rsquo;t act for it yet — that&rsquo;s set
-              up separately if you need it.
+              You can now see {shortOrgName(name)}&rsquo;s information. You can&rsquo;t act for it yet —
+              that&rsquo;s set up separately if you need it.
             </p>
             {forced === "offline" ? (
               <AuthNotice tone="warning">You&rsquo;re offline — the console will open when you&rsquo;re back.</AuthNotice>
@@ -105,9 +108,9 @@ export function InvitationAcceptedView({ id }: { id: string }) {
           <div className="relative z-[4] flex flex-col gap-4">
             <ol className="m-0 flex list-none flex-col gap-2.5 p-0">
               {[
-                ["Prove who you are", "From your own NDI Wallet — the register is asked about the person, never about a typed name."],
-                ["The register confirms you represent it", `The invitation names ${name}; the register still has to confirm it. NDI inviting you doesn't make you its representative.`],
-                ["Receive its registration", "The organisation accepts its registration into its own wallet, and you become its owner."],
+                ["Enter its registration number", "The one thing you type. The authority that registered it is asked about it."],
+                ["Answer the authority's request", `From your own NDI wallet. The invitation names ${name}, but the authority decides whether you represent it — NDI inviting you doesn't.`],
+                ["It's verified", "Its registration is added to its wallet automatically, and you become its owner."],
               ].map(([title, body], i) => (
                 <li key={title} className="flex items-start gap-3 rounded-[12px] border border-grid px-3.5 py-3">
                   <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full border border-grid font-mono text-[11px] text-muted">
@@ -125,7 +128,7 @@ export function InvitationAcceptedView({ id }: { id: string }) {
               disabled={forced === "offline"}
               onClick={() => {
                 startOrgOnboarding("company", inv?.id);
-                router.push("/onboarding/prove");
+                router.push("/onboarding/details");
               }}
             >
               Register the organisation
