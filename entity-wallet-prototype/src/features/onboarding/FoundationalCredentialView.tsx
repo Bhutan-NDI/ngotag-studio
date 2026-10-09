@@ -61,7 +61,7 @@ import { kindOf } from "./orgKinds";
  */
 export function FoundationalCredentialView() {
   const router = useRouter();
-  const { heldCredentials, orgOnboarding, orgInvitations, organizations, signup, hydrated, setActiveOrg, setPersona } =
+  const { heldCredentials, orgOnboarding, orgInvitations, organizations, hydrated, setActiveOrg, setPersona } =
     useDemo();
   const forced = useScreenState("SCR-ORG-07", ["live", "default", "name_differs"]);
 
@@ -92,7 +92,6 @@ export function FoundationalCredentialView() {
     if (!existing) setPersona("dorji");
     router.push(path);
   };
-  const accountDone = signup?.stage === "done" && !existing;
 
   if (!hydrated) {
     return (
@@ -233,8 +232,13 @@ export function FoundationalCredentialView() {
       </Panel>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <HairlineButton onClick={() => (accountDone ? router.push("/welcome") : open("/dashboard"))}>
-          {accountDone ? "Back to your organisations" : `Go to ${existing?.name ?? shortName}`}
+        {/* Straight to the organisation's dashboard, which is where the
+            specification sends this screen. It used to go back to the
+            account's list of organisations (SCR-ONB-05) — a list of one,
+            where the person had to choose the organisation they had just
+            verified. The list is still there at the next sign-in. */}
+        <HairlineButton onClick={() => open("/dashboard")}>
+          {`Go to ${existing?.name ?? shortName}`}
           <Icon name="arrowRight" size={14} strokeWidth={2} />
         </HairlineButton>
         {existing ? null : (

@@ -16,7 +16,7 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks exactly that —
-seven chapters, 25 steps, starting on the platform's day zero:
+seven chapters, 24 steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — NDI's root administrator, Anand Acharya, signs
    in. The account and Bhutan NDI's organisation were made when the platform
@@ -211,7 +211,7 @@ next credential in the chain (the prototype says that flow isn't built yet),
 with **View the credential** beside it. The summary says what Pelden can do
 *and what it can't*: hold and present credentials, not issue or verify them.
 
-**Back to your organisations**, then **Open**, lands on Pelden's first day:
+**Go to Pelden Trading** lands on Pelden's first day:
 *Welcome, Dorji*, a **Start here** panel led by the TPN, nothing waiting, no
 activity. Inviting colleagues is offered third; appointing someone to act is
 available but not prompted.
