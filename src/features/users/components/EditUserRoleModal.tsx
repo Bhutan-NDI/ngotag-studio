@@ -37,6 +37,14 @@ interface RoleI {
   disabled: boolean
 }
 
+const ROLE_DISPLAY_LABELS: Record<string, string> = {
+  ALLOW_PROOF_TEMPLATE: 'Create Proof Templates',
+  ALLOW_VERIFIER: 'Create Verifier Roles',
+}
+
+const getRoleLabel = (name: string): string =>
+  ROLE_DISPLAY_LABELS[name] ?? TextTitlecase(name)
+
 interface EditUserRoleModalProps {
   openModal: boolean
   user: User
@@ -288,7 +296,7 @@ const EditUserRoleModal = ({
                                 : 'font-light'
                             } cursor-pointer`}
                           >
-                            {TextTitlecase(role.name)}
+                            {getRoleLabel(role.name)}
                           </Label>
                         </div>
                       </div>
