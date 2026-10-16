@@ -46,6 +46,12 @@ export const getVerifierUserStatus = (verifierUser: VerifierUser): string =>
   verifierUser.revocationStatus ??
   'CREATED'
 
+// Issuing a fresh credential to a suspended or revoked user would undo the revocation.
+const isIssuanceBlocked = (verifierUser: VerifierUser): boolean => {
+  const status = getVerifierUserStatus(verifierUser)
+  return status === 'SUSPENDED' || status === 'REVOKED'
+}
+
 interface GetVerifierUserColumnDataParams {
   invitingId: string | null
   issuingId: string | null
@@ -141,7 +147,16 @@ export const getVerifierUserColumnData = ({
             Edit
           </DropdownMenuItem>
           <DropdownMenuItem
-            disabled={!canManage || issuingId === row.original.id}
+            disabled={
+              !canManage ||
+              issuingId === row.original.id ||
+              isIssuanceBlocked(row.original)
+            }
+            title={
+              isIssuanceBlocked(row.original)
+                ? 'A suspended or revoked user cannot be issued a credential'
+                : undefined
+            }
             onClick={() => onIssue(row.original)}
           >
             <Send className="mr-2 h-4 w-4" />
