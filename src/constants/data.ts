@@ -142,3 +142,38 @@ export const recentsalesdata: saleuser[] = [
     initials: 'sd',
   },
 ]
+
+// Bhutanndi-only: Mobile Verifier is backed by endpoints the other brands don't have, so it
+// is injected by BhutanndiSidebar instead of living in the shared navItems.
+export const mobileVerifierNavItem: NavItem = {
+  title: 'Mobile Verifier',
+  url: '#', // Placeholder as there is no direct link for the parent
+  icon: 'mobileVerifier',
+  isActive: false,
+  items: [
+    {
+      title: 'Proof Templates',
+      url: '/mobile-verifier/proof-templates',
+      icon: 'schemas',
+      shortcut: ['p', 't'],
+    },
+    {
+      title: 'Verifier Roles',
+      url: '/mobile-verifier/verifier-roles',
+      icon: 'users',
+      shortcut: ['v', 'r'],
+    },
+    {
+      title: 'Verifier Users',
+      url: '/mobile-verifier/verifier-users',
+      icon: 'users',
+      shortcut: ['v', 'u'],
+    },
+    {
+      title: 'Webhook',
+      url: '/mobile-verifier/webhook',
+      icon: 'settings',
+      shortcut: ['w', 'h'],
+    },
+  ],
+}

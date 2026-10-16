@@ -156,4 +156,17 @@ export const apiRoutes = {
   setting: {
     setting: '/client_credentials',
   },
+
+  // mobile-verifier's own gateway routes are not org-scoped in the URL — org
+  // identity travels in the caller's JWT instead, unlike most routes above.
+  mobileVerifier: {
+    proofTemplate: '/proof-template',
+    proofTemplateRole: '/proof-template/role',
+    verifierRole: '/verifier-role',
+    verifierRoleCreate: '/verifier-role/verifier-roles',
+    verifierUser: '/verifier-user',
+    verifierUserCreate: '/verifier-user/verifier-users',
+    webhookRegister: '/verifier-webhook',
+    webhook: '/verifier-webhook',
+  },
 }
