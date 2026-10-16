@@ -1,11 +1,20 @@
 'use client'
 
+import {
+  IWebhookAuthenticationV1,
+  IWebhookPayload,
+  getWebhook,
+  registerWebhook,
+} from '@/app/api/mobileVerifierWebhook'
 import { MOBILE_VERIFIER_ROLES, useHasOrgRole } from '@/lib/useOrgRoleAccess'
-import React, { JSX, useState } from 'react'
-import { getWebhook, registerWebhook } from '@/app/api/mobileVerifierWebhook'
+import React, { JSX, useEffect, useState } from 'react'
+import {
+  getResultMessage,
+  getResultStatusCode,
+  isNotFoundMessage,
+} from '@/lib/mobileVerifierResponse'
 
 import { AlertComponent } from '@/components/AlertComponent'
-import { AxiosResponse } from 'axios'
 import PageContainer from '@/components/layout/page-container'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { useAppSelector } from '@/lib/hooks'
@@ -28,6 +37,72 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
   const [success, setSuccess] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
 
+  // Fills the form from a stored webhook. The API masks secrets, so the token and client
+  // secret are left empty and have to be entered again to save.
+  const applyWebhook = (found: IWebhookPayload): void => {
+    setWebhookId(found.webhookId ?? '')
+    setWebhookURL(found.webhookUrl ?? '')
+    const authVersion = found.authentication?.version === 'v1' ? 'v1' : 'v2'
+    setVersion(authVersion)
+    setToken('')
+    setClientSecret('')
+    if (authVersion === 'v1') {
+      const data = found.authentication.data as IWebhookAuthenticationV1
+      setUrl(data?.url ?? '')
+      setGrantType(data?.grantType || 'client_credentials')
+      setClientId(data?.clientId ?? '')
+    } else {
+      setUrl('')
+      setGrantType('client_credentials')
+      setClientId('')
+    }
+  }
+
+  // Show the webhook already in use for the selected org, and never carry one org's
+  // form over to another.
+  useEffect(() => {
+    let cancelled = false
+    setWebhookId('')
+    setWebhookURL('')
+    setVersion('v2')
+    setToken('')
+    setUrl('')
+    setGrantType('client_credentials')
+    setClientId('')
+    setClientSecret('')
+    setSuccess(null)
+    setFailure(null)
+
+    if (!orgId) {
+      return
+    }
+
+    const loadCurrent = async (): Promise<void> => {
+      const res = await getWebhook(orgId)
+      if (cancelled) {
+        return
+      }
+      if (typeof res === 'string') {
+        if (!isNotFoundMessage(res)) {
+          setFailure(res)
+        }
+        return
+      }
+      if (
+        getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS &&
+        res.data?.data
+      ) {
+        applyWebhook(res.data.data)
+      }
+    }
+    loadCurrent()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId])
+
   const handleLookup = async (): Promise<void> => {
     if (!orgId) {
       setFailure('No organization selected')
@@ -42,18 +117,27 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
     setLooking(true)
 
     try {
-      const res = (await getWebhook(orgId, webhookId)) as AxiosResponse
-      const found = res?.data?.data
-      if (
-        res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS &&
-        found
-      ) {
-        setWebhookURL(found.webhookUrl ?? '')
-        setSuccess('Existing webhook loaded')
-      } else {
+      const res = await getWebhook(orgId, webhookId)
+      if (typeof res === 'string') {
+        // only a real "not found" means there is nothing registered under this ID; any other
+        // failure (401, 500, network) must not suggest registering over a working webhook
         setFailure(
-          'No webhook found for this ID — fill in the fields below to register one',
+          isNotFoundMessage(res)
+            ? 'No webhook found for this ID — fill in the fields below to register one'
+            : res,
         )
+        return
+      }
+      if (
+        getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS &&
+        res.data?.data
+      ) {
+        applyWebhook(res.data.data)
+        setSuccess(
+          'Existing webhook loaded — enter the token or client secret again to save changes',
+        )
+      } else {
+        setFailure(getResultMessage(res, 'Failed to look up webhook'))
       }
     } catch {
       setFailure('Failed to look up webhook')
@@ -89,7 +173,7 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
     setSaving(true)
 
     try {
-      const res = (await registerWebhook(
+      const res = await registerWebhook(
         {
           webhookId,
           webhookUrl: webhookURL,
@@ -103,15 +187,16 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
           },
         },
         orgId,
-      )) as AxiosResponse
+      )
+      const statusCode = getResultStatusCode(res)
 
       if (
-        res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS ||
-        res?.data?.statusCode === apiStatusCodes.API_STATUS_CREATED
+        statusCode === apiStatusCodes.API_STATUS_SUCCESS ||
+        statusCode === apiStatusCodes.API_STATUS_CREATED
       ) {
-        setSuccess(res?.data?.message || 'Webhook saved successfully')
+        setSuccess(getResultMessage(res, 'Webhook saved successfully'))
       } else {
-        setFailure(res?.data?.message || 'Failed to save webhook')
+        setFailure(getResultMessage(res, 'Failed to save webhook'))
       }
     } catch {
       setFailure('Failed to save webhook')
@@ -208,6 +293,7 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
             <input
               type="password"
               value={token}
+              placeholder="Enter the token (stored tokens are never shown)"
               onChange={(e) => setToken(e.target.value)}
               className="focus:ring-primary w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2"
             />
@@ -248,6 +334,7 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
               <input
                 type="password"
                 value={clientSecret}
+                placeholder="Enter the secret (stored secrets are never shown)"
                 onChange={(e) => setClientSecret(e.target.value)}
                 className="focus:ring-primary w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2"
               />

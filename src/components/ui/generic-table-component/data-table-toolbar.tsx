@@ -23,6 +23,7 @@ interface DataTableToolbarProps<TData> {
   onSearchTermChange: (term: string) => void
   searchPlaceholder?: string
   toolbarActions?: React.ReactNode
+  hideSearch?: boolean
 }
 
 export function DataTableToolbar<TData>({
@@ -31,6 +32,7 @@ export function DataTableToolbar<TData>({
   onSearchTermChange,
   searchPlaceholder,
   toolbarActions,
+  hideSearch = false,
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
 
@@ -51,14 +53,16 @@ export function DataTableToolbar<TData>({
   return (
     <div className="flex items-center justify-between">
       <div className="flex flex-1 flex-col-reverse items-start gap-y-2 sm:flex-row sm:items-center sm:space-x-2">
-        <Input
-          placeholder={searchPlaceholder}
-          value={localValue}
-          onChange={(e) => {
-            setLocalValue(e.target.value)
-          }}
-          className="h-8 w-[250px] lg:w-[350px]"
-        />
+        {!hideSearch && (
+          <Input
+            placeholder={searchPlaceholder}
+            value={localValue}
+            onChange={(e) => {
+              setLocalValue(e.target.value)
+            }}
+            className="h-8 w-[250px] lg:w-[350px]"
+          />
+        )}
         <div className="flex gap-x-2">
           {tableFilterOptions ? (
             tableFilterOptions.map(

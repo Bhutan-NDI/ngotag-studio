@@ -39,7 +39,7 @@ interface RoleI {
 
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
   ALLOW_PROOF_TEMPLATE: 'Create Proof Templates',
-  ALLOW_VERIFIER: 'Create Verifier Roles',
+  ALLOW_VERIFIER: 'Manage Mobile Verifier',
 }
 
 const getRoleLabel = (name: string): string =>

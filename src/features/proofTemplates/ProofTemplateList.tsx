@@ -13,13 +13,19 @@ import {
 } from './useProofTemplateColumns'
 import {
   createProofTemplate,
-  deleteProofTemplate,
+  getProofTemplateById,
+  getProofTemplates,
   getRoleProofTemplates,
   updateProofTemplate,
 } from '@/app/api/proofTemplates'
+import {
+  getResultMessage,
+  getResultStatusCode,
+  isNotFoundMessage,
+} from '@/lib/mobileVerifierResponse'
 
+import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
-import ConfirmationModal from '@/components/confirmation-modal'
 import { DataTable } from '@/components/ui/generic-table-component/data-table'
 import { DifPayloadEntry } from './DifSchemaPicker'
 import PageContainer from '@/components/layout/page-container'
@@ -67,15 +73,15 @@ const ProofTemplateList = (): JSX.Element => {
   const [version, setVersion] = useState('1.0.0')
   const [payloadData, setPayloadData] = useState<DifPayloadEntry[]>([])
   const [verifierRoleIds, setVerifierRoleIds] = useState<string[]>([])
+  // roles the template had when the edit form was opened
+  const [originalRoleIds, setOriginalRoleIds] = useState<string[]>([])
   const [success, setSuccess] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [isEdit, setIsEdit] = useState(false)
   const [editTemplateId, setEditTemplateId] = useState<string | null>(null)
 
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] =
-    useState<ProofTemplateRow | null>(null)
-  const [actionLoading, setActionLoading] = useState(false)
+  // a failed load (403, 502, ...) shown above the table; "not found" is just an empty list
+  const [listError, setListError] = useState<string | null>(null)
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -94,27 +100,28 @@ const ProofTemplateList = (): JSX.Element => {
     setVersion('1.0.0')
     setPayloadData([])
     setVerifierRoleIds([])
+    setOriginalRoleIds([])
   }
 
   const fetchRoles = async (): Promise<void> => {
     const response = await getVerifierRoles({ orgId, page: 1, pageSize: 100 })
     const { data } = (response as AxiosResponse) ?? {}
-    if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-      const list: VerifierRoleOption[] = data?.data ?? []
-      setRoles(list)
-      if (!selectedRoleId && list.length > 0) {
-        setSelectedRoleId(list[0].id)
-      }
+    // An org with no roles comes back as a non-success (404), so always replace the
+    // list; otherwise the previous org's roles would stay selectable for this one.
+    const list: VerifierRoleOption[] =
+      data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS
+        ? (data?.data ?? [])
+        : []
+    if (typeof response === 'string' && !isNotFoundMessage(response)) {
+      setListError(response)
     }
+    setRoles(list)
+    // '' means "All roles" (every template of the org); keep a still-valid role filter.
+    setSelectedRoleId((prev) => (list.some((r) => r.id === prev) ? prev : ''))
   }
 
   const fetchTemplates = async (reload = false): Promise<void> => {
-    if (!selectedRoleId) {
-      setTemplateList([])
-      setLoading(false)
-      return
-    }
-
+    setListError(null)
     if (reload) {
       setReloading(true)
     } else {
@@ -122,17 +129,24 @@ const ProofTemplateList = (): JSX.Element => {
     }
 
     try {
-      const response = await getRoleProofTemplates({
+      const query = {
         orgId,
-        roleId: selectedRoleId,
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
         search: pagination.searchTerm,
-      })
+      }
+      // "All roles" lists every template of the org; picking a role filters to its templates.
+      const response = selectedRoleId
+        ? await getRoleProofTemplates({ ...query, roleId: selectedRoleId })
+        : await getProofTemplates(query)
       const { data } = response as AxiosResponse
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        setTemplateList(data?.data ?? [])
+        // The org-wide list wraps its rows as [total, rows]; the per-role list returns the rows.
+        const rows: ProofTemplateRow[] = Array.isArray(data?.data?.[1])
+          ? data.data[1]
+          : (data?.data ?? [])
+        setTemplateList(rows)
         const total = data?.pagination?.total ?? 0
         setPagination((prev) => ({
           ...prev,
@@ -140,6 +154,9 @@ const ProofTemplateList = (): JSX.Element => {
         }))
       } else {
         setTemplateList([])
+        if (typeof response === 'string' && !isNotFoundMessage(response)) {
+          setListError(response)
+        }
       }
     } catch {
       setTemplateList([])
@@ -153,6 +170,11 @@ const ProofTemplateList = (): JSX.Element => {
   }
 
   useEffect(() => {
+    // drop the previous org's roles/templates immediately on org switch
+    setRoles([])
+    setSelectedRoleId('')
+    setTemplateList([])
+
     if (!orgId) {
       setLoading(false)
       return
@@ -187,10 +209,6 @@ const ProofTemplateList = (): JSX.Element => {
       if (openCreate && wasSuccess) {
         closeForm()
       }
-      if (showConfirmModal) {
-        setShowConfirmModal(false)
-        setSelectedTemplate(null)
-      }
     }, 3000)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -207,7 +225,7 @@ const ProofTemplateList = (): JSX.Element => {
     setOpenCreate(true)
   }
 
-  const openEdit = (template: ProofTemplateRow): void => {
+  const openEdit = async (template: ProofTemplateRow): Promise<void> => {
     setSuccess(null)
     setFailure(null)
     setIsEdit(true)
@@ -217,7 +235,29 @@ const ProofTemplateList = (): JSX.Element => {
     setDescription(template.description ?? '')
     setVersion(template.version)
     setPayloadData(parseTemplatePayload(template.payload))
-    setVerifierRoleIds([])
+
+    // The per-role list does not carry the role mapping, so fetch the template itself.
+    let mappings = template.verifierRoleToProofTemplates
+    if (!mappings) {
+      const response = await getProofTemplateById(orgId, template.id)
+      if (getResultStatusCode(response) === apiStatusCodes.API_STATUS_SUCCESS) {
+        mappings =
+          (response as AxiosResponse).data.data?.verifierRoleToProofTemplates ??
+          []
+      } else {
+        setFailure(
+          getResultMessage(
+            response,
+            'Could not load the roles currently assigned to this template',
+          ),
+        )
+      }
+    }
+    const currentRoleIds = (mappings ?? [])
+      .map((mapping) => mapping.verifierRoleId)
+      .filter((id): id is string => Boolean(id))
+    setVerifierRoleIds(currentRoleIds)
+    setOriginalRoleIds(currentRoleIds)
     setOpenCreate(true)
   }
 
@@ -253,25 +293,33 @@ const ProofTemplateList = (): JSX.Element => {
 
     try {
       if (isEdit && editTemplateId) {
-        const res = (await updateProofTemplate(editTemplateId, {
+        // The API replaces the template's roles with the list it receives and cannot clear them,
+        // so a template that has roles must keep at least one.
+        if (verifierRoleIds.length === 0 && originalRoleIds.length > 0) {
+          setFailure('Select at least one verifier role')
+          setCreating(false)
+          return
+        }
+        const res = await updateProofTemplate(editTemplateId, orgId, {
           name,
           description,
           version,
           payload,
-        })) as AxiosResponse
+          ...(verifierRoleIds.length > 0 ? { verifierRoleIds } : {}),
+        })
 
-        if (res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
+        if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS) {
           setSuccess(
-            res?.data?.message || 'Proof template updated successfully',
+            getResultMessage(res, 'Proof template updated successfully'),
           )
           fetchTemplates(true)
         } else {
-          setFailure(res?.data?.message || 'Failed to update proof template')
+          setFailure(getResultMessage(res, 'Failed to update proof template'))
         }
         return
       }
 
-      const res = (await createProofTemplate({
+      const res = await createProofTemplate({
         templateId,
         name,
         orgId,
@@ -279,13 +327,13 @@ const ProofTemplateList = (): JSX.Element => {
         version,
         payload,
         ...(verifierRoleIds.length > 0 ? { verifierRoleIds } : {}),
-      })) as AxiosResponse
+      })
 
-      if (res?.data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
-        setSuccess(res?.data?.message || 'Proof template created successfully')
+      if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_CREATED) {
+        setSuccess(getResultMessage(res, 'Proof template created successfully'))
         fetchTemplates(true)
       } else {
-        setFailure(res?.data?.message || 'Failed to create proof template')
+        setFailure(getResultMessage(res, 'Failed to create proof template'))
       }
     } catch {
       setFailure(
@@ -298,41 +346,7 @@ const ProofTemplateList = (): JSX.Element => {
     }
   }
 
-  const openDeleteConfirmation = (template: ProofTemplateRow): void => {
-    setSuccess(null)
-    setFailure(null)
-    setSelectedTemplate(template)
-    setShowConfirmModal(true)
-  }
-
-  const handleConfirmedDelete = async (): Promise<void> => {
-    if (!selectedTemplate) {
-      return
-    }
-    setActionLoading(true)
-    try {
-      const res = (await deleteProofTemplate(
-        selectedTemplate.id,
-        orgId,
-      )) as AxiosResponse
-      if (res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        setSuccess(res?.data?.message || 'Proof template deleted successfully')
-        fetchTemplates(true)
-      } else {
-        setFailure(res?.data?.message || 'Failed to delete proof template')
-      }
-    } catch {
-      setFailure('Something went wrong')
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const column = useProofTemplateColumns(
-    openEdit,
-    openDeleteConfirmation,
-    canManage,
-  )
+  const column = useProofTemplateColumns(openEdit, canManage)
 
   const formState: ProofTemplateFormState = {
     templateId,
@@ -379,7 +393,7 @@ const ProofTemplateList = (): JSX.Element => {
             }}
             className="rounded-md border px-3 py-2 text-sm"
           >
-            {roles.length === 0 && <option value="">No verifier roles</option>}
+            <option value="">All roles</option>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.role}
@@ -423,26 +437,11 @@ const ProofTemplateList = (): JSX.Element => {
           availableRoles={roles}
         />
 
-        {showConfirmModal && selectedTemplate && (
-          <ConfirmationModal
-            openModal={showConfirmModal}
-            buttonTitles={['Cancel', 'Delete']}
-            loading={actionLoading}
-            closeModal={() => {
-              setShowConfirmModal(false)
-              setSelectedTemplate(null)
-            }}
-            onSuccess={(confirmed: boolean): void => {
-              if (confirmed) {
-                handleConfirmedDelete()
-              }
-            }}
-            message="Are you sure you want to delete this proof template?"
-            isProcessing={actionLoading}
-            success={success}
-            failure={failure}
-            setSuccess={setSuccess}
-            setFailure={setFailure}
+        {listError && (
+          <AlertComponent
+            message={listError}
+            type="failure"
+            onAlertClose={() => setListError(null)}
           />
         )}
 

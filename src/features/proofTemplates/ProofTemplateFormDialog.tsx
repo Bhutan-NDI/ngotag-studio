@@ -159,37 +159,32 @@ const ProofTemplateFormDialog = ({
             />
           </div>
 
-          {!isEdit && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Verifier Roles</label>
-              <div className="flex flex-wrap gap-3 rounded-md border p-2">
-                {availableRoles.length === 0 && (
-                  <span className="text-muted-foreground text-sm">
-                    No verifier roles yet — create one first.
-                  </span>
-                )}
-                {availableRoles.map((r) => (
-                  <label
-                    key={r.id}
-                    className="flex items-center gap-1.5 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={verifierRoleIds.includes(r.id)}
-                      onChange={() => toggleVerifierRoleId(r.id)}
-                    />
-                    {r.role}
-                  </label>
-                ))}
-              </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Verifier Roles</label>
+            <div className="flex flex-wrap gap-3 rounded-md border p-2">
+              {availableRoles.length === 0 && (
+                <span className="text-muted-foreground text-sm">
+                  No verifier roles yet — create one first.
+                </span>
+              )}
+              {availableRoles.map((r) => (
+                <label key={r.id} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={verifierRoleIds.includes(r.id)}
+                    onChange={() => toggleVerifierRoleId(r.id)}
+                  />
+                  {r.role}
+                </label>
+              ))}
             </div>
-          )}
-          {isEdit && (
-            <p className="text-muted-foreground text-xs">
-              Verifier role assignment can only be set when creating a template
-              — updating leaves existing role mappings unchanged.
-            </p>
-          )}
+            {isEdit && (
+              <p className="text-muted-foreground text-xs">
+                Saving replaces this template&apos;s role assignments with the
+                roles ticked above.
+              </p>
+            )}
+          </div>
 
           <div className="space-y-1">
             <label className="text-sm font-medium">

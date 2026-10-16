@@ -10,7 +10,7 @@ import {
   TableStyling,
   getColumns,
 } from '@/components/ui/generic-table-component/columns'
-import { MoreVertical, Pencil, Trash2 } from 'lucide-react'
+import { MoreVertical, Pencil } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ColumnDef } from '@tanstack/react-table'
@@ -25,11 +25,20 @@ export interface ProofTemplateRow {
   orgId: string
   payload?: unknown
   createdAt: string
+  // present on the org-wide list only (not on the per-role list)
+  verifierRoleToProofTemplates?: {
+    verifierRoleId?: string
+    verifierRole?: { role: string } | null
+  }[]
 }
+
+const roleNamesOf = (template: ProofTemplateRow): string[] =>
+  (template.verifierRoleToProofTemplates ?? [])
+    .map((mapping) => mapping.verifierRole?.role)
+    .filter((name): name is string => Boolean(name))
 
 export const useProofTemplateColumns = (
   onEdit: (template: ProofTemplateRow) => void,
-  onDelete: (template: ProofTemplateRow) => void,
   canManage: boolean,
 ): ColumnDef<ProofTemplateRow>[] => {
   const actionCell = ({
@@ -52,13 +61,6 @@ export const useProofTemplateColumns = (
           <Pencil className="mr-2 h-4 w-4" />
           Update
         </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled={!canManage}
-          onClick={() => onDelete(row.original)}
-        >
-          <Trash2 className="mr-2 h-4 w-4 text-red-500" />
-          Delete
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -78,6 +80,15 @@ export const useProofTemplateColumns = (
       title: 'Name',
       accessorKey: 'name',
       cell: ({ row }) => <span>{row.original.name}</span>,
+      columnFunction: [],
+    },
+    {
+      id: 'roles',
+      title: 'Roles',
+      accessorKey: 'verifierRoleToProofTemplates',
+      cell: ({ row }): JSX.Element => (
+        <span>{roleNamesOf(row.original).join(', ') || '-'}</span>
+      ),
       columnFunction: [],
     },
     {

@@ -8,7 +8,11 @@ import {
 import { MOBILE_VERIFIER_ROLES, useHasOrgRole } from '@/lib/useOrgRoleAccess'
 import { Plus, RefreshCw } from 'lucide-react'
 import React, { JSX, useEffect, useState } from 'react'
-import { VerifierUser, getVerifierUserColumnData } from './verifierUserColumns'
+import {
+  VerifierUser,
+  getVerifierUserColumnData,
+  getVerifierUserStatus,
+} from './verifierUserColumns'
 import VerifierUserFormDialog, {
   VerifierRoleOption,
   VerifierUserFormHandlers,
@@ -25,8 +29,16 @@ import {
   updateVerifierUserStatus,
 } from '@/app/api/verifierUsers'
 
+import {
+  getResultMessage,
+  getResultStatusCode,
+  isNotFoundMessage,
+} from '@/lib/mobileVerifierResponse'
+
+import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
 import { DataTable } from '@/components/ui/generic-table-component/data-table'
+import Link from 'next/link'
 import PageContainer from '@/components/layout/page-container'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getVerifierRoles } from '@/app/api/verifierRoles'
@@ -60,6 +72,8 @@ const VerifierUserList = (): JSX.Element => {
   const [success, setSuccess] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [invitingId, setInvitingId] = useState<string | null>(null)
+  // a failed load (no webhook registered, 403, 502, ...) shown above the table
+  const [listError, setListError] = useState<string | null>(null)
   const [openStatus, setOpenStatus] = useState(false)
   const [statusUser, setStatusUser] = useState<VerifierUser | null>(null)
   const [selectedStatus, setSelectedStatus] = useState<string>(
@@ -74,6 +88,7 @@ const VerifierUserList = (): JSX.Element => {
   })
 
   const fetchUsers = async (reload = false): Promise<void> => {
+    setListError(null)
     if (reload) {
       setReloading(true)
     } else {
@@ -97,6 +112,10 @@ const VerifierUserList = (): JSX.Element => {
         }))
       } else {
         setUserList([])
+        // "not found" is just an empty list; anything else (e.g. no webhook registered) is a real error
+        if (typeof response === 'string' && !isNotFoundMessage(response)) {
+          setListError(response)
+        }
       }
     } catch {
       setUserList([])
@@ -237,27 +256,26 @@ const VerifierUserList = (): JSX.Element => {
       }
 
       if (isEdit && editUserId) {
-        const res = (await updateVerifierUser(
-          editUserId,
-          payload,
-        )) as AxiosResponse
+        const res = await updateVerifierUser(editUserId, payload)
 
-        if (res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-          setSuccess(res?.data?.message || 'Verifier user updated successfully')
+        if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS) {
+          setSuccess(
+            getResultMessage(res, 'Verifier user updated successfully'),
+          )
           fetchUsers(true)
         } else {
-          setFailure(res?.data?.message || 'Failed to update verifier user')
+          setFailure(getResultMessage(res, 'Failed to update verifier user'))
         }
         return
       }
 
-      const res = (await createVerifierUser(payload)) as AxiosResponse
+      const res = await createVerifierUser(payload)
 
-      if (res?.data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
-        setSuccess(res?.data?.message || 'Verifier user created successfully')
+      if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_CREATED) {
+        setSuccess(getResultMessage(res, 'Verifier user created successfully'))
         fetchUsers(true)
       } else {
-        setFailure(res?.data?.message || 'Failed to create verifier user')
+        setFailure(getResultMessage(res, 'Failed to create verifier user'))
       }
     } catch {
       setFailure(
@@ -274,7 +292,7 @@ const VerifierUserList = (): JSX.Element => {
     setStatusUser(verifierUser)
     setSelectedStatus(
       VERIFIER_USER_STATUS_OPTIONS.find(
-        (option) => option === verifierUser.revocationStatus,
+        (option) => option === getVerifierUserStatus(verifierUser),
       ) ?? VERIFIER_USER_STATUS_OPTIONS[0],
     )
     setOpenStatus(true)
@@ -284,22 +302,27 @@ const VerifierUserList = (): JSX.Element => {
     if (!statusUser) {
       return
     }
+    // rows from the client's webhook may not carry orgId, so use the selected org
+    if (!orgId) {
+      toast.error('No organization selected')
+      return
+    }
 
     setUpdatingStatus(true)
 
     try {
-      const res = (await updateVerifierUserStatus(
+      const res = await updateVerifierUserStatus(
         statusUser.id,
-        statusUser.orgId,
+        orgId,
         selectedStatus,
-      )) as AxiosResponse
+      )
 
-      if (res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-        toast.success(res?.data?.message || 'Status updated successfully')
+      if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS) {
+        toast.success(getResultMessage(res, 'Status updated successfully'))
         setOpenStatus(false)
         fetchUsers(true)
       } else {
-        toast.error(res?.data?.message || 'Failed to update status')
+        toast.error(getResultMessage(res, 'Failed to update status'))
       }
     } catch {
       toast.error('Failed to update status')
@@ -317,20 +340,18 @@ const VerifierUserList = (): JSX.Element => {
     setInvitingId(verifierUser.id)
 
     try {
-      const res = (await inviteVerifierUser(
-        verifierUser.email,
-        orgId,
-      )) as AxiosResponse
+      const res = await inviteVerifierUser(verifierUser.email, orgId)
+      const statusCode = getResultStatusCode(res)
 
       if (
-        res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS ||
-        res?.data?.statusCode === apiStatusCodes.API_STATUS_CREATED
+        statusCode === apiStatusCodes.API_STATUS_SUCCESS ||
+        statusCode === apiStatusCodes.API_STATUS_CREATED
       ) {
         toast.success(
-          res?.data?.message || 'Verifier user invited successfully',
+          getResultMessage(res, 'Verifier user invited successfully'),
         )
       } else {
-        toast.error(res?.data?.message || 'Failed to invite verifier user')
+        toast.error(getResultMessage(res, 'Failed to invite verifier user'))
       }
     } catch {
       toast.error('Failed to invite verifier user')
@@ -433,8 +454,27 @@ const VerifierUserList = (): JSX.Element => {
           onSubmit={handleUpdateStatus}
         />
 
+        {listError && (
+          <div className="mb-2">
+            <AlertComponent
+              message={listError}
+              type="failure"
+              onAlertClose={() => setListError(null)}
+            />
+            {/webhook/i.test(listError) && (
+              <Link
+                href="/mobile-verifier/webhook"
+                className="text-sm underline"
+              >
+                Go to Webhook settings
+              </Link>
+            )}
+          </div>
+        )}
+
         <DataTable
           isLoading={loading}
+          hideSearch
           placeHolder="Search by email"
           data={userList}
           columns={column}

@@ -6,7 +6,7 @@ import { NavItem } from '../../../../types'
 import { Organization } from '@/features/dashboard/type/organization'
 import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
 import { getOrganizations } from '@/app/api/organization'
-import { navItems } from '@/constants/data'
+import { mobileVerifierNavItem, navItems } from '@/constants/data'
 import {
   resetOrgState,
   setOrgId,
@@ -94,6 +94,7 @@ export function BhutanndiSidebar({
         items: [],
       },
       ...rest,
+      mobileVerifierNavItem,
     ]
   })
 

@@ -38,6 +38,8 @@ const DifSchemaPicker = ({
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
+    // set on cleanup so a slower, earlier search can't overwrite a newer one
+    let cancelled = false
     const timer = setTimeout(async () => {
       setLoading(true)
       try {
@@ -49,11 +51,15 @@ const DifSchemaPicker = ({
             page: 1,
             search: '',
             sortBy: 'id',
-            allSearch: search.trim(),
+            // getAllSchemas interpolates this straight into the query string
+            allSearch: encodeURIComponent(search.trim()),
           },
           SchemaTypes.schema_W3C,
           '',
         )
+        if (cancelled) {
+          return
+        }
         const { data } = response as AxiosResponse
         setSchemas(
           data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS
@@ -61,13 +67,20 @@ const DifSchemaPicker = ({
             : [],
         )
       } catch {
-        setSchemas([])
+        if (!cancelled) {
+          setSchemas([])
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }, 400)
 
-    return () => clearTimeout(timer)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [search])
 
   const isSelected = (schemaId: string, attribute: string): boolean =>

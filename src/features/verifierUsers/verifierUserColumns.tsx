@@ -32,6 +32,20 @@ export interface VerifierUser {
   statusId?: number | null
 }
 
+// The client's own system returns a numeric statusId rather than a status name.
+const VERIFIER_USER_STATUS_BY_ID: Record<number, string> = {
+  1: 'CREATED',
+  2: 'INVITED',
+  3: 'ACTIVE',
+  4: 'SUSPENDED',
+  5: 'REVOKED',
+}
+
+export const getVerifierUserStatus = (verifierUser: VerifierUser): string =>
+  VERIFIER_USER_STATUS_BY_ID[verifierUser.statusId ?? -1] ??
+  verifierUser.revocationStatus ??
+  'CREATED'
+
 interface GetVerifierUserColumnDataParams {
   invitingId: string | null
   canManage: boolean
@@ -73,24 +87,17 @@ export const getVerifierUserColumnData = ({
   {
     id: 'role',
     title: 'Role',
-    accessorKey: 'verifierRoleId',
-    cell: ({ row }) => (
-      <span>
-        {row.original.verifierRoleName ??
-          row.original.role?.role ??
-          row.original.verifierRoleId ??
-          'NA'}
-      </span>
-    ),
+    accessorKey: 'verifierRoleName',
+    // The role name is kept on the client's own record. Users created before it was stored there
+    // have none: show it empty (never the role id) until the user is edited and it gets saved.
+    cell: ({ row }) => <span>{row.original.verifierRoleName ?? ''}</span>,
     columnFunction: [],
   },
   {
     id: 'status',
     title: 'Status',
     accessorKey: 'revocationStatus',
-    cell: ({ row }) => (
-      <span>{row.original.revocationStatus ?? 'CREATED'}</span>
-    ),
+    cell: ({ row }) => <span>{getVerifierUserStatus(row.original)}</span>,
     columnFunction: [],
   },
   {

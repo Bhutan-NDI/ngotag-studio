@@ -25,6 +25,13 @@ import {
   updateVerifierRole,
 } from '@/app/api/verifierRoles'
 
+import {
+  getResultMessage,
+  getResultStatusCode,
+  isNotFoundMessage,
+} from '@/lib/mobileVerifierResponse'
+
+import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/generic-table-component/data-table'
@@ -58,6 +65,8 @@ const VerifierRoleList = (): JSX.Element => {
   const [failure, setFailure] = useState<string | null>(null)
   const [isEdit, setIsEdit] = useState(false)
   const [editRoleId, setEditRoleId] = useState<string | null>(null)
+  // a failed load (403, 502, ...) shown above the table; "not found" is just an empty list
+  const [listError, setListError] = useState<string | null>(null)
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -66,6 +75,7 @@ const VerifierRoleList = (): JSX.Element => {
   })
 
   const fetchRoles = async (reload = false): Promise<void> => {
+    setListError(null)
     if (reload) {
       setReloading(true)
     } else {
@@ -89,6 +99,9 @@ const VerifierRoleList = (): JSX.Element => {
         }))
       } else {
         setRoleList([])
+        if (typeof response === 'string' && !isNotFoundMessage(response)) {
+          setListError(response)
+        }
       }
     } catch {
       setRoleList([])
@@ -176,27 +189,29 @@ const VerifierRoleList = (): JSX.Element => {
 
     try {
       if (isEdit && editRoleId) {
-        const res = (await updateVerifierRole(editRoleId, {
+        const res = await updateVerifierRole(editRoleId, {
           role,
           orgId,
-        })) as AxiosResponse
+        })
 
-        if (res?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
-          setSuccess(res?.data?.message || 'Verifier role updated successfully')
+        if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS) {
+          setSuccess(
+            getResultMessage(res, 'Verifier role updated successfully'),
+          )
           fetchRoles(true)
         } else {
-          setFailure(res?.data?.message || 'Failed to update verifier role')
+          setFailure(getResultMessage(res, 'Failed to update verifier role'))
         }
         return
       }
 
-      const res = (await createVerifierRole({ role, orgId })) as AxiosResponse
+      const res = await createVerifierRole({ role, orgId })
 
-      if (res?.data?.statusCode === apiStatusCodes.API_STATUS_CREATED) {
-        setSuccess(res?.data?.message || 'Verifier role created successfully')
+      if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_CREATED) {
+        setSuccess(getResultMessage(res, 'Verifier role created successfully'))
         fetchRoles(true)
       } else {
-        setFailure(res?.data?.message || 'Failed to create verifier role')
+        setFailure(getResultMessage(res, 'Failed to create verifier role'))
       }
     } catch {
       setFailure(
@@ -325,8 +340,17 @@ const VerifierRoleList = (): JSX.Element => {
           handlers={formHandlers}
         />
 
+        {listError && (
+          <AlertComponent
+            message={listError}
+            type="failure"
+            onAlertClose={() => setListError(null)}
+          />
+        )}
+
         <DataTable
           isLoading={loading}
+          hideSearch
           placeHolder="Search by role name"
           data={roleList}
           columns={column}
