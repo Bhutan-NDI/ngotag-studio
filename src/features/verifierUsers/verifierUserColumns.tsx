@@ -4,7 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreVertical, Pencil, ShieldAlert } from 'lucide-react'
+import { MoreVertical, Pencil, Send, ShieldAlert } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { IColumnData } from '@/components/ui/generic-table-component/columns'
@@ -48,16 +48,20 @@ export const getVerifierUserStatus = (verifierUser: VerifierUser): string =>
 
 interface GetVerifierUserColumnDataParams {
   invitingId: string | null
+  issuingId: string | null
   canManage: boolean
   onInvite: (verifierUser: VerifierUser) => void
+  onIssue: (verifierUser: VerifierUser) => void
   onEdit: (verifierUser: VerifierUser) => void
   onStatus: (verifierUser: VerifierUser) => void
 }
 
 export const getVerifierUserColumnData = ({
   invitingId,
+  issuingId,
   canManage,
   onInvite,
+  onIssue,
   onEdit,
   onStatus,
 }: GetVerifierUserColumnDataParams): IColumnData[] => [
@@ -135,6 +139,13 @@ export const getVerifierUserColumnData = ({
           >
             <Pencil className="mr-2 h-4 w-4" />
             Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={!canManage || issuingId === row.original.id}
+            onClick={() => onIssue(row.original)}
+          >
+            <Send className="mr-2 h-4 w-4" />
+            {issuingId === row.original.id ? 'Sending...' : 'Send credential'}
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!canManage}

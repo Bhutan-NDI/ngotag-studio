@@ -91,6 +91,25 @@ export const updateVerifierUserStatus = async (
   }
 }
 
+// Sends the Mobile Verifier credential offer to the verifier user's email.
+export const sendVerifierUserIssuance = async (
+  id: string,
+  orgId: string,
+): Promise<string | AxiosResponse> => {
+  const axiosPayload = {
+    url: `${apiRoutes.mobileVerifier.verifierUser}/${id}/send-issuance?orgId=${orgId}`,
+    payload: {},
+    config: getHeaderConfigs(),
+  }
+
+  try {
+    return await axiosPost(axiosPayload)
+  } catch (error) {
+    const err = error as Error
+    return err?.message
+  }
+}
+
 export const inviteVerifierUser = async (
   email: string,
   orgId: string,

@@ -25,6 +25,7 @@ import {
   createVerifierUser,
   getVerifierUsers,
   inviteVerifierUser,
+  sendVerifierUserIssuance,
   updateVerifierUser,
   updateVerifierUserStatus,
 } from '@/app/api/verifierUsers'
@@ -72,6 +73,7 @@ const VerifierUserList = (): JSX.Element => {
   const [success, setSuccess] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [invitingId, setInvitingId] = useState<string | null>(null)
+  const [issuingId, setIssuingId] = useState<string | null>(null)
   // a failed load (no webhook registered, 403, 502, ...) shown above the table
   const [listError, setListError] = useState<string | null>(null)
   const [openStatus, setOpenStatus] = useState(false)
@@ -360,10 +362,43 @@ const VerifierUserList = (): JSX.Element => {
     }
   }
 
+  const handleSendIssuance = async (
+    verifierUser: VerifierUser,
+  ): Promise<void> => {
+    if (!orgId) {
+      toast.error('No organization selected')
+      return
+    }
+
+    setIssuingId(verifierUser.id)
+
+    try {
+      const res = await sendVerifierUserIssuance(verifierUser.id, orgId)
+      const statusCode = getResultStatusCode(res)
+
+      if (
+        statusCode === apiStatusCodes.API_STATUS_SUCCESS ||
+        statusCode === apiStatusCodes.API_STATUS_CREATED
+      ) {
+        toast.success(
+          getResultMessage(res, 'Credential issuance sent successfully'),
+        )
+      } else {
+        toast.error(getResultMessage(res, 'Failed to send credential issuance'))
+      }
+    } catch {
+      toast.error('Failed to send credential issuance')
+    } finally {
+      setIssuingId(null)
+    }
+  }
+
   const columnData = getVerifierUserColumnData({
     invitingId,
+    issuingId,
     canManage,
     onInvite: handleInvite,
+    onIssue: handleSendIssuance,
     onEdit: openEdit,
     onStatus: openStatusDialog,
   })
