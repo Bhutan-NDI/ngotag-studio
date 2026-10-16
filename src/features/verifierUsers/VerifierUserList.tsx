@@ -6,6 +6,12 @@ import {
   getColumns,
 } from '@/components/ui/generic-table-component/columns'
 import { MOBILE_VERIFIER_ROLES, useHasOrgRole } from '@/lib/useOrgRoleAccess'
+import {
+  MobileVerifierError,
+  getResultMessage,
+  getResultStatusCode,
+  isMobileVerifierError,
+} from '@/lib/mobileVerifierResponse'
 import { Plus, RefreshCw } from 'lucide-react'
 import React, { JSX, useEffect, useState } from 'react'
 import {
@@ -29,12 +35,6 @@ import {
   updateVerifierUser,
   updateVerifierUserStatus,
 } from '@/app/api/verifierUsers'
-
-import {
-  getResultMessage,
-  getResultStatusCode,
-  isNotFoundMessage,
-} from '@/lib/mobileVerifierResponse'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { AxiosResponse } from 'axios'
@@ -75,7 +75,7 @@ const VerifierUserList = (): JSX.Element => {
   const [invitingId, setInvitingId] = useState<string | null>(null)
   const [issuingId, setIssuingId] = useState<string | null>(null)
   // a failed load (no webhook registered, 403, 502, ...) shown above the table
-  const [listError, setListError] = useState<string | null>(null)
+  const [listError, setListError] = useState<MobileVerifierError | null>(null)
   const [openStatus, setOpenStatus] = useState(false)
   const [statusUser, setStatusUser] = useState<VerifierUser | null>(null)
   const [selectedStatus, setSelectedStatus] = useState<string>(
@@ -114,8 +114,8 @@ const VerifierUserList = (): JSX.Element => {
         }))
       } else {
         setUserList([])
-        // "not found" is just an empty list; anything else (e.g. no webhook registered) is a real error
-        if (typeof response === 'string' && !isNotFoundMessage(response)) {
+        // The list has no "no users" 404: a 404 here means no webhook is registered.
+        if (isMobileVerifierError(response)) {
           setListError(response)
         }
       }
@@ -492,11 +492,11 @@ const VerifierUserList = (): JSX.Element => {
         {listError && (
           <div className="mb-2">
             <AlertComponent
-              message={listError}
+              message={listError.message}
               type="failure"
               onAlertClose={() => setListError(null)}
             />
-            {/webhook/i.test(listError) && (
+            {listError.statusCode === 404 && (
               <Link
                 href="/mobile-verifier/webhook"
                 className="text-sm underline"

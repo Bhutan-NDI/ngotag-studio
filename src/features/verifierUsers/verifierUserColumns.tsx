@@ -138,7 +138,7 @@ export const getVerifierUserColumnData = ({
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent align="end" className="w-64">
           <DropdownMenuItem
             disabled={!canManage}
             onClick={() => onEdit(row.original)}
@@ -152,15 +152,22 @@ export const getVerifierUserColumnData = ({
               issuingId === row.original.id ||
               isIssuanceBlocked(row.original)
             }
-            title={
-              isIssuanceBlocked(row.original)
-                ? 'A suspended or revoked user cannot be issued a credential'
-                : undefined
-            }
             onClick={() => onIssue(row.original)}
           >
             <Send className="mr-2 h-4 w-4" />
-            {issuingId === row.original.id ? 'Sending...' : 'Send credential'}
+            <div className="flex flex-col">
+              <span>
+                {issuingId === row.original.id
+                  ? 'Sending...'
+                  : 'Send credential'}
+              </span>
+              {/* a disabled item gets no hover, so a title tooltip would never show */}
+              {isIssuanceBlocked(row.original) && (
+                <span className="text-muted-foreground text-xs">
+                  Not available while suspended or revoked
+                </span>
+              )}
+            </div>
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={!canManage}

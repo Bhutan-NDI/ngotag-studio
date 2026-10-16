@@ -1,6 +1,10 @@
+import {
+  MobileVerifierResult,
+  toMobileVerifierError,
+} from '@/lib/mobileVerifierResponse'
+
 import { axiosGet, axiosPatch, axiosPost } from '@/services/apiRequests'
 
-import { AxiosResponse } from 'axios'
 import { apiRoutes } from '@/config/apiRoutes'
 import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 
@@ -22,7 +26,7 @@ export interface IGetVerifierUsersParams {
 
 export const getVerifierUsers = async (
   params: IGetVerifierUsersParams,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const url = `${apiRoutes.mobileVerifier.verifierUser}?orgId=${params.orgId}&page=${params.page}&pageSize=${params.pageSize}`
   const axiosPayload = {
     url,
@@ -32,14 +36,13 @@ export const getVerifierUsers = async (
   try {
     return await axiosGet(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const createVerifierUser = async (
   payload: IVerifierUserPayload,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: apiRoutes.mobileVerifier.verifierUserCreate,
     payload,
@@ -49,15 +52,14 @@ export const createVerifierUser = async (
   try {
     return await axiosPost(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const updateVerifierUser = async (
   id: string,
   payload: IVerifierUserPayload,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.verifierUser}/${id}`,
     payload,
@@ -67,8 +69,7 @@ export const updateVerifierUser = async (
   try {
     return await axiosPatch(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
@@ -76,7 +77,7 @@ export const updateVerifierUserStatus = async (
   id: string,
   orgId: string,
   status: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.verifierUser}/${id}/status?orgId=${orgId}`,
     payload: { status },
@@ -86,8 +87,7 @@ export const updateVerifierUserStatus = async (
   try {
     return await axiosPatch(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
@@ -95,7 +95,7 @@ export const updateVerifierUserStatus = async (
 export const sendVerifierUserIssuance = async (
   id: string,
   orgId: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.verifierUser}/${id}/send-issuance?orgId=${orgId}`,
     payload: {},
@@ -105,15 +105,14 @@ export const sendVerifierUserIssuance = async (
   try {
     return await axiosPost(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const inviteVerifierUser = async (
   email: string,
   orgId: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.verifierUser}/invite?orgId=${orgId}`,
     payload: { email },
@@ -123,7 +122,6 @@ export const inviteVerifierUser = async (
   try {
     return await axiosPost(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }

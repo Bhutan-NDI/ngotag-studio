@@ -28,7 +28,8 @@ import {
 import {
   getResultMessage,
   getResultStatusCode,
-  isNotFoundMessage,
+  isMobileVerifierError,
+  isNotFoundError,
 } from '@/lib/mobileVerifierResponse'
 
 import { AlertComponent } from '@/components/AlertComponent'
@@ -99,8 +100,8 @@ const VerifierRoleList = (): JSX.Element => {
         }))
       } else {
         setRoleList([])
-        if (typeof response === 'string' && !isNotFoundMessage(response)) {
-          setListError(response)
+        if (isMobileVerifierError(response) && !isNotFoundError(response)) {
+          setListError(response.message)
         }
       }
     } catch {

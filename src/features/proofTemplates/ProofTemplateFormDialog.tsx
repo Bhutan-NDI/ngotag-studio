@@ -24,6 +24,8 @@ export interface ProofTemplateFormState {
   version: string
   payloadData: DifPayloadEntry[]
   verifierRoleIds: string[]
+  // false when an edited template's current roles could not be loaded
+  rolesLoaded: boolean
   isEdit: boolean
   creating: boolean
   success: string | null
@@ -65,6 +67,7 @@ const ProofTemplateFormDialog = ({
     version,
     payloadData,
     verifierRoleIds,
+    rolesLoaded,
     isEdit,
     creating,
     success,
@@ -159,32 +162,45 @@ const ProofTemplateFormDialog = ({
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Verifier Roles</label>
-            <div className="flex flex-wrap gap-3 rounded-md border p-2">
-              {availableRoles.length === 0 && (
-                <span className="text-muted-foreground text-sm">
-                  No verifier roles yet — create one first.
-                </span>
-              )}
-              {availableRoles.map((r) => (
-                <label key={r.id} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={verifierRoleIds.includes(r.id)}
-                    onChange={() => toggleVerifierRoleId(r.id)}
-                  />
-                  {r.role}
-                </label>
-              ))}
-            </div>
-            {isEdit && (
+          {isEdit && !rolesLoaded ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Verifier Roles</label>
               <p className="text-muted-foreground text-xs">
-                Saving replaces this template&apos;s role assignments with the
-                roles ticked above.
+                The roles currently assigned to this template could not be
+                loaded, so they will be left unchanged.
               </p>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Verifier Roles</label>
+              <div className="flex flex-wrap gap-3 rounded-md border p-2">
+                {availableRoles.length === 0 && (
+                  <span className="text-muted-foreground text-sm">
+                    No verifier roles yet — create one first.
+                  </span>
+                )}
+                {availableRoles.map((r) => (
+                  <label
+                    key={r.id}
+                    className="flex items-center gap-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={verifierRoleIds.includes(r.id)}
+                      onChange={() => toggleVerifierRoleId(r.id)}
+                    />
+                    {r.role}
+                  </label>
+                ))}
+              </div>
+              {isEdit && (
+                <p className="text-muted-foreground text-xs">
+                  Saving replaces this template&apos;s role assignments with the
+                  roles ticked above.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-sm font-medium">

@@ -1,6 +1,10 @@
+import {
+  MobileVerifierResult,
+  toMobileVerifierError,
+} from '@/lib/mobileVerifierResponse'
+
 import { axiosGet, axiosPatch, axiosPost } from '@/services/apiRequests'
 
-import { AxiosResponse } from 'axios'
 import { apiRoutes } from '@/config/apiRoutes'
 import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 
@@ -32,7 +36,7 @@ export interface IGetProofTemplatesParams {
 // Every template of the organization, whether or not it is mapped to a verifier role.
 export const getProofTemplates = async (
   params: IGetProofTemplatesParams,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const url = `${apiRoutes.mobileVerifier.proofTemplate}?orgId=${params.orgId}&page=${params.page}&pageSize=${params.pageSize}&search=${encodeURIComponent(params.search ?? '')}`
   const axiosPayload = {
     url,
@@ -42,8 +46,7 @@ export const getProofTemplates = async (
   try {
     return await axiosGet(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
@@ -51,7 +54,7 @@ export const getProofTemplates = async (
 export const getProofTemplateById = async (
   orgId: string,
   id: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.proofTemplate}?orgId=${orgId}&id=${id}`,
     config: getHeaderConfigs(),
@@ -60,14 +63,13 @@ export const getProofTemplateById = async (
   try {
     return await axiosGet(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const getRoleProofTemplates = async (
   params: IGetRoleProofTemplatesParams,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const url = `${apiRoutes.mobileVerifier.proofTemplateRole}?orgId=${params.orgId}&roleId=${params.roleId}&page=${params.page}&pageSize=${params.pageSize}&search=${encodeURIComponent(params.search ?? '')}`
   const axiosPayload = {
     url,
@@ -77,14 +79,13 @@ export const getRoleProofTemplates = async (
   try {
     return await axiosGet(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const createProofTemplate = async (
   payload: IProofTemplatePayload,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: apiRoutes.mobileVerifier.proofTemplate,
     payload,
@@ -94,8 +95,7 @@ export const createProofTemplate = async (
   try {
     return await axiosPost(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
@@ -103,7 +103,7 @@ export const updateProofTemplate = async (
   id: string,
   orgId: string,
   payload: Partial<IProofTemplatePayload>,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.proofTemplate}/${id}?orgId=${orgId}`,
     payload,
@@ -113,7 +113,6 @@ export const updateProofTemplate = async (
   try {
     return await axiosPatch(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }

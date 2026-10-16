@@ -40,6 +40,7 @@ const roleNamesOf = (template: ProofTemplateRow): string[] =>
 export const useProofTemplateColumns = (
   onEdit: (template: ProofTemplateRow) => void,
   canManage: boolean,
+  showRoles = true,
 ): ColumnDef<ProofTemplateRow>[] => {
   const actionCell = ({
     row,
@@ -121,6 +122,11 @@ export const useProofTemplateColumns = (
   ]
 
   const metadata: ITableMetadata = { enableSelection: false }
-  const tableStyling: TableStyling = { metadata, columnData }
+  const tableStyling: TableStyling = {
+    metadata,
+    columnData: columnData.filter(
+      (column) => showRoles || column.id !== 'roles',
+    ),
+  }
   return getColumns<ProofTemplateRow>(tableStyling)
 }

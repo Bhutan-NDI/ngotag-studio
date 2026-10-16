@@ -1,6 +1,6 @@
 'use client'
 
-import { JSX, useEffect, useState } from 'react'
+import { JSX, useEffect, useRef, useState } from 'react'
 import { MOBILE_VERIFIER_ROLES, useHasOrgRole } from '@/lib/useOrgRoleAccess'
 import { Plus, RefreshCw } from 'lucide-react'
 import ProofTemplateFormDialog, {
@@ -21,7 +21,8 @@ import {
 import {
   getResultMessage,
   getResultStatusCode,
-  isNotFoundMessage,
+  isMobileVerifierError,
+  isNotFoundError,
 } from '@/lib/mobileVerifierResponse'
 
 import { AlertComponent } from '@/components/AlertComponent'
@@ -75,6 +76,8 @@ const ProofTemplateList = (): JSX.Element => {
   const [verifierRoleIds, setVerifierRoleIds] = useState<string[]>([])
   // roles the template had when the edit form was opened
   const [originalRoleIds, setOriginalRoleIds] = useState<string[]>([])
+  // false when the template's current roles could not be loaded: they are then left unchanged
+  const [rolesLoaded, setRolesLoaded] = useState(true)
   const [success, setSuccess] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
   const [isEdit, setIsEdit] = useState(false)
@@ -90,6 +93,11 @@ const ProofTemplateList = (): JSX.Element => {
     searchTerm: '',
   })
 
+  // Only the latest request may update the page: switching org (or role/page) fires a new
+  // request while an older one may still be in flight and resolve last.
+  const rolesRequest = useRef(0)
+  const templatesRequest = useRef(0)
+
   const closeForm = (): void => {
     setOpenCreate(false)
     setIsEdit(false)
@@ -101,10 +109,15 @@ const ProofTemplateList = (): JSX.Element => {
     setPayloadData([])
     setVerifierRoleIds([])
     setOriginalRoleIds([])
+    setRolesLoaded(true)
   }
 
   const fetchRoles = async (): Promise<void> => {
+    const requestId = ++rolesRequest.current
     const response = await getVerifierRoles({ orgId, page: 1, pageSize: 100 })
+    if (requestId !== rolesRequest.current) {
+      return
+    }
     const { data } = (response as AxiosResponse) ?? {}
     // An org with no roles comes back as a non-success (404), so always replace the
     // list; otherwise the previous org's roles would stay selectable for this one.
@@ -112,8 +125,8 @@ const ProofTemplateList = (): JSX.Element => {
       data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS
         ? (data?.data ?? [])
         : []
-    if (typeof response === 'string' && !isNotFoundMessage(response)) {
-      setListError(response)
+    if (isMobileVerifierError(response) && !isNotFoundError(response)) {
+      setListError(response.message)
     }
     setRoles(list)
     // '' means "All roles" (every template of the org); keep a still-valid role filter.
@@ -121,6 +134,9 @@ const ProofTemplateList = (): JSX.Element => {
   }
 
   const fetchTemplates = async (reload = false): Promise<void> => {
+    const requestId = ++templatesRequest.current
+    const isLatest = (): boolean => requestId === templatesRequest.current
+
     setListError(null)
     if (reload) {
       setReloading(true)
@@ -139,6 +155,9 @@ const ProofTemplateList = (): JSX.Element => {
       const response = selectedRoleId
         ? await getRoleProofTemplates({ ...query, roleId: selectedRoleId })
         : await getProofTemplates(query)
+      if (!isLatest()) {
+        return
+      }
       const { data } = response as AxiosResponse
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
@@ -154,26 +173,31 @@ const ProofTemplateList = (): JSX.Element => {
         }))
       } else {
         setTemplateList([])
-        if (typeof response === 'string' && !isNotFoundMessage(response)) {
-          setListError(response)
+        if (isMobileVerifierError(response) && !isNotFoundError(response)) {
+          setListError(response.message)
         }
       }
     } catch {
-      setTemplateList([])
+      if (isLatest()) {
+        setTemplateList([])
+      }
     } finally {
-      if (reload) {
+      if (isLatest()) {
         setReloading(false)
-      } else {
         setLoading(false)
       }
     }
   }
 
   useEffect(() => {
-    // drop the previous org's roles/templates immediately on org switch
+    // drop the previous org's roles/templates (and its page/search) immediately on org
+    // switch, and invalidate anything still in flight for it
+    rolesRequest.current++
+    templatesRequest.current++
     setRoles([])
     setSelectedRoleId('')
     setTemplateList([])
+    setPagination((prev) => ({ ...prev, pageIndex: 0, searchTerm: '' }))
 
     if (!orgId) {
       setLoading(false)
@@ -238,12 +262,15 @@ const ProofTemplateList = (): JSX.Element => {
 
     // The per-role list does not carry the role mapping, so fetch the template itself.
     let mappings = template.verifierRoleToProofTemplates
-    if (!mappings) {
+    if (!Array.isArray(mappings)) {
+      mappings = undefined
       const response = await getProofTemplateById(orgId, template.id)
-      if (getResultStatusCode(response) === apiStatusCodes.API_STATUS_SUCCESS) {
-        mappings =
-          (response as AxiosResponse).data.data?.verifierRoleToProofTemplates ??
-          []
+      const fetched =
+        getResultStatusCode(response) === apiStatusCodes.API_STATUS_SUCCESS
+          ? (response as AxiosResponse).data.data?.verifierRoleToProofTemplates
+          : undefined
+      if (Array.isArray(fetched)) {
+        mappings = fetched
       } else {
         setFailure(
           getResultMessage(
@@ -253,6 +280,8 @@ const ProofTemplateList = (): JSX.Element => {
         )
       }
     }
+    // Without the current roles, saving must not touch them (the API replaces the whole set).
+    setRolesLoaded(Array.isArray(mappings))
     const currentRoleIds = (mappings ?? [])
       .map((mapping) => mapping.verifierRoleId)
       .filter((id): id is string => Boolean(id))
@@ -295,7 +324,11 @@ const ProofTemplateList = (): JSX.Element => {
       if (isEdit && editTemplateId) {
         // The API replaces the template's roles with the list it receives and cannot clear them,
         // so a template that has roles must keep at least one.
-        if (verifierRoleIds.length === 0 && originalRoleIds.length > 0) {
+        if (
+          rolesLoaded &&
+          verifierRoleIds.length === 0 &&
+          originalRoleIds.length > 0
+        ) {
           setFailure('Select at least one verifier role')
           setCreating(false)
           return
@@ -305,7 +338,9 @@ const ProofTemplateList = (): JSX.Element => {
           description,
           version,
           payload,
-          ...(verifierRoleIds.length > 0 ? { verifierRoleIds } : {}),
+          ...(rolesLoaded && verifierRoleIds.length > 0
+            ? { verifierRoleIds }
+            : {}),
         })
 
         if (getResultStatusCode(res) === apiStatusCodes.API_STATUS_SUCCESS) {
@@ -346,7 +381,8 @@ const ProofTemplateList = (): JSX.Element => {
     }
   }
 
-  const column = useProofTemplateColumns(openEdit, canManage)
+  // the per-role list does not carry each template's roles, so the column only fits "All roles"
+  const column = useProofTemplateColumns(openEdit, canManage, !selectedRoleId)
 
   const formState: ProofTemplateFormState = {
     templateId,
@@ -355,6 +391,7 @@ const ProofTemplateList = (): JSX.Element => {
     version,
     payloadData,
     verifierRoleIds,
+    rolesLoaded,
     isEdit,
     creating,
     success,
@@ -446,6 +483,7 @@ const ProofTemplateList = (): JSX.Element => {
         )}
 
         <DataTable
+          key={orgId}
           isLoading={loading}
           placeHolder="Search by template name"
           data={templateList}

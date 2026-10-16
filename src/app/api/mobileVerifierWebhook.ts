@@ -1,6 +1,10 @@
+import {
+  MobileVerifierResult,
+  toMobileVerifierError,
+} from '@/lib/mobileVerifierResponse'
+
 import { axiosGet, axiosPost } from '@/services/apiRequests'
 
-import { AxiosResponse } from 'axios'
 import { apiRoutes } from '@/config/apiRoutes'
 import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 
@@ -28,7 +32,7 @@ export interface IWebhookPayload {
 export const getWebhook = async (
   orgId: string,
   webhookId?: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const url = webhookId
     ? `${apiRoutes.mobileVerifier.webhook}?orgId=${orgId}&webhookId=${encodeURIComponent(webhookId)}`
     : `${apiRoutes.mobileVerifier.webhook}?orgId=${orgId}`
@@ -40,15 +44,14 @@ export const getWebhook = async (
   try {
     return await axiosGet(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }
 
 export const registerWebhook = async (
   payload: IWebhookPayload,
   orgId: string,
-): Promise<string | AxiosResponse> => {
+): Promise<MobileVerifierResult> => {
   const axiosPayload = {
     url: `${apiRoutes.mobileVerifier.webhookRegister}?orgId=${orgId}`,
     payload,
@@ -58,7 +61,6 @@ export const registerWebhook = async (
   try {
     return await axiosPost(axiosPayload)
   } catch (error) {
-    const err = error as Error
-    return err?.message
+    return toMobileVerifierError(error)
   }
 }

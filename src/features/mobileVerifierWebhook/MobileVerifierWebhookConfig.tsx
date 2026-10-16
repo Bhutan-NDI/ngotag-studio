@@ -11,7 +11,8 @@ import React, { JSX, useEffect, useState } from 'react'
 import {
   getResultMessage,
   getResultStatusCode,
-  isNotFoundMessage,
+  isMobileVerifierError,
+  isNotFoundError,
 } from '@/lib/mobileVerifierResponse'
 
 import { AlertComponent } from '@/components/AlertComponent'
@@ -82,9 +83,9 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
       if (cancelled) {
         return
       }
-      if (typeof res === 'string') {
-        if (!isNotFoundMessage(res)) {
-          setFailure(res)
+      if (isMobileVerifierError(res)) {
+        if (!isNotFoundError(res)) {
+          setFailure(res.message)
         }
         return
       }
@@ -118,13 +119,13 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
 
     try {
       const res = await getWebhook(orgId, webhookId)
-      if (typeof res === 'string') {
+      if (isMobileVerifierError(res)) {
         // only a real "not found" means there is nothing registered under this ID; any other
         // failure (401, 500, network) must not suggest registering over a working webhook
         setFailure(
-          isNotFoundMessage(res)
+          isNotFoundError(res)
             ? 'No webhook found for this ID — fill in the fields below to register one'
-            : res,
+            : res.message,
         )
         return
       }
