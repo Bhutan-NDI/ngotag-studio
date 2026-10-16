@@ -322,6 +322,11 @@ const ProofTemplateList = (): JSX.Element => {
       return
     }
 
+    if (!isEdit && !description.trim()) {
+      setFailure('Description is required')
+      return
+    }
+
     if (payloadData.length === 0) {
       setFailure('Select at least one schema attribute')
       return

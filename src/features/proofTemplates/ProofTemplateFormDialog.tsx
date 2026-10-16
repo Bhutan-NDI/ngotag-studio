@@ -142,7 +142,10 @@ const ProofTemplateFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Description</label>
+            {/* required on create (the API rejects an empty one); optional on update */}
+            <label className="text-sm font-medium">
+              Description{isEdit ? '' : ' *'}
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -224,6 +227,7 @@ const ProofTemplateFormDialog = ({
               disabled={
                 creating ||
                 !name.trim() ||
+                (!isEdit && !description.trim()) ||
                 !templateId.trim() ||
                 payloadData.length === 0
               }
