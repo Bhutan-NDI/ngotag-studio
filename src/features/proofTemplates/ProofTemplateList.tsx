@@ -97,8 +97,12 @@ const ProofTemplateList = (): JSX.Element => {
   // request while an older one may still be in flight and resolve last.
   const rolesRequest = useRef(0)
   const templatesRequest = useRef(0)
+  // The edit form loads the template's roles asynchronously; a newer edit, closing the form
+  // or switching org must discard a response for an older edit.
+  const editRequest = useRef(0)
 
   const closeForm = (): void => {
+    editRequest.current++
     setOpenCreate(false)
     setIsEdit(false)
     setEditTemplateId(null)
@@ -194,6 +198,7 @@ const ProofTemplateList = (): JSX.Element => {
     // switch, and invalidate anything still in flight for it
     rolesRequest.current++
     templatesRequest.current++
+    editRequest.current++
     setRoles([])
     setSelectedRoleId('')
     setTemplateList([])
@@ -250,6 +255,7 @@ const ProofTemplateList = (): JSX.Element => {
   }
 
   const openEdit = async (template: ProofTemplateRow): Promise<void> => {
+    const requestId = ++editRequest.current
     setSuccess(null)
     setFailure(null)
     setIsEdit(true)
@@ -265,6 +271,10 @@ const ProofTemplateList = (): JSX.Element => {
     if (!Array.isArray(mappings)) {
       mappings = undefined
       const response = await getProofTemplateById(orgId, template.id)
+      // another template was opened, or the form was closed, while this one was loading
+      if (requestId !== editRequest.current) {
+        return
+      }
       const fetched =
         getResultStatusCode(response) === apiStatusCodes.API_STATUS_SUCCESS
           ? (response as AxiosResponse).data.data?.verifierRoleToProofTemplates
