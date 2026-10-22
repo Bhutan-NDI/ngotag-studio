@@ -19,7 +19,7 @@ import { roleIn, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { daysLeft, dsgPill, kindsInWords } from "./shared";
+import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindsInWords } from "./shared";
 
 /**
  * SCR-DSG-03 — What is being proposed. FLOW-ORG-02 A2: the authority's
@@ -45,6 +45,20 @@ import { daysLeft, dsgPill, kindsInWords } from "./shared";
  */
 type Face = "live" | "default" | "loading" | "empty" | "error" | "success" | "offline" | "no_permission";
 
+/**
+ * What an old link says once the designation has moved on — one sentence
+ * per state the authority has been told about, so nothing is reported as
+ * accepted that wasn't. PENDING is the screen itself; PROPOSED and REFUSED
+ * are NDI's own process and show the empty state (FLOW-ORG-02 A1).
+ */
+const OPENED_LATER: Record<"ACCEPTED" | "ACTIVE" | "DECLINED" | "EXPIRED" | "SUSPENDED", string> = {
+  ACCEPTED: "You've accepted this. NDI is finishing switching it on — your authority console shows where it stands.",
+  ACTIVE: "You've accepted this, and your organisation is designated. Your authority console shows what's live.",
+  DECLINED: "You've declined. Nothing was created and NDI has been told.",
+  EXPIRED: "This expired without being accepted. NDI would need to propose it again.",
+  SUSPENDED: "Your designation is suspended. Businesses already confirmed stay confirmed. Your authority console shows why.",
+};
+
 export function AcceptDesignationView({ id }: { id: string }) {
   const router = useRouter();
   const { designations, organizations, currentPerson, personById, acceptDesignation, declineDesignation, hydrated } = useDemo();
@@ -60,7 +74,12 @@ export function AcceptDesignationView({ id }: { id: string }) {
   const owner = org ? roleIn(org, currentPerson) === "Owner" : false;
   const ownerName = org ? Object.entries(org.roles ?? {}).find(([, r]) => r === "Owner")?.[0] : undefined;
 
-  const natural: Face = !d
+  /* Before the second administrator approves (FLOW-ORG-02 A1, "none to the
+     authority until A2"), and after one refuses, there is nothing the
+     authority has been told — so an old or guessed link shows the same
+     empty state as no designation at all, not NDI's internal process. */
+  const notYetTheirs = d?.state === "PROPOSED" || d?.state === "REFUSED";
+  const natural: Face = !d || notYetTheirs
     ? "empty"
     : outcome
       ? "success"
@@ -87,7 +106,7 @@ export function AcceptDesignationView({ id }: { id: string }) {
   }
 
   /* Something already decided, opened from an old link: say where it went. */
-  if (forced === "live" && d && d.state !== "PENDING" && !outcome) {
+  if (forced === "live" && d && d.state !== "PENDING" && !notYetTheirs && !outcome) {
     {
       const pill = dsgPill(d, "authority");
       return (
@@ -97,14 +116,8 @@ export function AcceptDesignationView({ id }: { id: string }) {
             <Panel>
               <div className="relative z-[4] flex flex-col gap-3">
                 <StatusPill status={pill.status} label={pill.label} />
-                <p className="m-0 text-[14px] leading-[1.6] text-body">
-                  {d.state === "DECLINED"
-                    ? "You've declined. Nothing was created and NDI has been told."
-                    : d.state === "EXPIRED"
-                      ? "This expired without being accepted. NDI would need to propose it again."
-                      : "This has been accepted. Your authority console shows where it stands."}
-                </p>
-                {d.state === "ACTIVE" || d.state === "ACCEPTED" ? (
+                <p className="m-0 text-[14px] leading-[1.6] text-body">{OPENED_LATER[d.state as keyof typeof OPENED_LATER]}</p>
+                {d.state === "ACTIVE" || d.state === "ACCEPTED" || d.state === "SUSPENDED" ? (
                   <div>
                     <GradientButton onClick={() => router.push("/authority")}>Go to your authority console</GradientButton>
                   </div>
@@ -132,31 +145,7 @@ export function AcceptDesignationView({ id }: { id: string }) {
 
   const shown: Designation =
     d ??
-    ({
-      id,
-      orgId: "org-moice",
-      orgName: "Ministry of Industry, Commerce & Employment",
-      kind: "E",
-      entityTypes: ["sole_proprietorship", "partnership"],
-      legalBasis: "The licensing of businesses under the Ministry's mandate",
-      legalRef: "NDI/DSG/2026/002",
-      state: "PENDING",
-      proposedBy: "tshering",
-      proposedAt: null,
-      approvedBy: "tshendu",
-      approvedAt: null,
-      acceptedBy: null,
-      acceptedAt: null,
-      refusedReason: null,
-      expiresAt: null,
-      activatedAt: null,
-      didMethodAtActivation: null,
-      checks: null,
-      checkedAt: null,
-      ndiAccess: "ACTIVE",
-      ndiAccessChangedBy: null,
-      ndiAccessChangedAt: null,
-    } satisfies Designation);
+{ ...SAMPLE_DESIGNATION, id };
   const name = shown.orgName;
   const types = kindsInWords(shown.entityTypes);
 
@@ -172,7 +161,11 @@ export function AcceptDesignationView({ id }: { id: string }) {
       const r = acceptDesignation(shown.id);
       setBusy(false);
       if (!r.ok) {
-        setFailed(true);
+        /* E6: the store has already moved it to EXPIRED, so a retry would
+           only fail again. The page re-renders as the expired outcome
+           ("This expired without being accepted"); the generic "try again"
+           would be untrue. */
+        if (r.error !== "E6") setFailed(true);
         return;
       }
       setOutcome("accepted");
@@ -244,7 +237,16 @@ export function AcceptDesignationView({ id }: { id: string }) {
                 ...(shown.legalRef ? [{ label: "Reference", value: shown.legalRef, mono: true }] : []),
                 { label: "Proposed by", value: shown.proposedBy ? `${personById(shown.proposedBy).name}, NDI` : "NDI" },
                 { label: "Approved by", value: shown.approvedBy ? `${personById(shown.approvedBy).name}, NDI` : "NDI" },
-                { label: "Time to decide", value: `${daysLeft(shown.expiresAt) || 30} days${shown.expiresAt ? `, until ${formatDate(shown.expiresAt)}` : ""}` },
+                {
+                  label: "Time to decide",
+                  /* 30 is the window when nothing has started it yet; a real
+                     0 is the last day, not a missing date. */
+                  value: !shown.expiresAt
+                    ? "30 days"
+                    : daysLeft(shown.expiresAt) === 0
+                      ? `Today is the last day (${formatDate(shown.expiresAt)})`
+                      : `${daysLeft(shown.expiresAt)} days, until ${formatDate(shown.expiresAt)}`,
+                },
               ]}
             />
 

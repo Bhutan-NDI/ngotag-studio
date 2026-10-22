@@ -659,7 +659,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "NDI fixes its own part",
     happening:
       "Each check says passed or failed in words, what was observed, and who resolves it. This one is NDI's.",
-    doThis: "Press **Grant them**, then **Re-run checks**. When it says the ministry is designated, press **Next**.",
+    doThis: "Press **Grant them** — the checks run again. When it says the ministry is designated, press **Next**.",
     say: "The one screen where the mechanism is named — because somebody has to act on it.",
     match: "^/admin/designations/dsg-[^/]+/activation$",
   },

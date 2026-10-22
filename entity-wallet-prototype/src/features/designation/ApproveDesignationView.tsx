@@ -21,7 +21,7 @@ import { isNamedAdmin, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { daysLeft, dsgPill, kindSingular, kindsInWords } from "./shared";
+import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindSingular, kindsInWords } from "./shared";
 
 /**
  * SCR-DSG-02 — Approve a designation. FLOW-ORG-02 A1: dual control, for a
@@ -73,31 +73,7 @@ export function ApproveDesignationView({ id }: { id: string }) {
   const sample: Designation | undefined =
     live ??
     (forced !== "live" && forced !== "empty"
-      ? {
-          id,
-          orgId: "org-moice",
-          orgName: "Ministry of Industry, Commerce & Employment",
-          kind: "E",
-          entityTypes: ["sole_proprietorship", "partnership"],
-          legalBasis: "The licensing of businesses under the Ministry's mandate",
-          legalRef: "NDI/DSG/2026/002",
-          state: "PROPOSED",
-          proposedBy: "tshering",
-          proposedAt: new Date().toISOString().slice(0, 10),
-          approvedBy: null,
-          approvedAt: null,
-          acceptedBy: null,
-          acceptedAt: null,
-          refusedReason: null,
-          expiresAt: null,
-          activatedAt: null,
-          didMethodAtActivation: null,
-          checks: null,
-          checkedAt: null,
-          ndiAccess: "ACTIVE",
-          ndiAccessChangedBy: null,
-          ndiAccessChangedAt: null,
-        }
+      ? { ...SAMPLE_DESIGNATION, id, state: "PROPOSED", approvedBy: null, proposedAt: new Date().toISOString().slice(0, 10) }
       : undefined);
   const d: Designation | undefined = sample && forced === "expired" ? { ...sample, state: "EXPIRED" } : sample;
 

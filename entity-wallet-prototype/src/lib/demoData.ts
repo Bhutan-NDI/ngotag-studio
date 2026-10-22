@@ -1415,7 +1415,19 @@ export interface ArtefactObjection {
   note: string;
   by: PersonId;
   at: string;
+  /** When the authority and NDI agreed a change. An objection naming an item is resolved by taking it out. */
+  resolvedAt?: string | null;
 }
+
+/**
+ * Whether an objection is still holding adoption (FLOW-ORG-03 E4, "resolved
+ * by agreement, not by override"). One that names an over-broad item is
+ * resolved by taking the item out of what is adopted. One with no item — the
+ * officer objects to the draft as a whole — holds adoption until the
+ * authority and NDI agree, rather than adopting the full set while the
+ * banner says it was sent back.
+ */
+export const objectionHolds = (o: ArtefactObjection | undefined) => Boolean(o && !o.item && !o.resolvedAt);
 
 /**
  * NDI's drafts for each entity type. The sole proprietorship draft also
@@ -1466,8 +1478,17 @@ export const draftFor = (kind: OrgKind) => ARTEFACT_DRAFTS.find((d) => d.entityT
 export const ISSUER_ENTITLEMENTS = ["schemaCreate", "issuance", "verification"];
 
 /** Whether a designation still stands in the way of another for the same organisation. */
-export const designationInProgress = (d: Pick<Designation, "state">) =>
-  ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state);
+/**
+ * Whether a designation waiting on the authority has run out of its 30 days
+ * (FLOW-ORG-02 E6). Read from the date, like an accreditation's window, so
+ * the admin list, the console and "Propose again" agree without anyone first
+ * having to press Accept to discover it.
+ */
+export const dsgExpired = (d: Pick<Designation, "state" | "expiresAt">, today: string) =>
+  d.state === "PENDING" && Boolean(d.expiresAt && d.expiresAt < today);
+
+export const designationInProgress = (d: Pick<Designation, "state" | "expiresAt">) =>
+  ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state) && !dsgExpired(d, new Date().toISOString().slice(0, 10));
 
 export interface HarnessState {
   /**

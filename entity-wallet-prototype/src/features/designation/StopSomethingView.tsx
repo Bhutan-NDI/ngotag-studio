@@ -12,11 +12,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Select } from "@/components/ui/Select";
 import { Icon } from "@/components/ui/icons";
-import { roleIn, type OrgKind } from "@/lib/demoData";
+import type { OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { NOTHING_UNVERIFIED, kindPlural, kindTitle } from "./shared";
+import { NOTHING_UNVERIFIED, kindPlural, kindTitle, useAuthority } from "./shared";
 
 /**
  * SCR-ADO-04 — Stop something. FLOW-ORG-03 A1–A3: the highest-risk screen
@@ -43,7 +43,7 @@ type Face = "live" | "default" | "loading" | "error" | "success" | "offline" | "
 
 export function StopSomethingView() {
   const router = useRouter();
-  const { designations, adoptions, organizations, currentPerson, personById, activeOrgId, setNdiAccess, stopEntityType, hydrated } = useDemo();
+  const { adoptions, personById, setNdiAccess, stopEntityType, hydrated } = useDemo();
   const forced = useScreenState("SCR-ADO-04", ["live", "default", "loading", "error", "success", "offline", "no_permission"]) as Face;
 
   const [choice, setChoice] = useState<Option | null>(null);
@@ -53,12 +53,7 @@ export function StopSomethingView() {
   const [done, setDone] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
-  const org =
-    organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
-    organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
-  const d = designations.find((x) => x.orgId === org?.id && x.state === "ACTIVE");
-  const owner = org ? roleIn(org, currentPerson) === "Owner" : false;
-  const ownerId = org ? Object.entries(org.roles ?? {}).find(([, r]) => r === "Owner")?.[0] : undefined;
+  const { org, active: d, owner, ownerId } = useAuthority();
   const liveKinds = (d?.entityTypes ?? []).filter((k) => adoptions.some((a) => a.designationId === d?.id && a.entityType === k && a.state === "ACTIVE"));
 
   const natural: Face = done ? "success" : busy ? "loading" : !owner ? "no_permission" : "default";

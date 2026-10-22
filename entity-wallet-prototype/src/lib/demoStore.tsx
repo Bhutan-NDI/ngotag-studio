@@ -59,6 +59,8 @@ import {
   accEnding,
   accInProgress,
   designationInProgress,
+  dsgExpired,
+  objectionHolds,
   draftFor,
   ISSUER_ENTITLEMENTS,
   type ActivationCheck,
@@ -467,6 +469,38 @@ function namedAdminRefusal(me: Person | undefined, log: (text: string, orgId?: s
   if (isNamedAdmin(me)) return null;
   if (me?.platformRole === "root") log("Control failure — the root account tried to act on an accreditation", NDI_ORG);
   return { ok: false, error: "not_admin" };
+}
+
+/**
+ * Runs the activation checks (FLOW-ORG-02 P2–P6) and records the result: the
+ * checks on the designation and, if they all pass, ACTIVE with the two log
+ * entries that say nothing is live until the authority adopts. Accepting,
+ * re-running and granting entitlements all end here, so the record of how a
+ * designation became active never depends on which button did it.
+ */
+function runActivation(
+  s0: DemoState,
+  d: Designation,
+  setState: (f: (s: DemoState) => DemoState) => void,
+  log: (text: string, orgId?: string) => void,
+): boolean {
+  const checks = activationChecks(s0, d);
+  const allPass = checks.every((c) => c.pass);
+  setState((s) => ({
+    ...s,
+    designations: s.designations.map((x) =>
+      x.id !== d.id
+        ? x
+        : allPass
+          ? { ...x, state: "ACTIVE" as const, checks, checkedAt: today(), activatedAt: today(), didMethodAtActivation: "did:ethr" }
+          : { ...x, checks, checkedAt: today() },
+    ),
+  }));
+  if (allPass) {
+    log(`${d.orgName} is designated — nothing is live until it adopts`, NDI_ORG);
+    log("Designated as foundational issuer. Nothing is live in your name yet", d.orgId);
+  }
+  return allPass;
 }
 
 const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1026,7 +1060,7 @@ interface DemoActions {
     entityTypes: OrgKind[];
     legalBasis: string;
     legalRef: string;
-  }) => { ok: true; id: string } | { ok: false; error: "not_admin" | "E12" | "exists" | "invalid" };
+  }) => { ok: true; id: string } | { ok: false; error: "not_admin" | "E12" | "exists" | "covered" | "invalid" };
   /** SCR-DSG-02 — a second named admin decides. Never the proposer (E7), never root. */
   decideDesignation: (
     id: string,
@@ -1047,6 +1081,8 @@ interface DemoActions {
   setNdiAccess: (designationId: string, on: boolean) => { ok: true } | { ok: false; error: "not_owner" };
   /** SCR-ADO-01 — send the draft back with a note (E4). */
   objectToArtefacts: (designationId: string, entityType: OrgKind, item: string | null, note: string) => void;
+  /** Prototype — the authority and NDI agree a change to the draft, releasing a held objection (E4). */
+  resolveObjection: (designationId: string, entityType: OrgKind) => void;
   /**
    * SCR-ADO-02 — adopt the set for an entity type, as one act. A second
    * adoption for a type already live is a new version (A1), and only when
@@ -1056,7 +1092,7 @@ interface DemoActions {
     designationId: string,
     entityType: OrgKind,
     newVersion: boolean,
-  ) => { ok: true; version: number } | { ok: false; error: "E1" | "E5" | "E7" | "not_owner" | "invalid" };
+  ) => { ok: true; version: number } | { ok: false; error: "E1" | "E4" | "E5" | "E7" | "not_owner" | "invalid" };
   /** SCR-ADO-04 Option B — stop an entity type (A2). Nothing is un-verified. */
   stopEntityType: (designationId: string, entityType: OrgKind) => { ok: true } | { ok: false; error: "not_owner" };
 
@@ -1185,6 +1221,20 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       ].slice(0, 20),
     }));
   }, [state.accreditations, hydrated]);
+
+  /* FLOW-ORG-02 E6 — a designation nobody accepted in 30 days expires on its
+     date, for every screen at once. It used to expire only when someone
+     pressed Accept, so until then the list said "0 days left" and "Propose
+     again" returned `exists`. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.designations.some((d) => dsgExpired(d, now))) return;
+    setState((s) => ({
+      ...s,
+      designations: s.designations.map((d) => (dsgExpired(d, now) ? { ...d, state: "EXPIRED" as const } : d)),
+    }));
+  }, [state.designations, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -3398,6 +3448,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            with fewer than two active it is refused up front. */
         if (activeAdmins(s0).length < 2) return { ok: false, error: "E12" };
         if (s0.designations.some((d) => d.orgId === org.id && designationInProgress(d))) return { ok: false, error: "exists" };
+        /* P6 — a kind of business another authority already confirms can't
+           be proposed until that designation is superseded. The form disables
+           the box, but a draft resumed from storage could still carry it, and
+           it would then pass proposal and approval only to fail at activation
+           after three people had acted. So it's refused here, where it counts. */
+        if (
+          input.entityTypes.some((k) =>
+            s0.designations.some((d) => d.orgId !== org.id && designationInProgress(d) && d.state !== "PROPOSED" && d.entityTypes.includes(k)),
+          )
+        )
+          return { ok: false, error: "covered" };
         const id = rid("dsg");
         setState((s) => ({
           ...s,
@@ -3483,22 +3544,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* Only an OWNER of the authority's own organisation (A2). */
         if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
         const accepted: Designation = { ...d, state: "ACCEPTED", acceptedBy: s0.harness.persona, acceptedAt: today(), expiresAt: null };
-        /* Steps 2–3: activation is submitted and checked at once. */
-        const checks = activationChecks({ ...s0, designations: s0.designations.map((x) => (x.id === id ? accepted : x)) }, accepted);
-        const allPass = checks.every((c) => c.pass);
-        setState((s) => ({
-          ...s,
-          designations: s.designations.map((x) =>
-            x.id !== id
-              ? x
-              : allPass
-                ? { ...accepted, state: "ACTIVE" as const, checks, checkedAt: today(), activatedAt: today(), didMethodAtActivation: "did:ethr" }
-                : { ...accepted, checks, checkedAt: today() },
-          ),
-        }));
+        const s1 = { ...s0, designations: s0.designations.map((x) => (x.id === id ? accepted : x)) };
+        setState((s) => ({ ...s, designations: s.designations.map((x) => (x.id === id ? accepted : x)) }));
         log(`${d.orgName} accepted its designation`, NDI_ORG);
         log(`Accepted the designation as foundational issuer`, org.id);
-        return { ok: true, active: allPass };
+        /* Steps 2–3: activation is submitted and checked at once — through
+           the same path a re-run takes, so the audit trail records "designated"
+           whichever way it got there. */
+        return { ok: true, active: runActivation(s1, accepted, setState, log) };
       },
 
       declineDesignation: (id) => {
@@ -3521,35 +3574,23 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const d = s0.designations.find((x) => x.id === id);
         if (!isNamedAdmin(me)) return { ok: false, error: "not_admin" };
         if (!d || (d.state !== "ACCEPTED" && d.state !== "PENDING")) return { ok: false, error: "invalid" };
-        const checks = activationChecks(s0, d);
-        const allPass = checks.every((c) => c.pass);
-        setState((s) => ({
-          ...s,
-          designations: s.designations.map((x) =>
-            x.id !== id
-              ? x
-              : allPass
-                ? { ...x, state: "ACTIVE" as const, checks, checkedAt: today(), activatedAt: today(), didMethodAtActivation: "did:ethr" }
-                : { ...x, checks, checkedAt: today() },
-          ),
-        }));
-        if (allPass) {
-          log(`${d.orgName} is designated — nothing is live until it adopts`, NDI_ORG);
-          log("Designated as foundational issuer. Nothing is live in your name yet", d.orgId);
-        }
-        return { ok: true, active: allPass };
+        return { ok: true, active: runActivation(s0, d, setState, log) };
       },
 
       grantEntitlements: (orgId) => {
         const s0 = stateRef.current;
         if (!isNamedAdmin(s0.people.find((p) => p.id === s0.harness.persona))) return;
-        setState((s) => ({
-          ...s,
-          organizations: s.organizations.map((o) =>
-            o.id === orgId ? { ...o, entitlements: Array.from(new Set([...(o.entitlements ?? []), ...ISSUER_ENTITLEMENTS])) } : o,
-          ),
-        }));
+        const org = s0.organizations.find((o) => o.id === orgId);
+        /* Already granted: nothing to do, and nothing to log twice. */
+        if (!org || ISSUER_ENTITLEMENTS.every((e) => org.entitlements?.includes(e))) return;
+        const granted = { ...org, entitlements: Array.from(new Set([...(org.entitlements ?? []), ...ISSUER_ENTITLEMENTS])) };
+        const s1 = { ...s0, organizations: s0.organizations.map((o) => (o.id === orgId ? granted : o)) };
+        setState((s) => ({ ...s, organizations: s.organizations.map((o) => (o.id === orgId ? granted : o)) }));
         log("Granted the entitlements a foundational issuer needs", NDI_ORG);
+        /* And the checks run again at once, so the E4 failure and its button
+           don't stay on screen describing something already fixed. */
+        const d = s1.designations.find((x) => x.orgId === orgId && x.state === "ACCEPTED");
+        if (d) runActivation(s1, d, setState, log);
       },
 
       setNdiAccess: (designationId, on) => {
@@ -3582,6 +3623,18 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ],
         })),
 
+      resolveObjection: (designationId, entityType) => {
+        const o = stateRef.current.artefactObjections.find((x) => x.designationId === designationId && x.entityType === entityType);
+        if (!objectionHolds(o)) return;
+        setState((s) => ({
+          ...s,
+          artefactObjections: s.artefactObjections.map((x) =>
+            x.designationId === designationId && x.entityType === entityType ? { ...x, resolvedAt: today() } : x,
+          ),
+        }));
+        log(`Agreed a change with NDI to what people are asked for ${entityType.replace(/_/g, " ")}s`);
+      },
+
       adoptArtefacts: (designationId, entityType, newVersion) => {
         const s0 = stateRef.current;
         const d = s0.designations.find((x) => x.id === designationId);
@@ -3597,6 +3650,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (live && !newVersion) return { ok: false, error: "E7" };
         const draft = draftFor(entityType);
         const objection = s0.artefactObjections.find((o) => o.designationId === designationId && o.entityType === entityType);
+        /* E4 — an objection to the draft as a whole holds adoption until the
+           authority and NDI agree. Nothing is adopted over it. */
+        if (objectionHolds(objection)) return { ok: false, error: "E4" };
         /* An objection takes the over-broad item out of what is adopted —
            resolved by agreement, not by override (E4). */
         const asked = objection?.item ? draft.asked.filter((i) => i.item !== objection.item) : draft.asked;

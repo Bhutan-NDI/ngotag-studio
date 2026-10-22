@@ -13,10 +13,11 @@ import { Panel } from "@/components/ui/Panel";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { draftFor, roleIn, type OrgKind } from "@/lib/demoData";
+import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
+import { draftFor, objectionHolds, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { AskedList, kindSingular, kindTitle } from "./shared";
+import { AskedList, kindSingular, kindTitle, useAuthority } from "./shared";
 
 /**
  * SCR-ADO-01 — What people will be asked. FLOW-ORG-03 step 3: the officer
@@ -47,20 +48,16 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
   const router = useRouter();
   const params = useSearchParams();
   const changing = params.get("change") === "1";
-  const { designations, adoptions, artefactObjections, organizations, currentPerson, personById, activeOrgId, objectToArtefacts, hydrated } =
-    useDemo();
+  const { adoptions, artefactObjections, personById, objectToArtefacts, resolveObjection, hydrated } = useDemo();
   const forced = useScreenState("SCR-ADO-01", ["live", "default", "loading", "empty", "error", "offline", "no_permission"]) as Face;
 
   const [objecting, setObjecting] = useState(false);
   const [note, setNote] = useState("");
 
-  const org =
-    organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
-    organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
-  const d = designations.find((x) => x.orgId === org?.id && x.state === "ACTIVE");
-  const owner = org ? roleIn(org, currentPerson) === "Owner" : false;
+  const { org, active: d, owner } = useAuthority();
   const draft = draftFor(kind);
   const objection = artefactObjections.find((o) => o.designationId === d?.id && o.entityType === kind);
+  const held = objectionHolds(objection);
   const live = adoptions.find((a) => a.designationId === d?.id && a.entityType === kind && a.state === "ACTIVE");
   const viewingLive = Boolean(live) && !changing;
   const asked = viewingLive ? live!.asked : objection?.item ? draft.asked.filter((a) => a.item !== objection.item) : draft.asked;
@@ -117,9 +114,25 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
         {objection ? (
           <p role="status" className="m-0 flex items-start gap-2 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
             <Icon name="check" size={14} strokeWidth={2.4} className="mt-[2px] flex-none" style={{ color: "var(--ndi-success)" }} />
-            Sent back to NDI on {formatDate(objection.at)}
-            {objection.item ? `: ${objection.item} is out of what people will be asked` : ""}. &ldquo;{objection.note}&rdquo;
+            <span>
+              Sent back to NDI on {formatDate(objection.at)}
+              {objection.item ? `: ${objection.item} is out of what people will be asked` : ""}. &ldquo;{objection.note}&rdquo;
+              {held
+                ? " Nothing can be adopted until you and NDI agree a change."
+                : !objection.item && objection.resolvedAt
+                  ? ` You and NDI agreed a change on ${formatDate(objection.resolvedAt)}.`
+                  : ""}
+            </span>
           </p>
+        ) : null}
+        {held && d ? (
+          <SimulatedStep
+            standsFor="NDI and the ministry agreeing a change to the draft"
+            action={<SimulatedAction onClick={() => resolveObjection(d.id, kind)}>Mark it agreed</SimulatedAction>}
+          >
+            An objection to the draft as a whole is resolved by agreement, not by override. The prototype has no NDI side
+            for revising a draft, so this stands in for it.
+          </SimulatedStep>
         ) : null}
 
         <Panel>
@@ -203,13 +216,18 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
               ) : (
                 <GradientButton
                   onClick={() => router.push(`/authority/${kind}/adopt${changing ? "?change=1" : ""}`)}
-                  disabled={!canContinue || face === "error"}
+                  disabled={!canContinue || face === "error" || held}
                 >
                   Continue to adopt
                   <Icon name="arrowRight" size={16} strokeWidth={2} />
                 </GradientButton>
               )}
-              {viewingLive || objection ? null : (
+              {/* An objection route must exist or review is theatre (SCR-ADO-01),
+                  so it's on every draft. Hidden only while an objection is
+                  open, or once the flagged item has been taken out; after a
+                  whole-draft objection is agreed, the officer can raise
+                  another. */}
+              {viewingLive || (objection && !(objection.resolvedAt && !objection.item)) ? null : (
                 <HairlineButton onClick={() => setObjecting(true)} disabled={!canContinue || objecting}>
                   Raise an objection
                 </HairlineButton>

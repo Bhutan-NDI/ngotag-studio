@@ -16,10 +16,10 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { roleIn, type Adoption, type Designation, type OrgKind } from "@/lib/demoData";
+import { roleIn, type Adoption, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { daysLeft, dsgPill, kindTitle, kindsInWords } from "./shared";
+import { daysLeft, dsgPill, kindTitle, kindsInWords, useAuthority } from "./shared";
 
 /**
  * The authority console — SCR-DSG-05 (designation status) and SCR-ADO-03
@@ -51,21 +51,13 @@ type Face = "live" | "default" | "loading" | "empty" | "error" | "offline" | "su
 
 export function AuthorityConsoleView() {
   const router = useRouter();
-  const { designations, adoptions, organizations, currentPerson, personById, activeOrgId, setNdiAccess, hydrated } = useDemo();
+  const { adoptions, personById, setNdiAccess, hydrated } = useDemo();
   const forced = useScreenState("SCR-DSG-05", ["live", "default", "loading", "empty", "error", "offline", "suspended", "no_permission"]) as Face;
 
   const [confirmAccess, setConfirmAccess] = useState<"remove" | "restore" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const org =
-    organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
-    organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
-  const mine = designations.filter((d) => d.orgId === org?.id);
-  const d: Designation | undefined =
-    mine.find((x) => ["ACTIVE", "SUSPENDED"].includes(x.state)) ?? mine.find((x) => ["PENDING", "ACCEPTED"].includes(x.state)) ?? mine[0];
-  const owner = org ? roleIn(org, currentPerson) === "Owner" : false;
-  const ownerId = org ? Object.entries(org.roles ?? {}).find(([, r]) => r === "Owner")?.[0] : undefined;
-  const ownerName = ownerId ? personById(ownerId).name : "Your organisation's owner";
+  const { org, designation: d, owner, ownerName } = useAuthority();
 
   const rows = (k: OrgKind) => adoptions.filter((a) => a.designationId === d?.id && a.entityType === k).sort((a, b) => b.version - a.version);
   const current = (k: OrgKind): Adoption | undefined => rows(k).find((a) => a.state === "ACTIVE") ?? rows(k).find((a) => a.state === "WITHDRAWN");
