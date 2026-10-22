@@ -12,6 +12,7 @@ import { Panel } from "@/components/ui/Panel";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
+import { inOrg } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
@@ -45,9 +46,9 @@ export function AskingForMoreView({ requestId }: { requestId: string }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const r = credentialRequests.find((x) => x.id === requestId);
+  const r = credentialRequests.find((x) => x.id === requestId && inOrg(holder.orgId)(x));
   const lapsed = r?.consentBy ? r.consentBy < new Date().toISOString().slice(0, 10) : false;
-  const natural: Face = busy ? "loading" : lapsed ? "expired" : failed ? "offline" : !holder.can("credential:receive") ? "no_permission" : "default";
+  const natural: Face = busy ? "loading" : lapsed ? "expired" : failed ? "offline" : !holder.can("credential:receive", r?.credential) ? "no_permission" : "default";
   const face: Face = forced === "live" ? natural : forced;
 
   if (!hydrated) {
@@ -75,7 +76,7 @@ export function AskingForMoreView({ requestId }: { requestId: string }) {
           <Panel>
             <div className="relative z-[4] flex flex-col gap-3">
               <p className="m-0 text-[14px] text-body">
-                {r?.state === "WITHDRAWN" ? "You've withdrawn this request." : "There's nothing waiting for your answer on this request."}
+                {r?.state === "WITHDRAWN" ? (r.failReason ?? "You've withdrawn this request.") : "There's nothing waiting for your answer on this request."}
               </p>
               <div>
                 <HairlineButton onClick={() => router.push(r ? `/wallet/requests/${r.id}` : "/wallet/requests")}>See where it stands</HairlineButton>

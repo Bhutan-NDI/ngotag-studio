@@ -52,9 +52,15 @@ export function requestWords(r: Pick<CredentialRequest, "state" | "issuerName" |
     case "DECLINED_BY_HOLDER":
       return { status: "withdrawn", label: "Declined", sentence: "You've declined this. Nothing has been added." };
     case "WITHDRAWN":
-      return { status: "withdrawn", label: "Withdrawn", sentence: "You've withdrawn this request." };
+      /* Withdrawn by the person, or because the issuer stopped waiting for
+         an answer to its wider ask — which says so. */
+      return { status: "withdrawn", label: "Withdrawn", sentence: r.failReason ?? "You've withdrawn this request." };
     case "EXPIRED":
-      return { status: "lapsed", label: "Expired", sentence: `${issuer} didn't answer in time, or the offer wasn't accepted in time. Nothing was issued. You can ask again.` };
+      return {
+        status: "lapsed",
+        label: "Expired",
+        sentence: r.failReason ?? `${issuer} didn't answer in time, or the offer wasn't accepted in time. Nothing was issued. You can ask again.`,
+      };
     case "FAILED":
       return { status: "failed", label: "Didn't go through", sentence: r.failReason ?? `We couldn't reach ${issuerInline(issuer)}. Nothing has been shared. Try again later.` };
   }
@@ -106,8 +112,10 @@ export function useHolder() {
     name: org ? shortOrgName(org.name) : "Your organisation",
     kind: org?.kind ?? "company",
     rootName: root ? personById(root.personId).name : "Your organisation's owner",
-    held: heldCredentials.filter(inOrg(activeOrgId)).filter((c) => c.status === "active"),
-    can: (op: "credential:receive" | "credential:accept" | "credential:list") => mayOperate(activeOrgId, op),
+    /* What can be shared: active, and not replaced by a newer one. */
+    held: heldCredentials.filter(inOrg(activeOrgId)).filter((c) => c.status === "active" && !c.supersededBy),
+    can: (op: "credential:receive" | "credential:accept" | "credential:list", credentialType?: string) =>
+      mayOperate(activeOrgId, op, credentialType),
   };
 }
 

@@ -674,7 +674,8 @@ too** or **Don't share — withdraw the request**.
 registration number Pelden proved. **Open next** (SCR-CRD-09): the sentence
 *Decide on what Pelden Trading has proved. The name and type shown below come
 from NDI, not from Pelden Trading's credentials.* — then *Verified* and,
-dashed and below it, *From NDI (not verified by you)*. **Issue**, or
+dashed and below it, *From NDI (not verified by you)*. Fill in the taxpayer number's
+details — the fields start empty, showing the format — then **Issue**, or
 **Decline** with a reason and a message Pelden reads word for word.
 **What you offer** (SCR-CRD-07) pauses, retires or publishes a new version;
 **Integration** (SCR-CRD-10) starts empty — *Not set up. Requests go to your

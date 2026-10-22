@@ -62,11 +62,12 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
 
   const r = credentialRequests.find((x) => x.id === requestId);
   const offering = offerings.find((o) => o.id === r?.offeringId);
-  /* Only what the officer has changed. The rest reads from the offering's
-     prefilled values, so a page loaded before the store hydrates doesn't
-     lock in an empty form. */
+  /* The fields start empty, with the format as a placeholder: the officer
+     enters what the office's own register says. Prefilling them with the
+     example meant pressing Issue gave every business the same taxpayer
+     number, and an empty field (E8) could never happen. */
   const [edits, setEdits] = useState<Record<string, string>>({});
-  const values: Record<string, string> = Object.fromEntries((offering?.fields ?? []).map((f) => [f.name, edits[f.name] ?? f.example]));
+  const values: Record<string, string> = Object.fromEntries((offering?.fields ?? []).map((f) => [f.name, edits[f.name] ?? ""]));
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<"issued" | "declined" | null>(null);
@@ -229,6 +230,16 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
             <p className="m-0 text-[12.5px] text-muted">
               From their {r.consented.credential}, issued by {r.consented.issuer}.
             </p>
+            {/* What the business agreed to share when asked for more (A1) —
+                part of what it proved, so it belongs in this panel. */}
+            {r.alsoShared ? (
+              <div className="flex flex-col gap-1 border-t border-subtle pt-3">
+                <p className={LABEL_CLASS}>Also shared, when you asked for more</p>
+                <p className="m-0 text-[13.5px] text-body">
+                  Their {r.alsoShared.credential}: {r.alsoShared.items.join(", ")}.
+                </p>
+              </div>
+            ) : null}
           </section>
         </Panel>
 
@@ -264,6 +275,7 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
                     <input
                       className={FIELD_CLASS}
                       value={values[f.name] ?? ""}
+                      placeholder={`For example, ${f.example}`}
                       aria-invalid={err ? true : undefined}
                       aria-describedby={err ? `err-${f.name}` : undefined}
                       onChange={(e) => setEdits((v) => ({ ...v, [f.name]: e.target.value }))}

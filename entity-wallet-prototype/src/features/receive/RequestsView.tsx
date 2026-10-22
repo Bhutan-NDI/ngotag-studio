@@ -221,7 +221,7 @@ export function RequestsView() {
                             {canWithdraw ? (
                               <button
                                 type="button"
-                                disabled={readOnly || !holder.can("credential:receive")}
+                                disabled={readOnly || !holder.can("credential:receive", r.credential)}
                                 onClick={() => setWithdrawing(r)}
                                 className="ndi-plainlink whitespace-nowrap text-[12.5px] font-medium text-muted disabled:opacity-55"
                               >

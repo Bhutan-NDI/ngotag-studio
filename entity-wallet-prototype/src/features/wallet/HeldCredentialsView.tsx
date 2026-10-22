@@ -58,9 +58,10 @@ export function HeldCredentialsView() {
   const face = useScreenState("SCR-CRD-05", ["live", "loading", "error", "offline", "empty"]) as Face;
   const variant = face === "empty" ? "empty" : "populated";
   const all = variant === "empty" ? [] : heldCredentials.filter(inOrg(activeOrgId));
-  /* Newest first; a credential is superseded when a newer one of the same
-     type is held. */
-  const superseded = (c: HeldCredential) => all.some((x) => x.id !== c.id && x.type === c.type && x.receivedAt > c.receivedAt);
+  /* Superseded is what the store recorded when a renewal was accepted, not
+     a date comparison: a renewal and the original are often dated the same
+     day, and a strict "newer than" never marked either. */
+  const superseded = (c: HeldCredential) => Boolean(c.supersededBy);
 
   const foundational = all.find((c) => c.isFoundational);
   const rest = all.filter((c) => !c.isFoundational);
@@ -70,6 +71,10 @@ export function HeldCredentialsView() {
       crumbs={[{ label: "Wallet" }, { label: "Held credentials" }]}
       title="What we hold"
       actions={
+        /* credential:list, as UX-EW-03 SCR-CRD-05 lists it. The catalogue
+           it opens handles someone without credential:receive itself (E2):
+           the list shows, and Ask is replaced by the reason and who can
+           change it. Hiding the way in would hide that answer too. */
         mayOperate(activeOrgId, "credential:list") || face !== "live" ? (
           <GradientButton onClick={() => router.push("/wallet/get")} disabled={face === "offline"}>
             <Icon name="credentials" size={16} strokeWidth={2} />

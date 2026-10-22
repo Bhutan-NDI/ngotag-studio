@@ -17,6 +17,9 @@ import { LOCAL_MS, ROUND_TRIP_MS } from "@/lib/demoTiming";
 
 import { cannotAsk, issuerInline, useHolder } from "./shared";
 
+/** "sole proprietorships" — the kind of business as running text uses it. */
+const KIND_PLURAL: Record<string, string> = { company: "companies", sole_proprietorship: "sole proprietorships", partnership: "partnerships" };
+
 /**
  * SCR-CRD-02 — Ask for a credential. FLOW-CRD-01 step 2: one consent, to
  * share a credential the organisation holds with this issuer, and to receive
@@ -41,17 +44,17 @@ import { cannotAsk, issuerInline, useHolder } from "./shared";
  * The store decides whether the request is allowed (P1–P5); the faces
  * below render what it said.
  */
-type Face = "live" | "default" | "loading" | "submitted" | "e3" | "e4" | "e5" | "offline" | "no_permission";
+type Face = "live" | "default" | "loading" | "submitted" | "e3" | "not_eligible" | "e4" | "e5" | "offline" | "no_permission";
 
 export function AskForCredentialView({ offeringId }: { offeringId: string }) {
   const router = useRouter();
   const { offerings, credentialRequests, askForCredential, hydrated } = useDemo();
   const holder = useHolder();
-  const forced = useScreenState("SCR-CRD-02", ["live", "default", "loading", "submitted", "e3", "e4", "e5", "offline", "no_permission"]) as Face;
+  const forced = useScreenState("SCR-CRD-02", ["live", "default", "loading", "submitted", "e3", "not_eligible", "e4", "e5", "offline", "no_permission"]) as Face;
 
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [refused, setRefused] = useState<"E3" | "E4" | "E5" | "offline" | null>(null);
+  const [refused, setRefused] = useState<"E3" | "E4" | "E5" | "not_eligible" | "offline" | null>(null);
 
   const offering = offerings.find((o) => o.id === offeringId);
   const existing = credentialRequests.find((r) => inOrg(holder.orgId)(r) && r.offeringId === offeringId && requestInFlight(r));
@@ -62,13 +65,15 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
       ? "loading"
       : refused === "E3" || !offering || offering.status !== "ACTIVE"
         ? "e3"
+        : refused === "not_eligible" || !offering.eligibleKinds.includes(holder.kind)
+          ? "not_eligible"
         : refused === "E5" || (existing && !submitted)
           ? "e5"
           : refused === "E4" || !holder.held.some((c) => c.type === offering.prerequisite.credential)
             ? "e4"
           : refused === "offline"
             ? "offline"
-            : !holder.can("credential:receive")
+            : !holder.can("credential:receive", offering.credential)
               ? "no_permission"
               : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -105,7 +110,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
         /* The confirmation, then where it stands — the spec's "Submitted"
            is a moment, not a page to dismiss. */
         window.setTimeout(() => router.push(`/wallet/requests/${r.id}`), ROUND_TRIP_MS);
-      } else if (r.error === "E3" || r.error === "E4" || r.error === "E5") setRefused(r.error);
+      } else if (r.error === "E3" || r.error === "E4" || r.error === "E5" || r.error === "not_eligible") setRefused(r.error);
     }, LOCAL_MS);
   };
 
@@ -125,7 +130,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
     );
   }
 
-  if (face === "e3" || face === "e4" || face === "e5") {
+  if (face === "e3" || face === "not_eligible" || face === "e4" || face === "e5") {
     /* E4 arrives here only by address — the catalogue doesn't offer Ask
        until the prerequisite is held — so it says what's needed and offers
        the way to get it. */
@@ -139,6 +144,8 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               <p role="alert" className="m-0 text-[14px] leading-[1.6] text-body">
                 {face === "e3"
                   ? `${issuer} isn't offering this at the moment. Nothing has been sent.`
+                  : face === "not_eligible"
+                    ? `${issuer} doesn't offer this to ${KIND_PLURAL[holder.kind]}. Nothing has been sent.`
                   : face === "e4"
                     ? `To ask for this you first need: ${offering?.prerequisite.credential ?? "another credential"}.`
                     : "You've already asked for this. Here's where it stands."}

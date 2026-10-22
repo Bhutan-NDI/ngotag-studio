@@ -593,6 +593,12 @@ export interface HeldCredential {
   receivedAt: string;
   expiresAt: string | null;
   status: "active" | "expired" | "revoked";
+  /**
+   * The held credential that replaced this one, when a renewal was accepted
+   * (FLOW-CRD-02 step 6). Both are kept — this one is the record — but only
+   * the newer is shared, so this one no longer satisfies a prerequisite.
+   */
+  supersededBy?: string;
 }
 
 /**
@@ -1573,6 +1579,8 @@ export interface CredentialRequest {
   consented: Prerequisite;
   /** A1 — what the issuer asked for beyond the consent, listed separately (UXD-35). */
   askedMore: { credential: string; items: string[] } | null;
+  /** A1 answered "share this too": what was shared beyond the first consent, which the officer sees too. */
+  alsoShared?: { credential: string; items: string[] } | null;
   /** The issuer stops waiting for the answer on this date (7 days, FLOW-CRD-03 E4). */
   consentBy: string | null;
   /** The issuer's answer window (FLOW-CRD-03 step 4). */
@@ -1611,6 +1619,30 @@ export interface IssuerIntegration {
   lastError: string | null;
   log: { id: string; event: string; attempt: number; status: number; latencyMs: number; at: string }[];
 }
+
+/**
+ * What a request becomes when a date it was waiting on passes, or null. The
+ * issuer stops waiting for an answer to its wider ask on `consentBy`
+ * (FLOW-CRD-03 E4), which withdraws the request; an issuer that hasn't answered by `answerBy` has
+ * missed its window (FLOW-CRD-01 E10); an offer nobody accepted lapses on its
+ * `expiresAt` (E13). Read from the date, like the other windows in the
+ * prototype, so every screen and the store agree without anyone having to
+ * press a button that would discover it.
+ */
+export const crdEnding = (
+  r: Pick<CredentialRequest, "state" | "consentBy" | "answerBy" | "offer" | "issuerName">,
+  today: string,
+): { state: "EXPIRED" | "WITHDRAWN"; failReason: string | null } | null => {
+  /* EW-FLOW6-SD §5.1: NEEDS_CONSENT ends in WITHDRAWN "on refusal or when
+     the issuer stops waiting" — the request is withdrawn, not expired. */
+  if (r.state === "NEEDS_CONSENT" && r.consentBy && r.consentBy < today)
+    return { state: "WITHDRAWN", failReason: `${r.issuerName} stopped waiting for your answer. You can ask again.` };
+  if (r.state === "WITH_ISSUER" && r.answerBy && r.answerBy < today)
+    return { state: "EXPIRED", failReason: `${r.issuerName} didn't answer in time. Nothing was issued. You can ask again.` };
+  if (r.state === "OFFER_READY" && r.offer && r.offer.expiresAt < today)
+    return { state: "EXPIRED", failReason: `This offer from ${r.issuerName} expired. You can ask again.` };
+  return null;
+};
 
 /** Whether a request is still in flight — it blocks asking again (FLOW-CRD-01 P5, E5). */
 export const requestInFlight = (r: Pick<CredentialRequest, "state">) =>
@@ -2557,9 +2589,10 @@ export const SEED: DemoState = {
     },
     {
       /* Rinzin's grant, the one Act 3 runs on. Deliberately narrow, and
-         narrow in a way you can see: she may accept two kinds of credential
-         and present exactly one, to two
-         named counterparties, and only presenting needs an approver. */
+         narrow in a way you can see: she may present exactly one kind of
+         credential, to two named counterparties, and only presenting needs
+         an approver. Accepting has no type filter — EW-FLOW3-SD §4.2 gives
+         credential:accept none, AUTO, in every preset. */
       id: "rel-rinzin",
       personId: "rinzin",
       legalBasis: "entity_consent",
@@ -2574,12 +2607,7 @@ export const SEED: DemoState = {
         validUntil: day(113),
         grants: [
           { operation: "credential:receive", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
-          {
-            operation: "credential:accept",
-            credentialTypes: { mode: "list", values: ["Business Registration", "Business Licence"] },
-            relyingParties: { mode: "any" },
-            approval: "AUTO",
-          },
+          { operation: "credential:accept", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "credential:list", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           {
             operation: "proof:present",

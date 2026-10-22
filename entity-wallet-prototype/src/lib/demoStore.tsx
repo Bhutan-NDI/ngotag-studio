@@ -63,6 +63,7 @@ import {
   objectionHolds,
   draftFor,
   requestInFlight,
+  crdEnding,
   type CredentialAttribute,
   ISSUER_ENTITLEMENTS,
   type ActivationCheck,
@@ -152,8 +153,11 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       so nothing would be connected at all.
  *  17 — Flow 6: offerings, requests and the issuer's integration, the
  *       Department of Revenue & Customs and Deki as its officer.
+ *  18 — Rinzin's credential:accept takes any type, as EW-FLOW3-SD §4.2
+ *       gives it. A version-17 save still carries the narrow grant, which
+ *       the stricter permission check would now refuse the TPN under.
  */
-const SEED_VERSION = 17;
+const SEED_VERSION = 18;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -394,12 +398,6 @@ function activationChecks(s: DemoState, d: Designation): ActivationCheck[] {
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
 
 /**
- * Whether a person may run an operation for an organisation — read from
- * their ACTIVE relation's scope, the way the server would (FLOW-CRD-01 P2).
- * The screens ask this to grey a button with its reason; the store asks it
- * again before doing anything, because the screen is not the boundary.
- */
-/**
  * Whether the person driving owns an issuing office — what changing its
  * offerings and integration needs (SCR-CRD-07, SCR-CRD-10). Answering
  * requests needs only membership (OrgRoles.ISSUER), checked where it's done.
@@ -409,13 +407,35 @@ function issuerOwner(s: DemoState, orgId: string): boolean {
   return org?.roles?.[s.harness.persona] === "Owner";
 }
 
-function mayOperate(s: DemoState, personId: string, orgId: string, op: string): boolean {
+/**
+ * Whether a person may run an operation for an organisation — read from
+ * their ACTIVE relation's scope, the way the server would (FLOW-CRD-01 P2).
+ * The screens ask this to grey a button with its reason; the store asks it
+ * again before doing anything, because the screen is not the boundary.
+ *
+ * The whole grant is read, not only its operation: the scope has to be in
+ * force today, and when a credential type is given the grant has to cover
+ * it. Every preset leaves accepting unfiltered (EW-FLOW3-SD §4.2), but a
+ * grant may still name types — Rinzin may present exactly one kind. A
+ * grant that needs an approver is not a yes here. No preset puts one on
+ * receiving or accepting, and parking one for an approver isn't
+ * built for credentials, so it's refused rather than waved through.
+ */
+function mayOperate(s: DemoState, personId: string, orgId: string, op: string, credentialType?: string): boolean {
+  const now = today();
   return s.relations.some(
     (r) =>
       r.personId === personId &&
       (r.orgId ?? PELDEN) === orgId &&
       r.state === "ACTIVE" &&
-      r.scope.grants.some((g) => g.operation === op),
+      r.scope.validFrom <= now &&
+      (r.scope.validUntil === null || r.scope.validUntil >= now) &&
+      r.scope.grants.some(
+        (g) =>
+          g.operation === op &&
+          g.approval === "AUTO" &&
+          (!credentialType || g.credentialTypes.mode === "any" || g.credentialTypes.values.includes(credentialType)),
+      ),
   );
 }
 
@@ -1131,11 +1151,11 @@ interface DemoActions {
      Every precondition and who-may is decided here; the screens render. */
 
   /** Whether the person driving may run an operation for an organisation (P2). */
-  mayOperate: (orgId: string, op: "credential:receive" | "credential:accept" | "credential:list") => boolean;
+  mayOperate: (orgId: string, op: "credential:receive" | "credential:accept" | "credential:list", credentialType?: string) => boolean;
   /** SCR-CRD-02 — one consent: share the prerequisite whole, and ask. P1–P5. */
   askForCredential: (
     offeringId: string,
-  ) => { ok: true; id: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E5" };
+  ) => { ok: true; id: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E5" | "not_eligible" };
   /** The organisation's agent presents the prerequisite; the issuer verifies it (steps 4–8). Simulated. */
   deliverPrerequisite: (requestId: string) => void;
   /** Prototype — the issuer's proof request asks for more than the consent (A1). */
@@ -1308,6 +1328,22 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       designations: s.designations.map((d) => (dsgExpired(d, now) ? { ...d, state: "EXPIRED" as const } : d)),
     }));
   }, [state.designations, hydrated]);
+
+  /* FLOW-CRD-01 E10/E13, FLOW-CRD-03 E4 — a request whose date has passed
+     ends on that date (see crdEnding), for the lists, the inbox and the
+     store's own checks at once. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.credentialRequests.some((r) => crdEnding(r, now))) return;
+    setState((s) => ({
+      ...s,
+      credentialRequests: s.credentialRequests.map((r) => {
+        const ending = crdEnding(r, now);
+        return ending ? { ...r, state: ending.state, failReason: ending.failReason, consentBy: null } : r;
+      }),
+    }));
+  }, [state.credentialRequests, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -3759,9 +3795,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { ok: true, version };
       },
 
-      mayOperate: (orgId, op) => {
+      mayOperate: (orgId, op, credentialType) => {
         const s0 = stateRef.current;
-        return mayOperate(s0, s0.harness.persona, orgId, op);
+        return mayOperate(s0, s0.harness.persona, orgId, op, credentialType);
       },
 
       askForCredential: (offeringId) => {
@@ -3771,10 +3807,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* P1 — a verified holder. The option is absent otherwise (E1). */
         if (!org || !org.capabilities.includes("holder")) return { ok: false, error: "E1" };
         /* P2 — the asker's preset carries credential:receive (E2). */
-        if (!mayOperate(s0, s0.harness.persona, org.id, "credential:receive")) return { ok: false, error: "E2" };
+        if (!mayOperate(s0, s0.harness.persona, org.id, "credential:receive", offering?.credential)) return { ok: false, error: "E2" };
         /* P3 — still offered, and the issuer may still issue it (E3). */
         if (!offering || offering.status !== "ACTIVE" || !offering.covered) return { ok: false, error: "E3" };
-        const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active");
+        /* And offered to this kind of business. The catalogue only lists what
+           is, but a direct link reaches any offering, so it's checked here. */
+        if (!offering.eligibleKinds.includes(org.kind ?? "company")) return { ok: false, error: "not_eligible" };
+        /* Only what can be shared counts: a superseded credential is the
+           record, not something presented. */
+        const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active" && !c.supersededBy);
         /* P4 — the prerequisite is held (E4). */
         if (!held.some((c) => c.type === offering.prerequisite.credential)) return { ok: false, error: "E4" };
         /* P5 — nothing in flight, and not held unless renewable (E5). */
@@ -3857,14 +3898,18 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const s0 = stateRef.current;
         const r = s0.credentialRequests.find((x) => x.id === requestId);
         if (!r || r.state !== "NEEDS_CONSENT") return;
-        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive")) return;
+        /* E4 — past the date the issuer stopped waiting, there's nothing left to answer. */
+        if (crdEnding(r, today())) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
         setState((s) => ({
           ...s,
           credentialRequests: s.credentialRequests.map((x) =>
             x.id !== requestId
               ? x
               : share
-                ? { ...x, state: "AWAITING_PROOF" as const, consentBy: null }
+                ? /* What was shared beyond the first consent is recorded with the
+                     request, so the record and the officer's panel both show it. */
+                  { ...x, state: "AWAITING_PROOF" as const, consentBy: null, alsoShared: x.askedMore }
                 : { ...x, state: "WITHDRAWN" as const, consentBy: null },
           ),
         }));
@@ -3876,7 +3921,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const r = s0.credentialRequests.find((x) => x.id === requestId);
         /* A2 — whoever may ask may withdraw, until the issuer has replied. */
         if (!r || !["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER"].includes(r.state)) return;
-        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive")) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
         setState((s) => ({
           ...s,
           credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "WITHDRAWN" as const } : x)),
@@ -3933,18 +3978,19 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const s0 = stateRef.current;
         const r = s0.credentialRequests.find((x) => x.id === requestId);
         if (!r || r.state !== "OFFER_READY" || !r.offer) return { ok: false, error: "invalid" };
-        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept")) return { ok: false, error: "not_permitted" };
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return { ok: false, error: "not_permitted" };
         if (r.offer.expiresAt < today()) {
           setState((s) => ({ ...s, credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "EXPIRED" as const } : x)) }));
           return { ok: false, error: "E13" };
         }
         const issuer = s0.organizations.find((o) => o.id === r.issuerOrgId);
         const offer = r.offer;
+        const newId = rid("hc");
         setState((s) => ({
           ...s,
           heldCredentials: [
             {
-              id: rid("hc"),
+              id: newId,
               orgId: r.orgId === PELDEN ? undefined : r.orgId,
               type: r.credential,
               issuer: r.issuerName,
@@ -3956,7 +4002,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               expiresAt: offer.validUntil,
               status: "active" as const,
             },
-            ...s.heldCredentials,
+            /* A renewal replaces what it renews (FLOW-CRD-02 step 6): the old
+               one is kept as the record and marked superseded, so it's no
+               longer shared or counted as a prerequisite — as SCR-CRD-04
+               told the person accepting. */
+            ...s.heldCredentials.map((c) => (c.id === r.replaces ? { ...c, supersededBy: newId } : c)),
           ],
           credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "ISSUED" as const } : x)),
         }));
@@ -3968,7 +4018,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const s0 = stateRef.current;
         const r = s0.credentialRequests.find((x) => x.id === requestId);
         if (!r || r.state !== "OFFER_READY") return;
-        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept")) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return;
         setState((s) => ({
           ...s,
           credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "DECLINED_BY_HOLDER" as const } : x)),

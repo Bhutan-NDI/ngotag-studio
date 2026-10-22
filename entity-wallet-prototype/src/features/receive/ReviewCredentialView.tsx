@@ -14,6 +14,7 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
+import { inOrg } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
@@ -54,7 +55,9 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
   const [declining, setDeclining] = useState(false);
   const [failed, setFailed] = useState<"E13" | "offline" | null>(null);
 
-  const r = credentialRequests.find((x) => x.id === requestId);
+  /* Only this organisation's requests: another organisation's id in the
+     address gets the not-found branch, not its offer and who asked. */
+  const r = credentialRequests.find((x) => x.id === requestId && inOrg(holder.orgId)(x));
   useSimulatedDelivery(r ? [r] : []);
   const offering = offerings.find((o) => o.id === r?.offeringId);
   const replaces = heldCredentials.find((c) => c.id === r?.replaces);
@@ -69,7 +72,7 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
           ? "e13"
           : failed === "offline"
             ? "offline"
-            : !holder.can("credential:accept")
+            : !holder.can("credential:accept", r?.credential)
               ? "no_permission"
               : "default";
   const face: Face = forced === "live" ? natural : forced;
