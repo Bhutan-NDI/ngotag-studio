@@ -141,6 +141,17 @@ export const apiRoutes = {
     organizations: '/orgs/public-profile',
     organizationDetails: '/orgs/public-profiles',
   },
+  // Organisation wallet migration (SAD-NGOTAG-WM-01 §3.2). Provisional until
+  // the platform API is agreed; prefixed with /orgs/:orgId by the wrappers.
+  walletMigration: {
+    root: '/agents/migrate',
+    status: '/status',
+    preflight: '/preflight',
+    rehearsal: '/rehearsal',
+    schedule: '/schedule',
+    listAll: '/agents/migrations',
+    stepUp: '/auth/step-up',
+  },
   Agent: {
     checkAgentHealth: '/agents/health',
     agentDedicatedSpinup: '/agents/spinup',

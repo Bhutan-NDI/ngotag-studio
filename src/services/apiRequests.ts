@@ -10,6 +10,7 @@ import {
 } from '@/config/marketplaceErrors'
 
 import { HeaderConfig } from '@/config/GetHeaderConfigs'
+import { setPausedByServer } from '@/lib/walletMigrationSlice'
 import { store } from '@/lib/store'
 import { toast } from 'sonner'
 
@@ -63,6 +64,11 @@ const HandleResponse = (
     error.statusCode = responseData.status
     error.code = body?.code
     notifyMarketplaceGate(body?.code, body?.message)
+    // The org is mid-move: show the paused banner wherever this happened
+    // (SCR-WM-08). Caught here because most API wrappers drop the status.
+    if (responseData.status === 423 && body?.code === 'ORG_AGENT_MIGRATING') {
+      store.dispatch(setPausedByServer())
+    }
     return Promise.reject(error)
   }
   return Promise.reject(

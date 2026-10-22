@@ -8,6 +8,7 @@ import { BhutanndiAppShell } from './bhutanndi/layout/BhutanndiAppShell'
 import { BhutanndiBareShell } from './bhutanndi/layout/BhutanndiBareShell'
 import Header from './layout/header'
 import KBar from './kbar'
+import { PausedBanner } from '@/features/walletMigration/components/PausedBanner'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { usePathname } from 'next/navigation'
 
@@ -47,7 +48,10 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
   if (isBhutanndiTheme()) {
     return (
       <KBar>
-        <BhutanndiAppShell>{children}</BhutanndiAppShell>
+        <BhutanndiAppShell>
+          <PausedBanner />
+          {children}
+        </BhutanndiAppShell>
       </KBar>
     )
   }
@@ -58,6 +62,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
         <AppSidebar />
         <SidebarInset>
           <Header />
+          <PausedBanner />
           {children}
         </SidebarInset>
       </SidebarProvider>
