@@ -132,7 +132,10 @@ export function ReviewRequestView({ id }: { id: string }) {
 
   const overlaps = issueOverlaps(acc, accreditations, (oid) => organizations.find((o) => o.id === oid)?.name ?? oid);
   const offline = face === "offline";
-  const canAct = isNamedAdmin(currentPerson) && !offline;
+  /* Sent back for a different review: whoever reviewed it before can't be
+     that review. The store refuses them too; this says why up front. */
+  const reviewedBefore = Boolean(acc.earlierReviewers?.includes(currentPerson.id));
+  const canAct = isNamedAdmin(currentPerson) && !offline && !reviewedBefore;
 
   const send = (approve: boolean) => {
     setBusy(true);
@@ -215,6 +218,11 @@ export function ReviewRequestView({ id }: { id: string }) {
         {offline ? (
           <p role="status" className="m-0 text-[13.5px] text-body">
             You&rsquo;re offline. Nothing can be recorded until you&rsquo;re back.
+          </p>
+        ) : null}
+        {reviewedBefore ? (
+          <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
+            You reviewed this before it was sent for a different review, so another administrator has to review it.
           </p>
         ) : null}
         {failed ? (

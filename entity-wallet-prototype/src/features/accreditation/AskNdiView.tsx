@@ -74,7 +74,7 @@ export function AskNdiView() {
   const [ask, setAsk] = useState<AskItem[]>([]);
   const [issue, setIssue] = useState<IssueType[]>([]);
   const [busy, setBusy] = useState<false | "sending" | "identity">(false);
-  const [outcome, setOutcome] = useState<"submitted" | "E3" | "E6" | "offline" | null>(null);
+  const [outcome, setOutcome] = useState<"submitted" | "E2" | "E3" | "E6" | "offline" | null>(null);
   const [saved, setSaved] = useState(false);
   const [stepUp, setStepUp] = useState<"awaiting_scan" | "waiting">("awaiting_scan");
 
@@ -118,7 +118,7 @@ export function AskNdiView() {
   const existing = capability ? accreditations.find((a) => a.orgId === activeOrgId && a.capability === capability && ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE"].includes(a.state)) : undefined;
 
   const natural: Face =
-    root?.personId !== harness.persona
+    root?.personId !== harness.persona || outcome === "E2"
       ? "no_permission"
       : outcome === "submitted"
         ? "submitted"
@@ -199,7 +199,7 @@ export function AskNdiView() {
           /* Nothing saved. */
         }
         setOutcome("submitted");
-      } else setOutcome(r.error === "E3" ? "E3" : r.error === "E6" ? "E6" : null);
+      } else setOutcome(r.error);
     }, LOCAL_MS * 3);
   };
 

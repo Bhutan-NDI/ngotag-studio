@@ -1199,6 +1199,8 @@ export interface Accreditation {
   requestedAt: string | null;
   /** FLOW-ACC-02 step 6: the reviewer's recommendation. */
   recommendation: { by: PersonId; approve: boolean; reason: string | null; at: string } | null;
+  /** Reviewers a recommended decline was sent back from (ACC-02/E11) — none of them may review it again. */
+  earlierReviewers?: PersonId[];
   decidedBy: PersonId | null;
   decidedAt: string | null;
   /** NDI's reason when it declines — shown to the organisation verbatim. */
@@ -1241,12 +1243,45 @@ export interface AccRequestInput {
 }
 
 /**
+ * What an accreditation becomes when its 30-day window runs out, or null if
+ * it hasn't. Nobody acts to end it — the date does — so it is read from the
+ * date rather than waiting for someone to press a button that would discover
+ * it. Until it was, a lapsed proposal still counted as in progress, "Propose
+ * again" returned E10, and nothing could end it.
+ *
+ * - An NDI proposal nobody decided lapses (FLOW-ACC-01/E14), and so does a
+ *   listing that never published.
+ * - An approval nobody accepted expires (FLOW-ACC-01/E2).
+ * - A business's request is different (FLOW-ACC-02/E12): it's the
+ *   recommendation that expires, not the request. The request goes back to
+ *   IN_REVIEW for a fresh review — by anyone, since nobody was found wanting
+ *   — and stays open, so it still stands in the way of a duplicate.
+ */
+export const accEnding = (
+  a: Pick<Accreditation, "state" | "expiresAt" | "door">,
+  today: string,
+): "LAPSED" | "EXPIRED" | "IN_REVIEW" | null => {
+  if (!a.expiresAt || a.expiresAt >= today) return null;
+  if (a.state === "PENDING_ACCEPTANCE") return "EXPIRED";
+  if (a.door === "REQUEST" && a.state === "PROPOSED") return "IN_REVIEW";
+  if (["SUBMITTED", "IN_REVIEW", "PROPOSED", "LISTING"].includes(a.state)) return "LAPSED";
+  return null;
+};
+
+/**
  * Whether an accreditation still stands in the way of another for the same
  * organisation and capability — in progress, or ACTIVE (FLOW-ACC-01/E10,
- * FLOW-ACC-02/E3). Ended ones do not.
+ * FLOW-ACC-02/E3). Ended ones do not, and nor does one whose window has run
+ * out but which the store hasn't yet moved on — unless it is a request going
+ * back for review, which is still open.
  */
-export const accInProgress = (a: Pick<Accreditation, "state">) =>
-  ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD", "STOPPED"].includes(a.state);
+export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) => {
+  const ending = accEnding(a, new Date().toISOString().slice(0, 10));
+  return (
+    ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD", "STOPPED"].includes(a.state) &&
+    (ending === null || ending === "IN_REVIEW")
+  );
+};
 
 /* ------------------------------------------------------------------ */
 /* Flow 5 — foundational-issuer designation and adoption               */
