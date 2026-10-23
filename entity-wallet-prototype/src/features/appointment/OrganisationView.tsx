@@ -13,7 +13,7 @@ import { NextCredentialAction } from "@/features/onboarding/NextCredentialAction
 import { inOrg, shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { presetOf } from "./presets";
+import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
 
 /**
  * SCR-ORG-07 — the organisation, from inside the console.
@@ -25,8 +25,8 @@ import { presetOf } from "./presets";
  * - The representative sees everything: the next credential as the primary
  *   action, and giving someone authority and seeing who can act beside it.
  * - An appointed person sees only what their authority covers, in the
- *   words of the preset they were given, with what it doesn't cover
- *   beside it (the negative clause).
+ *   words of the presets they were given, with what it doesn't cover
+ *   beside it — computed from the boxes left unticked (UXD-58).
  * - A member with no authority sees the organisation named and nothing
  *   they could act on.
  *
@@ -47,7 +47,13 @@ export function OrganisationView() {
     forced !== "live" ? forced : mine?.isRootAuthority ? "representative" : mine ? "appointed" : "member";
   /* Anything it has asked NDI for, or been approved for (Flow 4). */
   const accs = accreditations.filter((a) => a.orgId === activeOrgId && !["EXPIRED", "SUPERSEDED"].includes(a.state));
-  const preset = presetOf(face === "appointed" ? (mine?.preset ?? "receive") : undefined);
+  /* A forced face with no appointment shows the guided grant, Receive. */
+  const minePresets = presetsOf(mine);
+  const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {
+    name: "You",
+    orgName: short,
+    shareWith: mine ? shareTargetsOf(mine) : null,
+  });
 
   return (
     <AppShell>
@@ -132,14 +138,14 @@ export function OrganisationView() {
           <Panel>
             <div className="relative z-[4] flex flex-col gap-3">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">You can act for {short}</h2>
-              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">{preset?.label}</p>
-              {preset?.allows.map((a) => (
+              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">{grant.label}</p>
+              {grant.allows.map((a) => (
                 <p key={a} className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                   <Icon name="check" size={14} strokeWidth={2.4} className="mt-[5px] flex-none text-accent" />
                   {a}
                 </p>
               ))}
-              {preset?.doesNotAllow.map((a) => (
+              {grant.wont.map((a) => (
                 <p key={a} className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                   <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
                   You can&rsquo;t: {a.charAt(0).toLowerCase() + a.slice(1)}
