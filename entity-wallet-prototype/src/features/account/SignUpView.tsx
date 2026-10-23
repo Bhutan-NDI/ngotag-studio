@@ -165,8 +165,8 @@ export function SignUpView() {
 
           <AuthNotice tone="warning">
             This account should belong to <strong className="text-strong">you</strong>, not to
-            someone helping you. Later you&rsquo;ll be asked to confirm your identity, and it must
-            match the person named here.
+            someone helping you. When you verify an organisation you&rsquo;ll confirm your identity, and
+            this account will then be recorded as yours.
           </AuthNotice>
 
           <label className={FIELD_BLOCK_CLASS}>
