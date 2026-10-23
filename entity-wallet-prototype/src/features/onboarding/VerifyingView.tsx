@@ -48,12 +48,22 @@ import { kindOf } from "./orgKinds";
  * Success goes first to accepting responsibility (SCR-DEL-01, FLOW-DEL-02),
  * and from there to the organisation's verified screen.
  */
-type Face = "checking" | "setting_up" | "unreachable" | "setup_failed" | "issuing_failed";
+/* E14 — the authority's decision lapsed before setup finished: not a
+   refusal, and the platform's failure to own (FLOW-ORG-01 v0.13). */
+type Face = "checking" | "setting_up" | "unreachable" | "setup_failed" | "issuing_failed" | "approval_lapsed";
 
 export function VerifyingView() {
   const router = useRouter();
-  const { orgOnboarding, signup, currentPerson, checkWithAuthority, completeOrgOnboarding, setVerificationNotify, hydrated } =
-    useDemo();
+  const {
+    orgOnboarding,
+    signup,
+    currentPerson,
+    checkWithAuthority,
+    completeOrgOnboarding,
+    setVerificationNotify,
+    startOrgOnboarding,
+    hydrated,
+  } = useDemo();
   const forced = useScreenState("SCR-ORG-04", [
     "live",
     "checking",
@@ -61,6 +71,7 @@ export function VerifyingView() {
     "unreachable",
     "setup_failed",
     "issuing_failed",
+    "approval_lapsed",
     "resumed",
   ]);
 
@@ -72,7 +83,7 @@ export function VerifyingView() {
 
   /* A local fault on top of the stored stage: E8 leaves the record where it
      was (inconclusive, not a refusal), E9/E10 leave it setting up. */
-  const [fault, setFault] = useState<"unreachable" | "setup_failed" | null>(null);
+  const [fault, setFault] = useState<"unreachable" | "setup_failed" | "approval_lapsed" | null>(null);
   const [resumed, setResumed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -114,6 +125,8 @@ export function VerifyingView() {
         ? "unreachable"
         : fault === "setup_failed"
           ? "setup_failed"
+          : fault === "approval_lapsed"
+            ? "approval_lapsed"
           : stage === "setting_up"
             ? "setting_up"
             : "checking";
@@ -197,6 +210,37 @@ export function VerifyingView() {
         </Panel>
       ) : null}
 
+      {face === "approval_lapsed" ? (
+        <Panel>
+          <div className="relative z-[4] flex flex-col gap-3" role="alert">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="m-0 font-display text-[15px] font-semibold text-strong">The approval lapsed</p>
+              <StatusPill status="expired" label="Lapsed" />
+            </div>
+            {/* E14: owned as the platform's failure, never read as a refusal.
+                Starting again asks the authority once more, with that
+                attempt's one scan (S4); the organisation already being set
+                up is reused, not duplicated. */}
+            <p className="m-0 max-w-[62ch] text-[13.5px] leading-[1.6] text-body">
+              We couldn&rsquo;t finish setting up {orgOnboarding?.authoritativeName ?? "your organisation"} in time, so{" "}
+              {authority}&rsquo;s approval has lapsed. Start again and they&rsquo;ll check once more — nothing
+              already set up is lost.
+            </p>
+            <div>
+              <HairlineButton
+                onClick={() => {
+                  if (orgOnboarding) startOrgOnboarding(orgOnboarding.kind, orgOnboarding.invitationId, orgOnboarding.existingOrgId);
+                  router.push("/onboarding");
+                }}
+              >
+                <Icon name="refresh" size={14} strokeWidth={2} />
+                Start again
+              </HairlineButton>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
       {face === "setup_failed" || face === "issuing_failed" ? (
         <Panel>
           <div className="relative z-[4] flex flex-col gap-3" role="status">
@@ -208,8 +252,8 @@ export function VerifyingView() {
             </div>
             <p className="m-0 max-w-[62ch] text-[13.5px] leading-[1.6] text-body">
               {face === "issuing_failed"
-                ? `Almost there — ${authority} has approved your organisation and we're issuing its credential.`
-                : `${Authority} has approved your organisation. We're still setting up its wallet — this can take a few minutes.`}
+                ? `Almost there — ${authority} has approved your organisation and we're finishing setting it up.`
+                : `${Authority} has approved your organisation. We're still setting it up — this can take a few minutes.`}
             </p>
             <div className="flex flex-wrap items-center gap-2.5">
               <HairlineButton onClick={retry}>
@@ -228,19 +272,27 @@ export function VerifyingView() {
       <Panel>
         <ol className="relative z-[4] m-0 flex list-none flex-col gap-4 p-0" aria-live="polite">
           <Step
-            label={approved ? `${Authority} has approved your organisation` : `${Authority} is checking its records`}
+            label={
+              face === "approval_lapsed"
+                ? `${Authority}'s approval has lapsed`
+                : approved
+                  ? `${Authority} has approved your organisation`
+                  : `${Authority} is checking its records`
+            }
             detail={
-              approved
+              face === "approval_lapsed"
+                ? "It approved, but setting up took longer than its approval lasts. Starting again asks once more."
+                : approved
                 ? "Its records show you as a representative. That was its decision."
                 : face === "unreachable"
                   ? "No answer yet — no decision has been made."
                   : `Whether its records show you as a representative of this registration. Usually under a minute.`
             }
-            state={approved ? "done" : face === "unreachable" ? "paused" : "active"}
+            state={approved ? "done" : face === "unreachable" || face === "approval_lapsed" ? "paused" : "active"}
           />
           <Step
-            label="Setting up your organisation's wallet"
-            detail="Its wallet is created and its registration added to it. This takes a few minutes."
+            label="Setting up your organisation"
+            detail="Its place on the platform is created and its registration added to it. This takes a few minutes."
             state={face === "setting_up" ? "active" : approved ? "paused" : "waiting"}
           />
         </ol>
@@ -263,9 +315,14 @@ export function VerifyingView() {
                 Show what happens if {authority} can&rsquo;t be reached
               </button>
             ) : (
-              <button type="button" onClick={() => setFault("setup_failed")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
-                Show what happens if setting up stalls
-              </button>
+              <>
+                <button type="button" onClick={() => setFault("setup_failed")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
+                  Show what happens if setting up stalls
+                </button>
+                <button type="button" onClick={() => setFault("approval_lapsed")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
+                  Show what happens if setting up outlasts the approval
+                </button>
+              </>
             )}
           </div>
         </div>
