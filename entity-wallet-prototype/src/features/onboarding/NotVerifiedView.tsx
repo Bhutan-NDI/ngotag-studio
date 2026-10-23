@@ -38,7 +38,8 @@ import { kindOf } from "./orgKinds";
 export function NotVerifiedView() {
   const router = useRouter();
   const { orgOnboarding, organizations, startOrgOnboarding, hydrated } = useDemo();
-  const forced = useScreenState("SCR-ORG-05", ["not_a_representative", "not_recognised"]);
+  /* Both faces stay in the switcher, to show they read the same (S6). */
+  useScreenState("SCR-ORG-05", ["not_a_representative", "not_recognised"]);
   const [guidance, setGuidance] = useState(false);
 
   const kind = kindOf(orgOnboarding?.kind);
@@ -68,15 +69,14 @@ export function NotVerifiedView() {
       <Panel>
         <div className="relative z-[4] flex flex-col gap-4" role="alert">
           <p className="m-0 max-w-[64ch] text-[14px] leading-[1.65] text-body">
-            {forced === "not_recognised" ? (
-              <>The {kind.authority} doesn&rsquo;t recognise this registration, or it&rsquo;s no longer active.</>
-            ) : (
-              <>
-                The {kind.authority}&rsquo;s records don&rsquo;t show you as a representative of{" "}
-                <span className={existing ? "" : "font-mono"}>{subject}</span>. We asked them; the decision is
-                theirs. If their records are wrong, it has to be corrected with the {kind.authority}.
-              </>
-            )}
+            {/* E6 and E7 share one message, word for word (FLOW-ORG-01 S6):
+                a registration the authority doesn't know must not read
+                differently from one it knows but you don't represent, or the
+                screen becomes a way to test which identifiers exist. The
+                switcher keeps both faces so the sameness can be shown. */}
+            The {kind.authority}&rsquo;s records don&rsquo;t show you as a representative of{" "}
+            <span className={existing ? "" : "font-mono"}>{subject}</span>. We asked them; the decision is
+            theirs. If their records are wrong, it has to be corrected with the {kind.authority}.
           </p>
           <p className="m-0 max-w-[64ch] text-[13px] leading-[1.6] text-muted">
             Nothing has been set up{existing ? `, and ${existing.name} is exactly as it was` : ""}.
