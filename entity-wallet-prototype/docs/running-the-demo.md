@@ -740,14 +740,17 @@ panel, held apart from the table:
 
 ### 3 · The refusal — worth showing deliberately
 
-Go to **Offers** and open **Fleet Insurance Certificate**.
+Go to **Offers**, open **Fleet Insurance Certificate**, and pick
+**out_of_scope** in the state switcher.
 
-> "This is a normal event, not an error. Her authority covers Business
-> Registration and Business Licence. Insurance was not granted."
+> "Accepting is never limited by what the credential is — every preset that
+> can accept can accept anything. So the only refusal here is about the
+> person: a role without accepting. She can still read every attribute; what
+> she can't do is accept or decline."
 
-Point at the only action available:
+Point at what replaced the buttons:
 
-> "One next step, and it routes to the owner. There is deliberately no way for
+> "It says who can accept, and nothing else. There is deliberately no way for
 > her to widen her own authority from here — this is exactly the moment
 > somebody would reach for that, and it must not exist."
 

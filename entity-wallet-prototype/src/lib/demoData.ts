@@ -2808,8 +2808,12 @@ export const SEED: DemoState = {
       expiresAt: day(7),
     },
     {
-      /* The denied state. The reason is specific and the next step routes to
-         the Owner — never to a self-edit. */
+      /* An ordinary offer. It used to be the denied example, refused because
+         Rinzin's accept grant named only two credential types. EW-FLOW3-SD
+         §4.2 gives credential:accept no type filter in any preset, so no
+         offer can be out of scope by its type. The one refusal SCR-CRD-04
+         has is about the person — a role without credential:accept — and
+         that face is in B4's state switcher, on any offer. */
       id: "offer-insurance",
       type: "Fleet Insurance Certificate",
       issuer: "Royal Insurance Corporation of Bhutan",
@@ -2820,9 +2824,8 @@ export const SEED: DemoState = {
         { name: "policy_number", value: "RICB-MV-2026-77412" },
         { name: "sum_insured", value: "BTN 4,200,000" },
       ],
-      decision: "out_of_scope",
-      decisionReason:
-        "Your authority covers Business Registration and Business Licence credentials. Accepting insurance credentials was not granted.",
+      decision: "allowed",
+      decisionReason: null,
       state: "pending",
       receivedAt: day(-4),
       expiresAt: day(10),
