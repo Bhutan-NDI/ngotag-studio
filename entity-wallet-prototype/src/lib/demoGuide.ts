@@ -334,9 +334,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 6,
     title: "Choose what Ugyen can do",
     happening:
-      "One of four choices, each saying what it allows and what it doesn't — there's no list of permissions to tick. Dorji confirms they're authorised to make the appointment; citing a document like a board resolution is optional and folded away.",
+      "Four boxes, ticked in any combination, each saying what it allows — not a list of permissions. What Ugyen won't be able to do is worked out from the boxes left unticked, and the whole grant reads back as one sentence. Dorji confirms they're authorised to make the appointment; citing a document like a board resolution is optional and folded away.",
     doThis:
-      "Choose **Ugyen Phuntsho**, leave **Receive credentials**, tick the statement that you're authorised, then press **Give authority**.",
+      "Choose **Ugyen Phuntsho**, leave just **Receive credentials** ticked, tick the statement that you're authorised, then press **Give authority**.",
     say: "Membership let Ugyen in. This is the separate thing that lets Ugyen act — and Dorji can say exactly what it covers.",
     route: "/people-who-can-act/give",
     persona: "dorji",
@@ -370,7 +370,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 6,
     title: "Ugyen can act for Pelden",
     happening:
-      "Exactly what Dorji chose — receive credentials — with what it doesn't cover listed beside it. Ugyen can read it and can't change it.",
+      "Exactly what Dorji ticked — receive credentials — with what it doesn't cover, from the boxes Dorji left unticked, listed beside it. Ugyen can read it and can't change it.",
     doThis: "Press **Next**.",
     route: "/organisation",
   },

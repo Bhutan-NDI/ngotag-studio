@@ -50,8 +50,9 @@ nine chapters, 37 steps, starting on the platform's day zero:
    member with no authority. Back as Dorji, the Members page lists Ugyen:
    identity not yet confirmed, authority none.
 6. **Give someone authority to act** (FLOW-DEL-01) — Dorji chooses Ugyen and
-   one of four choices (**Receive credentials**), each saying what it allows
-   and what it doesn't, and confirms they're authorised to make the
+   ticks what they can do (**Receive credentials**) from four boxes that
+   combine, sees what Ugyen won't be able to do worked out from the rest,
+   and confirms they're authorised to make the
    appointment; citing a document is optional and folded away. Ugyen reviews
    who appointed them and what they can and can't do, then **one approval in
    their NDI wallet** both confirms who they are and accepts.
@@ -459,21 +460,34 @@ UX-EW-01 SCR-DEL-02 to 05.
 
 ### 1 · Choose what they can do — `/people-who-can-act/give`
 
-Choose **Ugyen Phuntsho**. Then one of **four choices** — Receive
-credentials, Share credentials with named organisations, Approve others'
-actions, Everything — each with what it allows *and what it doesn't*.
-There is no list of permissions to tick, and no custom option.
+Choose **Ugyen Phuntsho**. Then tick one or more of **four boxes** —
+Receive credentials, Share credentials, Approve others' actions, Give
+authority to act — each saying what it allows. They combine (EW-FLOW3-SD
+§4.2, D18): an accountant who receives certificates and sends them on gets
+*Receive* and *Share*, without becoming an approver. There is no
+*Everything*, no list of permissions, and no custom option.
+
+Under the boxes, the grant reads back as one sentence, with what Ugyen
+**won't be able to do** worked out from the boxes left unticked, plus two
+lines that are always there.
 
 > "Dorji can say exactly what Ugyen can do, in one sentence. That's the
 > test: if you can't restate what you granted, you didn't really grant it."
 
 Worth showing:
 
-- **Share** asks which organisations. With none named, **Give authority**
-  stays unavailable (E12). With approval on and nobody else able to
-  approve, it says before you submit that Dorji will be asked each time (A1).
-- **Everything** says what it still doesn't give: giving others authority,
-  and taking the credentials off the platform.
+- **Share** asks for a reach: only organisations Dorji names, or any that
+  asks. Named with none chosen, **Give authority** stays unavailable (E12).
+  With approval on and nobody else able to approve, it says before you
+  submit that Dorji will be asked each time (A1). *Give authority to act*
+  works the same way with its own approval setting.
+- Untick everything: **Give authority** is unavailable — choose at least one
+  thing (E13).
+- Tick **Approve** with **Share**: the screen says Ugyen can approve what
+  others share, never what they share themselves (A2). The approvals queue
+  enforces it too.
+- Tick all four: the two fixed lines still say Ugyen can't appoint anyone
+  else or take the credentials off the platform. All four is not a deputy.
 - The **statement** is required: Dorji confirms they're authorised to make
   this appointment. **Cite the document behind this** is optional and folded
   away — the file stays on the device, and only a fingerprint would be kept.
