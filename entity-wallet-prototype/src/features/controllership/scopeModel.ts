@@ -163,6 +163,16 @@ const OPERATIONS: Record<
     partyList: null,
     gateable: false,
   },
+  "authority:issue": {
+    verb: "give someone authority to act",
+    noun: "grant of authority",
+    label: "Give authority to act",
+    typeAny: null,
+    typeList: null,
+    partyAny: null,
+    partyList: null,
+    gateable: true,
+  },
 };
 
 export function operationLabel(operation: ControllerOperation): string {

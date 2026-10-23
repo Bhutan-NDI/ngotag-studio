@@ -16,22 +16,29 @@ import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { inOrg, roleIn, shortOrgName, standsNow, type AppointmentDocument, type PresetId } from "@/lib/demoData";
+import { inOrg, roleIn, shortOrgName, standsNow, type AppointmentDocument, type PresetId, type ShareReach } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { PRESETS, SHARE_TARGETS } from "./presets";
+import { PRESETS, SHARE_TARGETS, describeGrant } from "./presets";
 
 /**
  * SCR-DEL-02 — Give someone authority to act. FLOW-DEL-01 steps 1–4.
  *
- * ONE SCREEN, FOUR CHOICES
+ * ONE SCREEN, FOUR BOXES
  *
  * This replaced a two-screen proposal — a legal-basis choice and a required
  * signed instrument, then a page of operations ticked one at a time. The
- * specification has neither. The representative chooses a member and one
- * of four presets (UXD-22), each saying what it allows and what it doesn't,
- * so whatever is given can be said back in one sentence (UC-20).
+ * specification has neither. The representative chooses a member and ticks
+ * one or more of four presets (UXD-58, EW-FLOW3-SD/D18). A single choice
+ * forced the commonest roles — an accountant who receives certificates and
+ * sends them on — into *Everything*, which also made them an approver; so
+ * the presets combine, and *Everything* is gone.
+ *
+ * Each box says what it allows. What the person *won't* be able to do is
+ * computed from the boxes left unticked, because each preset's own limits
+ * contradict the others' once two are ticked. The whole grant still reads
+ * back in one sentence (UC-20), and the screen shows that sentence.
  *
  * THE STATEMENT IS REQUIRED; THE DOCUMENT IS NOT
  *
@@ -48,16 +55,21 @@ import { PRESETS, SHARE_TARGETS } from "./presets";
  * WHAT IS REFUSED, AND WHERE
  *
  * Only the representative appoints (DEL-01/E1); someone who already can
- * act is shown but not offered (E3); *Share* with nobody named can't be
- * sent (E12). The screen says each of these up front, and the store refuses
- * them anyway — the screen is not the boundary.
+ * act is shown but not offered (E3); *Share* to named organisations with
+ * none named can't be sent (E12), and nor can nothing ticked (E13). The
+ * screen says each of these up front, and the store refuses them anyway —
+ * the screen is not the boundary. Two things are allowed but said before
+ * submitting: approval falling to the representative (A1), and an approver
+ * who also shares or gives authority never approving their own (A2).
  */
 type Face =
   | "default"
   | "no_one_to_choose"
   | "already_has_authority"
   | "approval_falls_to_you"
+  | "approves_and_shares"
   | "nothing_to_share_with"
+  | "nothing_chosen"
   | "not_representative"
   | "offline";
 
@@ -76,7 +88,9 @@ export function GiveAuthorityView() {
     "no_one_to_choose",
     "already_has_authority",
     "approval_falls_to_you",
+    "approves_and_shares",
     "nothing_to_share_with",
+    "nothing_chosen",
     "not_representative",
     "offline",
   ]);
@@ -97,7 +111,8 @@ export function GiveAuthorityView() {
   const holds = (id: string) =>
     relations.some((r) => inOrg(activeOrgId)(r) && r.personId === id && !r.isRootAuthority && standsNow(r, today));
   /* Whether anyone but the representative can approve. If nobody can, a
-     share that needs approval falls to the representative (DEL-01/A1). */
+     share or a grant that needs approval falls to the representative
+     (DEL-01/A1). */
   const otherApprover = relations.some(
     (r) =>
       inOrg(activeOrgId)(r) &&
@@ -107,9 +122,13 @@ export function GiveAuthorityView() {
   );
 
   const [personId, setPersonId] = useState<string>(members.find((m) => !holds(m.id))?.id ?? "");
-  const [preset, setPreset] = useState<PresetId>("receive");
+  const [presets, setPresets] = useState<PresetId[]>(["receive"]);
+  /* Named is the narrower reach, so it is where the choice starts. */
+  const [shareReach, setShareReach] = useState<ShareReach>("named");
   const [shareWith, setShareWith] = useState<string[]>([]);
+  /* §4.2: presenting and giving authority both default to one approver. */
   const [needsApproval, setNeedsApproval] = useState(true);
+  const [issueNeedsApproval, setIssueNeedsApproval] = useState(true);
   const [until, setUntil] = useState("");
   const [attested, setAttested] = useState(false);
   /* The statement confirms authority to appoint *this person on these
@@ -130,13 +149,34 @@ export function GiveAuthorityView() {
 
   const natural: Face = !isRepresentative ? "not_representative" : members.length === 0 ? "no_one_to_choose" : "default";
   const face: Face = forced === "live" ? natural : (forced as Face);
-  const showE12 = face === "nothing_to_share_with" || (preset === "share" && shareWith.length === 0);
-  /* Both Share and Everything let the appointee share, and both default to
-     a share needing approval (§4.2) — so both show the setting, and both say
-     when the approving would fall to the representative (A1). */
-  const sharing = preset === "share" || preset === "everything";
-  const showA1 = face === "approval_falls_to_you" || (sharing && needsApproval && !otherApprover);
-  const effectivePreset: PresetId = face === "nothing_to_share_with" || face === "approval_falls_to_you" ? "share" : preset;
+  /* The state switcher's faces tick what they need, so each is reachable
+     from any starting point; live, it is what the representative ticked. */
+  const ticked: PresetId[] =
+    face === "nothing_chosen"
+      ? []
+      : face === "nothing_to_share_with" || face === "approval_falls_to_you"
+        ? ["share"]
+        : face === "approves_and_shares"
+          ? ["share", "approve"]
+          : presets;
+  const reach: ShareReach = face === "nothing_to_share_with" ? "named" : shareReach;
+  const named = face === "nothing_to_share_with" ? [] : shareWith;
+  const on = (id: PresetId) => ticked.includes(id);
+  const toggle = (id: PresetId, c: boolean) =>
+    changeTerms(setPresets)(c ? [...presets.filter((p) => p !== id), id] : presets.filter((p) => p !== id));
+
+  const showE13 = ticked.length === 0;
+  const showE12 = on("share") && reach === "named" && named.length === 0;
+  /* A1: what needs approval, with nobody but the representative to give it. */
+  const a1Share = on("share") && needsApproval && (face === "approval_falls_to_you" || !otherApprover);
+  const a1Issue = on("give_authority") && issueNeedsApproval && !otherApprover;
+  /* A2: an approver who also shares or gives authority (§4.2). */
+  const showA2 = on("approve") && (on("share") || on("give_authority"));
+  const grant = describeGrant(ticked, {
+    name: chosenName === "they" ? "They" : chosenName,
+    orgName: short,
+    shareWith: on("share") && reach === "named" ? named : null,
+  });
 
   if (!hydrated) {
     return (
@@ -189,7 +229,7 @@ export function GiveAuthorityView() {
     );
   }
 
-  const canSubmit = Boolean(chosen) && !holds(personId) && attested && !(effectivePreset === "share" && shareWith.length === 0) && face !== "offline";
+  const canSubmit = Boolean(chosen) && !holds(personId) && attested && !showE13 && !showE12 && face !== "offline";
 
   const submit = () => {
     if (!canSubmit) return;
@@ -197,9 +237,11 @@ export function GiveAuthorityView() {
     window.setTimeout(() => {
       const r = appoint({
         personId,
-        preset,
-        shareWith: preset === "share" ? shareWith : [],
+        presets: ticked,
+        shareReach: reach,
+        shareWith: on("share") && reach === "named" ? named : [],
         shareNeedsApproval: needsApproval,
+        issueNeedsApproval,
         validUntil: until || null,
         document: docOpen && (doc.reference || doc.fileName || doc.date) ? doc : null,
       });
@@ -259,85 +301,128 @@ export function GiveAuthorityView() {
         {/* ---- What they can do ---- */}
         <Panel>
           <fieldset className="relative z-[4] m-0 flex flex-col gap-2 border-0 p-0">
-            <legend className={`${LABEL_CLASS} mb-2 p-0`}>What {chosenName} can do</legend>
+            <legend className={`${LABEL_CLASS} mb-2 p-0`}>What {chosenName} can do — tick one or more</legend>
             {PRESETS.map((p) => {
-              const on = effectivePreset === p.id;
+              const checked = on(p.id);
               return (
-                <label
+                <div
                   key={p.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-[11px] border px-3.5 py-3"
-                  style={{ borderColor: on ? "var(--ndi-mint-40)" : "var(--border-grid)", background: on ? "var(--ndi-mint-08)" : "transparent" }}
+                  className="flex flex-col gap-3 rounded-[11px] border px-3.5 py-3"
+                  style={{ borderColor: checked ? "var(--ndi-mint-40)" : "var(--border-grid)", background: checked ? "var(--ndi-mint-08)" : "transparent" }}
                 >
-                  <input
-                    type="radio"
-                    name="preset"
-                    checked={on}
-                    onChange={() => changeTerms(setPreset)(p.id)}
-                    className="mt-0.5 h-4 w-4 flex-none accent-[var(--ndi-mint)]"
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="font-display text-[14px] font-semibold text-strong">{p.label}</span>
-                    {p.allows.map((a) => (
-                      <span key={a} className="flex items-start gap-2 text-[12.5px] leading-[1.5] text-body">
-                        <Icon name="check" size={12} strokeWidth={2.6} className="mt-[4px] flex-none text-accent" />
-                        {a}
-                      </span>
-                    ))}
-                    {p.doesNotAllow.map((a) => (
-                      <span key={a} className="flex items-start gap-2 text-[12.5px] leading-[1.5] text-muted">
-                        <Icon name="close" size={12} strokeWidth={2.6} className="mt-[4px] flex-none" style={{ color: "var(--text-faint)" }} />
-                        {a}
-                      </span>
-                    ))}
-                  </span>
-                </label>
+                  <Checkbox checked={checked} onChange={(c) => toggle(p.id, c)} label={p.label} description={p.allows} />
+
+                  {/* Share's reach and approval sit with the box they belong to. */}
+                  {p.id === "share" && checked ? (
+                    <div className="ml-7 flex flex-col gap-3 border-t border-subtle pt-3">
+                      <div role="radiogroup" aria-label={`Who ${chosenName} may share with`} className="flex flex-col gap-2">
+                        {(
+                          [
+                            ["named", "Only organisations I name"],
+                            ["any", "Any organisation that asks"],
+                          ] as const
+                        ).map(([value, label]) => (
+                          <label key={value} className="flex cursor-pointer items-center gap-2.5 text-[13px] text-body">
+                            <input
+                              type="radio"
+                              name="share-reach"
+                              checked={reach === value}
+                              onChange={() => changeTerms(setShareReach)(value)}
+                              className="h-4 w-4 flex-none accent-[var(--ndi-mint)]"
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                      {reach === "named" ? (
+                        <div className="flex flex-col gap-2">
+                          <p className="m-0 text-[12.5px] leading-[1.5] text-faint">
+                            Only organisations on NDI&rsquo;s list of trusted organisations can be named.
+                          </p>
+                          <div className="grid gap-2 min-[641px]:grid-cols-2">
+                            {SHARE_TARGETS.map((t) => (
+                              <Checkbox
+                                key={t}
+                                checked={named.includes(t)}
+                                onChange={(c) => changeTerms(setShareWith)(c ? [...shareWith, t] : shareWith.filter((x) => x !== t))}
+                                label={t}
+                              />
+                            ))}
+                          </div>
+                          {showE12 ? (
+                            <p role="status" className="m-0 text-[12.5px] leading-[1.5] text-muted">
+                              Choose at least one organisation {chosenName} may share credentials with.
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      <Checkbox
+                        checked={needsApproval}
+                        onChange={changeTerms(setNeedsApproval)}
+                        label="Each share needs someone to approve it"
+                        description="Recommended, and on unless you turn it off."
+                      />
+                      {a1Share ? (
+                        <div role="status" className="flex flex-col gap-1.5">
+                          <p className="m-0 text-[13px] leading-[1.6] text-body">
+                            You&rsquo;ll be asked to approve each time {chosenName} {chosen ? "shares" : "share"} a credential.
+                          </p>
+                          <button type="button" onClick={() => changeTerms(setNeedsApproval)(false)} className="ndi-plainlink self-start text-[12.5px] font-medium text-accent">
+                            Allow it without approval
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {p.id === "give_authority" && checked ? (
+                    <div className="ml-7 flex flex-col gap-3 border-t border-subtle pt-3">
+                      <Checkbox
+                        checked={issueNeedsApproval}
+                        onChange={changeTerms(setIssueNeedsApproval)}
+                        label="Each grant of authority needs someone to approve it"
+                        description="Recommended, and on unless you turn it off."
+                      />
+                      {a1Issue ? (
+                        <div role="status" className="flex flex-col gap-1.5">
+                          <p className="m-0 text-[13px] leading-[1.6] text-body">
+                            You&rsquo;ll be asked to approve each time {chosenName} {chosen ? "gives" : "give"} someone authority to act.
+                          </p>
+                          <button type="button" onClick={() => changeTerms(setIssueNeedsApproval)(false)} className="ndi-plainlink self-start text-[12.5px] font-medium text-accent">
+                            Allow it without approval
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               );
             })}
           </fieldset>
 
-          {effectivePreset === "share" ? (
-            <div className="relative z-[4] mt-4 flex flex-col gap-3 border-t border-subtle pt-4">
-              <p className={`${LABEL_CLASS} m-0`}>Organisations {chosenName} may share with</p>
-              <div className="grid gap-2 min-[641px]:grid-cols-2">
-                {SHARE_TARGETS.map((t) => (
-                  <Checkbox
-                    key={t}
-                    checked={shareWith.includes(t)}
-                    onChange={(c) => changeTerms(setShareWith)(c ? [...shareWith, t] : shareWith.filter((x) => x !== t))}
-                    label={t}
-                  />
-                ))}
-              </div>
-              {showE12 ? (
-                <p role="status" className="m-0 text-[12.5px] leading-[1.5] text-muted">
-                  Choose at least one organisation {chosenName} may share credentials with.
-                </p>
-              ) : null}
-            </div>
+          {showE13 ? (
+            <p role="status" className="relative z-[4] mt-3 mb-0 text-[12.5px] leading-[1.5] text-muted">
+              Choose at least one thing {chosenName} can do.
+            </p>
           ) : null}
 
-          {effectivePreset === "share" || effectivePreset === "everything" ? (
-            <div className="relative z-[4] mt-4 border-t border-subtle pt-4">
-              <Checkbox
-                checked={needsApproval}
-                onChange={changeTerms(setNeedsApproval)}
-                label="Each share needs someone to approve it"
-                description="Recommended, and on unless you turn it off. Approving is done by someone who can approve others' actions."
-              />
-            </div>
+          {showA2 ? (
+            <p role="status" className="relative z-[4] mt-3 mb-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] leading-[1.6] text-body" style={{ background: "rgb(var(--tint) / 0.04)" }}>
+              {chosen ? chosenName : "They"} can approve what others share, but never what they share themselves.
+            </p>
           ) : null}
 
-          {(effectivePreset === "share" || effectivePreset === "everything") && showA1 ? (
-            <div role="status" className="relative z-[4] mt-3 flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
-              <p className="m-0 text-[13px] leading-[1.6] text-body">
-                You&rsquo;ll be asked to approve each time {chosenName} shares a credential — nobody else
-                at {short} can approve yet.
-              </p>
-              <div>
-                <button type="button" onClick={() => changeTerms(setNeedsApproval)(false)} className="ndi-plainlink text-[12.5px] font-medium text-accent">
-                  Allow sharing without approval
-                </button>
-              </div>
+          {/* The read-back, computed from what is ticked (UC-20). */}
+          {ticked.length ? (
+            <div className="relative z-[4] mt-4 flex flex-col gap-2 border-t border-subtle pt-4">
+              <p className="m-0 text-[13.5px] leading-[1.6] text-body">{grant.sentence}</p>
+              <p className={`${LABEL_CLASS} m-0 mt-1`}>{chosenName} won&rsquo;t be able to</p>
+              {grant.wont.map((w) => (
+                <span key={w} className="flex items-start gap-2 text-[12.5px] leading-[1.5] text-muted">
+                  <Icon name="close" size={12} strokeWidth={2.6} className="mt-[4px] flex-none" style={{ color: "var(--text-faint)" }} />
+                  {w}
+                </span>
+              ))}
             </div>
           ) : null}
         </Panel>
@@ -439,7 +524,9 @@ export function GiveAuthorityView() {
               ? `${chosen?.name ?? "They"} can already act for ${short}.`
               : refused === "E12"
                 ? `Choose at least one organisation ${chosenName} may share credentials with.`
-                : `Only the representative can give people authority to act for ${short}.`}
+                : refused === "E13"
+                  ? `Choose at least one thing ${chosenName} can do.`
+                  : `Only the representative can give people authority to act for ${short}.`}
           </p>
         ) : null}
 
