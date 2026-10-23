@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
@@ -32,13 +31,16 @@ import { formatDate } from "@/features/controllership/scopeModel";
  * "Business Licence — 4 attributes" would be asking them to accept
  * something they have not seen.
  *
- * THE REFUSAL IS DESIGNED, NOT AN ERROR
+ * THE REFUSAL IS ABOUT THE PERSON, NOT THE OFFER
  *
- * An out-of-scope offer is a normal event, not a fault. It gets the specific
- * rule that refused it, and one next step — a request to the owner — never a
- * self-edit. That last part matters more than it looks: an out-of-scope
- * refusal is exactly the moment a Controller would reach for a way to widen
- * their own authority, and there must not be one.
+ * EW-FLOW3-SD §4.2 gives credential:accept no type filter in any preset, so
+ * an offer is never refused for what it is. The one refusal SCR-CRD-04 has
+ * is "Disabled / no permission": the viewer's role lacks credential:accept.
+ * The contents stay visible — they are what the organisation is being
+ * offered, and anyone who may see the offer may read it — and the actions
+ * are replaced by who can accept. There is no way to widen your own
+ * authority from here: a refusal is exactly the moment someone would reach
+ * for one, and it must not exist.
  */
 export function OfferDetailView({ offerId }: { offerId: string }) {
   const router = useRouter();
@@ -51,8 +53,6 @@ export function OfferDetailView({ offerId }: { offerId: string }) {
     "accepted",
     "declined",
   ]);
-
-  const [asked, setAsked] = useState(false);
 
   const offer = offers.find((o) => o.id === offerId);
 
@@ -167,32 +167,12 @@ export function OfferDetailView({ offerId }: { offerId: string }) {
               />
               <div className="flex flex-col gap-2">
                 <p className="font-display text-[14.5px] font-semibold text-strong">
-                  You cannot accept this one
+                  Your role doesn&rsquo;t include accepting credentials
                 </p>
                 <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
                   {offer.decisionReason ??
-                    "Accepting this kind of credential was not granted to you."}
+                    "You can see what it contains. Dorji Wangchuk, Pelden Trading's representative, can accept or decline it. The offer stays here until it expires."}
                 </p>
-                {asked ? (
-                  <p
-                    role="status"
-                    aria-live="polite"
-                    className="mt-1 flex items-start gap-2 text-[13px] leading-[1.5] text-accent"
-                  >
-                    <Icon name="check" size={14} strokeWidth={2.2} className="mt-px flex-none" />
-                    <span>
-                      Your request has gone to Dorji Wangchuk. The offer stays here
-                      until it expires.
-                    </span>
-                  </p>
-                ) : (
-                  <div className="mt-1 flex flex-wrap gap-2.5">
-                    <HairlineButton onClick={() => setAsked(true)}>
-                      <Icon name="send" size={14} strokeWidth={2} />
-                      Ask the owner to widen my authority
-                    </HairlineButton>
-                  </div>
-                )}
               </div>
             </div>
           </Panel>

@@ -269,6 +269,7 @@ export type PersonaId =
   | "invitee"
   | "yeshey"
   | "kesang"
+  | "deki"
   | "root"
   | "tshering"
   | "tshendu";
@@ -295,6 +296,7 @@ export const PERSONAS: PersonaId[] = [
   "invitee",
   "yeshey",
   "kesang",
+  "deki",
   "root",
   "tshering",
   "tshendu",
@@ -608,6 +610,12 @@ export interface HeldCredential {
   receivedAt: string;
   expiresAt: string | null;
   status: "active" | "expired" | "revoked";
+  /**
+   * The held credential that replaced this one, when a renewal was accepted
+   * (FLOW-CRD-02 step 6). Both are kept — this one is the record — but only
+   * the newer is shared, so this one no longer satisfies a prerequisite.
+   */
+  supersededBy?: string;
 }
 
 /**
@@ -1507,6 +1515,235 @@ export const dsgExpired = (d: Pick<Designation, "state" | "expiresAt">, today: s
 export const designationInProgress = (d: Pick<Designation, "state" | "expiresAt">) =>
   ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state) && !dsgExpired(d, new Date().toISOString().slice(0, 10));
 
+/* ------------------------------------------------------------------ */
+/* Flow 6 — receiving a credential                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What an issuer needs to see before it decides: a credential the
+ * organisation holds, shared whole (EW-FLOW6-SD/D20), and the items the
+ * issuer says it will use. SCR-CRD-02 lists every attribute, because a
+ * JSON-LD credential can't be shared in part — and must never claim it is.
+ */
+export interface Prerequisite {
+  credential: string;
+  issuer: string;
+  /** Every attribute in it, in the words SCR-CRD-02 lists them. */
+  attributes: string[];
+  /** What the issuer says it uses — a subset of `attributes`. */
+  uses: string[];
+}
+
+/** A field the officer fills or confirms on SCR-CRD-09. */
+export interface OfferField {
+  name: string;
+  label: string;
+  example: string;
+}
+
+/**
+ * An issuer's offering — something a business can ask it for (SCR-CRD-07).
+ * `version` pins what a request agreed to: publishing a change makes a new
+ * version, and requests already made keep theirs.
+ */
+export interface CredentialOffering {
+  id: string;
+  issuerOrgId: string;
+  issuerName: string;
+  credential: string;
+  summary: string;
+  eligibleKinds: OrgKind[];
+  prerequisite: Prerequisite;
+  /** `queue` — officers answer on SCR-CRD-08 (Kind Q). `api` — the issuer's system answers (Kind A). */
+  answering: "queue" | "api";
+  answerWindowDays: number;
+  renewable: boolean;
+  status: "ACTIVE" | "PAUSED" | "RETIRED";
+  version: number;
+  fields: OfferField[];
+  /** Whether the issuer's approval to issue still covers it (FLOW-CRD-03 E2). */
+  covered: boolean;
+}
+
+/**
+ * A request's life, as the holder's side sees it (FLOW-CRD-01). Each is
+ * stated in words by who has it now (SCR-CRD-03, UN-38) — never as a code.
+ */
+export type CrdRequestState =
+  | "AWAITING_PROOF"
+  | "NEEDS_CONSENT"
+  | "WITH_ISSUER"
+  | "OFFER_READY"
+  | "ISSUED"
+  | "DECLINED_BY_ISSUER"
+  | "DECLINED_BY_HOLDER"
+  | "WITHDRAWN"
+  | "EXPIRED"
+  | "FAILED";
+
+export interface CredentialRequest {
+  id: string;
+  orgId: string;
+  offeringId: string;
+  offeringVersion: number;
+  credential: string;
+  issuerName: string;
+  issuerOrgId: string;
+  requestedBy: PersonId;
+  requestedAt: string;
+  state: CrdRequestState;
+  /** What the consent on SCR-CRD-02 covered. */
+  consented: Prerequisite;
+  /** A1 — what the issuer asked for beyond the consent, listed separately (UXD-35). */
+  askedMore: { credential: string; items: string[] } | null;
+  /** A1 answered "share this too": what was shared beyond the first consent, which the officer sees too. */
+  alsoShared?: { credential: string; items: string[] } | null;
+  /** The issuer stops waiting for the answer on this date (7 days, FLOW-CRD-03 E4). */
+  consentBy: string | null;
+  /** The issuer's answer window (FLOW-CRD-03 step 4). */
+  answerBy: string | null;
+  /** The issuer's reason, carried verbatim (UXD-38). */
+  declined: { code: string; message: string } | null;
+  offer: { attributes: CredentialAttribute[]; validUntil: string | null; offeredAt: string; expiresAt: string } | null;
+  answeredBy: PersonId | null;
+  answeredAt: string | null;
+  /** Why a request failed, in words (E6, E11, E14, E18). */
+  failReason: string | null;
+  /** The held credential this one replaces, when it does. */
+  replaces: string | null;
+}
+
+/** An offer refused automatically — only ever on the Activity tab (UXD-36). */
+export interface RefusedOffer {
+  id: string;
+  orgId: string;
+  claimedIssuer: string;
+  credential: string;
+  reason: string;
+  /** Whether the sender is listed — "claiming" when it isn't, because the name is unproven. */
+  listed: boolean;
+  at: string;
+}
+
+/** The issuer's integration (SCR-CRD-10) — read by its IT lead, the one technical screen. */
+export interface IssuerIntegration {
+  orgId: string;
+  webhookUrl: string | null;
+  secretRotatedAt: string | null;
+  clients: { id: string; name: string; createdAt: string }[];
+  queueFallback: boolean;
+  failingSince: string | null;
+  lastError: string | null;
+  log: { id: string; event: string; attempt: number; status: number; latencyMs: number; at: string }[];
+}
+
+/**
+ * What a request becomes when a date it was waiting on passes, or null. The
+ * issuer stops waiting for an answer to its wider ask on `consentBy`
+ * (FLOW-CRD-03 E4), which withdraws the request; an issuer that hasn't answered by `answerBy` has
+ * missed its window (FLOW-CRD-01 E10); an offer nobody accepted lapses on its
+ * `expiresAt` (E13). Read from the date, like the other windows in the
+ * prototype, so every screen and the store agree without anyone having to
+ * press a button that would discover it.
+ */
+export const crdEnding = (
+  r: Pick<CredentialRequest, "state" | "consentBy" | "answerBy" | "offer" | "issuerName">,
+  today: string,
+): { state: "EXPIRED" | "WITHDRAWN"; failReason: string | null } | null => {
+  /* EW-FLOW6-SD §5.1: NEEDS_CONSENT ends in WITHDRAWN "on refusal or when
+     the issuer stops waiting" — the request is withdrawn, not expired. */
+  if (r.state === "NEEDS_CONSENT" && r.consentBy && r.consentBy < today)
+    return { state: "WITHDRAWN", failReason: `${r.issuerName} stopped waiting for your answer. You can ask again.` };
+  if (r.state === "WITH_ISSUER" && r.answerBy && r.answerBy < today)
+    return { state: "EXPIRED", failReason: `${r.issuerName} didn't answer in time. Nothing was issued. You can ask again.` };
+  if (r.state === "OFFER_READY" && r.offer && r.offer.expiresAt < today)
+    return { state: "EXPIRED", failReason: `This offer from ${r.issuerName} expired. You can ask again.` };
+  return null;
+};
+
+/** Whether a request is still in flight — it blocks asking again (FLOW-CRD-01 P5, E5). */
+export const requestInFlight = (r: Pick<CredentialRequest, "state">) =>
+  ["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER", "OFFER_READY"].includes(r.state);
+
+/** The Business Registration's attributes, as SCR-CRD-02 lists them. */
+const REGISTRATION_ATTRIBUTES = [
+  "Registered name",
+  "Registration number",
+  "Company type",
+  "Registered address",
+  "Date of incorporation",
+  "Status",
+];
+
+/**
+ * What the Department of Revenue & Customs offers on request. The TPN is
+ * the next credential in a company's chain (UX-EW-01 UXD-14) and what the
+ * first day's dashboard leads with; the bonded-warehouse authorisation
+ * needs the TPN first, which is E4's case in the catalogue.
+ */
+export const SEED_OFFERINGS: CredentialOffering[] = [
+  {
+    id: "off-tpn",
+    issuerOrgId: "org-drc",
+    issuerName: "Department of Revenue & Customs",
+    credential: "Taxpayer Number (TPN)",
+    summary: "Your business's tax identity — what a bank, a customs broker or a supplier asks for.",
+    eligibleKinds: ["company", "sole_proprietorship", "partnership"],
+    prerequisite: {
+      credential: "Business Registration",
+      issuer: "Corporate Regulatory Authority",
+      attributes: REGISTRATION_ATTRIBUTES,
+      uses: ["Registered name", "Registration number", "Company type"],
+    },
+    answering: "queue",
+    answerWindowDays: 5,
+    renewable: false,
+    status: "ACTIVE",
+    version: 1,
+    fields: [
+      { name: "tpn", label: "Taxpayer number", example: "TPN-114-8830" },
+      { name: "tax_office", label: "Tax office", example: "Thimphu Regional Revenue & Customs Office" },
+      { name: "registered_for", label: "Registered for", example: "Business income tax, GST" },
+    ],
+    covered: true,
+  },
+  {
+    id: "off-bonded",
+    issuerOrgId: "org-drc",
+    issuerName: "Department of Revenue & Customs",
+    credential: "Bonded Warehouse Authorisation",
+    summary: "Permission to store goods in a bonded warehouse before duty is paid.",
+    eligibleKinds: ["company"],
+    prerequisite: {
+      credential: "Taxpayer Number (TPN)",
+      issuer: "Department of Revenue & Customs",
+      attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
+      uses: ["Registered name", "Taxpayer number"],
+    },
+    answering: "queue",
+    answerWindowDays: 15,
+    renewable: true,
+    status: "ACTIVE",
+    version: 1,
+    fields: [
+      { name: "facility_code", label: "Facility code", example: "BW-PHU-0043" },
+      { name: "bonded_capacity", label: "Bonded capacity", example: "1,800 m³" },
+    ],
+    covered: true,
+  },
+];
+
+export const SEED_INTEGRATION: IssuerIntegration = {
+  orgId: "org-drc",
+  webhookUrl: null,
+  secretRotatedAt: null,
+  clients: [],
+  queueFallback: true,
+  failingSince: null,
+  lastError: null,
+  log: [],
+};
+
 export interface HarnessState {
   /**
    * Who the console is being driven as. Decides what is *absent*.
@@ -1595,6 +1832,14 @@ export interface DemoState {
   adoptions: Adoption[];
   /** Flow 5 — what an officer sent back on SCR-ADO-01. */
   artefactObjections: ArtefactObjection[];
+  /** Flow 6 — what issuers offer on request. */
+  offerings: CredentialOffering[];
+  /** Flow 6 — every organisation's requests to issuers, from both sides. */
+  credentialRequests: CredentialRequest[];
+  /** Flow 6 — offers refused automatically, shown only on the Activity tab. */
+  refusedOffers: RefusedOffer[];
+  /** Flow 6 — the issuer's delivery set-up (Kind A). */
+  integration: IssuerIntegration;
   /**
    * True from the moment onboarding completes until the story jumps past
    * act 1: the console is showing Pelden on its first day (`firstRunState`),
@@ -1996,6 +2241,25 @@ export const SEED: DemoState = {
       agentReady: true,
       entitlements: ["issuance", "verification"],
     },
+    {
+      /* Flow 6's issuer. The Department of Revenue & Customs issues the
+         taxpayer number a company needs next, approved to issue on NDI. Its
+         officers answer requests from a queue today (Kind Q); its own system
+         isn't connected yet, which SCR-CRD-10 shows as its empty state. */
+      id: "org-drc",
+      name: "Department of Revenue & Customs",
+      legalName: "Department of Revenue & Customs, Ministry of Finance",
+      description: "Issues taxpayer numbers and customs authorisations on NDI.",
+      role: "Owner",
+      members: 1,
+      createdAt: "2024-09-03",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["issuer", "verifier"],
+      memberIds: ["deki"],
+      roles: { deki: "Owner" },
+      publicDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+    },
   ],
   /* The original Studio's staff list — four NDI people the story never
      knew, the first of them the prototype's own designer. Emptied: NDI's
@@ -2256,6 +2520,18 @@ export const SEED: DemoState = {
       cidVerified: true,
     },
     {
+      /* The Department of Revenue & Customs' officer: processes taxpayer
+         registrations in DRC's own system today (UX-EW-03 §1.1), and is
+         also the office's owner on the platform, so one person can show
+         both the queue and the offerings. */
+      id: "deki",
+      name: "Deki Yangzom",
+      cid: "•••• •••• 2264",
+      email: "deki.yangzom@drc.gov.bt",
+      title: "Taxpayer services officer · Department of Revenue & Customs",
+      cidVerified: true,
+    },
+    {
       /* The Corporate Regulatory Authority's office, as its records name
          who adopted in its name. Never driven — not in PERSONAS. */
       id: "registrar",
@@ -2334,9 +2610,10 @@ export const SEED: DemoState = {
     },
     {
       /* Rinzin's grant, the one Act 3 runs on. Deliberately narrow, and
-         narrow in a way you can see: she may accept two kinds of credential
-         and present exactly one, to two
-         named counterparties, and only presenting needs an approver. */
+         narrow in a way you can see: she may present exactly one kind of
+         credential, to two named counterparties, and only presenting needs
+         an approver. Accepting has no type filter — EW-FLOW3-SD §4.2 gives
+         credential:accept none, AUTO, in every preset. */
       id: "rel-rinzin",
       personId: "rinzin",
       legalBasis: "entity_consent",
@@ -2351,12 +2628,7 @@ export const SEED: DemoState = {
         validUntil: day(113),
         grants: [
           { operation: "credential:receive", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
-          {
-            operation: "credential:accept",
-            credentialTypes: { mode: "list", values: ["Business Registration", "Business Licence"] },
-            relyingParties: { mode: "any" },
-            approval: "AUTO",
-          },
+          { operation: "credential:accept", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "credential:list", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           {
             operation: "proof:present",
@@ -2557,8 +2829,12 @@ export const SEED: DemoState = {
       expiresAt: day(7),
     },
     {
-      /* The denied state. The reason is specific and the next step routes to
-         the Owner — never to a self-edit. */
+      /* An ordinary offer. It used to be the denied example, refused because
+         Rinzin's accept grant named only two credential types. EW-FLOW3-SD
+         §4.2 gives credential:accept no type filter in any preset, so no
+         offer can be out of scope by its type. The one refusal SCR-CRD-04
+         has is about the person — a role without credential:accept — and
+         that face is in B4's state switcher, on any offer. */
       id: "offer-insurance",
       type: "Fleet Insurance Certificate",
       issuer: "Royal Insurance Corporation of Bhutan",
@@ -2569,9 +2845,8 @@ export const SEED: DemoState = {
         { name: "policy_number", value: "RICB-MV-2026-77412" },
         { name: "sum_insured", value: "BTN 4,200,000" },
       ],
-      decision: "out_of_scope",
-      decisionReason:
-        "Your authority covers Business Registration and Business Licence credentials. Accepting insurance credentials was not granted.",
+      decision: "allowed",
+      decisionReason: null,
       state: "pending",
       receivedAt: day(-4),
       expiresAt: day(10),
@@ -3239,6 +3514,24 @@ export const SEED: DemoState = {
   ],
   artefactObjections: [],
 
+  offerings: SEED_OFFERINGS,
+  credentialRequests: [],
+  /* One attempt the wallet refused on its own: an offer from a sender not
+     on NDI's list. Never notified (UXD-36) — the Activity tab is the only
+     place it shows, which is the point of keeping it. */
+  refusedOffers: [
+    {
+      id: "rof-1",
+      orgId: "org-pelden",
+      claimedIssuer: "Bhutan Revenue Authority",
+      credential: "Tax Exemption Certificate",
+      reason: "not from an organisation on NDI's list of trusted organisations",
+      listed: false,
+      at: day(-6),
+    },
+  ],
+  integration: SEED_INTEGRATION,
+
   orgInterests: [],
   responsibilities: [],
 
@@ -3528,8 +3821,8 @@ export function dayZeroState(seed: DemoState): DemoState {
     /* Yeshey has had an account since the bank came onto NDI; root since the
        platform was deployed. Nobody else has one yet. */
     people: seed.people.map((p) =>
-      /* Kesang too: the ministry has been on NDI as long as the bank. */
-      p.id === "yeshey" || p.id === "kesang" || p.id === "registrar" || p.platformRole === "root"
+      /* Kesang and Deki too: their offices have been on NDI as long as the bank. */
+      p.id === "yeshey" || p.id === "kesang" || p.id === "deki" || p.id === "registrar" || p.platformRole === "root"
         ? p
         : { ...p, hasAccount: false, memberRole: undefined, platformRole: undefined },
     ),

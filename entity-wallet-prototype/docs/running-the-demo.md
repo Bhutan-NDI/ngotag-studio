@@ -91,14 +91,23 @@ steps, starting on the platform's day zero:
     Kesang reads what people will be asked, sends back the date of birth the
     register doesn't need, and adopts for sole proprietorships. Then **Stop
     something** shows three different stops, none pre-selected.
-11. **Where to go next.**
+11. **Pelden gets its TPN** (FLOW-CRD-01, FLOW-CRD-03) — Dorji opens **Get a
+    credential**, asks the Department of Revenue & Customs for the taxpayer
+    number, and reads exactly what is shared: all of Pelden's registration,
+    every item listed. Deki Yangzom, the tax office's officer, opens the
+    request and decides on what Pelden proved, with NDI's name for Pelden
+    kept apart as unverified. Deki issues; Dorji checks the details and
+    accepts, and the Activity tab shows an offer the wallet refused on its
+    own.
+12. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
 (FLOW-ONB-02 §7.3). Giving authority follows FLOW-DEL-01; the role in a
 wallet is Flow 8, which has no specification yet, so it follows Story B5 and
 is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01,
-FLOW-ACC-02 and UX-EW-02 SCR-ACC-01 to 06. The screens for what comes after onboarding — receiving and
+FLOW-ACC-02 and UX-EW-02 SCR-ACC-01 to 06. Flow 6 follows FLOW-CRD-01 to 03
+and UX-EW-03 SCR-CRD-01 to 10. The screens for what comes after onboarding —
 presenting, approvals, verification, revocation, appeals, and Bank of
 Bhutan being verified — still exist and are described further down, but
 the guide and the demo controls no longer walk them.
@@ -651,6 +660,52 @@ again**.
 
 ---
 
+## Flow 6 — receiving a credential
+
+Start from **Demo controls → Walk a flow → Pelden asks for its TPN**: Pelden
+is verified, with Dorji as its representative.
+
+### Asking — `/wallet/get`, as Dorji
+
+**Get a credential** (SCR-CRD-01) lists what offices issue to a company, each
+with what the office needs to see first. The bonded-warehouse authorisation
+is badged *Needs Taxpayer Number (TPN) first*. On the TPN, **Ask for this**
+(SCR-CRD-02): what Pelden shares, with every attribute of its registration —
+the ones the office doesn't use marked as shared, not used — beside what it
+may receive, and that nothing is added until someone accepts it. **Ask the
+Department of Revenue & Customs**. The request page says who has it:
+sending, then waiting for the office, usually within 5 days.
+
+**Requests and offers** (SCR-CRD-03) lists it with the next date and
+**Withdraw**. The dashed **Have it ask for a bank account too** stands in
+for an issuer asking for more than was agreed: **Answer** opens SCR-CRD-06,
+with what was agreed and what is asked now as two lists, and **Share this
+too** or **Don't share — withdraw the request**.
+
+### Answering — `/issuer/requests`, as Deki
+
+**Requests to answer** (SCR-CRD-08), least time left first, led by the
+registration number Pelden proved. **Open next** (SCR-CRD-09): the sentence
+*Decide on what Pelden Trading has proved. The name and type shown below come
+from NDI, not from Pelden Trading's credentials.* — then *Verified* and,
+dashed and below it, *From NDI (not verified by you)*. Fill in the taxpayer number's
+details — the fields start empty, showing the format — then **Issue**, or
+**Decline** with a reason and a message Pelden reads word for word.
+**What you offer** (SCR-CRD-07) pauses, retires or publishes a new version;
+**Integration** (SCR-CRD-10) starts empty — *Not set up. Requests go to your
+officers' queue.*
+
+### Accepting — `/wallet/requests`, as Dorji
+
+**Waiting for you → Review** (SCR-CRD-04): every detail, the office marked as
+on NDI's list, and the prompt to decline and contact the office if anything
+is wrong. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
+beside the registration. **Activity** lists the request and an offer
+*claiming to be from Bhutan Revenue Authority*, refused because the sender
+isn't on NDI's list — nobody was notified.
+
+---
+
 ## The Act 3 walkthrough
 
 About six minutes, as **Rinzin**. The story: an ordinary working day, and the
@@ -699,14 +754,17 @@ panel, held apart from the table:
 
 ### 3 · The refusal — worth showing deliberately
 
-Go to **Offers** and open **Fleet Insurance Certificate**.
+Go to **Offers**, open **Fleet Insurance Certificate**, and pick
+**out_of_scope** in the state switcher.
 
-> "This is a normal event, not an error. Her authority covers Business
-> Registration and Business Licence. Insurance was not granted."
+> "Accepting is never limited by what the credential is — every preset that
+> can accept can accept anything. So the only refusal here is about the
+> person: a role without accepting. She can still read every attribute; what
+> she can't do is accept or decline."
 
-Point at the only action available:
+Point at what replaced the buttons:
 
-> "One next step, and it routes to the owner. There is deliberately no way for
+> "It says who can accept, and nothing else. There is deliberately no way for
 > her to widen her own authority from here — this is exactly the moment
 > somebody would reach for that, and it must not exist."
 

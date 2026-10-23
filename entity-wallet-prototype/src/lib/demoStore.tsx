@@ -63,6 +63,9 @@ import {
   dsgExpired,
   objectionHolds,
   draftFor,
+  requestInFlight,
+  crdEnding,
+  type CredentialAttribute,
   ISSUER_ENTITLEMENTS,
   type ActivationCheck,
   type Designation,
@@ -149,8 +152,15 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       connected, and two new organisations (the CRA and MoICE) with
  *       Kesang as the ministry's officer. A version-15 save has none of it,
  *       so nothing would be connected at all.
+ *  17 — Flow 6: offerings, requests and the issuer's integration, the
+ *       Department of Revenue & Customs and Deki as its officer.
+ *  18 — Rinzin's credential:accept takes any type, as EW-FLOW3-SD §4.2
+ *       gives it. A version-17 save still carries the narrow grant, which
+ *       the stricter permission check would now refuse the TPN under.
+ *  19 — The Fleet Insurance offer is an ordinary offer, not refused by its
+ *       type. A version-18 save still carries it as out of scope.
  */
-const SEED_VERSION = 16;
+const SEED_VERSION = 19;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -389,6 +399,48 @@ function activationChecks(s: DemoState, d: Designation): ActivationCheck[] {
 }
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+/**
+ * Whether the person driving owns an issuing office — what changing its
+ * offerings and integration needs (SCR-CRD-07, SCR-CRD-10). Answering
+ * requests needs only membership (OrgRoles.ISSUER), checked where it's done.
+ */
+function issuerOwner(s: DemoState, orgId: string): boolean {
+  const org = s.organizations.find((o) => o.id === orgId);
+  return org?.roles?.[s.harness.persona] === "Owner";
+}
+
+/**
+ * Whether a person may run an operation for an organisation — read from
+ * their ACTIVE relation's scope, the way the server would (FLOW-CRD-01 P2).
+ * The screens ask this to grey a button with its reason; the store asks it
+ * again before doing anything, because the screen is not the boundary.
+ *
+ * The whole grant is read, not only its operation: the scope has to be in
+ * force today, and when a credential type is given the grant has to cover
+ * it. Every preset leaves accepting unfiltered (EW-FLOW3-SD §4.2), but a
+ * grant may still name types — Rinzin may present exactly one kind. A
+ * grant that needs an approver is not a yes here. No preset puts one on
+ * receiving or accepting, and parking one for an approver isn't
+ * built for credentials, so it's refused rather than waved through.
+ */
+function mayOperate(s: DemoState, personId: string, orgId: string, op: string, credentialType?: string): boolean {
+  const now = today();
+  return s.relations.some(
+    (r) =>
+      r.personId === personId &&
+      (r.orgId ?? PELDEN) === orgId &&
+      r.state === "ACTIVE" &&
+      r.scope.validFrom <= now &&
+      (r.scope.validUntil === null || r.scope.validUntil >= now) &&
+      r.scope.grants.some(
+        (g) =>
+          g.operation === op &&
+          g.approval === "AUTO" &&
+          (!credentialType || g.credentialTypes.mode === "any" || g.credentialTypes.values.includes(credentialType)),
+      ),
+  );
+}
 
 /**
  * A DID shaped like the method it claims to be.
@@ -1100,6 +1152,49 @@ interface DemoActions {
   /** SCR-ADO-04 Option B — stop an entity type (A2). Nothing is un-verified. */
   stopEntityType: (designationId: string, entityType: OrgKind) => { ok: true } | { ok: false; error: "not_owner" };
 
+  /* ---- Receiving a credential (Flow 6) ----
+     The holder's side (FLOW-CRD-01, -02) and the issuer's (FLOW-CRD-03).
+     Every precondition and who-may is decided here; the screens render. */
+
+  /** Whether the person driving may run an operation for an organisation (P2). */
+  mayOperate: (orgId: string, op: "credential:receive" | "credential:accept" | "credential:list", credentialType?: string) => boolean;
+  /** SCR-CRD-02 — one consent: share the prerequisite whole, and ask. P1–P5. */
+  askForCredential: (
+    offeringId: string,
+  ) => { ok: true; id: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E5" | "not_eligible" };
+  /** The organisation's agent presents the prerequisite; the issuer verifies it (steps 4–8). Simulated. */
+  deliverPrerequisite: (requestId: string) => void;
+  /** Prototype — the issuer's proof request asks for more than the consent (A1). */
+  simulateAskForMore: (requestId: string) => void;
+  /** SCR-CRD-06 — share the wider prerequisite too, or don't (and the request is withdrawn). */
+  answerAskForMore: (requestId: string, share: boolean) => void;
+  /** SCR-CRD-03 — withdraw before an offer arrives (A2). */
+  withdrawCredentialRequest: (requestId: string) => void;
+  /** SCR-CRD-09 — the issuer's officer issues. E10 if someone already answered. */
+  issueOnRequest: (
+    requestId: string,
+    attributes: CredentialAttribute[],
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" };
+  /** SCR-CRD-09 — decline, with a reason code and a message the business reads verbatim (A1). */
+  declineOnRequest: (
+    requestId: string,
+    code: string,
+    message: string,
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" };
+  /** SCR-CRD-04 — accept what arrived (step 11). It becomes the organisation's. */
+  acceptCredentialOffer: (requestId: string) => { ok: true } | { ok: false; error: "not_permitted" | "E13" | "invalid" };
+  /** SCR-CRD-04 — decline it (A3). Nothing is added. */
+  declineCredentialOffer: (requestId: string) => void;
+  /** SCR-CRD-07 — pause, resume or retire an offering, or publish a new version of it. */
+  setOfferingStatus: (offeringId: string, status: "ACTIVE" | "PAUSED" | "RETIRED") => void;
+  publishOfferingVersion: (offeringId: string, changes: { uses: string[]; answerWindowDays: number; renewable: boolean }) => void;
+  /** SCR-CRD-10 — the integration lead's settings. */
+  setWebhook: (url: string) => void;
+  rotateSecret: () => void;
+  createClient: (name: string) => void;
+  setQueueFallback: (on: boolean) => void;
+  sendTestEvent: () => void;
+
   /* ---- Demo harness ----
      Not product surface. These drive the persona switcher, the story runner
      and the state switcher, which are what make the demo runnable by someone
@@ -1239,6 +1334,22 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       designations: s.designations.map((d) => (dsgExpired(d, now) ? { ...d, state: "EXPIRED" as const } : d)),
     }));
   }, [state.designations, hydrated]);
+
+  /* FLOW-CRD-01 E10/E13, FLOW-CRD-03 E4 — a request whose date has passed
+     ends on that date (see crdEnding), for the lists, the inbox and the
+     store's own checks at once. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.credentialRequests.some((r) => crdEnding(r, now))) return;
+    setState((s) => ({
+      ...s,
+      credentialRequests: s.credentialRequests.map((r) => {
+        const ending = crdEnding(r, now);
+        return ending ? { ...r, state: ending.state, failReason: ending.failReason, consentBy: null } : r;
+      }),
+    }));
+  }, [state.credentialRequests, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -3726,6 +3837,300 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         log(`Adopted what people will be asked — version ${version}`, org.id);
         return { ok: true, version };
       },
+
+      mayOperate: (orgId, op, credentialType) => {
+        const s0 = stateRef.current;
+        return mayOperate(s0, s0.harness.persona, orgId, op, credentialType);
+      },
+
+      askForCredential: (offeringId) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const offering = s0.offerings.find((o) => o.id === offeringId);
+        /* P1 — a verified holder. The option is absent otherwise (E1). */
+        if (!org || !org.capabilities.includes("holder")) return { ok: false, error: "E1" };
+        /* P2 — the asker's preset carries credential:receive (E2). */
+        if (!mayOperate(s0, s0.harness.persona, org.id, "credential:receive", offering?.credential)) return { ok: false, error: "E2" };
+        /* P3 — still offered, and the issuer may still issue it (E3). */
+        if (!offering || offering.status !== "ACTIVE" || !offering.covered) return { ok: false, error: "E3" };
+        /* And offered to this kind of business. The catalogue only lists what
+           is, but a direct link reaches any offering, so it's checked here. */
+        if (!offering.eligibleKinds.includes(org.kind ?? "company")) return { ok: false, error: "not_eligible" };
+        /* Only what can be shared counts: a superseded credential is the
+           record, not something presented. */
+        const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active" && !c.supersededBy);
+        /* P4 — the prerequisite is held (E4). */
+        if (!held.some((c) => c.type === offering.prerequisite.credential)) return { ok: false, error: "E4" };
+        /* P5 — nothing in flight, and not held unless renewable (E5). */
+        if (s0.credentialRequests.some((r) => r.orgId === org.id && r.offeringId === offeringId && requestInFlight(r)))
+          return { ok: false, error: "E5" };
+        if (!offering.renewable && held.some((c) => c.type === offering.credential)) return { ok: false, error: "E5" };
+        const id = rid("crq");
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const isRoot = s0.relations.some(
+          (r) => r.personId === s0.harness.persona && (r.orgId ?? PELDEN) === org.id && r.isRootAuthority && r.state === "ACTIVE",
+        );
+        setState((s) => ({
+          ...s,
+          credentialRequests: [
+            {
+              id,
+              orgId: org.id,
+              offeringId,
+              offeringVersion: offering.version,
+              credential: offering.credential,
+              issuerName: offering.issuerName,
+              issuerOrgId: offering.issuerOrgId,
+              requestedBy: s.harness.persona,
+              requestedAt: today(),
+              state: "AWAITING_PROOF",
+              consented: offering.prerequisite,
+              askedMore: null,
+              consentBy: null,
+              answerBy: null,
+              declined: null,
+              offer: null,
+              answeredBy: null,
+              answeredAt: null,
+              failReason: null,
+              replaces: held.find((c) => c.type === offering.credential)?.id ?? null,
+            },
+            ...s.credentialRequests,
+          ],
+        }));
+        log(`Asked ${offering.issuerName} for ${offering.credential}`, org.id);
+        /* UXD-39 — a request made by anyone but the Root tells the Root at
+           once; it doesn't wait for the Root's approval. */
+        if (!isRoot)
+          log(
+            `${me?.name ?? "Someone"} asked ${offering.issuerName} for your ${offering.credential} and shared your ${offering.prerequisite.credential}`,
+            org.id,
+          );
+        return { ok: true, id };
+      },
+
+      deliverPrerequisite: (requestId) =>
+        setState((s) => {
+          const r = s.credentialRequests.find((x) => x.id === requestId);
+          const offering = s.offerings.find((o) => o.id === r?.offeringId);
+          if (!r || r.state !== "AWAITING_PROOF") return s;
+          return {
+            ...s,
+            credentialRequests: s.credentialRequests.map((x) =>
+              x.id === requestId ? { ...x, state: "WITH_ISSUER" as const, answerBy: inDays(offering?.answerWindowDays ?? 5) } : x,
+            ),
+          };
+        }),
+
+      simulateAskForMore: (requestId) =>
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId && (x.state === "AWAITING_PROOF" || x.state === "WITH_ISSUER")
+              ? {
+                  ...x,
+                  state: "NEEDS_CONSENT" as const,
+                  askedMore: { credential: "Bank account", items: ["Account holder", "Account number", "Bank"] },
+                  consentBy: inDays(7),
+                }
+              : x,
+          ),
+        })),
+
+      answerAskForMore: (requestId, share) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        if (!r || r.state !== "NEEDS_CONSENT") return;
+        /* E4 — past the date the issuer stopped waiting, there's nothing left to answer. */
+        if (crdEnding(r, today())) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id !== requestId
+              ? x
+              : share
+                ? /* What was shared beyond the first consent is recorded with the
+                     request, so the record and the officer's panel both show it. */
+                  { ...x, state: "AWAITING_PROOF" as const, consentBy: null, alsoShared: x.askedMore }
+                : { ...x, state: "WITHDRAWN" as const, consentBy: null },
+          ),
+        }));
+        log(share ? `Agreed to share more with ${r.issuerName}` : `Withdrew the request to ${r.issuerName}`, r.orgId);
+      },
+
+      withdrawCredentialRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        /* A2 — whoever may ask may withdraw, until the issuer has replied. */
+        if (!r || !["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER"].includes(r.state)) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "WITHDRAWN" as const } : x)),
+        }));
+        log(`Withdrew the request to ${r.issuerName} for ${r.credential}`, r.orgId);
+      },
+
+      issueOnRequest: (requestId, attributes) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        /* The OrgRoles.ISSUER user role in the issuer's own organisation. */
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        if (r.answerBy && r.answerBy < today()) return { ok: false, error: "E7" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? {
+                  ...x,
+                  state: "OFFER_READY" as const,
+                  answeredBy: s.harness.persona,
+                  answeredAt: today(),
+                  offer: { attributes, validUntil: null, offeredAt: today(), expiresAt: inDays(30) },
+                }
+              : x,
+          ),
+        }));
+        log(`Issued ${r.credential} on request`, issuer.id);
+        log(`${r.issuerName} has replied — review it`, r.orgId);
+        return { ok: true };
+      },
+
+      declineOnRequest: (requestId, code, message) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? { ...x, state: "DECLINED_BY_ISSUER" as const, answeredBy: s.harness.persona, answeredAt: today(), declined: { code, message: message.trim() } }
+              : x,
+          ),
+        }));
+        log(`Declined a request for ${r.credential}`, issuer.id);
+        return { ok: true };
+      },
+
+      acceptCredentialOffer: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        if (!r || r.state !== "OFFER_READY" || !r.offer) return { ok: false, error: "invalid" };
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return { ok: false, error: "not_permitted" };
+        if (r.offer.expiresAt < today()) {
+          setState((s) => ({ ...s, credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "EXPIRED" as const } : x)) }));
+          return { ok: false, error: "E13" };
+        }
+        const issuer = s0.organizations.find((o) => o.id === r.issuerOrgId);
+        const offer = r.offer;
+        const newId = rid("hc");
+        setState((s) => ({
+          ...s,
+          heldCredentials: [
+            {
+              id: newId,
+              orgId: r.orgId === PELDEN ? undefined : r.orgId,
+              type: r.credential,
+              issuer: r.issuerName,
+              issuerDid: issuer?.publicDid ?? "",
+              issuerTrusted: true,
+              attributes: offer.attributes,
+              isFoundational: false,
+              receivedAt: today(),
+              expiresAt: offer.validUntil,
+              status: "active" as const,
+            },
+            /* A renewal replaces what it renews (FLOW-CRD-02 step 6): the old
+               one is kept as the record and marked superseded, so it's no
+               longer shared or counted as a prerequisite — as SCR-CRD-04
+               told the person accepting. */
+            ...s.heldCredentials.map((c) => (c.id === r.replaces ? { ...c, supersededBy: newId } : c)),
+          ],
+          credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "ISSUED" as const } : x)),
+        }));
+        log(`Added ${r.credential} from ${r.issuerName} to your credentials`, r.orgId);
+        return { ok: true };
+      },
+
+      declineCredentialOffer: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        if (!r || r.state !== "OFFER_READY") return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "DECLINED_BY_HOLDER" as const } : x)),
+        }));
+        log(`Declined ${r.credential} from ${r.issuerName}. Nothing was added`, r.orgId);
+      },
+
+      setOfferingStatus: (offeringId, status) => {
+        const s0 = stateRef.current;
+        const o = s0.offerings.find((x) => x.id === offeringId);
+        if (!o || !issuerOwner(s0, o.issuerOrgId)) return;
+        setState((s) => ({ ...s, offerings: s.offerings.map((x) => (x.id === offeringId ? { ...x, status } : x)) }));
+        log(`${status === "PAUSED" ? "Paused" : status === "RETIRED" ? "Retired" : "Resumed"} ${o.credential}`, o.issuerOrgId);
+      },
+
+      publishOfferingVersion: (offeringId, changes) => {
+        const s0 = stateRef.current;
+        const o0 = s0.offerings.find((x) => x.id === offeringId);
+        if (!o0 || !issuerOwner(s0, o0.issuerOrgId)) return;
+        log(`Published version ${o0.version + 1} of ${o0.credential}`, o0.issuerOrgId);
+        setState((s) => ({
+          ...s,
+          offerings: s.offerings.map((o) =>
+            o.id === offeringId
+              ? {
+                  ...o,
+                  version: o.version + 1,
+                  answerWindowDays: changes.answerWindowDays,
+                  renewable: changes.renewable,
+                  prerequisite: { ...o.prerequisite, uses: changes.uses },
+                }
+              : o,
+          ),
+        }));
+      },
+
+      setWebhook: (url) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, webhookUrl: url.trim() || null, secretRotatedAt: s.integration.secretRotatedAt ?? today() } })),
+
+      rotateSecret: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, secretRotatedAt: today() } })),
+
+      createClient: (name) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({
+          ...s,
+          integration: { ...s.integration, clients: [...s.integration.clients, { id: rid("cli"), name: name.trim(), createdAt: today() }] },
+        })),
+
+      setQueueFallback: (on) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, queueFallback: on } })),
+
+      sendTestEvent: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({
+          ...s,
+          integration: {
+            ...s.integration,
+            failingSince: null,
+            lastError: null,
+            log: [
+              { id: rid("evt"), event: "credential-request.test", attempt: 1, status: 200, latencyMs: 140 + Math.floor(Math.random() * 120), at: today() },
+              ...s.integration.log,
+            ].slice(0, 12),
+          },
+        })),
 
       stopEntityType: (designationId, entityType) => {
         const s0 = stateRef.current;
