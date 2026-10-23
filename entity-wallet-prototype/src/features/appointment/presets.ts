@@ -1,4 +1,4 @@
-import type { ApprovalPolicy, ControllershipRelation, PresetId, Scope, ScopeGrant, ShareReach } from "@/lib/demoData";
+import type { ApprovalPolicy, ControllershipRelation, Organization, PresetId, Scope, ScopeGrant, ShareReach } from "@/lib/demoData";
 
 /**
  * The four presets a representative ticks on SCR-DEL-02, in any combination
@@ -66,13 +66,21 @@ const ORDER: PresetId[] = PRESETS.map((p) => p.id);
 
 export const presetOf = (id: PresetId) => PRESETS.find((p) => p.id === id);
 
-/** Organisations listed as verifiers — what *Share* may name. */
-export const SHARE_TARGETS = [
-  "Bhutan National Single Window",
-  "Bank of Bhutan",
-  "Department of Revenue & Customs",
-  "Royal Insurance Corporation of Bhutan",
-];
+/**
+ * Who *Share* may name: organisations holding an ACTIVE source of the
+ * VERIFIER capability (EW-FLOW3-SD v0.3 §4.2; EW-FLOW4-SD §2.3) — an
+ * approval to verify, a foundational designation, or the bootstrap grant.
+ * The console records any of those as the organisation's `verifier`
+ * capability, so that is what is read.
+ *
+ * Not the Trust Registry, and not a fixed list: a registry entry is per
+ * identity and stays current when an organisation stops verifying or only
+ * issues, so it can't say who may be shared with. The list grows as NDI
+ * approves verifiers, and E12 refuses anyone not on it.
+ */
+export function shareTargets(organizations: Pick<Organization, "id" | "name" | "capabilities">[], exceptOrgId?: string): string[] {
+  return organizations.filter((o) => o.id !== exceptOrgId && o.capabilities.includes("verifier")).map((o) => o.name);
+}
 
 /**
  * The presets a relation was made from. An appointment saved before presets
