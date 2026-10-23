@@ -156,8 +156,10 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  18 — Rinzin's credential:accept takes any type, as EW-FLOW3-SD §4.2
  *       gives it. A version-17 save still carries the narrow grant, which
  *       the stricter permission check would now refuse the TPN under.
+ *  19 — The Fleet Insurance offer is an ordinary offer, not refused by its
+ *       type. A version-18 save still carries it as out of scope.
  */
-const SEED_VERSION = 18;
+const SEED_VERSION = 19;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
