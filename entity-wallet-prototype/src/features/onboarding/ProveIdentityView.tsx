@@ -102,6 +102,17 @@ export function ProveIdentityView() {
       ? { id: invitee.id, name: invitee.name }
       : { id: "dorji", name: accountName || "Dorji Wangchuk" };
 
+  /* FLOW-ORG-01 E13: a different identity is refused only when the account
+     is already anchored to someone. A fresh self-service account is not —
+     step 11 anchors it to whoever the register confirms — so there is
+     nothing for another wallet to mismatch. An organisation's existing owner
+     (Kind E) and an invitee carry the identity they were confirmed with. */
+  const accountAnchored = orgOnboarding?.existingOrgId
+    ? Boolean(currentPerson.cidVerified)
+    : invitee
+      ? Boolean(invitee.cidVerified)
+      : false;
+
   const prove = () => recordIdentityProof(answerer.name, answerer.id);
 
   const start = (outcome: "proved" | "mismatch" | "declined") => {
@@ -271,21 +282,21 @@ export function ProveIdentityView() {
 
       {shown === "credential_rejected"
         ? outcome(
-            "Your identity credential couldn't be accepted",
+            "The identity you shared couldn't be accepted",
             <>
               <p className="m-0">
-                The {kind.authority} couldn&rsquo;t accept your identity credential. Check it in your
+                The {kind.authority} couldn&rsquo;t accept the identity you shared. Check it in your
                 NDI wallet before trying again.
               </p>
               {guidance ? (
                 <p role="status" className="m-0 text-faint">
-                  In the wallet, open your citizen credential: if it shows as expired or revoked,
+                  In the NDI wallet app, open your identity: if it shows as expired or revoked,
                   renew it with the Department of Civil Registration and Census, then try again.
                 </p>
               ) : null}
             </>,
             <>
-              <HairlineButton onClick={() => setGuidance(true)}>What to check in the wallet</HairlineButton>
+              <HairlineButton onClick={() => setGuidance(true)}>What to check in the NDI wallet</HairlineButton>
               {tryAgain}
             </>,
           )
@@ -296,13 +307,13 @@ export function ProveIdentityView() {
             "You'll need the NDI wallet",
             <>
               <p className="m-0">
-                You&rsquo;ll need the NDI wallet app with your identity credential to verify an
+                You&rsquo;ll need the NDI wallet app, set up with your identity, to verify an
                 organisation.
               </p>
               {guidance ? (
                 <p role="status" className="m-0 text-faint">
                   Bhutan NDI Wallet is on the App Store and Google Play. Setting it up adds your
-                  identity credential. Come back here when it&rsquo;s on your phone.
+                  identity. Come back here when it&rsquo;s on your phone.
                 </p>
               ) : null}
             </>,
@@ -317,17 +328,16 @@ export function ProveIdentityView() {
 
       {shown === "mismatch"
         ? outcome(
-            "This proof is for someone else",
+            "This isn't the identity this account belongs to",
             <>
+              {/* E13's copy, which names nobody: neither whose wallet
+                  answered nor whose the account is (UX-EW-01 §3.5). */}
               <p className="m-0">
-                The wallet that answered belongs to Karma Dorji, but this account belongs to{" "}
-                {accountName ?? answerer.name}. An organisation has to be verified by the person who
-                represents it, from their own account.
+                The identity you shared isn&rsquo;t the one this account belongs to. An organisation
+                has to be verified by its representative, from their own account. Nothing has been
+                set up.
               </p>
-              <p className="m-0">
-                If you were helping someone, they need their own account. Nothing has been set up,
-                and the {kind.authority} wasn&rsquo;t asked anything.
-              </p>
+              <p className="m-0">The {kind.authority} wasn&rsquo;t asked anything.</p>
             </>,
             tryAgain,
           )
@@ -339,17 +349,17 @@ export function ProveIdentityView() {
             value="ndi-org-verification-proof"
             title={`The ${kind.authority} is asking who you are`}
             purpose={`It checks your identity against its own records for this registration. NDI doesn't see those records, and keeps nothing from this proof.`}
-            sharing={["Your full name, as it is on your citizen credential", "Your citizenship ID number"]}
-            notSharing={["Anything about the organisation", "Anything else in your wallet"]}
+            sharing={["Your full name, as it is on your citizen ID", "Your citizenship ID number"]}
+            notSharing={["Anything about the organisation", "Anything else in your NDI wallet"]}
             sameDevice={sameDevice}
             status={handoffStatus}
             statusDetail={
               shown === "mismatch"
-                ? "The identity you proved does not match the person this account belongs to."
+                ? "The identity you shared isn't the one this account belongs to."
                 : shown === "declined"
-                  ? "You declined in the wallet. Nothing was shared."
+                  ? "You declined in the NDI wallet app. Nothing was shared."
                   : shown === "credential_rejected"
-                    ? "Your identity credential wasn't accepted. Nothing was checked."
+                    ? "The identity you shared wasn't accepted. Nothing was checked."
                     : undefined
             }
             onRetry={shown === "expired" ? () => router.push("/onboarding/details") : undefined}
@@ -382,11 +392,13 @@ export function ProveIdentityView() {
             I don&rsquo;t have the NDI wallet
           </button>
           <button type="button" onClick={() => start("declined")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
-            Show what happens if you decline in the wallet
+            Show what happens if you decline in the NDI wallet app
           </button>
-          <button type="button" onClick={() => start("mismatch")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
-            Show what happens if someone else&rsquo;s wallet answers
-          </button>
+          {accountAnchored ? (
+            <button type="button" onClick={() => start("mismatch")} className="ndi-plainlink text-[12.5px] font-medium text-faint">
+              Show what happens if someone else&rsquo;s NDI wallet answers
+            </button>
+          ) : null}
         </div>
       ) : null}
     </OnboardingShell>
