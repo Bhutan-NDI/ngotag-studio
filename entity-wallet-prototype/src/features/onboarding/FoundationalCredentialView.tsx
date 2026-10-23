@@ -90,7 +90,10 @@ export function FoundationalCredentialView() {
 
   const legalName = orgOnboarding?.authoritativeName ?? "Pelden Trading Pvt. Ltd.";
   const shortName = legalName.replace(/ (Pvt\. )?Ltd\.$/, "");
-  const knownAs = existing?.name ?? invitation?.legalName ?? null;
+  /* Name differs is Kind E only (UX-EW-01 SCR-ORG-07): the organisation
+     already had a name on the platform. No FLOW-ONB-02 invitation carries
+     an organisation name, so an invitation is not compared against. */
+  const knownAs = existing?.name ?? null;
   const nameDiffers =
     forced === "name_differs" || (forced === "live" && Boolean(knownAs) && knownAs !== legalName);
   const shownKnownAs = knownAs && knownAs !== legalName ? knownAs : "Pelden Trading";
