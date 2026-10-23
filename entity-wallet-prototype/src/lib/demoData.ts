@@ -1205,7 +1205,7 @@ export interface Accreditation {
   requestedAt: string | null;
   /** FLOW-ACC-02 step 6: the reviewer's recommendation. */
   recommendation: { by: PersonId; approve: boolean; reason: string | null; at: string } | null;
-  /** Reviewers a recommended decline was sent back from (ACC-02/E11) — none of them may review it again. */
+  /** The reviewer a recommended decline was sent back from (ACC-02/E11), who may not be the different review. Only the most recent. */
   earlierReviewers?: PersonId[];
   decidedBy: PersonId | null;
   decidedAt: string | null;

@@ -1024,8 +1024,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
      row. Returns the same state when nothing has run out, so it settles.
 
      A request whose recommendation expired (ACC-02/E12) goes back to
-     IN_REVIEW with the recommendation cleared. Nobody is added to
-     earlierReviewers: that is only for a recommended decline sent back
+     IN_REVIEW with the recommendation cleared, and any earlier bar with
+     it: earlierReviewers is only for a recommended decline sent back
      (E11). Here nothing was wrong with the review, so anyone may do the
      fresh one, including whoever did the last. */
   useEffect(() => {
@@ -1039,7 +1039,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const ending = accEnding(a, now);
         if (!ending) return a;
         return ending === "IN_REVIEW"
-          ? { ...a, state: "IN_REVIEW" as const, recommendation: null, proposedBy: null, proposedAt: null, expiresAt: null }
+          ? { ...a, state: "IN_REVIEW" as const, recommendation: null, proposedBy: null, proposedAt: null, expiresAt: null, earlierReviewers: [] }
           : { ...a, state: ending };
       }),
       activity: [
@@ -3056,15 +3056,28 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const acc = s0.accreditations.find((a) => a.id === id);
         if (!acc || acc.state !== "PROPOSED" || acc.door !== "REQUEST") return { ok: false, error: "invalid" };
         /* "A different review" has to be one: the reviewer it came back from
-           is kept, and reviewRequest refuses them (and anyone who reviewed it
-           before them). Clearing the recommendation without remembering who
-           made it let the same person simply review it again. */
-        const earlier = [...(acc.earlierReviewers ?? []), ...(acc.recommendation ? [acc.recommendation.by] : [])];
+           is kept, and reviewRequest refuses them. Only them — FLOW-ACC-02 E11
+           asks for an administrator different from the one who recommended
+           the decline, not from everyone who ever reviewed it. Barring every
+           earlier reviewer left nobody with two admins after a second
+           send-back.
+           The request goes back to IN_REVIEW, which has no clock in the
+           specification, so the recommendation's 30 days are cleared with it;
+           kept, they would lapse a request that is meant to stay open. */
+        const earlier = acc.recommendation ? [acc.recommendation.by] : [];
         setState((s) => ({
           ...s,
           accreditations: s.accreditations.map((a) =>
             a.id === id
-              ? { ...a, state: "IN_REVIEW" as const, recommendation: null, proposedBy: null, proposedAt: null, earlierReviewers: earlier }
+              ? {
+                  ...a,
+                  state: "IN_REVIEW" as const,
+                  recommendation: null,
+                  proposedBy: null,
+                  proposedAt: null,
+                  expiresAt: null,
+                  earlierReviewers: earlier,
+                }
               : a,
           ),
         }));
