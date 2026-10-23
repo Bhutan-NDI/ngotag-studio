@@ -86,7 +86,7 @@ steps, starting on the platform's day zero:
     Industry, Commerce & Employment, already on the platform; Tshendu
     approves. Kesang Wangmo, the ministry's director, reads what it is taking
     on — including that NDI hosts its keys — and accepts. One activation
-    check fails (an entitlement NDI grants), Kinzang grants it and re-runs.
+    check fails (an entitlement NDI grants); Kinzang grants it and the checks run again.
     Kesang reads what people will be asked, sends back the date of birth the
     register doesn't need, and adopts for sole proprietorships. Then **Stop
     something** shows three different stops, none pre-selected.
@@ -389,7 +389,7 @@ basis, who proposed and approved, and NDI's access in the spec's words —
 including that NDI hosts the ministry's keys. **Accept**. Activation runs at
 once (SCR-DSG-04): one check fails — schema creation is missing — and says
 NDI grants it. As Kinzang, **Designations → Accepted — checks not passing
-yet**, **Grant them**, **Re-run checks**: designated, and nothing live yet.
+yet**, **Grant them**: the checks run again, and it's designated, with nothing live yet.
 
 As Kesang, **Authority** (SCR-DSG-05 and SCR-ADO-03, one page): the
 designation, NDI's access with **Remove NDI's access**, members including

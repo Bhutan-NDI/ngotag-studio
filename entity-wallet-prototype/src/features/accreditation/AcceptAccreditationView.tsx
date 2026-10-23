@@ -62,6 +62,13 @@ type Face =
   | "declined"
   | "not_found";
 
+/** The refusals SCR-ACC-03 can meet after Accept, in its words. Nothing is accepted in any of them. */
+const ACCEPT_REFUSALS: Record<"E2" | "not_owner" | "invalid", string> = {
+  E2: "This approval expired before it was accepted. Nothing was accepted — NDI can propose it again.",
+  not_owner: "Only your organisation's owner can accept this. Nothing was accepted.",
+  invalid: "This approval has changed since you opened it — it's no longer waiting to be accepted. Nothing was accepted.",
+};
+
 export function AcceptAccreditationView({ id }: { id: string }) {
   const router = useRouter();
   const {
@@ -95,6 +102,10 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   const [step, setStep] = useState<"idle" | "setting_up" | "set_up_failed" | "not_set_up" | "wallet" | "not_confirmed" | "done" | "declined">("idle");
   const [scan, setScan] = useState<"awaiting_scan" | "waiting">("awaiting_scan");
   const [busy, setBusy] = useState(false);
+  /* The store's refusal, said rather than swallowed: an owner pressing Accept
+     after the 30 days, or after someone else changed it, otherwise saw
+     nothing happen. */
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   const acc: Accreditation | undefined = accreditations.find((a) => a.id === id);
   const org = organizations.find((o) => o.id === acc?.orgId);
@@ -219,9 +230,11 @@ export function AcceptAccreditationView({ id }: { id: string }) {
     window.setTimeout(() => {
       setBusy(false);
       const r = prepareAcceptance(a.id);
+      setRefusal(null);
       if (r.ok) setStep("wallet");
       else if (r.error === "E6") setStep("setting_up");
       else if (r.error === "E5") setStep("not_set_up");
+      else setRefusal(ACCEPT_REFUSALS[r.error]);
     }, LOCAL_MS);
   };
 
@@ -229,6 +242,11 @@ export function AcceptAccreditationView({ id }: { id: string }) {
     <AppShell>
       <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
         {header}
+        {refusal ? (
+          <p role="alert" className="m-0 rounded-[12px] border px-4 py-3 text-[13.5px] leading-[1.6] text-body" style={{ borderColor: "var(--ndi-warning)" }}>
+            {refusal}
+          </p>
+        ) : null}
 
         <Panel>
           <div className="relative z-[4] flex flex-col gap-4">
@@ -356,7 +374,13 @@ export function AcceptAccreditationView({ id }: { id: string }) {
                 window.setTimeout(() => {
                   const r = acceptAccreditation(a.id);
                   setScan("awaiting_scan");
-                  setStep(r.ok ? "done" : "not_confirmed");
+                  /* Only a check that fails at the wallet step is "not
+                     confirmed"; an expiry or a lost permission says so. */
+                  if (r.ok) setStep("done");
+                  else if (r.error === "E2" || r.error === "not_owner" || r.error === "invalid") {
+                    setStep("idle");
+                    setRefusal(ACCEPT_REFUSALS[r.error]);
+                  } else setStep("not_confirmed");
                 }, WALLET_HANDOFF_MS);
               }}
             />

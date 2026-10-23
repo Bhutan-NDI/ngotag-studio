@@ -288,7 +288,9 @@ export function ProposeDesignationView() {
                   ? "This needs a second administrator to approve it, and only one is active. Nothing was proposed."
                   : errors.form === "exists"
                     ? `${name} already has a designation on its way or in force.`
-                    : "Nothing was proposed. Check the fields above and try again."}
+                    : errors.form === "covered"
+                      ? "Another authority already confirms one of these kinds of business. That designation has to be superseded first. Nothing was proposed."
+                      : "Nothing was proposed. Check the fields above and try again."}
               </p>
             ) : null}
 

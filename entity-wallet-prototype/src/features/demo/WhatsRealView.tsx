@@ -260,6 +260,12 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Write-once schema publication, the versioned proof request and authorisation written in one transaction, and the service account's permission enforced at the agent.",
       },
       {
+        shown: "\"Mark it agreed\" after an objection to the whole draft",
+        reality:
+          "A prototype control. An objection with no item holds adoption until it's resolved; nothing on NDI's side revises a draft, so this button stands in for NDI and the authority agreeing.",
+        needs: "NDI's side of the objection: revising the draft and the authority accepting the revision (FLOW-ORG-03 E4).",
+      },
+      {
         shown: "The second approver is always a named administrator",
         reality:
           "UX-EW-02 lets the root account approve a designation; FLOW-ONB-02 v0.6 is later and says the root account approves nothing. The prototype follows the later document.",

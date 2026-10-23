@@ -12,11 +12,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { draftFor, isPlatformAdmin, roleIn, type OrgKind } from "@/lib/demoData";
+import { draftFor, isPlatformAdmin, objectionHolds, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
-import { kindPlural, kindSingular, kindTitle } from "./shared";
+import { kindPlural, kindSingular, kindTitle, useAuthority } from "./shared";
 
 /**
  * SCR-ADO-02 — Adopt for an entity type. FLOW-ORG-03 step 4: the
@@ -50,22 +50,19 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
   const router = useRouter();
   const params = useSearchParams();
   const changing = params.get("change") === "1";
-  const { designations, artefactObjections, organizations, currentPerson, activeOrgId, adoptArtefacts, hydrated } = useDemo();
+  const { artefactObjections, currentPerson, adoptArtefacts, hydrated } = useDemo();
   const forced = useScreenState("SCR-ADO-02", ["live", "default", "loading", "e1", "e2", "e3", "e4", "e7", "success", "offline", "ndi_admin"]) as Face;
 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ version: number } | null>(null);
-  const [error, setError] = useState<"E1" | "E5" | "E7" | "offline" | null>(null);
+  const [error, setError] = useState<"E1" | "E4" | "E5" | "E7" | "offline" | null>(null);
 
-  const org =
-    organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
-    organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
-  const d = designations.find((x) => x.orgId === org?.id && x.state === "ACTIVE");
-  const owner = org ? roleIn(org, currentPerson) === "Owner" : false;
+  const { org, active: d, owner } = useAuthority();
   const draft = draftFor(kind);
   const objection = artefactObjections.find((o) => o.designationId === d?.id && o.entityType === kind);
   const asked = objection?.item ? draft.asked.filter((a) => a.item !== objection.item) : draft.asked;
+  const held = objectionHolds(objection);
 
   const natural: Face = isPlatformAdmin(currentPerson) ? "ndi_admin" : result ? "success" : busy ? "loading" : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -104,6 +101,7 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
 
   if (face === "success") {
     const v = result?.version ?? 1;
+    const accessRemoved = d?.ndiAccess !== "ACTIVE" && Boolean(d);
     return (
       <AppShell>
         <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
@@ -114,11 +112,18 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
                 <Icon name="check" size={16} strokeWidth={2.4} style={{ color: "var(--ndi-success)" }} />
                 {v > 1
                   ? `Version ${v} is now what people will be asked. Version ${v - 1} stays on record.`
-                  : `${kindTitle(kind)} are now live.`}
+                  : accessRemoved
+                    ? `Adopted for ${kindPlural(kind)}.`
+                    : `${kindTitle(kind)} are now live.`}
               </p>
+              {/* Adopting is the authority's to do whatever NDI's access is, but
+                  nothing goes live while that access is removed: NDI can't
+                  send the request in its name, so Flow 2 keeps the type closed.
+                  Saying "now live" then would be untrue. */}
               <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-muted">
-                From now, a {kindSingular(kind)} can verify with {name}, and people are asked exactly what you
-                read.
+                {accessRemoved
+                  ? `It isn't live yet: you've removed NDI's access, so NDI can't ask people in your name. A ${kindSingular(kind)} can verify with ${name} once you restore it, from your authority console.`
+                  : `From now, a ${kindSingular(kind)} can verify with ${name}, and people are asked exactly what you read.`}
               </p>
               <div>
                 <GradientButton onClick={() => router.push("/authority")}>Go to your authority console</GradientButton>
@@ -143,7 +148,7 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
       const r = adoptArtefacts(d.id, kind, changing);
       setBusy(false);
       if (r.ok) setResult({ version: r.version });
-      else if (r.error === "E1" || r.error === "E5" || r.error === "E7") setError(r.error);
+      else if (r.error === "E1" || r.error === "E4" || r.error === "E5" || r.error === "E7") setError(r.error);
     }, ROUND_TRIP_MS);
   };
 
@@ -155,7 +160,9 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
         ? "That schema isn't published yet. It has to be published before it can be adopted."
         : face === "e3"
           ? "This schema belongs to another organisation. A foundational credential has to be published by the authority that issues it."
-          : face === "e4"
+          : held || error === "E4"
+            ? "You've sent this back to NDI. Nothing can be adopted until you and NDI agree a change."
+            : face === "e4"
             ? `This request asks for more than is needed to confirm a representative: ${draft.overBroad ?? "Date of birth"}. Go back and send it back with a note.`
             : face === "e7" || error === "E7"
               ? `Someone else has just adopted for ${kindPlural(kind)}. View what was adopted.`
@@ -180,6 +187,12 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
         {!owner ? (
           <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
             Only your organisation&rsquo;s owner can adopt this.
+          </p>
+        ) : null}
+        {d && d.ndiAccess !== "ACTIVE" ? (
+          <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] leading-[1.6] text-body">
+            You&rsquo;ve removed NDI&rsquo;s access. You can still adopt this, but it won&rsquo;t be live until you
+            restore it.
           </p>
         ) : null}
 
@@ -216,7 +229,7 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
               verified, under the version that was in force at the time.
             </p>
             <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
-              <GradientButton onClick={() => setConfirming(true)} disabled={!owner || busy || !d || ["e1", "e2", "e3", "e4", "e7"].includes(face)}>
+              <GradientButton onClick={() => setConfirming(true)} disabled={!owner || busy || !d || held || ["e1", "e2", "e3", "e4", "e7"].includes(face)}>
                 {busy ? "Adopting…" : "Adopt"}
               </GradientButton>
               <HairlineButton onClick={() => router.push(`/authority/${kind}${changing ? "?change=1" : ""}`)}>Back</HairlineButton>

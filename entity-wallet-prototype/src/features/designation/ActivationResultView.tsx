@@ -16,7 +16,7 @@ import { isNamedAdmin, roleIn, type ActivationCheck, type Designation } from "@/
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
-import { CheckList, kindPlural, kindsInWords } from "./shared";
+import { CheckList, SAMPLE_DESIGNATION, kindPlural, kindsInWords } from "./shared";
 
 /**
  * SCR-DSG-04 — Activation result. FLOW-ORG-02 step 3: turn a failed
@@ -48,31 +48,7 @@ import { CheckList, kindPlural, kindsInWords } from "./shared";
  */
 type Face = "live" | "default" | "loading" | "e1" | "e2" | "e3" | "e3_unseeded" | "e4" | "e5" | "success" | "offline";
 
-const SAMPLE: Designation = {
-  id: "sample",
-  orgId: "org-moice",
-  orgName: "Ministry of Industry, Commerce & Employment",
-  kind: "E",
-  entityTypes: ["sole_proprietorship", "partnership"],
-  legalBasis: "",
-  legalRef: "",
-  state: "ACCEPTED",
-  proposedBy: "tshering",
-  proposedAt: null,
-  approvedBy: "tshendu",
-  approvedAt: null,
-  acceptedBy: "kesang",
-  acceptedAt: null,
-  refusedReason: null,
-  expiresAt: null,
-  activatedAt: null,
-  didMethodAtActivation: null,
-  checks: null,
-  checkedAt: null,
-  ndiAccess: "ACTIVE",
-  ndiAccessChangedBy: null,
-  ndiAccessChangedAt: null,
-};
+const SAMPLE: Designation = { ...SAMPLE_DESIGNATION, state: "ACCEPTED", acceptedBy: "kesang" };
 
 /** A full set of checks with one failing, for the forced error faces. */
 function forcedChecks(fail: ActivationCheck["error"]): ActivationCheck[] {

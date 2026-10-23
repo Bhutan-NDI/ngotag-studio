@@ -57,6 +57,15 @@ type Face =
   | "offline"
   | "not_found";
 
+/** decideAccreditation's refusals, in the words SCR-ACC-02 gives them. Nothing is recorded in any of them. */
+const DECIDE_REFUSALS: Record<"E1" | "E5" | "E11" | "not_admin" | "invalid", string> = {
+  E1: "You proposed this, so a different administrator has to decide it. Nothing was recorded.",
+  E5: "You reviewed this request, so a different administrator has to decide it. Nothing was recorded.",
+  E11: "This was recommended for decline, so it can't be approved. Confirm the decline, or send it for a different review.",
+  not_admin: "Only NDI's named platform administrators decide approvals. Nothing was recorded.",
+  invalid: "This has already been decided, or is no longer waiting for a decision. Nothing you did was recorded.",
+};
+
 export function ApproveAccreditationView({ id }: { id: string }) {
   const router = useRouter();
   const { accreditations, organizations, people, harness, currentPerson, personById, decideAccreditation, sendBackForReview, hydrated } =
@@ -76,6 +85,7 @@ export function ApproveAccreditationView({ id }: { id: string }) {
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [done, setDone] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   const live = accreditations.find((a) => a.id === id);
   /* Forced faces need something to show even when the address names
@@ -183,7 +193,12 @@ export function ApproveAccreditationView({ id }: { id: string }) {
   const isRequest = acc.door === "REQUEST";
   const whoCan = people.filter((p) => isNamedAdmin(p) && p.hasAccount !== false && p.id !== acc.proposedBy).map((p) => p.name);
   const overlaps = issueOverlaps(acc, accreditations, (oid) => organizations.find((o) => o.id === oid)?.name ?? oid);
-  const pill = face === "lapsed" ? { status: "lapsed", label: "Lapsed" } : accPill(acc, "admin");
+  const pill =
+    face === "lapsed"
+      ? acc.door === "REQUEST"
+        ? { status: "under_review", label: "Back for review" }
+        : { status: "lapsed", label: "Lapsed" }
+      : accPill(acc, "admin");
   const offline = face === "offline";
   const canAct = isNamedAdmin(currentPerson) && !offline;
 
@@ -192,7 +207,15 @@ export function ApproveAccreditationView({ id }: { id: string }) {
     window.setTimeout(() => {
       const r = decideAccreditation(acc.id, approve, why);
       setBusy(false);
-      if (!r.ok) return;
+      /* The store's refusal is the one that counts, so it's said here rather
+         than swallowed: a second administrator who had it open while a
+         colleague decided would otherwise see Approve come back with no
+         explanation. */
+      if (!r.ok) {
+        setRefusal(DECIDE_REFUSALS[r.error]);
+        return;
+      }
+      setRefusal(null);
       setDone(
         approve
           ? isRequest
@@ -279,7 +302,16 @@ export function ApproveAccreditationView({ id }: { id: string }) {
           </Panel>
         ) : null}
 
-        {after ? (
+        {refusal ? (
+          <p role="alert" className="m-0 rounded-[12px] border px-4 py-3 text-[13.5px] leading-[1.6] text-body" style={{ borderColor: "var(--ndi-warning)" }}>
+            {refusal}
+          </p>
+        ) : null}
+
+        {/* After a decision the success panel says what happened; the status
+            panel would repeat it ("Waiting for … to accept") or, after a
+            decline, offer to propose again under the confirmation. */}
+        {after && face !== "success" ? (
           <Panel>
             <div className="relative z-[4] flex flex-col gap-3" role="status">
               <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">{after}</p>
@@ -317,12 +349,11 @@ export function ApproveAccreditationView({ id }: { id: string }) {
               </p>
               <div>
                 {isRequest ? (
-                  <HairlineButton
-                    onClick={() => {
-                      sendBackForReview(acc.id);
-                      router.push(`/admin/accreditations/${acc.id}/review`);
-                    }}
-                  >
+                  /* E12 needs no action to happen: the store has already put
+                     the request back in review. This only takes the
+                     administrator there. sendBackForReview is E11's — a
+                     recommended decline — and would bar the last reviewer. */
+                  <HairlineButton onClick={() => router.push(`/admin/accreditations/${acc.id}/review`)}>
                     Review it afresh
                   </HairlineButton>
                 ) : (
@@ -390,7 +421,13 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                     ]
                   : []),
                 ...(acc.decidedBy ? [{ label: "Decided by", value: `${personById(acc.decidedBy).name}${acc.decidedAt ? `, ${formatDate(acc.decidedAt)}` : ""}` }] : []),
-                ...(proposedHere && face !== "lapsed" ? [{ label: "Lapses", value: `In ${daysUntil(acc.expiresAt)} days, if nobody decides` }] : []),
+                ...(proposedHere && face !== "lapsed"
+                  ? [
+                      isRequest
+                        ? { label: "If nobody decides", value: `In ${daysUntil(acc.expiresAt)} days it goes back for a fresh review` }
+                        : { label: "Lapses", value: `In ${daysUntil(acc.expiresAt)} days, if nobody decides` },
+                    ]
+                  : []),
               ]}
             />
             <p className="m-0 text-[13.5px] leading-[1.6] text-body">
@@ -444,7 +481,8 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                   </GradientButton>
                   <HairlineButton
                     onClick={() => {
-                      sendBackForReview(acc.id);
+                      const r = sendBackForReview(acc.id);
+                      if (!r.ok) return setRefusal(DECIDE_REFUSALS[r.error]);
                       router.push("/admin/accreditations");
                     }}
                     disabled={!canAct}

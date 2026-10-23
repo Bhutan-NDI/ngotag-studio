@@ -1,7 +1,8 @@
 "use client";
 
 import { Icon } from "@/components/ui/icons";
-import type { ActivationCheck, AskedItem, Designation, OrgKind } from "@/lib/demoData";
+import { roleIn, type ActivationCheck, type AskedItem, type Designation, type OrgKind } from "@/lib/demoData";
+import { useDemo } from "@/lib/demoStore";
 
 /**
  * What the designation and adoption screens share (UX-EW-02, Flow 5).
@@ -31,9 +32,14 @@ export const kindsInWords = (kinds: OrgKind[]) => {
   return words.length <= 1 ? (words[0] ?? "") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 };
 
-/** Whole days from today to a date, never negative. */
+/**
+ * Whole days from today to a date, never negative — 0 on the date itself.
+ * Counted between calendar dates, not from this instant: `new Date("YYYY-MM-DD")`
+ * is UTC midnight, already past by the morning of the last day, which made
+ * the last day read as none left.
+ */
 export const daysLeft = (date: string | null) =>
-  date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000)) : 0;
+  date ? Math.max(0, Math.round((Date.parse(date) - Date.parse(new Date().toISOString().slice(0, 10))) / 86_400_000)) : 0;
 
 /**
  * A designation's state as a pill, worded for whoever reads it. Waiting on
@@ -134,3 +140,64 @@ export function CheckList({ checks }: { checks: ActivationCheck[] }) {
     </ol>
   );
 }
+
+/**
+ * The authority the screens are about, and who owns it. The organisation
+ * being worked in, if it has a designation, else the first one the person
+ * belongs to that does — so Kesang lands on the ministry even when the
+ * switcher was left on another organisation. One place for it: four screens
+ * had a copy each, and copies drift.
+ *
+ * `designation` is the one that matters now: live or suspended first, then
+ * one waiting on the authority, then whatever else there is.
+ */
+export function useAuthority() {
+  const { organizations, designations, activeOrgId, currentPerson, personById } = useDemo();
+  const org =
+    organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
+    organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
+  const mine = designations.filter((d) => d.orgId === org?.id);
+  const designation: Designation | undefined =
+    mine.find((x) => ["ACTIVE", "SUSPENDED"].includes(x.state)) ?? mine.find((x) => ["PENDING", "ACCEPTED"].includes(x.state)) ?? mine[0];
+  const ownerId = org ? Object.entries(org.roles ?? {}).find(([, r]) => r === "Owner")?.[0] : undefined;
+  return {
+    org,
+    designation,
+    /** Only an ACTIVE designation can adopt or stop anything. */
+    active: designation?.state === "ACTIVE" ? designation : undefined,
+    owner: org ? roleIn(org, currentPerson) === "Owner" : false,
+    ownerId,
+    ownerName: ownerId ? personById(ownerId).name : "Your organisation's owner",
+  };
+}
+
+/**
+ * The designation the state switcher shows when there isn't a real one to
+ * show — the ministry, for sole proprietorships and partnerships. Screens
+ * override the state (and id) they need; one literal instead of three.
+ */
+export const SAMPLE_DESIGNATION: Designation = {
+  id: "sample",
+  orgId: "org-moice",
+  orgName: "Ministry of Industry, Commerce & Employment",
+  kind: "E",
+  entityTypes: ["sole_proprietorship", "partnership"],
+  legalBasis: "The licensing of businesses under the Ministry's mandate",
+  legalRef: "NDI/DSG/2026/002",
+  state: "PENDING",
+  proposedBy: "tshering",
+  proposedAt: null,
+  approvedBy: "tshendu",
+  approvedAt: null,
+  acceptedBy: null,
+  acceptedAt: null,
+  refusedReason: null,
+  expiresAt: null,
+  activatedAt: null,
+  didMethodAtActivation: null,
+  checks: null,
+  checkedAt: null,
+  ndiAccess: "ACTIVE",
+  ndiAccessChangedBy: null,
+  ndiAccessChangedAt: null,
+};
