@@ -117,7 +117,10 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
 
   const disclosing = request?.disclosing ?? request?.requiredAttributes ?? [];
 
-  const alreadySigned = operation.signatures.some((s) => s.personId === harness.persona);
+  /* An approver never decides their own request (SAD-EW-01 §8.4;
+     FLOW-DEL-01 A2). The store refuses it too; this says why first. */
+  const ownRequest = operation.requestedBy === harness.persona;
+  const alreadySigned = ownRequest || operation.signatures.some((s) => s.personId === harness.persona);
   const remaining = operation.requiredSignatures - operation.signatures.length;
 
   const signViaWallet = () => {
@@ -381,9 +384,9 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
                     color: "var(--text-body)",
                   }}
                 >
-                  You have already signed this one. Dual control means the
-                  remaining signature has to come from someone else — switch
-                  person to continue.
+                  {ownRequest
+                    ? "You asked for this, so someone else has to approve it. You can approve what others ask for, never your own."
+                    : "You have already signed this one. Dual control means the remaining signature has to come from someone else — switch person to continue."}
                 </p>
               ) : null}
 
@@ -401,7 +404,8 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
                 <button
                   type="button"
                   onClick={() => setRejectOpen(true)}
-                  className="ndi-dialog-confirm inline-flex h-11 items-center gap-2 rounded-[10px] px-4 font-display text-[13.5px] font-semibold"
+                  disabled={ownRequest}
+                  className="ndi-dialog-confirm inline-flex h-11 items-center gap-2 rounded-[10px] px-4 font-display text-[13.5px] font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                   data-tone="danger"
                 >
                   Reject
