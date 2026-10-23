@@ -2600,6 +2600,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
                 ]
               : s.relations,
             responsibilities: [...s.responsibilities.filter((r) => r.orgId !== orgId), { orgId, state: "PENDING", at: now }],
+            /* Step 11 writes the account's identity anchor (FLOW-ORG-01 v0.13):
+               from here a different wallet is refused with E13. */
+            people: s.people.map((p) => (p.id === personId ? anchored(p) : p)),
             harness: { ...s.harness, persona: personId },
             orgOnboarding: s.orgOnboarding ? { ...s.orgOnboarding, stage: "verified" } : s.orgOnboarding,
             activeOrgId: orgId,
