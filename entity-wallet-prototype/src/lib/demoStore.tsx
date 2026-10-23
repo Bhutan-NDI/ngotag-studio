@@ -13,7 +13,7 @@ import {
 
 import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
-import { SHARE_TARGETS, scopeFor } from "@/features/appointment/presets";
+import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import {
   NDI_ORG,
   PELDEN,
@@ -1503,9 +1503,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            this is the boundary. */
         const ticked = presets.filter((p, i) => presets.indexOf(p) === i);
         if (ticked.length === 0) return { ok: false, error: "E13" };
-        /* DEL-01/E12: a named reach names someone, and only listed verifiers. */
+        /* DEL-01/E12: a named reach names someone, and only organisations
+           holding an ACTIVE verifier source (EW-FLOW3-SD v0.3 §4.2). */
         const named = ticked.includes("share") && shareReach === "named";
-        if (named && (shareWith.length === 0 || shareWith.some((t) => !SHARE_TARGETS.includes(t))))
+        const verifiers = shareTargets(s0.organizations, orgId);
+        if (named && (shareWith.length === 0 || shareWith.some((t) => !verifiers.includes(t))))
           return { ok: false, error: "E12" };
         const choice = {
           presets: ticked,

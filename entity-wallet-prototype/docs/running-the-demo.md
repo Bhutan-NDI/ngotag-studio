@@ -494,7 +494,9 @@ lines that are always there.
 Worth showing:
 
 - **Share** asks for a reach: only organisations Dorji names, or any that
-  asks. Named with none chosen, **Give authority** stays unavailable (E12).
+  asks. The ones Dorji can name are the organisations NDI has approved to
+  verify — on the story's first day, only Bank of Bhutan; the list grows as
+  Flow 4 approves more. Named with none chosen, **Give authority** stays unavailable (E12).
   With approval on and nobody else able to approve, it says before you
   submit that Dorji will be asked each time (A1). *Give authority to act*
   works the same way with its own approval setting.
