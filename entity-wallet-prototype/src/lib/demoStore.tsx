@@ -13,7 +13,7 @@ import {
 
 import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
-import { scopeFor } from "@/features/appointment/presets";
+import { SHARE_TARGETS, scopeFor } from "@/features/appointment/presets";
 import {
   NDI_ORG,
   PELDEN,
@@ -53,6 +53,7 @@ import {
   type OrgKind,
   type AppointmentDocument,
   type PresetId,
+  type ShareReach,
   standsNow,
   REGISTER_RECORDS,
   OBSERVED_OPERATORS,
@@ -600,7 +601,7 @@ interface DemoActions {
 
   /* ---- Flow 3 (FLOW-DEL-02, FLOW-DEL-01) ----
      The representative accepts responsibility; then gives a member
-     authority from one of four presets; the member accepts with one wallet
+     authority from one or more of four presets; the member accepts with one wallet
      approval. Every refusal is decided here, not on the screen. */
 
   /**
@@ -613,12 +614,15 @@ interface DemoActions {
   /** SCR-DEL-02 — give a member authority. Returns the appointment's id. */
   appoint: (input: {
     personId: PersonId;
-    preset: PresetId;
+    /** One or more, in any combination (EW-FLOW3-SD §4.2, D18). */
+    presets: PresetId[];
+    shareReach: ShareReach;
     shareWith: string[];
     shareNeedsApproval: boolean;
+    issueNeedsApproval: boolean;
     validUntil: string | null;
     document: AppointmentDocument | null;
-  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E12" };
+  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E12" | "E13" };
   /**
    * SCR-DEL-04 — the appointee's one wallet approval, which both confirms
    * who they are and records their acceptance (EW-FLOW3-SD/D7). `answeredAs`
@@ -1486,7 +1490,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ],
         })),
 
-      appoint: ({ personId, preset, shareWith, shareNeedsApproval, validUntil, document }) => {
+      appoint: ({ personId, presets, shareReach, shareWith, shareNeedsApproval, issueNeedsApproval, validUntil, document }) => {
         const s0 = stateRef.current;
         const orgId = s0.activeOrgId;
         const root = s0.relations.find((r) => inOrg(orgId)(r) && r.isRootAuthority && r.state === "ACTIVE");
@@ -1495,7 +1499,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* DEL-01/E3: one appointment per person per organisation at a time. */
         if (s0.relations.some((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today())))
           return { ok: false, error: "E3" };
-        if (preset === "share" && shareWith.length === 0) return { ok: false, error: "E12" };
+        /* DEL-01/E13: at least one preset. The screen disables the button;
+           this is the boundary. */
+        const ticked = presets.filter((p, i) => presets.indexOf(p) === i);
+        if (ticked.length === 0) return { ok: false, error: "E13" };
+        /* DEL-01/E12: a named reach names someone, and only listed verifiers. */
+        const named = ticked.includes("share") && shareReach === "named";
+        if (named && (shareWith.length === 0 || shareWith.some((t) => !SHARE_TARGETS.includes(t))))
+          return { ok: false, error: "E12" };
+        const choice = {
+          presets: ticked,
+          shareReach,
+          shareWith: named ? shareWith : [],
+          shareNeedsApproval,
+          issueNeedsApproval,
+        };
         const id = rid("rel");
         const now = today();
         const person = s0.people.find((p) => p.id === personId);
@@ -1508,14 +1526,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               personId,
               legalBasis: "entity_consent",
               instrument: null,
-              scope: scopeFor(preset, shareWith, shareNeedsApproval, now, validUntil),
+              scope: scopeFor(choice, now, validUntil),
               state: "PENDING_ACCEPTANCE",
               isRootAuthority: false,
               createdAt: now,
               acceptedAt: null,
               activatedAt: null,
-              preset,
-              shareNeedsApproval,
+              presets: ticked,
+              shareReach: ticked.includes("share") ? shareReach : undefined,
+              shareNeedsApproval: ticked.includes("share") ? shareNeedsApproval : undefined,
+              issueNeedsApproval: ticked.includes("give_authority") ? issueNeedsApproval : undefined,
               attestation: { attestedBy: s.harness.persona, attestedAt: now },
               document,
               expiresAt: inDays(14),
@@ -1678,6 +1698,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
+          /* An approver never approves their own request (SAD-EW-01 §8.4;
+             FLOW-DEL-01 A2) — not even someone holding Approve with Share. */
+          if (operation.requestedBy === s.harness.persona) return s;
 
           const signatures = [
             ...operation.signatures,
@@ -1742,6 +1765,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
+          /* Deciding includes refusing: still never one's own (A2). */
+          if (operation.requestedBy === s.harness.persona) return s;
           return {
             ...s,
             parkedOperations: s.parkedOperations.map((p) =>
