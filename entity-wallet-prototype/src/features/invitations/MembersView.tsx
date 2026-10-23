@@ -11,7 +11,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { roleIn, type OrgInvitation } from "@/lib/demoData";
-import { presetOf } from "@/features/appointment/presets";
+import { presetOf, presetsOf } from "@/features/appointment/presets";
 import { useDemo } from "@/lib/demoStore";
 
 import { PendingInvitations } from "./PendingInvitations";
@@ -85,7 +85,7 @@ export function MembersView() {
      force. */
   const authorityOf = (personId: string) => {
     const r = relations.find((rel) => rel.personId === personId && rel.state === "ACTIVE");
-    if (r) return r.isRootAuthority ? "Representative" : `Can act · ${presetOf(r.preset)?.label ?? "set individually"}`;
+    if (r) return r.isRootAuthority ? "Representative" : `Can act · ${presetsOf(r).map((id) => presetOf(id)?.label).join(", ") || "set individually"}`;
     const held = delegatedAuthorities.filter(
       (a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "accepted",
     );

@@ -417,7 +417,11 @@ export type ControllerOperation =
   | "credential:list"
   | "proof:present"
   | "connection:create"
-  | "approval:decide";
+  | "approval:decide"
+  /* Giving someone authority to act in their own wallet (EW-FLOW8-SD §8.1).
+     The Root holds it, and so does a Controller ticked for *Give authority
+     to act* on SCR-DEL-02 (EW-FLOW3-SD §4.2, D18). */
+  | "authority:issue";
 
 export type ApprovalPolicy = "AUTO" | "SINGLE_APPROVER" | "DUAL_CONTROL";
 
@@ -491,12 +495,21 @@ export interface ControllershipRelation {
   /*
    * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
    * older relations, which were authored operation by operation before the
-   * four presets were agreed (EW-FLOW3-SD/D8).
+   * presets were agreed (EW-FLOW3-SD/D8).
    */
-  /** Which of the four presets it was made from. */
-  preset?: PresetId;
+  /** Which presets were ticked — one or more (EW-FLOW3-SD §4.2, D18). */
+  presets?: PresetId[];
+  /**
+   * The single preset an appointment carried before presets could be
+   * combined. Only a demo saved then still has it; `presetsOf` reads it.
+   */
+  preset?: string;
+  /** For *Share*: named organisations, or any (§4.2). */
+  shareReach?: ShareReach;
   /** For *Share*: whether each share needs someone to approve it. */
   shareNeedsApproval?: boolean;
+  /** For *Give authority to act*: whether each grant needs approval. */
+  issueNeedsApproval?: boolean;
   /** The representative's required statement that they may make it (D5). */
   attestation?: { attestedBy: PersonId; attestedAt: string };
   /** The optional authorising document — cited, never uploaded (D5). */
@@ -508,11 +521,15 @@ export interface ControllershipRelation {
 }
 
 /**
- * The four things a representative can let someone do (EW-FLOW3-SD §4.2,
- * UXD-22). Raw scope is never authored on a screen; each preset resolves to
- * one, in `features/appointment/presets.ts`.
+ * The four things a representative can let someone do, ticked in any
+ * combination (EW-FLOW3-SD §4.2, D18; UXD-58). Raw scope is never authored
+ * on a screen; the ticked presets resolve to one, in
+ * `features/appointment/presets.ts`. There is no *Everything*.
  */
-export type PresetId = "receive" | "share" | "approve" | "everything";
+export type PresetId = "receive" | "share" | "approve" | "give_authority";
+
+/** Who *Share* may share with: the organisations named, or any (§4.2). */
+export type ShareReach = "named" | "any";
 
 /**
  * Whether a relation still stands — in force, or offered and not yet
@@ -2010,6 +2027,10 @@ export const SEED: DemoState = {
           { operation: "proof:present", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "connection:create", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "approval:decide", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
+          /* The Root preset gained authority:issue when giving authority to
+             act became something the Root can also tick for others
+             (EW-FLOW3-SD §4.2, EW-FLOW8-SD/D21). */
+          { operation: "authority:issue", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
         ],
       },
       state: "ACTIVE",

@@ -12,10 +12,10 @@ import { Panel } from "@/components/ui/Panel";
 import { SimulatedLink } from "@/components/ui/SimulatedStep";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { inOrg } from "@/lib/demoData";
+import { inOrg, shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { presetOf } from "./presets";
+import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
 import { FullTerms, Responsibilities } from "./Responsibilities";
 
 /**
@@ -56,9 +56,18 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   const root = relations.find((x) => inOrg(org?.id ?? "org-pelden")(x) && x.isRootAuthority);
   const rep = people.find((p) => p.id === (r?.attestation?.attestedBy ?? root?.personId));
   const repName = rep?.name ?? "Dorji Wangchuk";
-  const preset = presetOf(r?.preset ?? "receive");
-  const shareWith = r?.scope.grants.flatMap((g) => (g.relyingParties.mode === "list" ? g.relyingParties.values : [])) ?? [];
-  const uniqueShare = shareWith.filter((v, i, a) => a.indexOf(v) === i);
+  /* What was ticked, read back as one grant: allows from the boxes ticked,
+     "won't" from the ones left unticked (UX-EW-01 SCR-DEL-03, UXD-58). */
+  const ticked = presetsOf(r);
+  const grant = describeGrant(ticked.length ? ticked : ["receive"], {
+    name: "You",
+    orgName: shortOrgName(orgName),
+    shareWith: r ? shareTargetsOf(r) : null,
+  });
+  const approvals = [
+    ticked.includes("share") && r?.shareNeedsApproval ? "Each share needs approval." : null,
+    ticked.includes("give_authority") && r?.issueNeedsApproval ? "Each grant of authority needs approval." : null,
+  ].filter(Boolean);
   const now = new Date().toISOString().slice(0, 10);
 
   /* E8 and E9 are both "the basis was lost", and the screen says which in
@@ -162,26 +171,21 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
           <div className="relative z-[4] grid gap-5 min-[761px]:grid-cols-2">
             <div className="flex flex-col gap-2">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">You&rsquo;ll be able to</h2>
-              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">{preset?.label}</p>
-              {preset?.allows.map((a) => (
+              <p className="m-0 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted">{grant.label}</p>
+              {grant.allows.map((a) => (
                 <p key={a} className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                   <Icon name="check" size={14} strokeWidth={2.4} className="mt-[5px] flex-none text-accent" />
                   {a}
                 </p>
               ))}
-              {uniqueShare.length ? (
-                <p className="m-0 text-[13px] leading-[1.6] text-muted">
-                  With: {uniqueShare.join(", ")}
-                  {r?.shareNeedsApproval ? ". Each share needs approval." : "."}
-                </p>
-              ) : null}
+              {approvals.length ? <p className="m-0 text-[13px] leading-[1.6] text-muted">{approvals.join(" ")}</p> : null}
               <p className="m-0 text-[13px] text-muted">
                 {r?.scope.validUntil ? `Until ${formatDate(r.scope.validUntil)}.` : "No end date — until it's ended."}
               </p>
             </div>
             <div className="flex flex-col gap-2">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">You won&rsquo;t be able to</h2>
-              {preset?.doesNotAllow.map((a) => (
+              {grant.wont.map((a) => (
                 <p key={a} className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                   <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
                   {a}
