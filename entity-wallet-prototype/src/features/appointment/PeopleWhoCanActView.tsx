@@ -12,10 +12,10 @@ import { SimulatedLink } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { inOrg, type ControllershipRelation, type Person } from "@/lib/demoData";
+import { inOrg, shortOrgName, type ControllershipRelation, type Person } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { presetOf } from "./presets";
+import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
 
 /**
  * SCR-DEL-05 — People who can act for {organisation}.
@@ -90,7 +90,7 @@ export function PeopleWhoCanActView() {
                 createdAt: today(),
                 acceptedAt: status === "active" ? today() : null,
                 activatedAt: status === "active" ? today() : null,
-                preset: "receive",
+                presets: ["receive"],
                 expiresAt: today(),
                 verifiedName: status === "active" ? "Ugyen Phuntsho Dorji" : null,
               },
@@ -126,7 +126,8 @@ export function PeopleWhoCanActView() {
           <ul className="relative z-[4] m-0 flex list-none flex-col p-0">
             {shown.map((row, i) => {
               const r = row.relation;
-              const preset = presetOf(r.preset);
+              /* One sentence per person, read back from what was ticked (UC-20). */
+              const ticked = presetsOf(r);
               const verified = r.verifiedName ?? null;
               const name = row.status === "active" && verified ? verified : row.person.name;
               const first = row.person.name.split(" ")[0];
@@ -142,18 +143,19 @@ export function PeopleWhoCanActView() {
                       ) : null}
                       <span className="text-[13px] leading-[1.55] text-body">
                         {row.status === "representative"
-                          ? `Recorded as ${orgName}'s representative. Can do everything, and is the only one who can give others authority.`
-                          : preset
-                            ? preset.label
-                            : "What they can do was set individually, before the four choices existed."}
+                          ? `Recorded as ${orgName}'s representative. Can do everything, and is the only one who can appoint people to act for it.`
+                          : ticked.length
+                            ? describeGrant(ticked, { name: first, orgName: shortOrgName(orgName), shareWith: shareTargetsOf(r) }).sentence
+                            : "What they can do was set individually, before the presets existed."}
                       </span>
-                      {r.preset === "share" && r.scope.grants.some((g) => g.relyingParties.mode === "list") ? (
+                      {(ticked.includes("share") && r.shareNeedsApproval) || (ticked.includes("give_authority") && r.issueNeedsApproval) ? (
                         <span className="text-[12.5px] text-faint">
-                          With{" "}
-                          {r.scope.grants.flatMap((g) => (g.relyingParties.mode === "list" ? g.relyingParties.values : []))
-                            .filter((v, k, a) => a.indexOf(v) === k)
-                            .join(", ")}
-                          {r.shareNeedsApproval ? " — each share needs approval" : ""}
+                          {[
+                            ticked.includes("share") && r.shareNeedsApproval ? "Each share needs approval." : null,
+                            ticked.includes("give_authority") && r.issueNeedsApproval ? "Each grant of authority needs approval." : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                         </span>
                       ) : null}
                     </span>
