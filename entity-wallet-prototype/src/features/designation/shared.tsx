@@ -156,9 +156,18 @@ export function useAuthority() {
   const org =
     organizations.find((o) => o.id === activeOrgId && designations.some((d) => d.orgId === o.id)) ??
     organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
-  const mine = designations.filter((d) => d.orgId === org?.id);
+  /* Only a designation the authority has been shown, and that still stands,
+     is theirs to see. A PROPOSED one hasn't reached them (FLOW-ORG-02 A1:
+     nothing before the second approval); a REFUSED or an unapproved EXPIRED
+     one never did (E12, E13: "nothing reaches the authority"); a DECLINED
+     one is their own ended answer. Falling back to whatever row came first
+     showed a proposal as theirs, with NDI's process in it. These count as no
+     designation, so every authority screen shows its empty state. */
+  const mine = designations.filter(
+    (d) => d.orgId === org?.id && !["PROPOSED", "REFUSED", "DECLINED", "EXPIRED"].includes(d.state),
+  );
   const designation: Designation | undefined =
-    mine.find((x) => ["ACTIVE", "SUSPENDED"].includes(x.state)) ?? mine.find((x) => ["PENDING", "ACCEPTED"].includes(x.state)) ?? mine[0];
+    mine.find((x) => ["ACTIVE", "SUSPENDED"].includes(x.state)) ?? mine.find((x) => ["PENDING", "ACCEPTED"].includes(x.state));
   const ownerId = org ? Object.entries(org.roles ?? {}).find(([, r]) => r === "Owner")?.[0] : undefined;
   return {
     org,
