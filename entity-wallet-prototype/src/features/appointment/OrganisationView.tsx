@@ -45,8 +45,11 @@ export function OrganisationView() {
   const mine = relations.find((r) => inOrg(activeOrgId)(r) && r.personId === harness.persona && r.state === "ACTIVE");
   const face: Face =
     forced !== "live" ? forced : mine?.isRootAuthority ? "representative" : mine ? "appointed" : "member";
-  /* Anything it has asked NDI for, or been approved for (Flow 4). */
-  const accs = accreditations.filter((a) => a.orgId === activeOrgId && !["EXPIRED", "SUPERSEDED"].includes(a.state));
+  /* Anything it has asked NDI for, or been approved for (Flow 4). Not a
+     proposal that lapsed before NDI decided it, which the organisation
+     never saw; a replaced approval is still counted through its
+     replacement. */
+  const accs = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "LAPSED");
   /* A forced face with no appointment shows the guided grant, Receive. */
   const minePresets = presetsOf(mine);
   const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {

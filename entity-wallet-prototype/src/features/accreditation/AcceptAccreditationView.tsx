@@ -17,7 +17,7 @@ import { ENFORCEMENT_DATE, VERIFICATION_ORG_NAME, roleIn, type Accreditation } f
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, daysUntil, inline } from "./shared";
+import { ScopeList, inline, legalBasisText, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-03 — What you're being approved for. FLOW-ACC-01 steps 4–7.
@@ -44,6 +44,17 @@ import { ScopeList, daysUntil, inline } from "./shared";
  * as the acceptance rather than being asked twice. Then one wallet approval
  * confirms who they are and records that they accept. "Didn't confirm"
  * (E4) says plainly that nothing was accepted.
+ *
+ * The identity set up here is created *not primary*: it becomes the
+ * organisation's primary DID only when the acceptance is recorded (step 8),
+ * so a wallet step that doesn't confirm leaves nothing changed.
+ *
+ * NO DEADLINE, BUT IT CAN BE WITHDRAWN
+ *
+ * Nothing here counts down any more (EW-FLOW4-SD/D20): the owner and NDI
+ * are reminded, and the approval waits. If NDI withdraws it (E2) the
+ * officer is told so in NDI's words — "NDI has withdrawn this approval:
+ * <reason>." — rather than finding a date has passed.
  */
 type Face =
   | "live"
@@ -56,15 +67,14 @@ type Face =
   | "not_confirmed"
   | "loading"
   | "success"
-  | "expired"
+  | "withdrawn"
   | "offline"
   | "no_permission"
   | "declined"
   | "not_found";
 
 /** The refusals SCR-ACC-03 can meet after Accept, in its words. Nothing is accepted in any of them. */
-const ACCEPT_REFUSALS: Record<"E2" | "not_owner" | "invalid", string> = {
-  E2: "This approval expired before it was accepted. Nothing was accepted — NDI can propose it again.",
+const ACCEPT_REFUSALS: Record<"not_owner" | "invalid", string> = {
   not_owner: "Only your organisation's owner can accept this. Nothing was accepted.",
   invalid: "This approval has changed since you opened it — it's no longer waiting to be accepted. Nothing was accepted.",
 };
@@ -94,7 +104,7 @@ export function AcceptAccreditationView({ id }: { id: string }) {
     "not_confirmed",
     "loading",
     "success",
-    "expired",
+    "withdrawn",
     "offline",
     "no_permission",
   ]) as Face;
@@ -103,14 +113,13 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   const [scan, setScan] = useState<"awaiting_scan" | "waiting">("awaiting_scan");
   const [busy, setBusy] = useState(false);
   /* The store's refusal, said rather than swallowed: an owner pressing Accept
-     after the 30 days, or after someone else changed it, otherwise saw
+     after NDI withdrew it, or after someone else changed it, otherwise saw
      nothing happen. */
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const acc: Accreditation | undefined = accreditations.find((a) => a.id === id);
   const org = organizations.find((o) => o.id === acc?.orgId);
   const owner = people.find((p) => roleIn(org, p) === "Owner");
-  const now = new Date().toISOString().slice(0, 10);
 
   const natural: Face = !acc
     ? "not_found"
@@ -118,8 +127,8 @@ export function AcceptAccreditationView({ id }: { id: string }) {
       ? "declined"
       : step === "done" || acc.state === "LISTING" || acc.state === "ACTIVE"
         ? "success"
-        : acc.state === "EXPIRED" || (acc.state === "PENDING_ACCEPTANCE" && acc.expiresAt !== null && acc.expiresAt < now)
-          ? "expired"
+        : acc.state === "WITHDRAWN" && acc.withdrawal?.reason === "BY_NDI"
+          ? "withdrawn"
           : acc.state !== "PENDING_ACCEPTANCE"
             ? "not_found"
             : roleIn(org, currentPerson) !== "Owner"
@@ -165,9 +174,12 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   if (face === "not_found") return outcome("This approval isn't waiting for you any more.", <HairlineButton onClick={() => router.push("/verify-or-issue")}>See where it stands</HairlineButton>);
   if (face === "declined")
     return outcome("You've declined. Nothing is listed and NDI has been told.", <HairlineButton onClick={() => router.push("/dashboard")}>Close</HairlineButton>);
-  if (face === "expired")
+  if (face === "withdrawn")
     return outcome(
-      "This has expired. NDI would need to propose it again.",
+      <>
+        NDI has withdrawn this approval: {acc?.withdrawal?.note ?? "it no longer needs to be accepted"}. Nothing is listed, and
+        NDI would need to propose it again.
+      </>,
       <Link href="/legal/support" className="ndi-plainlink text-[13.5px] font-medium text-accent">
         Contact NDI
       </Link>,
@@ -185,42 +197,11 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   /* From here on the approval is shown in full. Forced faces without a
      record borrow the bank's recognition, which is the story's own. */
   const a: Accreditation =
-    acc ??
-    ({
-      id,
-      orgId: "org-bob",
-      orgName: "Bank of Bhutan Ltd.",
-      officerEmail: null,
-      door: "RECOGNITION",
-      capability: "verifier",
-      purpose: "Confirming who a customer is when they open an account",
-      agreementRef: "NDI/AGR/2024/003",
-      ask: [
-        { credential: "Citizen ID", item: "Full name", checkOnly: false },
-        { credential: "Citizen ID", item: "Citizenship ID number", checkOnly: false },
-        { credential: "Citizen ID", item: "Photo", checkOnly: false },
-      ],
-      issue: [],
-      observed: null,
-      state: "PENDING_ACCEPTANCE",
-      proposedBy: "tshering",
-      proposedAt: now,
-      requestedBy: null,
-      requestedAt: null,
-      recommendation: null,
-      decidedBy: "root",
-      decidedAt: now,
-      declineReason: null,
-      declinedByOrg: false,
-      acceptedName: null,
-      acceptedAt: null,
-      listedAt: null,
-      expiresAt: null,
-      publicIdentity: null,
-      refusals: null,
-    } satisfies Accreditation);
+    acc ?? sampleAccreditation({ id, state: "PENDING_ACCEPTANCE", decidedBy: "tshendu", decidedAt: new Date().toISOString().slice(0, 10) });
   const short = name.replace(/ (Pvt\. )?Ltd\.$/, "");
-  const did = org?.publicDid;
+  /* The identity it will be listed under: one set up for this approval and
+     not yet primary, or else the primary it has. */
+  const did = org?.pendingDid ?? org?.publicDid;
   const recognition = face === "recognition" || a.door === "RECOGNITION";
   const offline = face === "offline";
   const readOnly = offline || face === "no_permission";
@@ -299,10 +280,11 @@ export function AcceptAccreditationView({ id }: { id: string }) {
               NDI hosts your organisation&rsquo;s keys, as it does for every organisation on the platform.
             </p>
             <p className="m-0 text-[13px] leading-[1.6] text-muted">
-              Purpose: {a.purpose}. {a.agreementRef ? `Agreement ${a.agreementRef}. ` : ""}Proposed by{" "}
-              {a.proposedBy ? personById(a.proposedBy).name : "NDI"}
-              {a.decidedBy ? ` and approved by ${personById(a.decidedBy).name}` : ""}, at NDI.{" "}
-              {a.expiresAt ? `${daysUntil(a.expiresAt)} days left to decide.` : ""}
+              Purpose: {a.purpose}. {a.capability === "issuer" && a.legalBasis ? `Legal basis: ${legalBasisText(a)}. ` : ""}
+              {a.agreementRef ? `Agreement ${a.agreementRef}. ` : ""}Proposed by {a.proposedBy ? personById(a.proposedBy).name : "NDI"}
+              {a.proposedAt ? ` on ${formatDate(a.proposedAt)}` : ""}
+              {a.decidedBy ? ` and approved by ${personById(a.decidedBy).name}` : ""}
+              {a.decidedAt ? ` on ${formatDate(a.decidedAt)}` : ""}, at NDI.
             </p>
           </div>
         </Panel>
@@ -375,9 +357,9 @@ export function AcceptAccreditationView({ id }: { id: string }) {
                   const r = acceptAccreditation(a.id);
                   setScan("awaiting_scan");
                   /* Only a check that fails at the wallet step is "not
-                     confirmed"; an expiry or a lost permission says so. */
+                     confirmed"; a withdrawal or a lost permission says so. */
                   if (r.ok) setStep("done");
-                  else if (r.error === "E2" || r.error === "not_owner" || r.error === "invalid") {
+                  else if (r.error === "not_owner" || r.error === "invalid") {
                     setStep("idle");
                     setRefusal(ACCEPT_REFUSALS[r.error]);
                   } else setStep("not_confirmed");
@@ -390,7 +372,6 @@ export function AcceptAccreditationView({ id }: { id: string }) {
         {face === "not_confirmed" ? (
           <p role="alert" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13.5px] text-body" style={{ background: "rgb(var(--tint) / 0.04)" }}>
             Your NDI wallet didn&rsquo;t confirm. Nothing has been accepted — you can try again.
-            {a.expiresAt ? ` ${daysUntil(a.expiresAt)} days left.` : ""}
           </p>
         ) : null}
         {offline ? (

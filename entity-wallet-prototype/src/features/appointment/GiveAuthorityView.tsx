@@ -20,7 +20,7 @@ import { inOrg, roleIn, shortOrgName, standsNow, type AppointmentDocument, type 
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { PRESETS, SHARE_TARGETS, describeGrant } from "./presets";
+import { PRESETS, describeGrant, shareTargets } from "./presets";
 
 /**
  * SCR-DEL-02 — Give someone authority to act. FLOW-DEL-01 steps 1–4.
@@ -122,6 +122,8 @@ export function GiveAuthorityView() {
   );
 
   const [personId, setPersonId] = useState<string>(members.find((m) => !holds(m.id))?.id ?? "");
+  /* Who a named reach can name: organisations approved to verify. */
+  const verifiers = shareTargets(organizations, activeOrgId);
   const [presets, setPresets] = useState<PresetId[]>(["receive"]);
   /* Named is the narrower reach, so it is where the choice starts. */
   const [shareReach, setShareReach] = useState<ShareReach>("named");
@@ -337,10 +339,10 @@ export function GiveAuthorityView() {
                       {reach === "named" ? (
                         <div className="flex flex-col gap-2">
                           <p className="m-0 text-[12.5px] leading-[1.5] text-faint">
-                            Only organisations on NDI&rsquo;s list of trusted organisations can be named.
+                            Only organisations NDI has approved to verify can be named.
                           </p>
                           <div className="grid gap-2 min-[641px]:grid-cols-2">
-                            {SHARE_TARGETS.map((t) => (
+                            {verifiers.map((t) => (
                               <Checkbox
                                 key={t}
                                 checked={named.includes(t)}

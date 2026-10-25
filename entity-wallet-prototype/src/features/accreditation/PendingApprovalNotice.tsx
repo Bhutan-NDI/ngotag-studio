@@ -9,22 +9,19 @@ import { formatDate } from "@/features/controllership/scopeModel";
 import { ENFORCEMENT_DATE } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { daysUntil } from "./shared";
-
 /**
  * The organisation dashboard's way into SCR-ACC-03 — the specification's
  * "notification to the organisation's OWNER; organisation dashboard" entry
  * point. Every pending item reachable from a list, never only from an
- * email, with the time it has left (UX-EW-02 §3.4). For recognition it
- * carries the enforcement date, because an officer who misses it finds out
- * by being refused (Journey I).
+ * email (UX-EW-02 §3.4). It used to count down the days left to accept;
+ * acceptance no longer expires (EW-FLOW4-SD/D20), so it says when NDI
+ * approved it instead — a date, not a deadline. For recognition it still
+ * carries the enforcement date, because an officer who misses that one
+ * finds out by being refused (Journey I).
  */
 export function PendingApprovalNotice() {
   const { accreditations, activeOrgId } = useDemo();
-  const now = new Date().toISOString().slice(0, 10);
-  const pending = accreditations.filter(
-    (a) => a.orgId === activeOrgId && a.state === "PENDING_ACCEPTANCE" && !(a.expiresAt && a.expiresAt < now),
-  );
+  const pending = accreditations.filter((a) => a.orgId === activeOrgId && a.state === "PENDING_ACCEPTANCE");
   if (!pending.length) return null;
   return (
     <>
@@ -35,8 +32,8 @@ export function PendingApprovalNotice() {
               <StatusPill status="pending_acceptance" label="Waiting for you to accept" />
               <p className="m-0 max-w-[62ch] text-[14px] leading-[1.6] text-body">
                 NDI has proposed approving {a.orgName.replace(/ (Pvt\. )?Ltd\.$/, "")} to{" "}
-                {a.capability === "verifier" ? "verify customers" : "issue credentials"}. {daysUntil(a.expiresAt)} days
-                left to decide.
+                {a.capability === "verifier" ? "verify customers" : "issue credentials"}
+                {a.decidedAt ? `, approved on ${formatDate(a.decidedAt)}` : ""}.
                 {a.door === "RECOGNITION" ? ` Without it, what you already do stops on ${formatDate(ENFORCEMENT_DATE)}.` : ""}
               </p>
             </div>

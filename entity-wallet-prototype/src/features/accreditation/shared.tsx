@@ -44,9 +44,18 @@ export const inline = (label: string) => label.charAt(0).toLowerCase() + label.s
 
 export const sameItem = (a: AskItem, b: AskItem) => a.credential === b.credential && a.item === b.item;
 
-/** Whole days from today to a date, never negative. */
+/** Whole days from today to a date, never negative. Only a FLOW-ACC-01 proposal still has one (E14). */
 export const daysUntil = (date: string | null) =>
   date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000)) : 0;
+
+/**
+ * An issuer's legal basis as one line — the mandate, then where it is
+ * written down. One per record (EW-FLOW4-SD/D23), shown wherever the scope
+ * is, so the second administrator and the accepting officer read the same
+ * justification the proposer gave.
+ */
+export const legalBasisText = (a: Pick<Accreditation, "legalBasis" | "legalBasisRef">) =>
+  a.legalBasis ? `${a.legalBasis}${a.legalBasisRef ? ` (${a.legalBasisRef})` : ""}` : "—";
 
 /**
  * The scope summary of SCR-ACC-01's content table, used wherever a scope is
@@ -67,9 +76,16 @@ export function scopeSentence(orgName: string, capability: AccCapability, ask: A
  * One accreditation's state, as a pill — worded for whoever is reading.
  * Administrators may say "accreditation"; an organisation reads outcomes
  * (UX-EW-02 §2.4). Every state either door can reach has a word here, so no
- * screen has to invent one.
+ * screen has to invent one. A withdrawn record is worded by why it was
+ * withdrawn, because "Withdrawn" alone reads the same for a business that
+ * changed its mind and an approval NDI took back. "Stopped" is not here: it
+ * is read from the organisation's identity (accStopped), and the status
+ * screen puts it over the pill of an ACTIVE record.
  */
-export function accPill(a: Pick<Accreditation, "state" | "door" | "declinedByOrg" | "recommendation">, audience: "admin" | "org") {
+export function accPill(
+  a: Pick<Accreditation, "state" | "door" | "declinedByOrg" | "recommendation" | "withdrawal">,
+  audience: "admin" | "org",
+) {
   const org = audience === "org";
   switch (a.state) {
     case "SUBMITTED":
@@ -87,20 +103,23 @@ export function accPill(a: Pick<Accreditation, "state" | "door" | "declinedByOrg
       return { status: "active", label: org ? "Approved" : "Active" };
     case "DECLINED":
       return { status: "declined", label: a.declinedByOrg ? (org ? "You declined" : "Declined by organisation") : org ? "Not approved" : "Declined" };
-    case "EXPIRED":
-      return { status: "expired", label: "Expired" };
     case "LAPSED":
       return { status: "lapsed", label: "Lapsed" };
     case "WITHDRAWN":
-      return { status: "withdrawn", label: "Withdrawn" };
+      switch (a.withdrawal?.reason) {
+        case "REPLACED":
+          return { status: "replaced", label: "Replaced" };
+        case "NOT_LISTED":
+          return { status: "withdrawn", label: "Not listed" };
+        case "BY_NDI":
+          return { status: "withdrawn", label: org ? "Withdrawn by NDI" : "Withdrawn" };
+        default:
+          return { status: "withdrawn", label: org ? "Withdrawn" : "Withdrawn by the business" };
+      }
     case "RESIGNED":
       return { status: "resigned", label: org ? "Stopped" : "Resigned" };
-    case "SUPERSEDED":
-      return { status: "superseded", label: "Replaced" };
     case "HELD":
       return { status: "held", label: "Held" };
-    case "STOPPED":
-      return { status: "stopped", label: "Stopped" };
   }
 }
 
@@ -125,10 +144,7 @@ export function ScopeList({
         {issue.map((t) => (
           <li key={t.name} className="flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
             <Icon name="check" size={14} strokeWidth={2.4} className="mt-[5px] flex-none text-accent" />
-            <span>
-              {t.name}
-              <span className="block text-[12.5px] text-muted">Basis: {t.basis}</span>
-            </span>
+            <span>{t.name}</span>
           </li>
         ))}
       </ul>
@@ -242,24 +258,27 @@ export function ItemChooser({
 }
 
 /**
- * Credential types an issuer will issue — named in words, each with the
- * basis for issuing it (§3.2, SCR-ACC-06 "choosing — issue"). Free text,
- * unlike the item chooser: what an issuer issues is its own credential and
- * is not yet published anywhere to choose from.
+ * Credential types an issuer will issue — named in words (§3.2, SCR-ACC-06
+ * "choosing — issue"). Free text, unlike the item chooser: what an issuer
+ * issues is its own credential and is not yet published anywhere to choose
+ * from. Names only: the justification is one purpose and one legal basis for
+ * all of them (D23, UXD-59), asked for once beside this list by
+ * LegalBasisFields rather than again for every type.
  */
 export function IssueTypesEditor({ value, onChange }: { value: IssueType[]; onChange: (next: IssueType[]) => void }) {
   const [name, setName] = useState("");
-  const [basis, setBasis] = useState("");
+  const add = () => {
+    if (!name.trim() || value.some((v) => v.name === name.trim())) return;
+    onChange([...value, { name: name.trim() }]);
+    setName("");
+  };
   return (
     <div className="flex flex-col gap-3">
       {value.length ? (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {value.map((t) => (
             <li key={t.name} className="flex items-start justify-between gap-3 rounded-[10px] border border-grid px-3.5 py-2.5">
-              <span className="text-[13.5px] leading-[1.55] text-body">
-                {t.name}
-                <span className="block text-[12.5px] text-muted">Basis: {t.basis}</span>
-              </span>
+              <span className="text-[13.5px] leading-[1.55] text-body">{t.name}</span>
               <button
                 type="button"
                 onClick={() => onChange(value.filter((x) => x.name !== t.name))}
@@ -272,30 +291,119 @@ export function IssueTypesEditor({ value, onChange }: { value: IssueType[]; onCh
           ))}
         </ul>
       ) : null}
-      <div className="grid gap-3 min-[761px]:grid-cols-2">
-        <label className={FIELD_BLOCK_CLASS}>
+      <div className="flex flex-col gap-3 min-[761px]:flex-row min-[761px]:items-end">
+        <label className={`${FIELD_BLOCK_CLASS} min-[761px]:flex-1`}>
           <span className={LABEL_CLASS}>Credential, in words</span>
-          <input className={`${FIELD_CLASS} h-11`} value={name} onChange={(e) => setName(e.target.value)} placeholder="For example: Training certificate" />
+          <input
+            className={`${FIELD_CLASS} h-11`}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                add();
+              }
+            }}
+            placeholder="For example: Training certificate"
+          />
         </label>
-        <label className={FIELD_BLOCK_CLASS}>
-          <span className={LABEL_CLASS}>Why you can issue it</span>
-          <input className={`${FIELD_CLASS} h-11`} value={basis} onChange={(e) => setBasis(e.target.value)} placeholder="For example: we run the course and keep the results" />
-        </label>
-      </div>
-      <div>
-        <HairlineButton
-          onClick={() => {
-            if (!name.trim() || !basis.trim() || value.some((v) => v.name === name.trim())) return;
-            onChange([...value, { name: name.trim(), basis: basis.trim() }]);
-            setName("");
-            setBasis("");
-          }}
-          disabled={!name.trim() || !basis.trim()}
-        >
-          <Icon name="plus" size={14} strokeWidth={2.2} />
-          Add type
-        </HairlineButton>
+        <div>
+          <HairlineButton onClick={add} disabled={!name.trim()}>
+            <Icon name="plus" size={14} strokeWidth={2.2} />
+            Add type
+          </HairlineButton>
+        </div>
       </div>
     </div>
   );
+}
+
+/**
+ * An issuer's one legal basis, and where it is written down (D23). Asked
+ * once for every credential type in scope — the mandate a ministry has for
+ * its employees, or a licence an operator holds — not once per type.
+ */
+export function LegalBasisFields({
+  basis,
+  reference,
+  onBasis,
+  onReference,
+}: {
+  basis: string;
+  reference: string;
+  onBasis: (v: string) => void;
+  onReference: (v: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 min-[761px]:grid-cols-2">
+      <label className={FIELD_BLOCK_CLASS}>
+        <span className={LABEL_CLASS}>Legal basis</span>
+        <input
+          className={`${FIELD_CLASS} h-11`}
+          value={basis}
+          onChange={(e) => onBasis(e.target.value)}
+          placeholder="For example: we run the course and keep the results"
+        />
+        <span className="text-[12.5px] leading-[1.5] text-faint">Why you can issue these — once, for all of them.</span>
+      </label>
+      <label className={FIELD_BLOCK_CLASS}>
+        <span className={LABEL_CLASS}>Reference</span>
+        <input
+          className={`${FIELD_CLASS} h-11`}
+          value={reference}
+          onChange={(e) => onReference(e.target.value)}
+          placeholder="An act, a licence or a registration number"
+        />
+      </label>
+    </div>
+  );
+}
+
+/**
+ * The record a forced state-switcher face shows when the address names
+ * nothing real: the bank's recognition to verify, which is the story's own.
+ * One definition, so a new field on the record is added once rather than in
+ * every screen's preview — the last change to the record broke three.
+ */
+export function sampleAccreditation(overrides: Partial<Accreditation> = {}): Accreditation {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    id: "acc-sample",
+    orgId: "org-bob",
+    orgName: "Bank of Bhutan Ltd.",
+    officerEmail: null,
+    door: "RECOGNITION",
+    capability: "verifier",
+    purpose: "Confirming who a customer is when they open an account",
+    legalBasis: "",
+    legalBasisRef: "",
+    agreementRef: "NDI/AGR/2024/003",
+    ask: [
+      { credential: "Citizen ID", item: "Full name", checkOnly: false },
+      { credential: "Citizen ID", item: "Citizenship ID number", checkOnly: false },
+      { credential: "Citizen ID", item: "Photo", checkOnly: false },
+    ],
+    issue: [],
+    observed: null,
+    state: "PROPOSED",
+    replacesId: null,
+    requestId: null,
+    proposedBy: "tshering",
+    proposedAt: today,
+    requestedBy: null,
+    requestedAt: null,
+    recommendation: null,
+    decidedBy: null,
+    decidedAt: null,
+    declineReason: null,
+    declinedByOrg: false,
+    withdrawal: null,
+    acceptedName: null,
+    acceptedAt: null,
+    listedAt: null,
+    expiresAt: null,
+    publicIdentity: null,
+    refusals: null,
+    ...overrides,
+  };
 }

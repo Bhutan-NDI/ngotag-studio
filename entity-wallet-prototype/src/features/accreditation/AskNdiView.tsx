@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,22 +13,41 @@ import { Panel } from "@/components/ui/Panel";
 import { WalletHandoff } from "@/components/ui/WalletHandoff";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { VERIFICATION_ORG_NAME, inOrg, type AccCapability, type AskItem, type IssueType } from "@/lib/demoData";
+import {
+  VERIFICATION_ORG_NAME,
+  accInProgress,
+  inOrg,
+  type AccCapability,
+  type AccRequestPart,
+  type AskItem,
+  type IssueType,
+} from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { IssueTypesEditor, ItemChooser, scopeSentence } from "./shared";
+import { IssueTypesEditor, ItemChooser, LegalBasisFields, scopeSentence } from "./shared";
 
 /**
  * SCR-ACC-06 — Verify customers or issue credentials. FLOW-ACC-02 steps 1–5.
  *
- * TWO CHOICES, EACH WITH AN EXAMPLE
+ * TWO CHOICES, EACH WITH AN EXAMPLE — EITHER OR BOTH
  *
  * A business owner does not arrive knowing what "verify" means on NDI. Each
  * choice says what it is in a sentence and gives an example a shopkeeper
  * would recognise — checking someone is over 18; giving people a training
- * certificate. Then the item chooser, with the yes-or-no checks first and a
- * plain reason to ask for less: NDI checks it, and customers see it.
+ * certificate. Either may be asked for, or both at once (EW-FLOW4-SD/D22,
+ * UXD-59): asking for the second only after the first was decided made a
+ * slow two-step for a business that wants both. Each capability is still
+ * its own part of the request, with its own scope and purpose, and NDI
+ * decides each on its own — one can be approved and the other declined.
+ * A capability already asked for, or approved, is not offered (E3); the
+ * page says where it stands instead.
+ *
+ * ONE PURPOSE AND ONE LEGAL BASIS FOR ISSUING
+ *
+ * Issuing names its credential types in words, then gives one purpose and
+ * one legal basis for all of them (D23), not a basis for each type —
+ * which asked "why can you issue this?" twice.
  *
  * WRITTEN BY THE BUSINESS, DECIDED AS WRITTEN
  *
@@ -35,13 +55,14 @@ import { IssueTypesEditor, ItemChooser, scopeSentence } from "./shared";
  * request exactly as written and won't change it (UXD-30), and that
  * approval puts the business on NDI's public list (UXD-29). If NDI
  * declines, its reason comes back in its own words and "change and ask
- * again" reopens this page with the request as it was.
+ * again" reopens this page with that part as it was.
  */
 type Face =
   | "live"
   | "default"
   | "choosing_verify"
   | "choosing_issue"
+  | "choosing_both"
   | "step_up"
   | "loading"
   | "submitted"
@@ -52,6 +73,18 @@ type Face =
 
 const DRAFT_KEY = "ndi-acc-request-draft";
 
+interface Draft {
+  caps: AccCapability[];
+  verifyPurpose: string;
+  issuePurpose: string;
+  ask: AskItem[];
+  issue: IssueType[];
+  legalBasis: string;
+  legalBasisRef: string;
+}
+
+const EMPTY: Draft = { caps: [], verifyPurpose: "", issuePurpose: "", ask: [], issue: [], legalBasis: "", legalBasisRef: "" };
+
 export function AskNdiView() {
   const router = useRouter();
   const { organizations, relations, accreditations, activeOrgId, harness, personById, requestCapability, hydrated } = useDemo();
@@ -60,6 +93,7 @@ export function AskNdiView() {
     "default",
     "choosing_verify",
     "choosing_issue",
+    "choosing_both",
     "step_up",
     "loading",
     "submitted",
@@ -69,36 +103,37 @@ export function AskNdiView() {
     "no_permission",
   ]) as Face;
 
-  const [capability, setCapability] = useState<AccCapability | null>(null);
-  const [purpose, setPurpose] = useState("");
-  const [ask, setAsk] = useState<AskItem[]>([]);
-  const [issue, setIssue] = useState<IssueType[]>([]);
+  const [draft, setDraft] = useState<Draft>(EMPTY);
   const [busy, setBusy] = useState<false | "sending" | "identity">(false);
-  const [outcome, setOutcome] = useState<"submitted" | "E2" | "E3" | "E6" | "offline" | null>(null);
+  const [outcome, setOutcome] = useState<"submitted" | "E2" | "E3" | "E6" | "invalid" | "offline" | null>(null);
   const [saved, setSaved] = useState(false);
   const [stepUp, setStepUp] = useState<"awaiting_scan" | "waiting">("awaiting_scan");
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
-  /* "Change and ask again" reopens the declined request as it was; a
-     saved draft otherwise. Read once from the address. */
+  /* "Change and ask again" reopens the declined part as it was; a saved
+     draft otherwise. Read once from the address. */
   useEffect(() => {
     const from = new URLSearchParams(window.location.search).get("from");
     const prior = from ? accreditations.find((a) => a.id === from) : undefined;
     if (prior) {
-      setCapability(prior.capability);
-      setPurpose(prior.purpose);
-      setAsk(prior.ask);
-      setIssue(prior.issue);
+      setDraft({
+        ...EMPTY,
+        caps: [prior.capability],
+        verifyPurpose: prior.capability === "verifier" ? prior.purpose : "",
+        issuePurpose: prior.capability === "issuer" ? prior.purpose : "",
+        ask: prior.ask,
+        issue: prior.issue,
+        legalBasis: prior.legalBasis,
+        legalBasisRef: prior.legalBasisRef,
+      });
       return;
     }
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw) as { capability: AccCapability | null; purpose: string; ask: AskItem[]; issue: IssueType[] };
-        setCapability(d.capability);
-        setPurpose(d.purpose);
-        setAsk(d.ask);
-        setIssue(d.issue);
-      }
+      /* A draft saved before both could be asked for has a single
+         `capability` and no `caps`; it is dropped rather than half-read. */
+      const d = raw ? (JSON.parse(raw) as Partial<Draft>) : null;
+      if (d && Array.isArray(d.caps)) setDraft({ ...EMPTY, ...d });
     } catch {
       /* Nothing to resume. */
     }
@@ -106,8 +141,13 @@ export function AskNdiView() {
   }, []);
 
   useEffect(() => {
-    if (forced === "choosing_verify") setCapability("verifier");
-    if (forced === "choosing_issue") setCapability("issuer");
+    const forcedCaps: Partial<Record<Face, AccCapability[]>> = {
+      choosing_verify: ["verifier"],
+      choosing_issue: ["issuer"],
+      choosing_both: ["verifier", "issuer"],
+    };
+    const next = forcedCaps[forced];
+    if (next) setDraft((d) => ({ ...d, caps: next }));
   }, [forced]);
 
   const org = organizations.find((o) => o.id === activeOrgId);
@@ -115,24 +155,30 @@ export function AskNdiView() {
   const short = name.replace(/ (Pvt\. )?Ltd\.$/, "");
   const root = relations.find((r) => inOrg(org?.id ?? "")(r) && r.isRootAuthority && r.state === "ACTIVE");
   const rootName = root ? personById(root.personId).name : "its representative";
-  const existing = capability ? accreditations.find((a) => a.orgId === activeOrgId && a.capability === capability && ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE"].includes(a.state)) : undefined;
+  /* E3, per capability: one already asked for or approved isn't offered,
+     but the other still is. */
+  const taken = (c: AccCapability) => accreditations.some((a) => a.orgId === activeOrgId && a.capability === c && accInProgress(a));
+  const bothTaken = taken("verifier") && taken("issuer");
+  const caps = draft.caps.filter((c) => forced !== "live" || !taken(c));
 
   const natural: Face =
     root?.personId !== harness.persona || outcome === "E2"
       ? "no_permission"
       : outcome === "submitted"
         ? "submitted"
-        : outcome === "E3" || existing
+        : outcome === "E3" || bothTaken
           ? "already_asked"
           : outcome === "E6"
             ? "error"
             : busy
               ? "loading"
-              : capability === "verifier"
-                ? "choosing_verify"
-                : capability === "issuer"
-                  ? "choosing_issue"
-                  : "default";
+              : caps.length === 2
+                ? "choosing_both"
+                : caps[0] === "verifier"
+                  ? "choosing_verify"
+                  : caps[0] === "issuer"
+                    ? "choosing_issue"
+                    : "default";
   const face: Face = forced === "live" ? natural : forced;
 
   if (!hydrated) {
@@ -167,7 +213,8 @@ export function AskNdiView() {
     return message(
       <>
         <Icon name="check" size={15} strokeWidth={2.4} className="mr-1.5 inline text-accent" />
-        Sent. NDI will review it and a second administrator will decide. You&rsquo;ll see where it stands on your
+        Sent. NDI will review it and a second administrator will decide
+        {draft.caps.length === 2 ? " — verifying and issuing each on its own" : ""}. You&rsquo;ll see where it stands on your
         status page.
       </>,
       <GradientButton onClick={() => router.push("/verify-or-issue")}>Go to status</GradientButton>,
@@ -175,10 +222,15 @@ export function AskNdiView() {
   if (face === "loading")
     return message(busy === "identity" || forced === "loading" ? "Setting up your organisation's public identity…" : "Sending…");
 
-  const ready = Boolean(capability && purpose.trim() && (capability === "verifier" ? ask.length : issue.length));
+  const verifying = caps.includes("verifier");
+  const issuing = caps.includes("issuer");
+  const ready =
+    caps.length > 0 &&
+    (!verifying || (draft.ask.length > 0 && Boolean(draft.verifyPurpose.trim()))) &&
+    (!issuing || (draft.issue.length > 0 && Boolean(draft.issuePurpose.trim()) && Boolean(draft.legalBasis.trim())));
 
   const send = () => {
-    if (!capability) return;
+    if (!caps.length) return;
     if (face === "offline") {
       setOutcome("offline");
       return;
@@ -191,7 +243,12 @@ export function AskNdiView() {
         setOutcome("E6");
         return;
       }
-      const r = requestCapability({ capability, purpose, ask: capability === "verifier" ? ask : [], issue: capability === "issuer" ? issue : [] });
+      const parts: AccRequestPart[] = caps.map((c) =>
+        c === "verifier"
+          ? { capability: c, purpose: draft.verifyPurpose, ask: draft.ask, issue: [], legalBasis: "", legalBasisRef: "" }
+          : { capability: c, purpose: draft.issuePurpose, ask: [], issue: draft.issue, legalBasis: draft.legalBasis, legalBasisRef: draft.legalBasisRef },
+      );
+      const r = requestCapability({ parts });
       if (r.ok) {
         try {
           localStorage.removeItem(DRAFT_KEY);
@@ -223,17 +280,19 @@ export function AskNdiView() {
       <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5">
         {header}
 
-        <div role="radiogroup" aria-label="What you want to do" className="grid gap-4 min-[761px]:grid-cols-2">
+        <p className="m-0 text-[13.5px] text-muted">Choose one, or both.</p>
+        <div role="group" aria-label="What you want to do" className="grid gap-4 min-[761px]:grid-cols-2">
           {choices.map((c) => {
-            const on = capability === c.value;
+            const on = caps.includes(c.value);
+            const already = forced === "live" && taken(c.value);
             return (
               <button
                 key={c.value}
                 type="button"
-                role="radio"
-                aria-checked={on}
-                onClick={() => setCapability(c.value)}
-                className="flex flex-col gap-2 rounded-[16px] border p-5 text-left transition-colors duration-150"
+                aria-pressed={on}
+                disabled={already}
+                onClick={() => set("caps", on ? draft.caps.filter((x) => x !== c.value) : [...draft.caps.filter((x) => x !== c.value), c.value])}
+                className="flex flex-col gap-2 rounded-[16px] border p-5 text-left transition-colors duration-150 disabled:cursor-not-allowed"
                 style={{
                   borderColor: on ? "var(--accent)" : "var(--border-grid)",
                   background: on ? "var(--ndi-mint-04)" : "transparent",
@@ -245,6 +304,14 @@ export function AskNdiView() {
                   {on ? <Icon name="check" size={15} strokeWidth={2.4} className="ml-auto text-accent" /> : null}
                 </span>
                 <span className="text-[13.5px] leading-[1.55] text-muted">{c.text}</span>
+                {already ? (
+                  <span className="text-[13px] leading-[1.55] text-body">
+                    You&rsquo;ve already asked for this.{" "}
+                    <Link href="/verify-or-issue" className="ndi-plainlink font-medium text-accent">
+                      Here&rsquo;s where it stands.
+                    </Link>
+                  </span>
+                ) : null}
               </button>
             );
           })}
@@ -267,48 +334,72 @@ export function AskNdiView() {
           </Panel>
         ) : null}
 
-        {capability ? (
+        {caps.length ? (
           <Panel>
             <form
-              className="relative z-[4] flex flex-col gap-5"
+              className="relative z-[4] flex flex-col gap-6"
               onSubmit={(e) => {
                 e.preventDefault();
                 if (ready && !busy) send();
               }}
             >
-              {capability === "verifier" ? (
-                <div className={FIELD_BLOCK_CLASS}>
-                  <span className={LABEL_CLASS}>What you&rsquo;ll ask customers for</span>
-                  <p className="m-0 text-[13px] leading-[1.6] text-muted">
-                    Ask only for what you need. NDI checks this, and your customers will see what you ask for.
-                  </p>
-                  <ItemChooser value={ask} onChange={setAsk} />
-                </div>
-              ) : (
-                <div className={FIELD_BLOCK_CLASS}>
-                  <span className={LABEL_CLASS}>What you&rsquo;ll issue</span>
-                  <IssueTypesEditor value={issue} onChange={setIssue} />
-                </div>
-              )}
+              {verifying ? (
+                <section className="flex flex-col gap-4" aria-label="Verify customers">
+                  {issuing ? <h2 className="m-0 font-display text-[15px] font-semibold text-strong">Verify customers</h2> : null}
+                  <div className={FIELD_BLOCK_CLASS}>
+                    <span className={LABEL_CLASS}>What you&rsquo;ll ask customers for</span>
+                    <p className="m-0 text-[13px] leading-[1.6] text-muted">
+                      Ask only for what you need. NDI checks this, and your customers will see what you ask for.
+                    </p>
+                    <ItemChooser value={draft.ask} onChange={(v) => set("ask", v)} />
+                  </div>
+                  <label className={FIELD_BLOCK_CLASS}>
+                    <span className={LABEL_CLASS}>What it&rsquo;s for</span>
+                    <textarea
+                      className={`${FIELD_CLASS} resize-y py-3`}
+                      rows={2}
+                      value={draft.verifyPurpose}
+                      onChange={(e) => set("verifyPurpose", e.target.value)}
+                      placeholder="For example: checking customers are over 18 before selling tobacco"
+                    />
+                  </label>
+                  <p className="m-0 text-[13.5px] leading-[1.6] text-body">{scopeSentence(short, "verifier", draft.ask, [])}</p>
+                </section>
+              ) : null}
 
-              <label className={FIELD_BLOCK_CLASS}>
-                <span className={LABEL_CLASS}>What it&rsquo;s for</span>
-                <textarea
-                  className={`${FIELD_CLASS} resize-y py-3`}
-                  rows={2}
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  placeholder={capability === "verifier" ? "For example: checking customers are over 18 before selling tobacco" : "For example: certificates for people who finish our safety course"}
-                />
-              </label>
+              {issuing ? (
+                <section className={`flex flex-col gap-4 ${verifying ? "border-t border-subtle pt-5" : ""}`} aria-label="Issue credentials">
+                  {verifying ? <h2 className="m-0 font-display text-[15px] font-semibold text-strong">Issue credentials</h2> : null}
+                  <div className={FIELD_BLOCK_CLASS}>
+                    <span className={LABEL_CLASS}>What you&rsquo;ll issue</span>
+                    <IssueTypesEditor value={draft.issue} onChange={(v) => set("issue", v)} />
+                  </div>
+                  <label className={FIELD_BLOCK_CLASS}>
+                    <span className={LABEL_CLASS}>What it&rsquo;s for</span>
+                    <textarea
+                      className={`${FIELD_CLASS} resize-y py-3`}
+                      rows={2}
+                      value={draft.issuePurpose}
+                      onChange={(e) => set("issuePurpose", e.target.value)}
+                      placeholder="For example: certificates for people who finish our safety course"
+                    />
+                  </label>
+                  <LegalBasisFields
+                    basis={draft.legalBasis}
+                    reference={draft.legalBasisRef}
+                    onBasis={(v) => set("legalBasis", v)}
+                    onReference={(v) => set("legalBasisRef", v)}
+                  />
+                  <p className="m-0 text-[13.5px] leading-[1.6] text-body">{scopeSentence(short, "issuer", [], draft.issue)}</p>
+                </section>
+              ) : null}
 
               <div className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3.5" style={{ background: "rgb(var(--tint) / 0.03)" }} aria-live="polite">
-                <p className="m-0 text-[13.5px] leading-[1.6] text-body">{scopeSentence(short, capability, ask, issue)}</p>
                 <p className="m-0 text-[13px] leading-[1.6] text-muted">
                   NDI checks that {short} is verified, that what you&rsquo;ve said it&rsquo;s for is specific, and that
                   you&rsquo;re asking for no more than that needs
-                  {capability === "issuer" ? ", and that you're entitled to issue each credential" : ""}. It aims to
-                  decide within 10 working days.
+                  {issuing ? ", and that your legal basis covers what you'll issue" : ""}. It aims to decide within 10 working
+                  days{verifying && issuing ? ", and decides verifying and issuing each on its own" : ""}.
                 </p>
                 <p className="m-0 text-[13.5px] leading-[1.6] text-body">
                   If NDI approves, {short} is added to NDI&rsquo;s public list of trusted organisations.
@@ -327,6 +418,12 @@ export function AskNdiView() {
                   (Sending will fail here, to show what that looks like.)
                 </p>
               ) : null}
+              {outcome === "invalid" ? (
+                <p role="alert" className="m-0 text-[13.5px] text-body">
+                  Something&rsquo;s missing: for each thing you&rsquo;re asking for, what it&rsquo;s for and at least one item
+                  {issuing ? ", and for issuing, your legal basis" : ""}. Nothing has been sent.
+                </p>
+              ) : null}
               {face === "offline" ? (
                 <p role="status" className="m-0 text-[13.5px] text-body">
                   {outcome === "offline"
@@ -342,7 +439,7 @@ export function AskNdiView() {
                 <HairlineButton
                   onClick={() => {
                     try {
-                      localStorage.setItem(DRAFT_KEY, JSON.stringify({ capability, purpose, ask, issue }));
+                      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
                       setSaved(true);
                     } catch {
                       /* Storage unavailable: nothing saved. */
