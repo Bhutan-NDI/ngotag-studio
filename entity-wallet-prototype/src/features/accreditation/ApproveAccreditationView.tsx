@@ -15,12 +15,19 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { ENFORCEMENT_DATE, isNamedAdmin, type Accreditation } from "@/lib/demoData";
+import {
+  ENFORCEMENT_DATE,
+  REMINDER_WORKING_DAYS,
+  accStopped,
+  isNamedAdmin,
+  workingDaysSince,
+  type Accreditation,
+} from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
-import { ScopeList, accPill, capVerb, daysUntil, inline } from "./shared";
+import { ScopeList, accPill, capVerb, daysUntil, inline, legalBasisText, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-02 — Approve an accreditation. FLOW-ACC-01 step 2; FLOW-ACC-02
@@ -35,16 +42,26 @@ import { ScopeList, accPill, capVerb, daysUntil, inline } from "./shared";
  * screen is not the boundary (standing rule 9), it only avoids offering
  * something and then refusing it.
  *
- * AS SUBMITTED, AND NO APPROVE AGAINST A DECLINE
+ * AS SUBMITTED, AND A RECOMMENDED DECLINE CAN ONLY BE CONFIRMED
  *
  * A business's request is approved or declined as the business wrote it —
  * NDI does not narrow it on their behalf (EW-FLOW4-SD/D9, UXD-30), because
  * then the business would be approved for something it never asked for and
  * never saw. If it asks for too much, the decline says what to remove. And
  * when the reviewer recommended declining, there is no approve control at
- * all (ACC-02/E11): confirm the decline, or send it for a different review.
- * Overruling a reviewer quietly is the exact failure dual control exists
- * to prevent.
+ * all (ACC-02/E11): only confirming it, and the business reads the
+ * reviewer's reason. There used to be a "send for a different review" as
+ * well; it had no defined end and, with two administrators, could go round
+ * for ever (D21). A second administrator who disagrees talks to the
+ * reviewer, who can withdraw the recommendation and review it again.
+ *
+ * AN APPROVAL NOBODY ACCEPTS IS WITHDRAWN, NOT EXPIRED
+ *
+ * An institution's approval waits for its owner without a deadline (D20);
+ * the owner and NDI are reminded after 10 working days. If it is never
+ * going to be accepted, an administrator withdraws it here, with a reason
+ * the organisation is shown (ACC-01/E2) — so it never blocks a new
+ * proposal for good, and it never ends silently.
  */
 type Face =
   | "live"
@@ -52,6 +69,7 @@ type Face =
   | "self_proposed"
   | "recommended_decline"
   | "lapsed"
+  | "not_accepted"
   | "loading"
   | "success"
   | "offline"
@@ -61,21 +79,32 @@ type Face =
 const DECIDE_REFUSALS: Record<"E1" | "E5" | "E11" | "not_admin" | "invalid", string> = {
   E1: "You proposed this, so a different administrator has to decide it. Nothing was recorded.",
   E5: "You reviewed this request, so a different administrator has to decide it. Nothing was recorded.",
-  E11: "This was recommended for decline, so it can't be approved. Confirm the decline, or send it for a different review.",
+  E11: "This was recommended for decline, so it can't be approved — only the decline confirmed. If you disagree, talk to the reviewer. Nothing was recorded.",
   not_admin: "Only NDI's named platform administrators decide approvals. Nothing was recorded.",
   invalid: "This has already been decided, or is no longer waiting for a decision. Nothing you did was recorded.",
 };
 
 export function ApproveAccreditationView({ id }: { id: string }) {
   const router = useRouter();
-  const { accreditations, organizations, people, harness, currentPerson, personById, decideAccreditation, sendBackForReview, hydrated } =
-    useDemo();
+  const {
+    accreditations,
+    organizations,
+    people,
+    harness,
+    currentPerson,
+    personById,
+    decideAccreditation,
+    withdrawRecommendation,
+    withdrawApproval,
+    hydrated,
+  } = useDemo();
   const forced = useScreenState("SCR-ACC-02", [
     "live",
     "default",
     "self_proposed",
     "recommended_decline",
     "lapsed",
+    "not_accepted",
     "loading",
     "success",
     "offline",
@@ -83,78 +112,50 @@ export function ApproveAccreditationView({ id }: { id: string }) {
 
   const [busy, setBusy] = useState(false);
   const [declining, setDeclining] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [reason, setReason] = useState("");
   const [done, setDone] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const live = accreditations.find((a) => a.id === id);
+  const today = new Date().toISOString().slice(0, 10);
   /* Forced faces need something to show even when the address names
      nothing; a recognition proposal for the bank is the story's own. */
   const sample: Accreditation | undefined =
-    live ??
-    (forced !== "live"
-      ? {
-          id,
-          orgId: "org-bob",
-          orgName: "Bank of Bhutan Ltd.",
-          officerEmail: null,
-          door: forced === "recommended_decline" ? "REQUEST" : "RECOGNITION",
-          capability: "verifier",
-          purpose: "Confirming who a customer is when they open an account",
-          agreementRef: "NDI/AGR/2024/003",
-          ask: [
-            { credential: "Citizen ID", item: "Full name", checkOnly: false },
-            { credential: "Citizen ID", item: "Citizenship ID number", checkOnly: false },
-            { credential: "Citizen ID", item: "Photo", checkOnly: false },
-          ],
-          issue: [],
-          observed: null,
-          state: "PROPOSED",
-          proposedBy: "tshering",
-          proposedAt: new Date().toISOString().slice(0, 10),
-          requestedBy: null,
-          requestedAt: null,
-          recommendation: null,
-          decidedBy: null,
-          decidedAt: null,
-          declineReason: null,
-          declinedByOrg: false,
-          acceptedName: null,
-          acceptedAt: null,
-          listedAt: null,
-          expiresAt: null,
-          publicIdentity: null,
-          refusals: null,
-        }
-      : undefined);
+    live ?? (forced !== "live" ? sampleAccreditation({ id, door: forced === "recommended_decline" ? "REQUEST" : "RECOGNITION" }) : undefined);
   const acc: Accreditation | undefined =
     sample && forced === "recommended_decline"
       ? {
           ...sample,
           door: "REQUEST",
           state: "PROPOSED",
+          requestedBy: sample.requestedBy ?? "dorji",
+          requestedAt: sample.requestedAt ?? today,
           recommendation: {
             by: sample.proposedBy ?? "tshering",
             approve: false,
             reason: sample.recommendation?.reason ?? "Ask to check age only, not the date of birth.",
-            at: sample.proposedAt ?? "",
+            at: sample.proposedAt ?? today,
           },
         }
-      : sample;
+      : sample && forced === "not_accepted"
+        ? { ...sample, state: "PENDING_ACCEPTANCE", decidedBy: sample.decidedBy ?? "tshendu", decidedAt: sample.decidedAt ?? today }
+        : sample;
 
-  const now = new Date().toISOString().slice(0, 10);
   const proposedHere = acc?.state === "PROPOSED";
   const natural: Face = !acc
     ? "not_found"
     : done
       ? "success"
-      : proposedHere && acc.expiresAt && acc.expiresAt < now
+      : proposedHere && acc.door !== "REQUEST" && acc.expiresAt && acc.expiresAt < today
         ? "lapsed"
         : proposedHere && acc.proposedBy === harness.persona
           ? "self_proposed"
           : proposedHere && acc.recommendation && !acc.recommendation.approve
             ? "recommended_decline"
-            : "default";
+            : acc.state === "PENDING_ACCEPTANCE"
+              ? "not_accepted"
+              : "default";
   const face: Face = forced === "live" ? natural : forced;
 
   if (!hydrated || face === "loading") {
@@ -190,17 +191,25 @@ export function ApproveAccreditationView({ id }: { id: string }) {
   const org = organizations.find((o) => o.id === acc.orgId);
   const verb = capVerb(acc.capability);
   const proposer = acc.proposedBy ? personById(acc.proposedBy).name : "—";
+  const reviewer = acc.recommendation ? personById(acc.recommendation.by).name : "The reviewer";
   const isRequest = acc.door === "REQUEST";
   const whoCan = people.filter((p) => isNamedAdmin(p) && p.hasAccount !== false && p.id !== acc.proposedBy).map((p) => p.name);
   const overlaps = issueOverlaps(acc, accreditations, (oid) => organizations.find((o) => o.id === oid)?.name ?? oid);
+  const stopped = accStopped(acc, org);
   const pill =
     face === "lapsed"
-      ? acc.door === "REQUEST"
-        ? { status: "under_review", label: "Back for review" }
-        : { status: "lapsed", label: "Lapsed" }
-      : accPill(acc, "admin");
+      ? { status: "lapsed", label: "Lapsed" }
+      : stopped
+        ? { status: "stopped", label: "Stopped" }
+        : accPill(acc, "admin");
   const offline = face === "offline";
   const canAct = isNamedAdmin(currentPerson) && !offline;
+  const replaces = acc.replacesId ? accreditations.find((a) => a.id === acc.replacesId) : undefined;
+  const replacedBy = accreditations.find((a) => a.replacesId === acc.id && a.state === "ACTIVE");
+  /* A request is never late (ACC-02/E12): it shows how long it has waited,
+     and that NDI has been reminded once it is 10 working days. */
+  const waitingSince = isRequest ? acc.proposedAt ?? acc.requestedAt : acc.decidedAt;
+  const reminded = workingDaysSince(waitingSince) >= REMINDER_WORKING_DAYS;
 
   const decide = (approve: boolean, why?: string) => {
     setBusy(true);
@@ -221,10 +230,12 @@ export function ApproveAccreditationView({ id }: { id: string }) {
           ? isRequest
             ? `Approved. ${acc.orgName} has been told, and its listing is being published.`
             : acc.door === "NEW"
-              ? `Approved. ${acc.officerEmail} has been invited to register ${acc.orgName}; they accept once it's registered. They have 30 days.`
-              : `Approved. ${acc.orgName}'s owner has been told, and has 30 days to accept it.`
+              ? `Approved. ${acc.officerEmail} has been invited to register ${acc.orgName}; they accept once it's registered.`
+              : `Approved. ${acc.orgName}'s owner has been told, and accepts it next.`
           : isRequest
-            ? `Declined. ${acc.orgName} has been told your reason, in your words.`
+            ? acc.recommendation && !acc.recommendation.approve
+              ? `Declined. ${acc.orgName} has been told ${reviewer}'s reason, in their words.`
+              : `Declined. ${acc.orgName} has been told your reason, in your words.`
             : `Declined. ${proposer} has been told your reason.`,
       );
     }, LOCAL_MS);
@@ -233,38 +244,38 @@ export function ApproveAccreditationView({ id }: { id: string }) {
   /* What happened since the decision, for an administrator following up.
      Each sentence is the admin-console half of a FLOW-ACC error path. */
   const after = (() => {
-    if (proposedHere) return null;
+    if (proposedHere || face === "not_accepted") return null;
     switch (acc.state) {
       case "SUBMITTED":
       case "IN_REVIEW":
         return `Waiting for review since ${acc.requestedAt ? formatDate(acc.requestedAt) : "—"}.`;
-      case "PENDING_ACCEPTANCE":
-        if (acc.expiresAt && acc.expiresAt < now) return "This accreditation expired without being accepted.";
-        return acc.door === "NEW" && !acc.orgId
-          ? `Invitation sent to ${acc.officerEmail}. Waiting for them to register ${acc.orgName} — ${daysUntil(acc.expiresAt)} days left.`
-          : `Waiting for ${acc.orgName} to accept — ${daysUntil(acc.expiresAt)} days left.`;
       case "LISTING":
-        return `Accepted by ${acc.acceptedName ?? "its representative"}${acc.acceptedAt ? ` on ${formatDate(acc.acceptedAt)}` : ""}. Publishing the listing.`;
+        return `${isRequest ? "Approved" : `Accepted by ${acc.acceptedName ?? "its representative"}${acc.acceptedAt ? ` on ${formatDate(acc.acceptedAt)}` : ""}`}. Publishing the listing — if it isn't published within 72 hours, NDI administrators are alerted and it keeps trying.`;
       case "ACTIVE":
-        return `Listed since ${acc.listedAt ? formatDate(acc.listedAt) : "—"}${acc.acceptedName ? `, accepted by ${acc.acceptedName}` : ""}.`;
+        return stopped
+          ? `${acc.orgName}'s public identity has changed since it was approved. Its requests are being refused until it's put back; the approval itself still stands.`
+          : `Listed since ${acc.listedAt ? formatDate(acc.listedAt) : "—"}${acc.acceptedName ? `, accepted by ${acc.acceptedName}` : ""}.`;
       case "DECLINED":
         return acc.declinedByOrg
           ? `${acc.orgName} declined the accreditation.`
           : `${acc.decidedBy ? personById(acc.decidedBy).name : "An administrator"} declined this: ${acc.declineReason ?? "—"}`;
-      case "EXPIRED":
-        return "This accreditation expired without being accepted.";
       case "LAPSED":
-        return "This approval lapsed because the listing couldn't be published.";
+        return "This proposal lapsed without a decision. It confers nothing.";
       case "WITHDRAWN":
-        return `${acc.orgName} withdrew its request.`;
+        switch (acc.withdrawal?.reason) {
+          case "REPLACED":
+            return `Replaced by a wider approval${replacedBy?.listedAt ? `, active since ${formatDate(replacedBy.listedAt)}` : ""}. This one stays on record; nothing stopped in between.`;
+          case "BY_NDI":
+            return `${acc.withdrawal.by ? personById(acc.withdrawal.by).name : "An administrator"} withdrew this approval: ${acc.withdrawal.note ?? "—"}`;
+          case "NOT_LISTED":
+            return "Withdrawn because the listing couldn't be published.";
+          default:
+            return `${acc.orgName} withdrew its request.`;
+        }
       case "RESIGNED":
         return `${acc.orgName} stopped ${acc.capability === "verifier" ? "verifying" : "issuing"} on ${acc.decidedAt ? formatDate(acc.decidedAt) : "—"}.`;
-      case "SUPERSEDED":
-        return "Replaced by a wider approval, which is now active. This one stays on record.";
       case "HELD":
         return "This public identity is already listed for another organisation. The listing is held until that's resolved.";
-      case "STOPPED":
-        return `${acc.orgName}'s public identity has changed since it was approved. Verifying and issuing have stopped until it's put back.`;
       default:
         return null;
     }
@@ -293,7 +304,7 @@ export function ApproveAccreditationView({ id }: { id: string }) {
             <div className="relative z-[4] flex flex-col gap-3" role="status">
               <p className="m-0 flex items-start gap-2 text-[14px] leading-[1.6] text-body">
                 <Icon name="check" size={15} strokeWidth={2.4} className="mt-[4px] flex-none text-accent" />
-                {done ?? `Approved. ${acc.orgName}'s owner has been told, and has 30 days to accept it.`}
+                {done ?? `Approved. ${acc.orgName}'s owner has been told, and accepts it next.`}
               </p>
               <div>
                 <GradientButton onClick={() => router.push("/admin/accreditations")}>Back to list</GradientButton>
@@ -327,8 +338,8 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 </p>
               ) : null}
               {(acc.state === "DECLINED" && !acc.declinedByOrg && !isRequest) ||
-              acc.state === "EXPIRED" ||
-              (acc.state === "PENDING_ACCEPTANCE" && acc.expiresAt && acc.expiresAt < now) ? (
+              acc.state === "LAPSED" ||
+              (acc.state === "WITHDRAWN" && acc.withdrawal?.reason === "BY_NDI") ? (
                 <div>
                   <HairlineButton onClick={() => router.push("/admin/accreditations/new")}>
                     {acc.state === "DECLINED" ? "Propose again, changed" : "Propose again"}
@@ -339,26 +350,38 @@ export function ApproveAccreditationView({ id }: { id: string }) {
           </Panel>
         ) : null}
 
-        {face === "lapsed" ? (
+        {face === "lapsed" && acc.state === "PROPOSED" ? (
           <Panel>
             <div className="relative z-[4] flex flex-col gap-3" role="status">
-              <p className="m-0 text-[14px] leading-[1.6] text-body">
-                {isRequest
-                  ? "This recommendation lapsed without a decision and has gone back for review."
-                  : "This proposal lapsed without a decision. It confers nothing."}
+              <p className="m-0 text-[14px] leading-[1.6] text-body">This proposal lapsed without a decision. It confers nothing.</p>
+              <div>
+                <HairlineButton onClick={() => router.push("/admin/accreditations/new")}>Propose again</HairlineButton>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
+        {/* ACC-01/E2: an approval waiting for its organisation. No deadline —
+            the owner and NDI are reminded — and Withdraw, with a reason,
+            for one that will never be accepted. */}
+        {face === "not_accepted" ? (
+          <Panel>
+            <div className="relative z-[4] flex flex-col gap-3" role="status">
+              <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
+                {acc.door === "NEW" && !acc.orgId
+                  ? `Invitation sent to ${acc.officerEmail}. Waiting for them to register ${acc.orgName} and accept.`
+                  : `Waiting for ${acc.orgName} to accept.`}{" "}
+                Not accepted since {waitingSince ? formatDate(waitingSince) : "—"}.
+              </p>
+              <p className="m-0 text-[13px] leading-[1.6] text-muted">
+                {reminded
+                  ? `${acc.orgName}'s owner and NDI's administrators have been reminded. It doesn't expire — withdraw it if it won't be accepted.`
+                  : `If it isn't accepted within ${REMINDER_WORKING_DAYS} working days, ${acc.orgName}'s owner and NDI's administrators are reminded. It doesn't expire.`}
               </p>
               <div>
-                {isRequest ? (
-                  /* E12 needs no action to happen: the store has already put
-                     the request back in review. This only takes the
-                     administrator there. sendBackForReview is E11's — a
-                     recommended decline — and would bar the last reviewer. */
-                  <HairlineButton onClick={() => router.push(`/admin/accreditations/${acc.id}/review`)}>
-                    Review it afresh
-                  </HairlineButton>
-                ) : (
-                  <HairlineButton onClick={() => router.push("/admin/accreditations/new")}>Propose again</HairlineButton>
-                )}
+                <HairlineButton onClick={() => setWithdrawing(true)} disabled={!canAct}>
+                  Withdraw
+                </HairlineButton>
               </div>
             </div>
           </Panel>
@@ -404,8 +427,17 @@ export function ApproveAccreditationView({ id }: { id: string }) {
             <DetailList
               items={[
                 { label: "Purpose", value: acc.purpose || "—" },
+                ...(acc.capability === "issuer" ? [{ label: "Legal basis", value: legalBasisText(acc) }] : []),
                 ...(acc.door === "NEW" ? [{ label: "Officer", value: acc.officerEmail ?? "—" }] : []),
                 { label: "Agreement", value: acc.agreementRef || "—" },
+                ...(replaces
+                  ? [
+                      {
+                        label: "Replaces",
+                        value: `Its current approval${replaces.listedAt ? `, listed ${formatDate(replaces.listedAt)}` : ""} — which stays in force until this one is listed`,
+                      },
+                    ]
+                  : []),
                 isRequest
                   ? {
                       label: "Asked by",
@@ -416,7 +448,7 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                   ? [
                       {
                         label: "Reviewed by",
-                        value: `${personById(acc.recommendation.by).name} — recommends ${acc.recommendation.approve ? "approving" : "declining"}${acc.recommendation.reason ? `: ${acc.recommendation.reason}` : ""}`,
+                        value: `${reviewer} — recommends ${acc.recommendation.approve ? "approving" : "declining"}${acc.recommendation.reason ? `: ${acc.recommendation.reason}` : ""}`,
                       },
                     ]
                   : []),
@@ -424,7 +456,10 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 ...(proposedHere && face !== "lapsed"
                   ? [
                       isRequest
-                        ? { label: "If nobody decides", value: `In ${daysUntil(acc.expiresAt)} days it goes back for a fresh review` }
+                        ? {
+                            label: "Waiting since",
+                            value: `${waitingSince ? formatDate(waitingSince) : "—"}${reminded ? " · NDI reminded" : ""}`,
+                          }
                         : { label: "Lapses", value: `In ${daysUntil(acc.expiresAt)} days, if nobody decides` },
                     ]
                   : []),
@@ -465,31 +500,37 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                     : "You proposed this, so a different administrator has to approve it."}
                 </p>
                 <p className="m-0 text-[13px] text-muted">{whoCan.length ? `${whoCan.join(" or ")} can.` : "No other administrator has an account yet."}</p>
+                {/* ACC-02/E11: the reviewer, and only the reviewer, can take
+                    a recommended decline back and review it again — how a
+                    disagreement between the two is settled now that there is
+                    no send-back. */}
+                {isRequest && acc.recommendation && !acc.recommendation.approve && acc.recommendation.by === harness.persona ? (
+                  <div>
+                    <HairlineButton
+                      onClick={() => {
+                        const r = withdrawRecommendation(acc.id);
+                        if (!r.ok) return setRefusal("This has changed since you opened it. Nothing was recorded.");
+                        router.push(`/admin/accreditations/${acc.id}/review`);
+                      }}
+                      disabled={!canAct}
+                    >
+                      Withdraw your recommendation
+                    </HairlineButton>
+                  </div>
+                ) : null}
               </div>
             ) : face === "recommended_decline" ? (
               <>
                 <p className="m-0 max-w-[66ch] text-[13.5px] leading-[1.6] text-body">
-                  {acc.recommendation ? personById(acc.recommendation.by).name : "The reviewer"} recommends declining:{" "}
-                  {acc.recommendation?.reason}. Confirm, or send it for a different review.
+                  {reviewer} recommends declining: {acc.recommendation?.reason}. Confirm the decline, or talk to {reviewer} if you
+                  disagree.
                 </p>
                 <div className="flex flex-wrap gap-2.5">
-                  <GradientButton
-                    onClick={() => decide(false, acc.recommendation?.reason ?? "")}
-                    disabled={!canAct || busy}
-                  >
+                  <GradientButton onClick={() => decide(false)} disabled={!canAct || busy}>
                     {busy ? "Recording…" : "Confirm the decline"}
                   </GradientButton>
-                  <HairlineButton
-                    onClick={() => {
-                      const r = sendBackForReview(acc.id);
-                      if (!r.ok) return setRefusal(DECIDE_REFUSALS[r.error]);
-                      router.push("/admin/accreditations");
-                    }}
-                    disabled={!canAct}
-                  >
-                    Send for a different review
-                  </HairlineButton>
                 </div>
+                <p className="m-0 text-[12.5px] text-muted">{acc.orgName} is told {reviewer}&rsquo;s reason, word for word.</p>
               </>
             ) : (
               <div className="flex flex-wrap gap-2.5">
@@ -530,6 +571,45 @@ export function ApproveAccreditationView({ id }: { id: string }) {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={isRequest ? 'For example: "Ask to check age only, not the date of birth."' : "For example: the purpose doesn't need the photo."}
+            />
+          </label>
+        </Dialog>
+
+        <Dialog
+          open={withdrawing}
+          onClose={() => {
+            setWithdrawing(false);
+            setReason("");
+          }}
+          tone="danger"
+          title={`Withdraw ${acc.orgName}'s approval?`}
+          lead={`${acc.orgName} is told it has been withdrawn, with your reason. Nothing is listed, and approving it again needs a new proposal.`}
+          confirmLabel="Withdraw"
+          confirmDisabled={!reason.trim()}
+          onConfirm={() => {
+            if (!reason.trim()) return;
+            setWithdrawing(false);
+            const r = withdrawApproval(acc.id, reason.trim());
+            setReason("");
+            if (!r.ok) {
+              setRefusal(
+                r.error === "not_admin"
+                  ? DECIDE_REFUSALS.not_admin
+                  : "This is no longer waiting to be accepted, so there's nothing to withdraw. Nothing was recorded.",
+              );
+              return;
+            }
+            setDone(`Withdrawn. ${acc.orgName} has been told your reason. A new proposal for it is no longer blocked.`);
+          }}
+        >
+          <label className={FIELD_BLOCK_CLASS}>
+            <span className={LABEL_CLASS}>Reason, for the organisation</span>
+            <textarea
+              className={`${FIELD_CLASS} resize-y py-3`}
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="For example: we couldn't reach your owner to accept it."
             />
           </label>
         </Dialog>

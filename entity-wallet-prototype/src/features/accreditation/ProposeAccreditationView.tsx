@@ -28,7 +28,7 @@ import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { issueOverlaps } from "./Criteria";
-import { IssueTypesEditor, ItemChooser, inline, sameItem, scopeSentence } from "./shared";
+import { IssueTypesEditor, ItemChooser, LegalBasisFields, inline, sameItem, scopeSentence } from "./shared";
 
 /**
  * SCR-ACC-01 — Propose an accreditation. FLOW-ACC-01 step 1.
@@ -57,8 +57,29 @@ import { IssueTypesEditor, ItemChooser, inline, sameItem, scopeSentence } from "
  * each marked "observed", and the date after which anything outside the
  * approval is refused. Removing what the purpose doesn't need is the point
  * of the step (UC-25); the screen makes that easy and says why.
+ *
+ * ONE LEGAL BASIS, AND KIND N MATCHED ON THE NAME
+ *
+ * An issuer is proposed with one purpose and one legal basis for every type
+ * it will issue (EW-FLOW4-SD/D23, UXD-59) — not a basis per type, which
+ * asked the purpose question a second time. And an institution proposed as
+ * "not on the platform yet" is matched on its legal name with case,
+ * spacing and punctuation folded: if that names an organisation already on
+ * the platform, the store refuses it and the screen offers to propose for
+ * that organisation instead (E10, AC-14), rather than inviting it to
+ * register twice.
  */
-type Face = "live" | "default" | "recognition" | "empty" | "error" | "overlap" | "success" | "offline" | "no_permission";
+type Face =
+  | "live"
+  | "default"
+  | "recognition"
+  | "empty"
+  | "error"
+  | "existing_org"
+  | "overlap"
+  | "success"
+  | "offline"
+  | "no_permission";
 type Kind = "EXISTING" | "NEW";
 
 const DRAFT_KEY = "ndi-acc-draft";
@@ -70,6 +91,8 @@ interface Draft {
   officerEmail: string;
   capability: AccCapability;
   purpose: string;
+  legalBasis: string;
+  legalBasisRef: string;
   agreementRef: string;
   ask: AskItem[];
   issue: IssueType[];
@@ -84,6 +107,7 @@ export function ProposeAccreditationView() {
     "recognition",
     "empty",
     "error",
+    "existing_org",
     "overlap",
     "success",
     "offline",
@@ -106,6 +130,8 @@ export function ProposeAccreditationView() {
     officerEmail: "",
     capability: "verifier",
     purpose: "",
+    legalBasis: "",
+    legalBasisRef: "",
     agreementRef: "",
     ask: [],
     issue: [],
@@ -113,6 +139,8 @@ export function ProposeAccreditationView() {
   const [replaces, setReplaces] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"E10" | "E12" | "invalid" | "offline" | null>(null);
+  /* E10 for Kind N: the name matches an organisation already on the platform. */
+  const [onPlatform, setOnPlatform] = useState<{ orgId: string; orgName: string } | null>(null);
   const [saved, setSaved] = useState<"saved" | "resumed" | null>(null);
   const [proposedId, setProposedId] = useState<string | null>(null);
 
@@ -131,6 +159,7 @@ export function ProposeAccreditationView() {
           orgId: o.orgId,
           capability: o.capability,
           purpose: o.suggestedPurpose,
+          legalBasis: o.legalBasis ?? "",
           ask: o.ask,
           issue: o.issue,
         }));
@@ -144,8 +173,14 @@ export function ProposeAccreditationView() {
         officerEmail: "digital@bt.bt",
         capability: "issuer",
         purpose: "Proving which person a mobile number is registered to",
-        issue: [{ name: "SIM registration", basis: "Telecommunications licence — the operator registers its subscribers" }],
+        legalBasis: "Telecommunications licence — the operator registers its subscribers",
+        legalBasisRef: "BICMA/LIC/2019/07",
+        issue: [{ name: "SIM registration" }],
       }));
+      return;
+    }
+    if (forced === "existing_org") {
+      setDraft((d) => ({ ...d, kind: "NEW", legalName: "BANK OF BHUTAN LTD", officerEmail: "digital@bob.bt" }));
       return;
     }
     /* Save and resume: a per-browser convenience, never shared state. */
@@ -191,12 +226,15 @@ export function ProposeAccreditationView() {
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     setError(null);
+    setOnPlatform(null);
   };
+  const existingMatch =
+    onPlatform ?? (face === "existing_org" ? { orgId: "org-bob", orgName: organizations.find((o) => o.id === "org-bob")?.legalName ?? "Bank of Bhutan Ltd." } : null);
 
   const ready =
     (draft.kind === "EXISTING" ? Boolean(draft.orgId) : Boolean(draft.legalName.trim() && /\S+@\S+\.\S+/.test(draft.officerEmail))) &&
     Boolean(draft.purpose.trim()) &&
-    (draft.capability === "verifier" ? draft.ask.length > 0 : draft.issue.length > 0);
+    (draft.capability === "verifier" ? draft.ask.length > 0 : draft.issue.length > 0 && Boolean(draft.legalBasis.trim()));
 
   const propose = () => {
     setBusy(true);
@@ -214,6 +252,8 @@ export function ProposeAccreditationView() {
         officerEmail: draft.kind === "NEW" ? draft.officerEmail.trim() : null,
         capability: draft.capability,
         purpose: draft.purpose,
+        legalBasis: draft.capability === "issuer" ? draft.legalBasis : "",
+        legalBasisRef: draft.capability === "issuer" ? draft.legalBasisRef : "",
         agreementRef: draft.agreementRef,
         ask: draft.capability === "verifier" ? draft.ask : [],
         issue: draft.capability === "issuer" ? draft.issue : [],
@@ -226,7 +266,8 @@ export function ProposeAccreditationView() {
           /* Nothing saved. */
         }
         setProposedId(r.id);
-      } else setError(r.error === "E10" || r.error === "E12" ? r.error : "invalid");
+      } else if (r.error === "E10_ORG") setOnPlatform({ orgId: r.orgId, orgName: r.orgName });
+      else setError(r.error === "E10" || r.error === "E12" ? r.error : "invalid");
     }, LOCAL_MS);
   };
 
@@ -401,6 +442,25 @@ export function ProposeAccreditationView() {
                 </div>
               ) : null}
 
+              {existingMatch ? (
+                <div role="alert" className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
+                  <p className="m-0 text-[13.5px] leading-[1.6] text-body">
+                    {existingMatch.orgName} is already on the platform. Propose for that organisation instead.
+                  </p>
+                  <div>
+                    <HairlineButton
+                      onClick={() => {
+                        const match = existingMatch;
+                        setDraft((d) => ({ ...d, kind: "EXISTING", orgId: match.orgId, legalName: "", officerEmail: "" }));
+                        setOnPlatform(null);
+                      }}
+                    >
+                      Propose for {existingMatch.orgName}
+                    </HairlineButton>
+                  </div>
+                </div>
+              ) : null}
+
               {showE10 ? (
                 <div role="alert" className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
                   <p className="m-0 text-[13.5px] leading-[1.6] text-body">
@@ -423,7 +483,10 @@ export function ProposeAccreditationView() {
                   )}
                 </div>
               ) : replaces ? (
-                <p className="m-0 text-[13px] text-muted">This replaces its current approval once it&rsquo;s accepted and listed.</p>
+                <p className="m-0 text-[13px] text-muted">
+                  This replaces its current approval once it&rsquo;s accepted and listed. Until then the current one stays in
+                  force, so nothing stops in between.
+                </p>
               ) : null}
 
               <label className={FIELD_BLOCK_CLASS}>
@@ -446,6 +509,12 @@ export function ProposeAccreditationView() {
                 <div className={FIELD_BLOCK_CLASS}>
                   <span className={LABEL_CLASS}>What it can issue</span>
                   <IssueTypesEditor value={draft.issue} onChange={(v) => set("issue", v)} />
+                  <LegalBasisFields
+                    basis={draft.legalBasis}
+                    reference={draft.legalBasisRef}
+                    onBasis={(v) => set("legalBasis", v)}
+                    onReference={(v) => set("legalBasisRef", v)}
+                  />
                   {overlaps.length || face === "overlap" ? (
                     <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
                       {overlaps.map((o) => (
@@ -482,12 +551,12 @@ export function ProposeAccreditationView() {
               ) : error === "invalid" ? (
                 <p role="alert" className="m-0 text-[13.5px] text-body">
                   Something&rsquo;s missing: the organisation, its purpose, and at least one thing it can{" "}
-                  {draft.capability === "verifier" ? "ask for" : "issue"}.
+                  {draft.capability === "verifier" ? "ask for" : "issue, with its legal basis"}.
                 </p>
               ) : null}
 
               <div className="flex flex-wrap items-center gap-2.5">
-                <GradientButton type="submit" disabled={!ready || busy || showE10}>
+                <GradientButton type="submit" disabled={!ready || busy || showE10 || Boolean(existingMatch)}>
                   {busy ? "Proposing…" : "Propose"}
                 </GradientButton>
                 <HairlineButton
