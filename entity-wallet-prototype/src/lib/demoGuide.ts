@@ -484,7 +484,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 8,
     title: "The bank is told",
     happening:
-      "Yeshey Choden is Bank of Bhutan's owner. The dashboard says NDI has proposed approving the bank to verify, how long is left, and that without it what the bank already does stops on the date.",
+      "Yeshey Choden is Bank of Bhutan's owner. The dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
     doThis: "Press **Review it**.",
     route: "/dashboard",
     persona: "yeshey",
@@ -522,7 +522,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 9,
     title: "Ask for a check, not the value",
     happening:
-      "Pelden sells tobacco and must check customers are over 18. Within each credential the yes-or-no checks come first: Pelden can learn that a customer is over 18 without ever seeing their date of birth.",
+      "Pelden sells tobacco and must check customers are over 18. A business can ask to verify, to issue, or both in one request; Pelden only needs to verify. Within each credential the yes-or-no checks come first: Pelden can learn that a customer is over 18 without ever seeing their date of birth.",
     doThis:
       "Press **Verify customers**. Open **Citizen ID** and tick **Is over 18**. For what it's for, type **Checking customers are over 18 before selling tobacco**. Press **Send to NDI**, then **Go to status**.",
     say: "NDI will approve or decline this exactly as Pelden wrote it. It won't change it on Pelden's behalf.",
@@ -531,7 +531,8 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     chapter: 9,
     title: "Waiting for NDI",
-    happening: "The request waits, dated, and Dorji can withdraw it. No promise of a decision date beyond what NDI aims for.",
+    happening:
+      "The request waits, dated, and Dorji can withdraw it. It never expires: if NDI takes longer than 10 working days, NDI is reminded, and Pelden keeps its place.",
     doThis: "Press **Next** — the guide switches to Kinzang.",
     route: "/verify-or-issue",
   },
@@ -554,7 +555,8 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     chapter: 9,
     title: "A second administrator decides",
-    happening: "Kinzang reviewed it, so it's Tshendu's to decide.",
+    happening:
+      "Kinzang reviewed it, so it's Tshendu's to decide. Had Kinzang recommended declining, Tshendu could only confirm it — no approve, and no sending it back.",
     doThis: "Under **Waiting for approval**, press **Pelden Trading Pvt. Ltd. · Verify**.",
     route: "/admin/accreditations",
     persona: "tshendu",

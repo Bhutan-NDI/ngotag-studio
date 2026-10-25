@@ -13,7 +13,14 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { ENFORCEMENT_DATE, OBSERVED_OPERATORS, accInProgress, type Accreditation } from "@/lib/demoData";
+import {
+  ENFORCEMENT_DATE,
+  OBSERVED_OPERATORS,
+  REMINDER_WORKING_DAYS,
+  accInProgress,
+  workingDaysSince,
+  type Accreditation,
+} from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { accPill, capVerb, daysUntil } from "./shared";
@@ -25,7 +32,9 @@ import { accPill, capVerb, daysUntil } from "./shared";
  *
  * Every pending item has to be reachable from a list, never only from an
  * emailed link, and show the time it has left (UX-EW-02 §3.4, pending-item
- * list). An administrator arrives here to do one of four things, and each
+ * list) — for an NDI proposal the days before it lapses, the one deadline
+ * left (D20); for everything else how long it has waited, and whether NDI
+ * has been reminded. An administrator arrives here to do one of four things, and each
  * is its own list: approve what a colleague proposed or recommended
  * (SCR-ACC-02), review what a business asked for (SCR-ACC-05), recognise an
  * organisation the gate has seen operating without approval (the entry to
@@ -44,7 +53,9 @@ export function AccreditationsAdminView() {
 
   const empty = forced === "empty";
   const now = new Date().toISOString().slice(0, 10);
-  const lapsed = (a: Accreditation) => a.state === "PROPOSED" && Boolean(a.expiresAt && a.expiresAt < now);
+  const lapsed = (a: Accreditation) => a.state === "PROPOSED" && a.door !== "REQUEST" && Boolean(a.expiresAt && a.expiresAt < now);
+  const since = (date: string | null) =>
+    `since ${date ? formatDate(date) : "—"}${workingDaysSince(date) >= REMINDER_WORKING_DAYS ? " · reminded" : ""}`;
   const toApprove = empty ? [] : accreditations.filter((a) => a.state === "PROPOSED");
   const toReview = empty ? [] : accreditations.filter((a) => a.state === "SUBMITTED" || a.state === "IN_REVIEW");
   /* The recognition list: what the gate observed, less anyone already on
@@ -125,7 +136,9 @@ export function AccreditationsAdminView() {
                     `/admin/accreditations/${a.id}`,
                     lapsed(a)
                       ? "This proposal lapsed without a decision."
-                      : `${a.recommendation ? "Reviewed" : "Proposed"} by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · ${daysUntil(a.expiresAt)} days left`,
+                      : a.door === "REQUEST"
+                        ? `Reviewed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · waiting ${since(a.proposedAt)}`
+                        : `Proposed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · ${daysUntil(a.expiresAt)} days left`,
                     i,
                   ),
                 )}
@@ -217,7 +230,7 @@ export function AccreditationsAdminView() {
                     a.listedAt
                       ? `Listed since ${formatDate(a.listedAt)}`
                       : a.state === "PENDING_ACCEPTANCE"
-                        ? `${daysUntil(a.expiresAt)} days left to accept`
+                        ? `Not accepted ${since(a.decidedAt)}`
                         : a.decidedAt
                           ? `Decided ${formatDate(a.decidedAt)}`
                           : "—",

@@ -216,14 +216,14 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Two administrators, and the organisation accepting by name",
         reality:
-          "\"The proposer can't approve it\", \"no approve against a recommended decline\" and \"only the owner accepts\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else.",
+          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\" and \"only the owner accepts\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
         needs: "Dual control enforced by the platform's services against distinct principals, and the identity-anchored acceptance on the real wallet proof flow.",
       },
       {
         shown: "Being added to NDI's public list of trusted organisations",
         reality:
           "\"Publishing your listing\" is a pause, then a state change in your browser. Nothing is written to any registry, and nobody else can see the list.",
-        needs: "The Trust Registry write, with the 30-day lapse if it fails, and the public lookup.",
+        needs: "The Trust Registry write — retried, with NDI alerted after 72 hours if it keeps failing — and the public lookup.",
       },
       {
         shown: "A public identity set up in a moment",

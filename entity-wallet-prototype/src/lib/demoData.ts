@@ -129,6 +129,17 @@ export interface Organization {
    * whatever its method — recorded as an exception (§10).
    */
   publicDid?: string;
+  /**
+   * A did:ethr created for an approval but not primary yet (FLOW-ACC-01
+   * step 5, FLOW-ACC-02 step 4). It becomes `publicDid` — the primary — only
+   * once the acceptance is recorded (ACC-01 step 8) or the request approved
+   * (ACC-02 step 8). Until then nothing the organisation already does uses
+   * it, so a wallet step that doesn't confirm (ACC-01/E4) or a declined
+   * request (ACC-02 AC-07) leaves the organisation exactly as it was. It used
+   * to be made primary the moment it was created, which put an unlisted DID
+   * into every invitation the organisation sent while it waited.
+   */
+  pendingDid?: string;
   /** Its name on the register, when that differs from how it is known. */
   legalName?: string;
   /**
@@ -1162,6 +1173,33 @@ export type AccCapability = "verifier" | "issuer";
  * business asking).
  */
 export type AccDoor = "NEW" | "EXISTING" | "RECOGNITION" | "REQUEST";
+/**
+ * What the first release keeps (EW-FLOW4-SD v0.2, D20–D24).
+ *
+ * `LAPSED` is the specification's `EXPIRED`, reason `NOT_APPROVED`: a
+ * FLOW-ACC-01 proposal no second administrator decided in 30 days (E14).
+ * It is the only ending a date causes (D20), and it keeps the name it has
+ * always had on screen — "Lapsed" — rather than share a word with the
+ * endings that went.
+ *
+ * Gone, and why:
+ * - `EXPIRED` for an approval nobody accepted, and the listing lapse with
+ *   it. Neither window expires any more: acceptance reminds the owner and
+ *   NDI and ends only when someone acts — the owner accepts or declines, or
+ *   an administrator withdraws it (ACC-01/E2) — and a listing retries and
+ *   alerts NDI after 72 hours (E8). A business never loses a request, and
+ *   an organisation never loses an approval, to a date nobody watched.
+ * - `SUPERSEDED`. Widening is a replacement: the new record names the one
+ *   it replaces (`replacesId`), and the old one is `WITHDRAWN`, reason
+ *   `REPLACED`, in the step that makes the new one `ACTIVE` (D24).
+ * - `STOPPED`. A changed primary DID refuses gated calls and alerts both
+ *   parties but leaves the record `ACTIVE` (ACC-01/E11) — so "stopped" is
+ *   read from the organisation's identity, by `accStopped`, not stored.
+ *   Suspension, its old neighbour, is flow 11's.
+ *
+ * `HELD` stays: a listing held because the DID is listed for someone else
+ * (E9) needs NDI, and the organisation is told so.
+ */
 export type AccState =
   | "SUBMITTED"
   | "IN_REVIEW"
@@ -1170,27 +1208,44 @@ export type AccState =
   | "LISTING"
   | "ACTIVE"
   | "DECLINED"
-  | "EXPIRED"
   | "LAPSED"
   | "WITHDRAWN"
   | "RESIGNED"
-  | "SUPERSEDED"
-  | "HELD"
-  | "STOPPED";
+  | "HELD";
 
 /** One thing a verifier may ask people for, from a published credential. */
 export interface AskItem {
   credential: string;
   item: string;
-  /** "Check only — you learn whether it's true, not the value" (UXD-28). */
+  /** "Check only — you'll learn whether it's true, not the value" (UXD-28). */
   checkOnly: boolean;
 }
 
-/** A credential type an issuer may issue, named in words, with its basis. */
+/**
+ * A credential type an issuer may issue, named in words. It used to carry a
+ * basis of its own; an issuer now gives one purpose and one legal basis for
+ * the record (EW-FLOW4-SD/D23, UXD-59), because purpose and a basis per
+ * type both answered "why you can and will issue this". Whether one basis is
+ * enough is open with GovTech Liaison (§13 item 12).
+ */
 export interface IssueType {
   name: string;
-  basis: string;
 }
+
+/**
+ * Why a record is `WITHDRAWN` — each is said differently to the
+ * organisation, so the reason is kept, not inferred from the door.
+ *
+ * - `REQUESTER` — the business's Root withdrew its request (ACC-02/A1).
+ * - `BY_NDI` — an administrator withdrew it, with a reason: an approval
+ *   nobody accepted (ACC-01/E2), or — catalogue flow 11, shown only from the
+ *   state switcher — one already active.
+ * - `NOT_LISTED` — NDI abandoned a listing that couldn't be published (E8,
+ *   ACC-02/E7). Shown only from the state switcher: the demo's listing
+ *   always publishes.
+ * - `REPLACED` — a wider approval became `ACTIVE` (D24).
+ */
+export type AccWithdrawReason = "REQUESTER" | "BY_NDI" | "NOT_LISTED" | "REPLACED";
 
 export interface Accreditation {
   id: string;
@@ -1201,13 +1256,31 @@ export interface Accreditation {
   officerEmail: string | null;
   door: AccDoor;
   capability: AccCapability;
+  /**
+   * What it will use the capability for. For an issuer, the single
+   * justification for every type in scope (D23).
+   */
   purpose: string;
+  /** Issuer only: the mandate it issues under, once for the record (D23). */
+  legalBasis: string;
+  /** Issuer only: where that mandate is written down — an act, a licence number. */
+  legalBasisRef: string;
   agreementRef: string;
   ask: AskItem[];
   issue: IssueType[];
   /** Recognition: what the gate observed it doing, and since when. */
   observed: { since: string; ask: AskItem[]; issue: IssueType[] } | null;
   state: AccState;
+  /** The `ACTIVE` record this one replaces, if any (D24). That one stays `ACTIVE` until this one is. */
+  replacesId: string | null;
+  /**
+   * FLOW-ACC-02: the request this record is a part of. A business may ask
+   * for both capabilities at once (D22); each is its own record — reviewed,
+   * recommended and decided on its own, so one can be approved and the
+   * other declined — and the two share this id, which is how they are
+   * withdrawn together and shown as one request.
+   */
+  requestId: string | null;
   /** The administrator who proposed it — or, for a request, who reviewed and recommended it. */
   proposedBy: PersonId | null;
   proposedAt: string | null;
@@ -1216,21 +1289,29 @@ export interface Accreditation {
   requestedAt: string | null;
   /** FLOW-ACC-02 step 6: the reviewer's recommendation. */
   recommendation: { by: PersonId; approve: boolean; reason: string | null; at: string } | null;
-  /** The reviewer a recommended decline was sent back from (ACC-02/E11), who may not be the different review. Only the most recent. */
-  earlierReviewers?: PersonId[];
   decidedBy: PersonId | null;
   decidedAt: string | null;
-  /** NDI's reason when it declines — shown to the organisation verbatim. */
+  /**
+   * The reason the organisation is shown when it is declined, verbatim. For
+   * a recommended decline that is the reviewer's reason (ACC-02/E11): the
+   * second administrator confirms it and adds nothing.
+   */
   declineReason: string | null;
   /** The officer declined at acceptance (FLOW-ACC-01 E3). */
   declinedByOrg: boolean;
+  /** Why it is `WITHDRAWN`, by whom, and NDI's words if NDI did it. */
+  withdrawal: { reason: AccWithdrawReason; note: string | null; by: PersonId | null; at: string } | null;
   /** The officer's name as their citizen credential gave it, at acceptance. */
   acceptedName: string | null;
   acceptedAt: string | null;
   listedAt: string | null;
-  /** The 30-day window that is running: decision, acceptance or listing. */
+  /**
+   * The one deadline left (D20): a FLOW-ACC-01 proposal lapses 30 days after
+   * it is made if nobody decides it (E14). Null everywhere else — requests,
+   * recommendations, acceptance and listing are reminded, not expired.
+   */
   expiresAt: string | null;
-  /** The public identity it is listed under. */
+  /** The public identity it is (to be) listed under. */
   publicIdentity: string | null;
   /** Refused in the last 30 days — asked for something outside scope. */
   refusals: { count: number; items: string[] } | null;
@@ -1244,6 +1325,8 @@ export interface AccProposalInput {
   officerEmail: string | null;
   capability: AccCapability;
   purpose: string;
+  legalBasis: string;
+  legalBasisRef: string;
   agreementRef: string;
   ask: AskItem[];
   issue: IssueType[];
@@ -1251,54 +1334,93 @@ export interface AccProposalInput {
   replaces: string | null;
 }
 
-/** What SCR-ACC-06 sends: a business's request, exactly as its Root wrote it. */
-export interface AccRequestInput {
+/** One capability in a business's request, exactly as its Root wrote it. */
+export interface AccRequestPart {
   capability: AccCapability;
   purpose: string;
   ask: AskItem[];
   issue: IssueType[];
+  legalBasis: string;
+  legalBasisRef: string;
+}
+
+/** What SCR-ACC-06 sends: one capability or both (D22). */
+export interface AccRequestInput {
+  parts: AccRequestPart[];
 }
 
 /**
- * What an accreditation becomes when its 30-day window runs out, or null if
- * it hasn't. Nobody acts to end it — the date does — so it is read from the
+ * Kind N's matching key (FLOW-ACC-01 P3, EW-FLOW4-SD §4.1): the legal name
+ * with case, spacing and punctuation folded, so "Druk Insurance Ltd." and
+ * "DRUK  INSURANCE LTD" are one institution. Trimming and lower-casing alone
+ * let a full stop through, and two administrators could each invite the
+ * same body as a verifier.
+ */
+export const normaliseLegalName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * What an accreditation becomes when its one window runs out, or null if it
+ * hasn't. Nobody acts to end it — the date does — so it is read from the
  * date rather than waiting for someone to press a button that would discover
  * it. Until it was, a lapsed proposal still counted as in progress, "Propose
  * again" returned E10, and nothing could end it.
  *
- * - An NDI proposal nobody decided lapses (FLOW-ACC-01/E14), and so does a
- *   listing that never published.
- * - An approval nobody accepted expires (FLOW-ACC-01/E2).
- * - A business's request is different (FLOW-ACC-02/E12): it's the
- *   recommendation that expires, not the request. The request goes back to
- *   IN_REVIEW for a fresh review — by anyone, since nobody was found wanting
- *   — and stays open, so it still stands in the way of a duplicate.
+ * Only an NDI proposal nobody decided lapses (FLOW-ACC-01/E14, D20). A
+ * business's request and the recommendation on it never expire
+ * (ACC-02/E8, E12): NDI is reminded after 10 working days and the business
+ * keeps its place. There used to be three more windows here — acceptance,
+ * listing and the recommendation — each with its own ending and copy, and
+ * most of the prototype's faults were in those edges.
  */
-export const accEnding = (
-  a: Pick<Accreditation, "state" | "expiresAt" | "door">,
-  today: string,
-): "LAPSED" | "EXPIRED" | "IN_REVIEW" | null => {
-  if (!a.expiresAt || a.expiresAt >= today) return null;
-  if (a.state === "PENDING_ACCEPTANCE") return "EXPIRED";
-  if (a.door === "REQUEST" && a.state === "PROPOSED") return "IN_REVIEW";
-  if (["SUBMITTED", "IN_REVIEW", "PROPOSED", "LISTING"].includes(a.state)) return "LAPSED";
-  return null;
-};
+export const accEnding = (a: Pick<Accreditation, "state" | "expiresAt" | "door">, today: string): "LAPSED" | null =>
+  a.state === "PROPOSED" && a.door !== "REQUEST" && a.expiresAt !== null && a.expiresAt < today ? "LAPSED" : null;
 
 /**
  * Whether an accreditation still stands in the way of another for the same
  * organisation and capability — in progress, or ACTIVE (FLOW-ACC-01/E10,
- * FLOW-ACC-02/E3). Ended ones do not, and nor does one whose window has run
- * out but which the store hasn't yet moved on — unless it is a request going
- * back for review, which is still open.
+ * FLOW-ACC-02/E3). Ended ones do not, and nor does a proposal whose window
+ * has run out but which the store hasn't yet moved on. A withdrawn approval
+ * is ended, which is what lets NDI propose again after withdrawing one
+ * nobody accepted (AC-15).
  */
-export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) => {
-  const ending = accEnding(a, new Date().toISOString().slice(0, 10));
-  return (
-    ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD", "STOPPED"].includes(a.state) &&
-    (ending === null || ending === "IN_REVIEW")
-  );
-};
+export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) =>
+  ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD"].includes(a.state) &&
+  accEnding(a, new Date().toISOString().slice(0, 10)) === null;
+
+/**
+ * ACC-01/E11 as a face, not a state: an `ACTIVE` approval whose organisation
+ * no longer has the listed identity as its primary DID. Gated calls are
+ * refused and both parties alerted, but the record stays `ACTIVE` (D24) —
+ * putting the listed DID back is enough, with no state to move back from.
+ */
+export const accStopped = (
+  a: Pick<Accreditation, "state" | "publicIdentity">,
+  org: Pick<Organization, "publicDid"> | undefined,
+) => a.state === "ACTIVE" && Boolean(a.publicIdentity) && org !== undefined && org.publicDid !== a.publicIdentity;
+
+/**
+ * Working days since a date — weekends skipped, holidays not modelled. The
+ * reminders that replaced the old expiries all fire at 10 working days
+ * (ACC-01/E2, E14; ACC-02/E8, E12), and the screens say when one has gone.
+ */
+export function workingDaysSince(date: string | null): number {
+  if (!date) return 0;
+  const d = new Date(`${date}T00:00:00`);
+  const end = new Date();
+  let n = 0;
+  while (d < end) {
+    d.setDate(d.getDate() + 1);
+    if (d < end && d.getDay() !== 0 && d.getDay() !== 6) n++;
+  }
+  return n;
+}
+
+export const REMINDER_WORKING_DAYS = 10;
 
 /* ------------------------------------------------------------------ */
 /* Flow 5 — foundational-issuer designation and adoption               */
@@ -1702,6 +1824,8 @@ export const OBSERVED_OPERATORS: {
   since: string;
   ask: AskItem[];
   issue: IssueType[];
+  /** Issuer only: the mandate it already issues under, offered as the proposal's one legal basis (D23). */
+  legalBasis?: string;
   suggestedPurpose: string;
 }[] = [
   {
@@ -1723,7 +1847,8 @@ export const OBSERVED_OPERATORS: {
     capability: "issuer",
     since: day(-240),
     ask: [],
-    issue: [{ name: "Bank account confirmation", basis: "Financial Services Act — the bank holds the account record" }],
+    issue: [{ name: "Bank account confirmation" }],
+    legalBasis: "Financial Services Act — the bank holds the account record",
     suggestedPurpose: "Confirming to other organisations that a customer holds an account",
   },
   {
@@ -1731,7 +1856,8 @@ export const OBSERVED_OPERATORS: {
     capability: "issuer",
     since: day(-150),
     ask: [],
-    issue: [{ name: "SIM registration", basis: "Telecommunications licence — the operator registers its subscribers" }],
+    issue: [{ name: "SIM registration" }],
+    legalBasis: "Telecommunications licence — the operator registers its subscribers",
     suggestedPurpose: "Proving which person a mobile number is registered to",
   },
 ];

@@ -14,11 +14,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { inOrg, roleIn, type AccState, type Accreditation } from "@/lib/demoData";
+import { accInProgress, accStopped, inOrg, roleIn, type AccCapability, type Accreditation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, accPill, capApproved, daysUntil, inline } from "./shared";
+import { ScopeList, accPill, capApproved, capVerb, inline, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-04 — Approval status. FLOW-ACC-01 steps 8–11; FLOW-ACC-02 steps
@@ -40,6 +40,16 @@ import { ScopeList, accPill, capApproved, daysUntil, inline } from "./shared";
  * confirmation says both halves: what stops straight away, and — for an
  * issuer — that what it has already issued stays valid (UXD-17). Each other
  * ending names who did it and what the organisation can do next.
+ *
+ * WHAT THE FIRST RELEASE LEFT OUT
+ *
+ * No suspension and no supersession (D24): a wider approval replaces the
+ * earlier one only once it is itself active, and the earlier one is shown
+ * under it as "Replaced", with nothing stopped in between. "Stopped" is not
+ * a state either — it is what an ACTIVE approval looks like when the
+ * organisation's primary identity no longer matches the listed one
+ * (ACC-01/E11), and putting it back is all Restore does. Nothing lapses
+ * here: a listing that can't be published is abandoned by NDI, by name.
  */
 type Face =
   | "live"
@@ -47,9 +57,9 @@ type Face =
   | "waiting"
   | "withdrawn"
   | "request_lapsed"
-  | "listing_lapsed"
-  | "suspended"
-  | "superseded"
+  | "listing_abandoned"
+  | "withdrawn_by_ndi"
+  | "replaced"
   | "declined"
   | "publishing"
   | "held"
@@ -59,21 +69,25 @@ type Face =
   | "offline"
   | "member";
 
-const FORCED_STATE: Partial<Record<Face, AccState>> = {
-  default: "ACTIVE",
-  waiting: "SUBMITTED",
-  withdrawn: "WITHDRAWN",
-  request_lapsed: "WITHDRAWN",
-  listing_lapsed: "LAPSED",
-  suspended: "ACTIVE",
-  superseded: "SUPERSEDED",
-  declined: "DECLINED",
-  publishing: "LISTING",
-  held: "HELD",
-  stopped: "STOPPED",
-  resigned: "RESIGNED",
-  offline: "ACTIVE",
-  member: "ACTIVE",
+/** The record each forced face shows, as overrides of the sample. */
+const FORCED: Partial<Record<Face, Partial<Accreditation>>> = {
+  default: { state: "ACTIVE" },
+  waiting: { state: "SUBMITTED", door: "REQUEST" },
+  withdrawn: { state: "WITHDRAWN", door: "REQUEST", withdrawal: { reason: "REQUESTER", note: null, by: null, at: "" } },
+  request_lapsed: { state: "WITHDRAWN", door: "REQUEST", withdrawal: { reason: "REQUESTER", note: null, by: null, at: "" } },
+  listing_abandoned: { state: "WITHDRAWN", listedAt: null, withdrawal: { reason: "NOT_LISTED", note: null, by: "tshendu", at: "" } },
+  withdrawn_by_ndi: {
+    state: "WITHDRAWN",
+    withdrawal: { reason: "BY_NDI", note: "your agreement with NDI has ended", by: "tshendu", at: "" },
+  },
+  replaced: { state: "ACTIVE", replacesId: "acc-sample-old" },
+  declined: { state: "DECLINED", door: "REQUEST" },
+  publishing: { state: "LISTING" },
+  held: { state: "HELD" },
+  stopped: { state: "ACTIVE" },
+  resigned: { state: "RESIGNED" },
+  offline: { state: "ACTIVE" },
+  member: { state: "ACTIVE" },
 };
 
 export function ApprovalStatusView() {
@@ -86,9 +100,9 @@ export function ApprovalStatusView() {
     "waiting",
     "withdrawn",
     "request_lapsed",
-    "listing_lapsed",
-    "suspended",
-    "superseded",
+    "listing_abandoned",
+    "withdrawn_by_ndi",
+    "replaced",
     "declined",
     "publishing",
     "held",
@@ -112,7 +126,9 @@ export function ApprovalStatusView() {
   /* Resign and withdraw: OWNER for an institution, the Root for a business.
      The store checks again; this only decides whether to offer them. */
   const manages = (isRoot || roleIn(org, currentPerson) === "Owner") && forced !== "member";
-  const mine = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "EXPIRED");
+  /* A proposal that lapsed before NDI decided it never reached the
+     organisation, so it isn't shown to it. */
+  const mine = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "LAPSED");
 
   /* Publishing the listing is simulated: whatever is LISTING when this page
      is open is published after a moment, standing in for the registry
@@ -134,80 +150,83 @@ export function ApprovalStatusView() {
   }
 
   /* A forced face shows one approval in that state — the org's own record
-     if it has one for that capability, otherwise the bank's verifying. */
-  const sampleBase: Accreditation = mine[0] ?? {
-    id: "acc-sample",
-    orgId: activeOrgId,
-    orgName: name,
-    officerEmail: null,
-    door: forced === "waiting" || forced === "withdrawn" || forced === "request_lapsed" || forced === "declined" ? "REQUEST" : "RECOGNITION",
-    capability: "verifier",
-    purpose: "Confirming who a customer is when they open an account",
-    agreementRef: "",
-    ask: [
-      { credential: "Citizen ID", item: "Full name", checkOnly: false },
-      { credential: "Citizen ID", item: "Citizenship ID number", checkOnly: false },
-      { credential: "Citizen ID", item: "Photo", checkOnly: false },
-    ],
-    issue: [],
-    observed: null,
-    state: "ACTIVE",
-    proposedBy: "tshering",
-    proposedAt: null,
-    requestedBy: root?.personId ?? null,
-    requestedAt: new Date().toISOString().slice(0, 10),
-    recommendation: null,
-    decidedBy: "root",
-    decidedAt: new Date().toISOString().slice(0, 10),
-    declineReason: "Ask to check age only, not the date of birth.",
-    declinedByOrg: false,
-    acceptedName: currentPerson.name,
-    acceptedAt: null,
-    listedAt: new Date().toISOString().slice(0, 10),
-    expiresAt: null,
-    publicIdentity: org?.publicDid ?? "did:ethr:0x3f9a1c7e5b2d48a06e91f0c4d7b8a2e5c13f6d90",
-    refusals: { count: 3, items: ["Date of birth", "Permanent address"] },
+     if it has one, otherwise the bank's verifying. */
+  const today = new Date().toISOString().slice(0, 10);
+  const sampleBase: Accreditation =
+    mine[0] ??
+    sampleAccreditation({
+      orgId: activeOrgId,
+      orgName: name,
+      agreementRef: "",
+      state: "ACTIVE",
+      requestedBy: root?.personId ?? null,
+      requestedAt: today,
+      decidedBy: "tshendu",
+      decidedAt: today,
+      acceptedName: currentPerson.name,
+      listedAt: today,
+      publicIdentity: org?.publicDid ?? "did:ethr:0x3f9a1c7e5b2d48a06e91f0c4d7b8a2e5c13f6d90",
+    });
+  const forcedRecord = (): Accreditation[] => {
+    const a: Accreditation = {
+      ...sampleBase,
+      declinedByOrg: false,
+      declineReason: sampleBase.declineReason ?? "Ask to check age only, not the date of birth.",
+      refusals: sampleBase.refusals ?? { count: 3, items: ["Date of birth", "Permanent address"] },
+      listedAt: sampleBase.listedAt ?? today,
+      ...FORCED[forced],
+    };
+    /* "Replaced": the approval that replaced another, with the earlier one
+       under it — the one face that needs two records. */
+    if (forced !== "replaced") return [a];
+    return [
+      a,
+      {
+        ...a,
+        id: "acc-sample-old",
+        replacesId: null,
+        state: "WITHDRAWN",
+        listedAt: "2025-06-02",
+        /* Narrower: a replacement is how a scope widens (D7). */
+        ask: a.ask.slice(0, Math.max(1, a.ask.length - 1)),
+        issue: a.issue.slice(0, Math.max(1, a.issue.length - 1)),
+        withdrawal: { reason: "REPLACED", note: null, by: null, at: today },
+      },
+    ];
   };
-  const shown: Accreditation[] =
-    forced === "live"
-      ? mine
-      : forced === "empty"
-        ? []
-        : [
-            {
-              ...sampleBase,
-              state: FORCED_STATE[forced] ?? "ACTIVE",
-              door: ["waiting", "withdrawn", "request_lapsed", "declined"].includes(forced) ? "REQUEST" : sampleBase.door,
-              declinedByOrg: false,
-              declineReason: sampleBase.declineReason ?? "Ask to check age only, not the date of birth.",
-              refusals: sampleBase.refusals ?? { count: 3, items: ["Date of birth", "Permanent address"] },
-            },
-          ];
+  const shown: Accreditation[] = forced === "live" ? mine : forced === "empty" ? [] : forcedRecord();
 
-  /* Superseded approvals are shown under the one that replaced them. */
-  const top = shown.filter((a) => a.state !== "SUPERSEDED" || forced === "superseded");
-  const replacedBy = (a: Accreditation) =>
-    shown.filter((x) => x.state === "SUPERSEDED" && x.capability === a.capability && x.id !== a.id && a.state === "ACTIVE");
+  /* A replaced approval is shown under the one that replaced it (D24). */
+  const isReplaced = (a: Accreditation) => a.state === "WITHDRAWN" && a.withdrawal?.reason === "REPLACED";
+  const top = shown.filter((a) => !isReplaced(a) || !shown.some((x) => x.replacesId === a.id));
+  const replacedUnder = (a: Accreditation) => shown.filter((x) => isReplaced(x) && a.replacesId === x.id);
+  const stoppedFace = (a: Accreditation) => (forced === "live" ? accStopped(a, org) : forced === "stopped");
+
+  const contactNdi = (label = "Contact NDI") => (
+    <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">
+      {label}
+    </Link>
+  );
 
   const status = (a: Accreditation): { text: React.ReactNode; action?: React.ReactNode } => {
-    const verb = a.capability === "verifier" ? "verify" : "issue";
-    switch (forced === "live" ? a.state : forced) {
-      case "suspended":
-        return {
-          text: `NDI has suspended ${short}'s approval to ${verb} while it checks how it's being used. Credentials you've already issued stay valid unless NDI says otherwise.`,
-          action: <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">Contact NDI</Link>,
-        };
-      case "request_lapsed":
-        return {
-          text: `A request made by ${a.requestedBy ? personById(a.requestedBy).name : "your previous representative"} lapsed when their authority ended.`,
-          action: isRoot ? <HairlineButton onClick={() => router.push("/verify-or-issue/ask")}>Ask again</HairlineButton> : null,
-        };
-      case "listing_lapsed":
-        return {
-          text: "This approval lapsed because the listing couldn't be published. NDI will contact you.",
-          action: <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">Contact NDI</Link>,
-        };
-    }
+    const verb = capVerb(a.capability);
+    if (forced === "request_lapsed")
+      return {
+        text: `A request made by ${a.requestedBy ? personById(a.requestedBy).name : "your previous representative"} lapsed when their authority ended.`,
+        action: isRoot ? <HairlineButton onClick={() => router.push("/verify-or-issue/ask")}>Ask again</HairlineButton> : null,
+      };
+    if (stoppedFace(a))
+      /* ACC-01/E11. The record is still ACTIVE; what stopped is every
+         request it makes, until the listed identity is primary again.
+         Nothing in the demo changes an organisation's primary identity —
+         the lock forbids it — so Restore shows the outcome rather than
+         calling the store. */
+      return restored
+        ? { text: "Put back. Your listed public identity is primary again, and verifying and issuing have restarted." }
+        : {
+            text: "Your organisation's public identity has changed since it was approved. Verifying and issuing have stopped until it's put back.",
+            action: manages ? <GradientButton onClick={() => setRestored(true)}>Restore</GradientButton> : null,
+          };
     switch (a.state) {
       case "ACTIVE":
         return {
@@ -229,7 +248,7 @@ export function ApprovalStatusView() {
         };
       case "PENDING_ACCEPTANCE":
         return {
-          text: `NDI has proposed approving ${short} to ${verb}. It's waiting for ${manages ? "you" : "the owner"} to accept — ${daysUntil(a.expiresAt)} days left.`,
+          text: `NDI has proposed approving ${short} to ${verb}. It's waiting for ${manages ? "you" : "the owner"} to accept.`,
           action: <GradientButton onClick={() => router.push(`/verify-or-issue/${a.id}`)}>Review and accept</GradientButton>,
         };
       case "LISTING":
@@ -244,44 +263,49 @@ export function ApprovalStatusView() {
               ) : null,
             };
       case "WITHDRAWN":
-        return {
-          text: "You've withdrawn your request.",
-          action: isRoot ? <HairlineButton onClick={() => router.push("/verify-or-issue/ask")}>Ask again later</HairlineButton> : null,
-        };
-      case "LAPSED":
-        return {
-          text: "This approval lapsed because the listing couldn't be published. NDI will contact you.",
-          action: <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">Contact NDI</Link>,
-        };
-      case "HELD":
-        return {
-          text: "Your listing is held while NDI checks something. We'll contact you.",
-          action: <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">Contact NDI</Link>,
-        };
-      case "STOPPED":
-        /* Only reachable from the state switcher — nothing in the demo
-           changes an organisation's primary identity — so Restore here
-           shows the outcome rather than calling the store. */
-        return restored
-          ? { text: "Put back. Your listed public identity is primary again, and verifying and issuing have restarted." }
-          : {
-              text: "Your organisation's public identity has changed since it was approved. Verifying and issuing have stopped until it's put back.",
-              action: manages ? <GradientButton onClick={() => setRestored(true)}>Restore</GradientButton> : null,
+        switch (a.withdrawal?.reason) {
+          case "NOT_LISTED":
+            return { text: "This approval was withdrawn because the listing couldn't be published. NDI will contact you.", action: contactNdi() };
+          case "BY_NDI":
+            /* Before it was accepted (E2) nothing ever started; after it
+               was listed (catalogue flow 11) the page says what stopped and
+               what still works. */
+            return a.listedAt && a.acceptedName
+              ? {
+                  text: `NDI has withdrawn ${short}'s approval to ${verb}: ${a.withdrawal.note ?? "—"}. ${
+                    a.capability === "verifier"
+                      ? "You can no longer ask people for information."
+                      : "You can no longer issue. Credentials you've already issued stay valid unless NDI says otherwise."
+                  }`,
+                  action: contactNdi(),
+                }
+              : { text: `NDI has withdrawn this approval: ${a.withdrawal.note ?? "—"}. Nothing is listed.`, action: contactNdi() };
+          case "REPLACED":
+            return { text: "Replaced by a wider approval. Kept on record; nothing stopped in between." };
+          default:
+            return {
+              text: "You've withdrawn your request.",
+              action: isRoot ? <HairlineButton onClick={() => router.push("/verify-or-issue/ask")}>Ask again later</HairlineButton> : null,
             };
+        }
+      case "HELD":
+        return { text: "Your listing is held while NDI checks something. We'll contact you.", action: contactNdi() };
       case "RESIGNED":
         return {
           text:
             a.capability === "verifier"
               ? "You've stopped verifying. You can no longer ask people for information."
               : "You've stopped issuing. Credentials you've already issued stay valid.",
-          action: <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">Contact NDI to be approved again</Link>,
+          action: contactNdi("Contact NDI to be approved again"),
         };
-      case "SUPERSEDED":
-        return { text: "Replaced by a wider approval. Kept on record." };
       default:
-        return { text: "This has expired. NDI would need to propose it again." };
+        return { text: "This is no longer waiting for anything." };
     }
   };
+
+  /* What the Root could still ask for: a capability with nothing in
+     progress or active (ACC-02/E3, per capability). */
+  const askable = (["verifier", "issuer"] as AccCapability[]).filter((c) => !mine.some((a) => a.capability === c && accInProgress(a)));
 
   return (
     <AppShell>
@@ -289,8 +313,7 @@ export function ApprovalStatusView() {
         <PageHeader crumbs={[{ label: name }, { label: "Verify or issue" }]} title="Verify or issue" />
         {forced === "offline" ? (
           <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
-            You&rsquo;re offline. This is how things stood when you were last connected, on{" "}
-            {formatDate(new Date().toISOString().slice(0, 10))}.
+            You&rsquo;re offline. This is how things stood when you were last connected, on {formatDate(today)}.
           </p>
         ) : null}
 
@@ -305,8 +328,11 @@ export function ApprovalStatusView() {
           </Panel>
         ) : (
           top.map((a) => {
-            const pill = forced === "suspended" ? { status: "suspended", label: "Suspended" } : accPill(a, "org");
+            const pill = stoppedFace(a) && !restored ? { status: "stopped", label: "Stopped" } : accPill(a, "org");
             const s = status(a);
+            /* The other part of the same request, when it asked for both
+               (D22) — each decided on its own, said so beside each. */
+            const sibling = a.requestId ? shown.find((x) => x.requestId === a.requestId && x.id !== a.id) : undefined;
             return (
               <Panel key={a.id}>
                 <div className="relative z-[4] flex flex-col gap-4">
@@ -319,6 +345,11 @@ export function ApprovalStatusView() {
                   <p role="status" className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
                     {s.text}
                   </p>
+                  {sibling ? (
+                    <p className="m-0 text-[12.5px] leading-[1.55] text-muted">
+                      Asked for together with {sibling.capability === "verifier" ? "verifying" : "issuing"}. NDI decides each on its own.
+                    </p>
+                  ) : null}
                   <div className="flex flex-col gap-2">
                     <p className="m-0 text-[12.5px] text-muted">
                       {a.capability === "verifier" ? "What you can ask people for" : "What you can issue"}
@@ -339,11 +370,13 @@ export function ApprovalStatusView() {
                     </p>
                   ) : null}
                   {s.action ? <div className="flex flex-wrap gap-2.5">{s.action}</div> : null}
-                  {replacedBy(a).map((old) => (
+                  {replacedUnder(a).map((old) => (
                     <div key={old.id} className="flex flex-col gap-1.5 border-t border-subtle pt-3">
-                      <StatusPill status="superseded" label="Replaced" />
+                      <StatusPill status="replaced" label="Replaced" />
                       <p className="m-0 text-[12.5px] text-muted">
-                        Earlier approval{old.listedAt ? `, listed ${formatDate(old.listedAt)}` : ""}: {old.ask.map((x) => inline(x.item)).join(", ") || old.issue.map((t) => t.name).join(", ")}.
+                        Earlier approval{old.listedAt ? `, listed ${formatDate(old.listedAt)}` : ""}:{" "}
+                        {old.ask.map((x) => inline(x.item)).join(", ") || old.issue.map((t) => t.name).join(", ")}. It stayed in force until
+                        this one was listed.
                       </p>
                     </div>
                   ))}
@@ -353,9 +386,11 @@ export function ApprovalStatusView() {
           })
         )}
 
-        {canAsk && top.length > 0 && !top.some((a) => a.door === "REQUEST" && ["SUBMITTED", "IN_REVIEW", "PROPOSED"].includes(a.state)) && top.length < 2 ? (
+        {canAsk && top.length > 0 && askable.length ? (
           <p className="m-0 text-[13px] text-muted">
-            Want to {top[0].capability === "verifier" ? "issue credentials" : "verify customers"} as well?{" "}
+            {askable.length === 1
+              ? `Want to ${askable[0] === "verifier" ? "verify customers" : "issue credentials"} as well? `
+              : "Want to verify customers or issue credentials? "}
             <Link href="/verify-or-issue/ask" className="ndi-plainlink font-medium text-accent">
               Ask NDI
             </Link>

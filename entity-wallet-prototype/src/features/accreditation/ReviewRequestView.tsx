@@ -20,7 +20,7 @@ import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
-import { ScopeList, capVerb } from "./shared";
+import { ScopeList, capVerb, legalBasisText } from "./shared";
 
 /**
  * SCR-ACC-05 — Review a request. FLOW-ACC-02 step 6.
@@ -34,6 +34,13 @@ import { ScopeList, capVerb } from "./shared";
  * for declining says what to remove, and the business reads that reason in
  * the reviewer's own words (UN-32). That is why the prompt for it gives an
  * example written to the business, not about it.
+ *
+ * ONE PART AT A TIME
+ *
+ * A business may ask for both capabilities in one request (D22). Each is a
+ * part of it, reviewed and recommended on its own — this page is one part,
+ * and says so when there is another — so verifying can be recommended while
+ * issuing is not, and neither waits for the other.
  *
  * ALERTS FIRST
  *
@@ -132,10 +139,9 @@ export function ReviewRequestView({ id }: { id: string }) {
 
   const overlaps = issueOverlaps(acc, accreditations, (oid) => organizations.find((o) => o.id === oid)?.name ?? oid);
   const offline = face === "offline";
-  /* Sent back for a different review: whoever reviewed it before can't be
-     that review. The store refuses them too; this says why up front. */
-  const reviewedBefore = Boolean(acc.earlierReviewers?.includes(currentPerson.id));
-  const canAct = isNamedAdmin(currentPerson) && !offline && !reviewedBefore;
+  const canAct = isNamedAdmin(currentPerson) && !offline;
+  /* The other part of the same request, if it asked for both (D22). */
+  const sibling = acc.requestId ? accreditations.find((a) => a.requestId === acc.requestId && a.id !== acc.id) : undefined;
 
   const send = (approve: boolean) => {
     setBusy(true);
@@ -155,7 +161,7 @@ export function ReviewRequestView({ id }: { id: string }) {
       setDone(
         approve
           ? "Recommended for approval. A different administrator decides next."
-          : "Recommended to decline. A different administrator confirms it, or sends it for another review; only then is the business told.",
+          : "Recommended to decline. A different administrator confirms it; only then is the business told, with your reason in your words.",
       );
     }, LOCAL_MS);
   };
@@ -180,6 +186,11 @@ export function ReviewRequestView({ id }: { id: string }) {
             <p className="m-0 max-w-[66ch] text-[13.5px] leading-[1.6] text-muted">
               Recommend approving or declining this as the business asked for it. You can&rsquo;t edit it.
             </p>
+            {sibling ? (
+              <p className="m-0 max-w-[66ch] text-[13px] leading-[1.6] text-muted">
+                The same request also asks to {capVerb(sibling.capability)}. That part is reviewed and decided on its own.
+              </p>
+            ) : null}
             <div className="flex flex-col gap-2">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">
                 {acc.capability === "verifier" ? "What it asks to ask people for" : "What it asks to issue"}
@@ -189,6 +200,7 @@ export function ReviewRequestView({ id }: { id: string }) {
             <DetailList
               items={[
                 { label: "Purpose", value: acc.purpose },
+                ...(acc.capability === "issuer" ? [{ label: "Legal basis", value: legalBasisText(acc) }] : []),
                 { label: "Asked by", value: acc.requestedBy ? `${personById(acc.requestedBy).name}, its representative` : "—" },
                 {
                   label: "Verified",
@@ -218,11 +230,6 @@ export function ReviewRequestView({ id }: { id: string }) {
         {offline ? (
           <p role="status" className="m-0 text-[13.5px] text-body">
             You&rsquo;re offline. Nothing can be recorded until you&rsquo;re back.
-          </p>
-        ) : null}
-        {reviewedBefore ? (
-          <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
-            You reviewed this before it was sent for a different review, so another administrator has to review it.
           </p>
         ) : null}
         {failed ? (

@@ -4,6 +4,8 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { OBSERVED_OPERATORS, type Accreditation, type Organization } from "@/lib/demoData";
 
+import { legalBasisText } from "./shared";
+
 /**
  * NDI's interim criteria, each beside the evidence an administrator looks
  * at (EW-FLOW4-SD §9). Shown on both administrator screens — SCR-ACC-05
@@ -63,7 +65,9 @@ export function Criteria({
     rows.push(
       {
         criterion: "It has the mandate to attest what it issues",
-        evidence: acc.issue.map((t) => `${t.name}: ${t.basis}`).join(" · ") || "—",
+        /* One basis for every type in the first release (D23); whether that
+           is enough for C6 is EW-FLOW4-SD §13 item 12. */
+        evidence: legalBasisText(acc),
       },
       {
         criterion: "It doesn't duplicate another issuer, unless several are intended",
