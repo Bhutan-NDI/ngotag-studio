@@ -20,7 +20,7 @@ import type { PersonaId } from "./demoData";
  * setting the entry needs, applied when it is chosen, so neither route can
  * be started in a deployment where it would not exist.
  */
-export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive" | "share" | "authority";
+export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive" | "share" | "authority" | "act";
 
 /**
  * The flows the demo controls offer — the onboardings the prototype is
@@ -68,6 +68,13 @@ export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "
  * approver (Journey T). Collecting from a link opens the seeded link for
  * Kinley Wangdi, three months on, with nobody signed in — the delegate has
  * no account (D10).
+ *
+ * Flow 9 has two, both three months on, where Pelden registered with the
+ * Single Window after its first grant and Pema holds its authority. A
+ * clearing agent acting for Pelden starts on BNSW's simulated site with
+ * nobody signed in to it — BNSW's sign-in is its own, not the Studio's, so
+ * there is no persona. Registering again starts on BNSW's registration page
+ * as Dorji, who shares from the Entity Wallet (Journey W's second half).
  */
 export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "root", code: "FLOW-ONB-02", title: "Root admin onboarding" },
@@ -80,6 +87,7 @@ export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "receive", code: "Flow 6", title: "Receiving a credential" },
   { id: "share", code: "Flow 7", title: "Presenting a credential" },
   { id: "authority", code: "Flow 8", title: "Giving authority to act" },
+  { id: "act", code: "Flow 9", title: "Acting for a company at BNSW" },
 ];
 
 export interface FlowEntry {
@@ -126,4 +134,6 @@ export const FLOW_ENTRIES: FlowEntry[] = [
   { group: "authority", label: "The owner gives a clearing agent authority", persona: "dorji", route: "/authority-to-act", start: "teamReady" },
   { group: "authority", label: "A controller gives authority, the owner approves", persona: "rinzin", route: "/authority-to-act/give", start: "livedIn" },
   { group: "authority", label: "Collect authority from a link", persona: null, route: "/authority/claim/c7Qm2xVb9TkPa4Lw", start: "livedIn" },
+  { group: "act", label: "A clearing agent declares for Pelden", persona: null, route: "/simulated/bnsw", start: "livedIn" },
+  { group: "act", label: "Pelden registers with BNSW again", persona: "dorji", route: "/simulated/bnsw/register", start: "livedIn" },
 ];

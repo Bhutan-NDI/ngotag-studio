@@ -996,46 +996,139 @@ export const SIM_CITIZENS: { cid: string; name: string; personId: PersonId | nul
   { cid: "10305007781", name: "Tashi Dorji", personId: null },
 ];
 
-/** One link in the chain a verification walks. */
-export interface AuthorityChainLink {
-  id: string;
-  label: string;
-  kind: "foundational" | "relation" | "role" | "capability";
-  /** Who holds this link — the entity, or a person. */
-  heldBy: string;
-  status: "valid" | "revoked" | "suspended" | "expired";
-}
+/* ------------------------------------------------------------------ */
+/* Flow 9 — the Bhutan National Single Window's own records            */
+/*                                                                     */
+/* None of these is the platform's. They are what BNSW's back end      */
+/* keeps (EW-FLOW9-SD §4), held in the demo store only because the      */
+/* prototype has no BNSW: the dashed BNSW pages read them, and nothing  */
+/* in the Entity Wallet does except the first-grant notice asking       */
+/* "is this organisation registered there?" (§7).                      */
+/* ------------------------------------------------------------------ */
 
-export interface ConstraintCheck {
-  label: string;
-  detail: string;
-  outcome: "pass" | "fail";
+/**
+ * BNSW's record of a company's registration — kept from FLOW-PRS-01's
+ * result when the company shares its registration, TPN and business
+ * licence with BNSW (§4.1, EW-FLOW9-CIG §3). Registering again replaces it.
+ */
+export interface CounterpartyRegistration {
+  id: string;
+  counterpartyId: string;
+  orgId: string;
+  /** `verification.holder` — the company's did:key. Audit only. */
+  holderDid: string;
+  /**
+   * `verification.holderPublishingDid` — the platform's attestation of the
+   * company's listed did:ethr (D8), or null when it wasn't CURRENT as an
+   * issuer of authority when it registered. B1 matches an authority's issuer to it.
+   */
+  publishingDid: string | null;
+  legalName: string;
+  registrationNumber: string;
+  tpn: string | null;
+  /** Kept, never looked up (pr-9 item 1 — see lib/bnsw.ts). */
+  tpnRevocationId: string | null;
+  /** Each business licence number and its revocation_id (B3, B4). `credentialId` is the prototype's link to the held credential its status stands for. */
+  licences: { number: string; revocationId: string; credentialId: string }[];
+  registeredAt: string;
+  /** The presentation request it came from — null for the seed's. */
+  requestId: string | null;
 }
 
 /**
- * The signed decision an external verifier renders (D5).
- *
- * `SERVICE_UNREACHABLE` is a FAIL, not a third outcome — it is separate here
- * only so the UI can say honestly *why* it failed. Fail closed: an
- * unreachable service never resolves to a hopeful spinner or a silent pass.
+ * BNSW's authority session — written at sign-in once V1–V6 and B0–B4 pass
+ * (§4.2, FLOW-AUT-02 Q1). It holds the delegate's name and citizen ID
+ * number: BNSW does see them, from the citizen credential.
  */
-export interface VerificationDecision {
+export interface AuthoritySession {
   id: string;
-  outcome: "PASS" | "FAIL" | "SERVICE_UNREACHABLE";
-  verifier: string;
-  /** Dual attribution, and nothing else about the person. */
-  entity: string;
-  actorId: PersonId;
-  authorityId: string;
-  declarationRef: string;
-  declarationHash: string;
-  declaredValue: { amount: number; currency: "BTN" };
-  chain: AuthorityChainLink[];
-  checks: ConstraintCheck[];
-  /** Present on a FAIL. Never leaks unrelated personal data. */
-  reasons: string[];
-  decidedAt: string;
-  signature: string;
+  counterpartyId: string;
+  /** BNSW's signed-in user, from its own Bhutan NDI sign-in (B0). */
+  signedInCid: string;
+  delegateDid: string;
+  /** The citizen credential's name and ID number. */
+  delegateName: string;
+  delegateCid: string;
+  /** The name the authority carries — shown beside the citizen credential's, not compared (D12). */
+  authorityName: string;
+  /** The registered company matched in B1. */
+  orgId: string;
+  registrationId: string;
+  principalDid: string;
+  /** The grant's id — `credentialSubject.relationId`. */
+  relationId: string;
+  /** BNSW task scopes the authority names (B2). */
+  tasks: string[];
+  /** Named by the authority, registered (B3) and ACTIVE at B4 — what A2 offers. */
+  licenceNumbers: string[];
+  valueCapNu: number;
+  perTransaction: boolean;
+  authorityRevocationId: string;
+  citizenRevocationId: string;
+  /** The authority's expirationDate (D19). */
+  validUntil: string;
+  /** The earlier of BNSW's sign-in timeout and validUntil (D13), as epoch ms. */
+  endsAt: number;
+  checkedAt: number;
+  status: "OPEN" | "ENDED";
+  endedAt: number | null;
+  endReason: "stopped" | "changed" | "timeout" | "expired" | "signed_out" | null;
+}
+
+/** What BNSW keeps with each declaration (§4.3, D14). */
+export interface CounterpartyDeclaration {
+  id: string;
+  reference: string;
+  counterpartyId: string;
+  orgId: string;
+  sessionId: string;
+  kind: "submit" | "amend";
+  /** The declaration this one amends (A3), and the one that amended this. */
+  amends: string | null;
+  amendedBy: string | null;
+  goods: string;
+  valueNu: number;
+  licenceNumber: string;
+  relationId: string;
+  authorityRevocationId: string;
+  delegateName: string;
+  delegateCid: string;
+  /** The status lookup's answer, as kept. */
+  statusResult: string;
+  at: string;
+}
+
+/** BNSW's form, kept as a draft through any refusal at submit (UXD-54). */
+export interface DeclarationDraft {
+  goods: string;
+  value: string;
+  licence: string;
+  /** The declaration being amended, or null for a new one. */
+  amends: string | null;
+}
+
+/** One of V1–V6 or B0–B4, as the result reports it. */
+export interface BnswCheck {
+  id: string;
+  label: string;
+  outcome: "pass" | "fail" | "not_run";
+}
+
+/**
+ * The simulated BNSW portal's own state: who is signed in to it, the
+ * request out to the app, what it last told the person, the draft, and the
+ * two things the prototype can't otherwise produce — an outage at NDI and
+ * a citizen credential that isn't valid.
+ */
+export interface BnswState {
+  signedInCid: string | null;
+  servicesDown: boolean;
+  suspendedCitizens: string[];
+  /** Steps 2–3 — the proof request out to the app; five minutes (E2). */
+  request: { id: string; startedAt: number } | null;
+  /** The last outcome to show, set by the store: a refusal, A4, an acceptance. */
+  notice: { code: string; text: string; checks: BnswCheck[]; at: number } | null;
+  draft: DeclarationDraft | null;
 }
 
 /**
@@ -2174,8 +2267,12 @@ export interface DemoState {
   authorityGrants: AuthorityGrant[];
   /** Flow 8 — SCR-AUT-02's form, read by SCR-AUT-03. */
   authorityDraft: AuthorityDraft | null;
-  /** Act 5 keeps both decisions so PASS and FAIL can sit side by side. */
-  decisions: VerificationDecision[];
+  /** Flow 9 — BNSW's registration records, authority sessions and declarations (BNSW's data, see above). */
+  counterpartyRegistrations: CounterpartyRegistration[];
+  authoritySessions: AuthoritySession[];
+  counterpartyDeclarations: CounterpartyDeclaration[];
+  /** Flow 9 — the simulated BNSW portal. */
+  bnsw: BnswState;
   auditEntries: AuditEntry[];
   appeals: Appeal[];
 
@@ -3199,6 +3296,26 @@ export const SEED: DemoState = {
       status: "revoked",
     },
     {
+      /* Pelden's taxpayer number, from the Department of Revenue & Customs
+         (Flow 6's offering). Flow 9's registration with the Single Window
+         shares it with the registration and the licence (EW-FLOW9-SD §4.1). */
+      id: "hc-tpn",
+      type: "Taxpayer Number (TPN)",
+      issuer: "Department of Revenue & Customs",
+      issuerDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "tpn", value: "TPN-114-8830" },
+        { name: "tax_office", value: "Thimphu Regional Revenue & Customs Office" },
+        { name: "registered_for", value: "Business income tax, GST" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-60),
+      expiresAt: null,
+      status: "active",
+    },
+    {
       /* Flow 8 — the business licence Pelden's clearing agents act under.
          The Phuentsholing branch's, because that is where its imports cross.
          MoICE marks its business licence as one someone acting for the
@@ -3478,6 +3595,18 @@ export const SEED: DemoState = {
       url: "https://www.bob.bt/ekyb/return",
       addedBy: "yeshey",
       addedAt: day(-40),
+    },
+    {
+      /* The Single Window's registration page — Flow 9's way back from
+         FLOW-PRS-01 once a company has shared its registration, licence
+         and TPN. Nobody in the story works at BNSW; the address was
+         registered when it joined (SCR-PRS-06). */
+      id: "ra-bnsw-register",
+      orgId: "org-bnsw",
+      returnUrlId: "bnsw-register-return",
+      url: "https://www.bnsw.gov.bt/register/return",
+      addedBy: "bnsw-admin",
+      addedAt: day(-200),
     },
   ],
 
@@ -3800,85 +3929,97 @@ export const SEED: DemoState = {
   ],
   authorityDraft: null,
 
-  decisions: [
+  /*
+   * Flow 9 — BNSW's own records, three months in (EW-FLOW9-SD §4). Pelden
+   * registered with the Single Window after its first grant, so the record
+   * carries its publishing DID and Pema's authority is recognised (B1). One
+   * earlier session of Pema's, ended at BNSW's sign-in timeout, with the two
+   * declarations she made in it — what BNSW keeps with each (§4.3).
+   */
+  counterpartyRegistrations: [
     {
-      /* Act 5, first run. Every check passes and the chain is whole. */
-      id: "dec-84120",
-      outcome: "PASS",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "g-pema",
-      declarationRef: "BNSW-DEC-2026-84120",
-      declarationHash: "sha256:1f6b90c4a7e2d3850b94cf17e6a02d5b83741ce90b2d6f45",
-      declaredValue: { amount: 420000, currency: "BTN" },
-      chain: [
-        { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "g-pema", label: "Authority to act for Pelden", kind: "capability", heldBy: "Pema Choden", status: "valid" },
-      ],
-      checks: [
-        { label: "Task in scope", detail: "Submit customs declarations is one of the granted tasks", outcome: "pass" },
-        { label: "Value within cap", detail: "Nu. 420,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
-        { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
-        { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
-        { label: "Authority chain intact", detail: "All four links live at the time of decision", outcome: "pass" },
-      ],
-      reasons: [],
-      decidedAt: day(-1),
-      signature: "z3Kf8Qa2NmVpT7wLxB4dRc9sYhE6uJn1PkG5tZoW",
-    },
-    {
-      /* The same capability, the same person, the same counterparty — and a
-         FAIL, because a link above it was withdrawn. This pair is the demo. */
-      id: "dec-84137",
-      outcome: "FAIL",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "g-pema",
-      declarationRef: "BNSW-DEC-2026-84137",
-      declarationHash: "sha256:8c04e71ab5d2f39607be4a1c8d5079f2361ba0e75c8d4f19",
-      declaredValue: { amount: 380000, currency: "BTN" },
-      chain: [
-        { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "g-pema", label: "Authority to act for Pelden", kind: "capability", heldBy: "Pema Choden", status: "revoked" },
-      ],
-      checks: [
-        { label: "Task in scope", detail: "Submit customs declarations is one of the granted tasks", outcome: "pass" },
-        { label: "Value within cap", detail: "Nu. 380,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
-        { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
-        { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
-        { label: "Authority chain intact", detail: "The authority was withdrawn on 9 Sep 2026", outcome: "fail" },
-      ],
-      reasons: [
-        "Pelden Trading Pvt. Ltd. has withdrawn this authority.",
-        "An authority cannot be relied on once the organisation that gave it has withdrawn it.",
-      ],
-      decidedAt: day(0),
-      signature: "z7Ln2Vx9BqTm4pKdW8sRc3aYhU5eJf1GoZ6tNwPi",
-    },
-    {
-      /* Fail closed, and say so. Seeded rather than only reachable through a
-         thrown error, because a state you cannot reach cannot be reviewed. */
-      id: "dec-unreachable",
-      outcome: "SERVICE_UNREACHABLE",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "g-pema",
-      declarationRef: "BNSW-DEC-2026-84141",
-      declarationHash: "sha256:5b93d0e6c1a47f28903e5bd7a4c61f80257ed3b9418c6a02",
-      declaredValue: { amount: 96000, currency: "BTN" },
-      chain: [],
-      checks: [],
-      reasons: [
-        "The Authority Verification API could not be reached, so nothing could be checked.",
-        "An unverifiable authority is treated as no authority.",
-      ],
-      decidedAt: day(0),
-      signature: "",
+      id: "reg-pelden-bnsw",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      holderDid: "did:key:z6MkhPq3vT8wYb2LcR5nJd9sXe4mKa7GuF1oZi6NyWrQ2tBc",
+      publishingDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      legalName: "Pelden Trading Pvt. Ltd.",
+      registrationNumber: "CRA-2019-04477",
+      tpn: "TPN-114-8830",
+      tpnRevocationId: "b81f04c2-6d3e-4a97-8e15-c2d07a9f3b64",
+      licences: [{ number: "BL-PLG-2025-00871", revocationId: "e4a92c17-0b5d-4f38-a6c1-9d27f30e85b2", credentialId: "hc-licence-plg" }],
+      registeredAt: day(-29),
+      requestId: null,
     },
   ],
+  authoritySessions: [
+    {
+      id: "as-pema-earlier",
+      counterpartyId: "org-bnsw",
+      signedInCid: "11512002960",
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      authorityName: "Pema Choden",
+      orgId: PELDEN,
+      registrationId: "reg-pelden-bnsw",
+      principalDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      relationId: "g-pema",
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 1000000,
+      perTransaction: true,
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      citizenRevocationId: "11512002-c17e-4a0d-9b52-115120029600",
+      validUntil: day(59),
+      endsAt: Date.parse(`${day(-2)}T11:30:00Z`),
+      checkedAt: Date.parse(`${day(-2)}T03:30:00Z`),
+      status: "ENDED",
+      endedAt: Date.parse(`${day(-2)}T11:30:00Z`),
+      endReason: "timeout",
+    },
+  ],
+  counterpartyDeclarations: [
+    {
+      id: "dcl-84120",
+      reference: "BNSW-DEC-2026-84120",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      sessionId: "as-pema-earlier",
+      kind: "submit",
+      amends: null,
+      amendedBy: null,
+      goods: "Steel roofing sheets, 12 pallets",
+      valueNu: 420000,
+      licenceNumber: "BL-PLG-2025-00871",
+      relationId: "g-pema",
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      at: day(-2),
+    },
+    {
+      id: "dcl-84137",
+      reference: "BNSW-DEC-2026-84137",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      sessionId: "as-pema-earlier",
+      kind: "submit",
+      amends: null,
+      amendedBy: null,
+      goods: "Cement, 40 tonnes",
+      valueNu: 380000,
+      licenceNumber: "BL-PLG-2025-00871",
+      relationId: "g-pema",
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      at: day(-2),
+    },
+  ],
+  bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
 
   auditEntries: [
     {
@@ -4348,7 +4489,10 @@ export function firstRunState(s: DemoState): DemoState {
     parkedOperations: [],
     authorityGrants: [],
     authorityDraft: null,
-    decisions: [],
+    counterpartyRegistrations: [],
+    authoritySessions: [],
+    counterpartyDeclarations: [],
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
     auditEntries: [
       {
         id: "au-onb-2",
@@ -4438,7 +4582,10 @@ export function dayZeroState(seed: DemoState): DemoState {
     parkedOperations: [],
     authorityGrants: [],
     authorityDraft: null,
-    decisions: [],
+    counterpartyRegistrations: [],
+    authoritySessions: [],
+    counterpartyDeclarations: [],
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
     auditEntries: [],
     appeals: [],
     signup: null,

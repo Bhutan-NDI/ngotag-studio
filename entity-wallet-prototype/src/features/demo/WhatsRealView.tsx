@@ -217,12 +217,47 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
           "The limit is always per declaration — the form offers nothing else, and every grant is written per transaction (pr-8 item 1). A link is \"used\" once the authority is accepted; opened again while an offer is out, it asks for identity again, then shows the same offer (pr-8 item 2). The duplicate warning also counts grants still waiting for approval or for the listing (pr-8, optional). SCR-AUT-01's heading is the specification's and is also Flow 3's page heading (align D1).",
         needs: "The specification to settle each.",
       },
+    ],
+  },
+  {
+    area: "Acting for a company at the Single Window",
+    icon: "shieldCheck",
+    rows: [
       {
-        /* The one row here about a counterparty rather than about NDI. */
-        shown: "The Bhutan National Single Window checking an authority",
+        shown: "The Bhutan National Single Window's website",
         reality:
-          "Flow 9's page, still ahead of its specification: it sends each declaration to the agent's wallet and to an NDI verification API, which EW-FLOW9-SD replaces. The Single Window is not live yet. It now reads Flow 8's grants, with no role chain and no grantor's relation in what it checks.",
-        needs: "Flow 9 itself (EW-FLOW9-SD), and BNSW's integration.",
+          "A dashed stand-in at /simulated/bnsw — the whole site inside one dashed frame, because SCR-AUT-07 is BNSW's screen, not NDI's. Signing in to it picks one of four invented citizens. Its records panel shows what BNSW's back end would keep; all of it is in your browser.",
+        needs: "BNSW building SCR-AUT-07, B0–B4, the authority session, the per-declaration check and the limit against EW-FLOW9-CIG (FLOW-AUT-02 P6).",
+      },
+      {
+        shown: "Pema sharing her citizen ID and her authority from her app",
+        reality:
+          "A dashed panel standing in for the app's own screen (SCR-AUT-08). Which authorities her app holds is read from the grants the story made. No proof request is sent, nothing is presented over DIDComm, and nothing is signed. \"A copied authority, signed with another key\" is how V2's failure is reached.",
+        needs: "client-service's proof request with two descriptors, and the app rendering a Capability credential and offering a choice between companies (§13 item 7).",
+      },
+      {
+        shown: "The checks at sign-in — NDI's V1–V6, then BNSW's B0–B4",
+        reality:
+          "lib/bnsw.ts reads the demo state in the order the solution design gives, stopping at the first failure. Nothing cryptographic happens: V1 and V6 always pass for a grant the story made. The result lists each check's outcome, which client-service doesn't forward yet — a failed check is still reported as validated today (R11).",
+        needs: "client-service forwarding the true outcome, V2–V6, the per-credential result fields and POST /status (FLOW-AUT-02 P3).",
+      },
+      {
+        shown: "A withdrawal reaching BNSW",
+        reality:
+          "Withdrawing, pausing and resuming are dashed steps standing in for catalogue flow 11, which has no specification. The status changes at once, and BNSW sees it on its next check — the next declaration. DA-CORE's target is within 60 seconds of the action; the prototype shows it as immediate.",
+        needs: "Flow 11, revocation for platform-issued credentials, and the 60-second propagation DA-CORE sets.",
+      },
+      {
+        shown: "Pelden registering with the Single Window",
+        reality:
+          "Flow 7's share from a website, with BNSW asking for the registration, the TPN and the business licence. The store writes BNSW's record when the share goes through, with Pelden's publishing DID when it is listed as able to give authority. The holder DID and revocation ids in it are strings made up from the credential ids.",
+        needs: "The registration result's holderPublishingDid (FLOW-AUT-02 P4), and revocation ids on MoICE's and DRC's credentials (P5).",
+      },
+      {
+        shown: "Choices the specification leaves open, made here",
+        reality:
+          "The TPN isn't looked up: B4, step 13 and §8.1 name the licence, the authority, the citizen ID and the listing, so a revoked TPN doesn't stop a declaration (pr-9 item 1). Where an authority names several registered licences, B4 checks each, the session opens if any is ACTIVE, and A2 offers only those (pr-9 item 2). BNSW's sign-in lasts eight hours (§13 item 8 is open). E12's reasons are the prototype's plain words (pr-9, optional), and so are \"You've stopped acting for <company>.\" and the label Amend. The publishing DID is carried when the company is listed — SD9 §7, not CIG §3's \"once it has given authority to anyone\". A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
+        needs: "The specification to settle each.",
       },
     ],
   },
@@ -520,7 +555,7 @@ export function WhatsRealView() {
             </h2>
             <p className="max-w-[64ch] text-[13.5px] leading-[1.65] text-body">
               There is no server, no database, no register integration, no
-              Authority Verification API and no wallet. There is no network layer at
+              verification service and no wallet. There is no network layer at
               all — the application makes no requests. Every organisation,
               person, credential, approval and decision you see lives in your
               browser&rsquo;s local storage and can be wiped with one button.

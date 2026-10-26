@@ -97,6 +97,14 @@ export interface GuideStep {
  * with *Share*, which the onboarding story never makes; it is a Walk a flow
  * entry from the story three months on, and the chapter's last step says so.
  *
+ * Pema then uses that authority at the Single Window (Flow 9), because
+ * authority nobody can use proves nothing. It follows Journey W first:
+ * Pelden has never registered with BNSW in this story, so her first try is
+ * refused (E8) and Dorji registers Pelden from BNSW's site — the same
+ * share-from-a-website flow as the bank's. Then she acts for Pelden, one
+ * declaration goes through, one is above her limit, and Pelden withdraws
+ * the authority before the next.
+ *
  * Member onboarding is here because the first day is now genuinely empty.
  * When it still listed the seed's colleagues, the room's first question on
  * seeing them was "how did these people get here?" — and the answer, an
@@ -116,6 +124,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "Pelden gets its TPN", shows: "Pelden asks the tax office, shares its registration, and accepts what comes back" },
   { title: "Pelden shares with its bank", shows: "From the bank's website and back, then a request in the wallet — the whole credential, said so" },
   { title: "Authority for the clearing agent", shows: "Dorji gives Pema authority to declare at the Single Window; she collects it with Bhutan NDI" },
+  { title: "Pema declares for Pelden", shows: "At the Single Window: one share from her app, then declarations checked each time — and refused, with why" },
   { title: "Where to go next", shows: "The other routes, and what's simulated" },
 ];
 
@@ -902,12 +911,106 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
 
-  /* ---- 13 · Where to go next ---- */
+  /* ---- 13 · Pema declares for Pelden (FLOW-AUT-02) ---- */
   {
     chapter: 13,
+    title: "The Single Window's own site",
+    happening:
+      "Bhutan National Single Window's website — dashed, because it's another organisation's system, not NDI's. Pema signs in to it as herself, with Bhutan NDI, as she does today. Nothing about any company yet.",
+    doThis: "Press **Sign in as Pema Choden** (dashed), then **Act for a company**.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 13,
+    title: "One share, both credentials",
+    happening:
+      "BNSW asks for two things in one request: her citizen ID and an authority. The dashed panel stands in for her Bhutan NDI app: who is asking, each authority she holds by company name, and that her citizen ID goes with it.",
+    doThis: "In the dashed app panel, press **Share**.",
+    say: "This is the only trip to the app. After this, each declaration is checked at BNSW without asking her phone again.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 13,
+    title: "Refused — Pelden isn't registered with BNSW",
+    happening:
+      "Every check NDI makes passed — the signatures, her key, Pelden on NDI's list, nothing withdrawn. BNSW's own first check failed: it has no registration from Pelden, so it can't recognise who gave the authority. The message says who can fix it, and how.",
+    doThis: "Read the message and the checks in BNSW's records, then press **Next** — the guide switches to Dorji.",
+    say: "BNSW fills in the company's name, TPN and licence from the company's own registration. So the company registers once, and nobody types those details again.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 13,
+    title: "Dorji registers Pelden",
+    happening:
+      "BNSW's registration page, the same shape as the bank's: a reference on the page and a button that leaves for the Entity Wallet. BNSW asks for the registration, the TPN and the business licence.",
+    doThis: "Press **Share from NDI Entity Wallet** (dashed).",
+    route: "/simulated/bnsw/register",
+    persona: "dorji",
+  },
+  {
+    chapter: 13,
+    title: "Who is asking",
+    happening: "The wallet's own address, the Single Window's name as NDI lists it, and BNSW's registration number to check against its page.",
+    doThis: "Press **Continue**, then **Sign in as Dorji Wangchuk** (dashed).",
+    match: "^/present$",
+  },
+  {
+    chapter: 13,
+    title: "Share with the Single Window",
+    happening:
+      "All three credentials, whole, under the sentence saying BNSW receives every detail. Pelden is already on NDI's list as able to give authority, so the platform also tells BNSW which identity Pelden gives authority from.",
+    doThis: "Press **Share with Bhutan National Single Window**.",
+    match: "^/wallet/sharing/pr-[^/]+$",
+  },
+  {
+    chapter: 13,
+    title: "Shared — back to BNSW",
+    happening: "The same five-second countdown back to the address BNSW registered.",
+    doThis: "Let the countdown run, or press **Go back to Bhutan National Single Window**.",
+    match: "^/wallet/sharing/pr-[^/]+/done$",
+  },
+  {
+    chapter: 13,
+    title: "Registered — and recognised",
+    happening:
+      "Back on BNSW's site, acting on what its own system fetched. Pelden is registered, and because it registered after it first gave authority, the authority it gives is recognised. A company that registered before would have to register again — that's what E8 said.",
+    doThis: "Press **Next** — the guide goes back to the declarations page.",
+    match: "^/simulated/bnsw/register/return$",
+  },
+  {
+    chapter: 13,
+    title: "Acting for Pelden",
+    happening:
+      "Pema is still signed in. This time every check passes and BNSW opens a session: the one sentence that must survive review — company, licence, limit, until when — and Pelden's TPN and registered name, shown, never typed.",
+    doThis:
+      "Press **Act for a company**, then **Share** (dashed). Read the sentence. Type goods and **420000** as the value, and press **Submit declaration**.",
+    say: "BNSW sees Pema's name and citizen ID number — it keeps them with every declaration. It never sees Pelden's credentials again, and Pelden isn't told each time.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 13,
+    title: "Above the limit",
+    happening:
+      "Each declaration is checked when it's submitted: the authority, her citizen ID, the licence and Pelden's listing, then the limit. Above Nu 1,000,000 it isn't submitted — the draft stays, and the session goes on.",
+    doThis: "Type **1200000** and press **Submit declaration**.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 13,
+    title: "Pelden withdraws it",
+    happening:
+      "Withdrawing is catalogue flow 11, not specified yet, so it's a dashed step. It reaches NDI at once — the target is within a minute — and BNSW finds out at the very next declaration: nothing submitted, the session ended, the draft kept.",
+    doThis: "Press **Pelden Trading withdraws the authority** (dashed). Change the value to **300000** and press **Submit declaration**.",
+    say: "Nobody had to tell BNSW. It checks every time, so a withdrawal works between one declaration and the next.",
+    route: "/simulated/bnsw",
+  },
+
+  /* ---- 14 · Where to go next ---- */
+  {
+    chapter: 14,
     title: "That's the story",
     happening:
-      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved; Pelden shared its registration with its bank — whole, and said so — from the bank's website and from its wallet; and Pelden gave its clearing agent authority to declare for it, which she collected in her own Bhutan NDI app without an account.",
+      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved; Pelden shared its registration with its bank — whole, and said so — from the bank's website and from its wallet; Pelden gave its clearing agent authority to declare for it, which she collected in her own Bhutan NDI app without an account; and she used it at the Single Window, where every declaration was checked against it — until Pelden withdrew it.",
     doThis:
       "To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },
