@@ -127,7 +127,7 @@ export function OrganisationView() {
                 {org?.kind === "sole_proprietorship" ? null : (
                 <div className="mt-2 flex flex-wrap items-center gap-2.5">
                   <Link href="/people-who-can-act/give">
-                    <HairlineButton>Give someone authority to act</HairlineButton>
+                    <HairlineButton>Appoint someone</HairlineButton>
                   </Link>
                   <Link href="/people-who-can-act" className="ndi-plainlink text-[12.5px] font-medium text-muted">
                     See who can act

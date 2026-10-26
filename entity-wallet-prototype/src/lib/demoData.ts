@@ -151,6 +151,21 @@ export interface Organization {
   agentReady?: boolean;
   /** Marketplace entitlements, read directly — never inferred (P5). */
   entitlements?: string[];
+  /**
+   * Flow 8 — its listing on NDI's list of trusted organisations as an issuer
+   * of authority, written when it makes its first grant (EW-FLOW8-SD D5,
+   * §7.1). `did` is the publishing did:ethr made in the grantor's session;
+   * it becomes the primary DID once listed, which the prototype records
+   * here rather than on `publicDid`, so Flow 4's accreditation screens don't
+   * read it as an approval to verify. `firstNotice` is SCR-AUT-01's
+   * first-grant notice, naming the counterparty, until dismissed.
+   */
+  authorityListing?: {
+    status: "PENDING" | "CURRENT" | "TERMINATED";
+    did: string;
+    listedAt: string | null;
+    firstNotice?: string | null;
+  };
 }
 
 /** An invitation to join an ecosystem, as opposed to an organization. */
@@ -829,35 +844,157 @@ export interface ParkedOperation {
   invalidatedReason?: string | null;
 }
 
-export type AuthorityKind = "role" | "capability";
-
 /**
- * A Role or Capability credential the entity issued into a person's own
- * wallet. The constraints are public: any verifier can read them, which is
- * the whole point of Pattern B.
+ * Flow 8 — an authority grant (EW-FLOW8-SD §4.1), the record behind one
+ * person's authority to act for an organisation from their own Bhutan NDI
+ * app.
+ *
+ * WHAT CHANGED FROM THE PRE-SPEC "DELEGATED AUTHORITY"
+ *
+ * The prototype used to hold Role and Capability credentials hanging off
+ * each other, issued to a member of the organisation, traced to the
+ * relation of whoever issued them. The specification settles all three the
+ * other way: Capability only, no chain (D1, D3); the delegate needs no
+ * account and may be outside the organisation (D10), identified when they
+ * collect it by the citizen ID number the grantor entered (D11); and the
+ * authority is the organisation's, not the grantor's — it survives them
+ * leaving (D15). So the record names the organisation and its decision,
+ * and who granted and approved it are attribution, not a link anything
+ * depends on.
+ *
+ * THE ID NUMBER IS NEVER KEPT
+ *
+ * Only `delegateIdKeyed` — what `keyedIdHash` makes of it — and that is
+ * cleared when the grant ends (§4.1, S4). Nothing on any screen can show
+ * the number again once it is submitted.
  */
-export interface DelegatedAuthority {
+export type GrantStatus =
+  | "AWAITING_APPROVAL"
+  | "AWAITING_LISTING"
+  | "CLAIMABLE"
+  | "ISSUING"
+  | "ACTIVE"
+  | "EXPIRED"
+  | "SUSPENDED"
+  | "REVOKED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "DECLINED"
+  | "LAPSED"
+  | "FAILED";
+
+export interface AuthorityGrant {
+  /** `grantId` — carried in the credential as `relationId`. */
   id: string;
-  kind: AuthorityKind;
-  title: string;
-  recipientId: PersonId;
-  /** The Role this Capability hangs off, if any. Act 5 revokes the parent. */
-  parentId: string | null;
-  /** Every Pattern B credential traces back to a controllership relation. */
-  relationId: string;
-  taskScopes: string[];
-  valueCap: { amount: number; currency: "BTN"; perTransaction: boolean } | null;
-  counterparties: ScopeFilter;
+  orgId: string;
+  /** `CAPABILITY` at first release (D1). `ROLE` is reserved. */
+  kind: "CAPABILITY";
+  /** The name the grantor typed. Shown until the delegate collects it. */
+  name: string;
+  /** The name the delegate's citizen credential states — written at claim (G8). */
+  delegateName: string | null;
+  /** The keyed hash of the ID number. Cleared when the grant ends (S4). */
+  delegateIdKeyed: string | null;
+  /** The did:key that signed the claim presentation (G8). */
+  delegateDid: string | null;
+  /**
+   * Prototype only: the story's record of whoever collected it, when they
+   * are one of its characters, so Flow 9's stand-in page can say who is
+   * signed in. Not part of the grant record — the platform keeps no
+   * account for a delegate (D10).
+   */
+  delegatePersonId: PersonId | null;
+  /** Task scopes from the published vocabulary (§5.2) — never shown as strings. */
+  tasks: string[];
+  /** Counterparty organisations, each CURRENT as a verifier (D19). */
+  counterparties: string[];
+  licenceNumbers: string[];
+  valueCapNu: number;
+  /** Always true at first release — the form offers only "per declaration" (pr-8 item 1). */
+  perTransaction: true;
   validFrom: string;
   validUntil: string;
-  status: "ACTIVE" | "SUSPENDED" | "REVOKED" | "EXPIRED";
-  acceptance: "sent" | "accepted" | "rejected" | "expired";
-  issuedAt: string;
-  acceptedAt: string | null;
-  endedAt?: string | null;
-  endedReason?: string | null;
-  appealReference?: string | null;
+  /** The publishing DID it is issued from, once the organisation is listed (§7.1). */
+  issuerDid: string | null;
+  /** Generated when the identity matches; discarded if the offer isn't accepted (D23). */
+  revocationId: string | null;
+  grantedBy: PersonId;
+  grantedRelationId: string;
+  approvedBy: PersonId | null;
+  approvedRelationId: string | null;
+  /** The parked approval, under SINGLE_APPROVER (§8.2). */
+  approvalId: string | null;
+  credentialRef: string | null;
+  /** The bearer reference in the claim link's path (FLOW-AUT-01 §7.2). */
+  claimRef: string | null;
+  claimExpiresAt: string | null;
+  /** SHA-256 of the grant as submitted — an approval is bound to it (D20). */
+  approvalHash: string;
+  status: GrantStatus;
+  submittedAt: string;
+  /** When it reached the state it is in. */
+  statusAt: string;
+  /** For an ended grant, the reason in words — SCR-AUT-01's Ended tab. */
+  endReason: string | null;
+  cancelledBy?: PersonId | null;
+  rejection?: { by: PersonId; note: string; at: string } | null;
+  /** Identity mismatches at claim; the third ends the grant (E9). */
+  mismatches: number;
+  /** ISSUING: when the offer is withdrawn (E13), as epoch ms. */
+  offerExpiresAt: number | null;
+  /** ISSUING: the delegate accepted, and the revocation id isn't registered yet (E17). */
+  accepted: boolean;
 }
+
+/**
+ * What SCR-AUT-02 holds between the form and SCR-AUT-03. In the store so
+ * the two screens can have their own addresses — *Change* goes back to a
+ * form still filled in. The ID number lives here only until *Give
+ * authority*, which keeps nothing but its keyed hash.
+ */
+export interface AuthorityDraft {
+  orgId: string;
+  name: string;
+  cid: string;
+  counterparty: string;
+  tasks: string[];
+  licences: string[];
+  limit: string;
+  until: string;
+  /** A3 answered "give another anyway". */
+  duplicateOk: boolean;
+}
+
+/**
+ * A stand-in for the HMAC FLOW-AUT-01 S4 asks for — a per-organisation key
+ * in the key management service over the citizen ID number. This is a
+ * string hash with the organisation's id mixed in: enough for the match
+ * and the duplicate warning to behave as the real one does, and nothing
+ * like enough to protect a real number (the what's-real page says so).
+ */
+export function keyedIdHash(orgId: string, cid: string): string {
+  const input = `${orgId}|${cid.replace(/\D/g, "")}`;
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < input.length; i += 1) {
+    a = Math.imul(a ^ input.charCodeAt(i), 0x01000193) >>> 0;
+    b = Math.imul(b ^ input.charCodeAt(input.length - 1 - i), 0x811c9dc5) >>> 0;
+  }
+  return `hmac:${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
+}
+
+/**
+ * The citizens the simulated Bhutan NDI app can share as, at a claim link.
+ * The first is the clearing agent the guided demo gives authority to; the
+ * others are who a forwarded link might reach (Journey U). Their numbers
+ * are invented, and are the only ID numbers anywhere in the prototype.
+ */
+export const SIM_CITIZENS: { cid: string; name: string; personId: PersonId | null }[] = [
+  { cid: "11512002960", name: "Pema Choden", personId: "pema" },
+  { cid: "10811004417", name: "Kinley Wangdi", personId: null },
+  { cid: "11206003325", name: "Sangay Wangmo", personId: null },
+  { cid: "10305007781", name: "Tashi Dorji", personId: null },
+];
 
 /** One link in the chain a verification walks. */
 export interface AuthorityChainLink {
@@ -2033,7 +2170,10 @@ export interface DemoState {
   /** Flow 7 — where NDI may send people back to, per verifier (SCR-PRS-06). */
   returnAddresses: ReturnAddress[];
   parkedOperations: ParkedOperation[];
-  delegatedAuthorities: DelegatedAuthority[];
+  /** Flow 8 — every grant of authority to act, in every state (SCR-AUT-01). */
+  authorityGrants: AuthorityGrant[];
+  /** Flow 8 — SCR-AUT-02's form, read by SCR-AUT-03. */
+  authorityDraft: AuthorityDraft | null;
   /** Act 5 keeps both decisions so PASS and FAIL can sit side by side. */
   decisions: VerificationDecision[];
   auditEntries: AuditEntry[];
@@ -2379,7 +2519,16 @@ export const SEED: DemoState = {
       /* Holder only: it signed up for itself, so it has an Entity Wallet and
          no issuing or verifying on the network. */
       capabilities: ["holder"],
-      memberIds: ["dorji", "rinzin", "ugyen", "pema", "invitee", "sonam", "karma", "tenzin"],
+      /* Not Pema: a clearing agent acts for Pelden from her own Bhutan NDI
+         app and needs no account here (EW-FLOW8-SD D10). */
+      memberIds: ["dorji", "rinzin", "ugyen", "invitee", "sonam", "karma", "tenzin"],
+      /* Listed as an issuer of authority since its first grant (Flow 8, D5). */
+      authorityListing: {
+        status: "CURRENT",
+        did: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+        listedAt: "2026-07-14",
+        firstNotice: null,
+      },
     },
     {
       /* Already on NDI as an issuer and verifier long before the Entity
@@ -2486,6 +2635,25 @@ export const SEED: DemoState = {
       memberIds: ["deki"],
       roles: { deki: "Owner" },
       publicDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+    },
+    {
+      /* Flow 8's counterparty. The Bhutan National Single Window is where a
+         clearing agent declares for a company (EW-FLOW8-SD §9), and the one
+         organisation the task vocabulary names (§5.2). It verifies on the
+         platform, which is what makes it CURRENT as a verifier (G5). Nobody
+         in the story works there: its own page is Flow 9's stand-in. */
+      id: "org-bnsw",
+      name: "Bhutan National Single Window",
+      legalName: "Bhutan National Single Window, Department of Revenue & Customs",
+      description: "The single window for customs declarations. Verifies authority to act on NDI.",
+      role: "Owner",
+      members: 0,
+      createdAt: "2026-04-14",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["verifier"],
+      memberIds: [],
+      publicDid: "did:ethr:bt:0x6e1d47a0c9b38f25d7e40a1c6b93f08e2d57a4c1",
     },
   ],
   /* The original Studio's staff list — four NDI people the story never
@@ -2864,6 +3032,10 @@ export const SEED: DemoState = {
             approval: "SINGLE_APPROVER",
           },
           { operation: "connection:create", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
+          /* *Give authority to act*, at its default: each grant needs one
+             other person to approve it (EW-FLOW3-SD §4.2, EW-FLOW8-SD D2).
+             Rinzin looks after the clearing agents — Journey T. */
+          { operation: "authority:issue", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "SINGLE_APPROVER" },
         ],
       },
       state: "ACTIVE",
@@ -3025,6 +3197,46 @@ export const SEED: DemoState = {
       receivedAt: day(-210),
       expiresAt: day(154),
       status: "revoked",
+    },
+    {
+      /* Flow 8 — the business licence Pelden's clearing agents act under.
+         The Phuentsholing branch's, because that is where its imports cross.
+         MoICE marks its business licence as one someone acting for the
+         holder may use (EW-FLOW8-SD D9), so it can be named in a grant (G4). */
+      id: "hc-licence-plg",
+      type: "Business Licence",
+      issuer: "Ministry of Industry, Commerce & Employment",
+      issuerDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "licence_number", value: "BL-PLG-2025-00871" },
+        { name: "licensed_activity", value: "General trading — import and wholesale" },
+        { name: "branch", value: "Phuentsholing" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-150),
+      expiresAt: day(215),
+      status: "active",
+    },
+    {
+      /* An earlier licence, now expired — SCR-AUT-02 shows it unavailable,
+         with the reason, rather than hiding it (E4, UXD-47). */
+      id: "hc-licence-thi-old",
+      type: "Business Licence",
+      issuer: "Ministry of Industry, Commerce & Employment",
+      issuerDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "licence_number", value: "BL-THI-2022-04410" },
+        { name: "licensed_activity", value: "General trading — retail" },
+        { name: "branch", value: "Thimphu" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-1100),
+      expiresAt: day(-30),
+      status: "expired",
     },
   ],
 
@@ -3309,24 +3521,27 @@ export const SEED: DemoState = {
       expiresAt: day(4),
     },
     {
-      /* Dual control, half collected. The plan folds multi-sig into B7 as a
-         variant rather than building D3, and this is that variant. */
-      id: "park-issue-highvalue",
+      /* Flow 8, Journey T: Rinzin gave an employee authority to act, and
+         her *Give authority to act* is SINGLE_APPROVER, so it waits for one
+         other person (EW-FLOW8-SD §8.2). One approver, never Rinzin — the
+         value threshold and two-signature control this used to show are
+         catalogue flow 10, out of scope (§1.2). */
+      id: "park-grant-sangay",
       operation: "authority:issue",
-      summary: "Issue Declaration authority to Pema Choden — cap Nu. 1,200,000",
-      requestedBy: "dorji",
-      relationId: "rel-root",
-      scopeVersion: 1,
-      targetId: null,
+      summary: "Give Sangay Wangmo authority to submit customs declarations at Bhutan National Single Window",
+      requestedBy: "rinzin",
+      relationId: "rel-rinzin",
+      scopeVersion: 3,
+      targetId: "g-sangay",
       targetRelyingParty: "Bhutan National Single Window",
-      payloadHash: "sha256:7d19a4fe0c38b5217e9c460da3f8b12a4e07c1685bd93fa2",
-      policy: "DUAL_CONTROL",
-      requiredSignatures: 2,
-      signatures: [{ personId: "dorji", at: day(-1), method: "wallet" }],
+      payloadHash: "sha256:9c03e7b15fa2d4806e1b3c97a54d0f82e6b19a7c3d05f418",
+      policy: "SINGLE_APPROVER",
+      requiredSignatures: 1,
+      signatures: [],
       state: "parked",
       decisionReason: null,
       createdAt: day(-1),
-      expiresAt: day(3),
+      expiresAt: day(6),
     },
     {
       /* Approved, then invalidated before it ran. The edge the brief calls
@@ -3390,101 +3605,200 @@ export const SEED: DemoState = {
     },
   ],
 
-  delegatedAuthorities: [
+  /*
+   * Flow 8 — Pelden's grants of authority to act, three months in. Each is
+   * here for a case SCR-AUT-01 must show before anyone has walked anything:
+   *
+   * - g-pema: Pema Choden, Druk Sharpa Freight's clearing agent, collected
+   *   her authority a month ago — Journey S's end, ACTIVE.
+   * - g-sangay: Rinzin, appointed with *Give authority to act*, gave an
+   *   employee authority to submit declarations, and Dorji hasn't approved
+   *   it yet — Journey T's middle, AWAITING_APPROVAL.
+   * - g-kinley: claimable — a link out, not yet collected.
+   * - g-tashi: a link nobody collected in seven days (E15, LAPSED).
+   * - g-pema-q2: Pema's earlier authority, which reached its end date.
+   *
+   * Their ID-number hashes are made the way the store makes them, from the
+   * simulated citizens' numbers, so a claim against g-kinley matches.
+   */
+  authorityGrants: [
     {
-      /* The Role Act 5 revokes. Everything below it fails when it goes. */
-      id: "da-role-broker",
-      kind: "role",
-      title: "Customs broker",
-      recipientId: "pema",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration", "customs:amendment"],
-      valueCap: null,
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
-      validFrom: day(-86),
-      validUntil: day(278),
+      id: "g-pema",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Pema Choden",
+      delegateName: "Pema Choden",
+      delegateIdKeyed: keyedIdHash(PELDEN, "11512002960"),
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegatePersonId: "pema",
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 1000000,
+      perTransaction: true,
+      validFrom: day(-31),
+      validUntil: day(59),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: "urn:uuid:4c1e8a72-9d03-4b6f-a5e2-81f7c03d9b46",
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:2a9f41c7e0b3d85640c1f7ae92b4d03e65a817cf0d24b9e3",
       status: "ACTIVE",
-      acceptance: "accepted",
-      issuedAt: day(-86),
-      acceptedAt: day(-86),
+      submittedAt: day(-31),
+      statusAt: day(-30),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: true,
     },
     {
-      /* Act 4's capability. Short-lived by design — expiry is the first line
-         of defence, so 90 days, not a year. */
-      id: "da-cap-declaration",
-      kind: "capability",
-      title: "Declaration authority",
-      recipientId: "pema",
-      parentId: "da-role-broker",
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration"],
-      valueCap: { amount: 500000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
+      id: "g-sangay",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Sangay Wangmo",
+      delegateName: null,
+      delegateIdKeyed: keyedIdHash(PELDEN, "11206003325"),
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 300000,
+      perTransaction: true,
+      validFrom: day(-1),
+      validUntil: day(89),
+      issuerDid: null,
+      revocationId: null,
+      grantedBy: "rinzin",
+      grantedRelationId: "rel-rinzin",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: "park-grant-sangay",
+      credentialRef: null,
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:9c03e7b15fa2d4806e1b3c97a54d0f82e6b19a7c3d05f418",
+      status: "AWAITING_APPROVAL",
+      submittedAt: day(-1),
+      statusAt: day(-1),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
+    },
+    {
+      id: "g-kinley",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Kinley Wangdi",
+      delegateName: null,
+      delegateIdKeyed: keyedIdHash(PELDEN, "10811004417"),
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 500000,
+      perTransaction: true,
       validFrom: day(-2),
       validUntil: day(88),
-      status: "ACTIVE",
-      acceptance: "accepted",
-      issuedAt: day(-2),
-      acceptedAt: day(-1),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: null,
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: null,
+      claimRef: "c7Qm2xVb9TkPa4Lw",
+      claimExpiresAt: day(5),
+      approvalHash: "sha256:51d8e0a3c7f294b6e1a05d38c9f27b4e0a6d13f58c2b97e4",
+      status: "CLAIMABLE",
+      submittedAt: day(-2),
+      statusAt: day(-2),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
     },
     {
-      /* The console's "sent, awaiting acceptance" state — acceptance is the
-         holder's consent and cannot be assumed. */
-      id: "da-cap-payments",
-      kind: "capability",
-      title: "Payment release authority",
-      recipientId: "sonam",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["payments:release"],
-      valueCap: { amount: 250000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bank of Bhutan"] },
-      validFrom: day(-1),
-      validUntil: day(59),
-      status: "ACTIVE",
-      acceptance: "sent",
-      issuedAt: day(-1),
-      acceptedAt: null,
+      id: "g-tashi",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Tashi Dorji",
+      delegateName: null,
+      delegateIdKeyed: null,
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 250000,
+      perTransaction: true,
+      validFrom: day(-20),
+      validUntil: day(70),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: null,
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: null,
+      claimRef: "t3Wd8nKq5RzHe1Yc",
+      claimExpiresAt: day(-13),
+      approvalHash: "sha256:e74a0c19b5d23f86a0c7e41b9d53f2a86c0e17b4d95a3f20",
+      status: "LAPSED",
+      submittedAt: day(-20),
+      statusAt: day(-13),
+      endReason: "Tashi Dorji didn't collect their authority by the date the link expired. Nothing was given.",
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
     },
     {
-      id: "da-cap-lapsed",
-      kind: "capability",
-      title: "Declaration authority (Q2)",
-      recipientId: "pema",
-      parentId: "da-role-broker",
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration"],
-      valueCap: { amount: 500000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
-      validFrom: day(-161),
-      validUntil: day(-71),
+      id: "g-pema-q2",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Pema Choden",
+      delegateName: "Pema Choden",
+      delegateIdKeyed: null,
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegatePersonId: "pema",
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 500000,
+      perTransaction: true,
+      validFrom: day(-122),
+      validUntil: day(-32),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: "0d6b3f28-c1e4-47a9-8b25-e93f0a7c164d",
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: "urn:uuid:a93d17e0-5b2c-48f6-9e41-c08b7f2d65a3",
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:0f6c2e91a7d438b5c1e09f4a72d3b86e5c10a9f7e2d4b631",
       status: "EXPIRED",
-      acceptance: "accepted",
-      issuedAt: day(-161),
-      acceptedAt: day(-161),
-    },
-    {
-      id: "da-role-warehouse",
-      kind: "role",
-      title: "Warehouse supervisor",
-      recipientId: "karma",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["warehouse:receipt"],
-      valueCap: null,
-      counterparties: { mode: "any" },
-      validFrom: day(-187),
-      validUntil: day(113),
-      status: "REVOKED",
-      acceptance: "accepted",
-      issuedAt: day(-187),
-      acceptedAt: day(-186),
-      endedAt: day(-40),
-      endedReason: "Left the company.",
-      appealReference: "AP-2026-0288",
+      submittedAt: day(-122),
+      statusAt: day(-32),
+      endReason: "Reached its end date.",
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: true,
     },
   ],
+  authorityDraft: null,
 
   decisions: [
     {
@@ -3494,18 +3808,16 @@ export const SEED: DemoState = {
       verifier: "Bhutan National Single Window",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "pema",
-      authorityId: "da-cap-declaration",
+      authorityId: "g-pema",
       declarationRef: "BNSW-DEC-2026-84120",
       declarationHash: "sha256:1f6b90c4a7e2d3850b94cf17e6a02d5b83741ce90b2d6f45",
       declaredValue: { amount: 420000, currency: "BTN" },
       chain: [
         { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "rel-root", label: "Root authority", kind: "relation", heldBy: "Dorji Wangchuk", status: "valid" },
-        { id: "da-role-broker", label: "Customs broker", kind: "role", heldBy: "Pema Choden", status: "valid" },
-        { id: "da-cap-declaration", label: "Declaration authority", kind: "capability", heldBy: "Pema Choden", status: "valid" },
+        { id: "g-pema", label: "Authority to act for Pelden", kind: "capability", heldBy: "Pema Choden", status: "valid" },
       ],
       checks: [
-        { label: "Task in scope", detail: "customs:declaration is one of the granted tasks", outcome: "pass" },
+        { label: "Task in scope", detail: "Submit customs declarations is one of the granted tasks", outcome: "pass" },
         { label: "Value within cap", detail: "Nu. 420,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
         { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
         { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
@@ -3523,26 +3835,24 @@ export const SEED: DemoState = {
       verifier: "Bhutan National Single Window",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "pema",
-      authorityId: "da-cap-declaration",
+      authorityId: "g-pema",
       declarationRef: "BNSW-DEC-2026-84137",
       declarationHash: "sha256:8c04e71ab5d2f39607be4a1c8d5079f2361ba0e75c8d4f19",
       declaredValue: { amount: 380000, currency: "BTN" },
       chain: [
         { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "rel-root", label: "Root authority", kind: "relation", heldBy: "Dorji Wangchuk", status: "valid" },
-        { id: "da-role-broker", label: "Customs broker", kind: "role", heldBy: "Pema Choden", status: "revoked" },
-        { id: "da-cap-declaration", label: "Declaration authority", kind: "capability", heldBy: "Pema Choden", status: "valid" },
+        { id: "g-pema", label: "Authority to act for Pelden", kind: "capability", heldBy: "Pema Choden", status: "revoked" },
       ],
       checks: [
-        { label: "Task in scope", detail: "customs:declaration is one of the granted tasks", outcome: "pass" },
+        { label: "Task in scope", detail: "Submit customs declarations is one of the granted tasks", outcome: "pass" },
         { label: "Value within cap", detail: "Nu. 380,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
         { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
         { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
-        { label: "Authority chain intact", detail: "Customs broker was revoked on 9 Sep 2026", outcome: "fail" },
+        { label: "Authority chain intact", detail: "The authority was withdrawn on 9 Sep 2026", outcome: "fail" },
       ],
       reasons: [
-        "The Customs broker role this authority depends on was withdrawn on 9 September 2026.",
-        "An authority cannot be relied on while any authority above it has been withdrawn.",
+        "Pelden Trading Pvt. Ltd. has withdrawn this authority.",
+        "An authority cannot be relied on once the organisation that gave it has withdrawn it.",
       ],
       decidedAt: day(0),
       signature: "z7Ln2Vx9BqTm4pKdW8sRc3aYhU5eJf1GoZ6tNwPi",
@@ -3555,7 +3865,7 @@ export const SEED: DemoState = {
       verifier: "Bhutan National Single Window",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "pema",
-      authorityId: "da-cap-declaration",
+      authorityId: "g-pema",
       declarationRef: "BNSW-DEC-2026-84141",
       declarationHash: "sha256:5b93d0e6c1a47f28903e5bd7a4c61f80257ed3b9418c6a02",
       declaredValue: { amount: 96000, currency: "BTN" },
@@ -3607,7 +3917,7 @@ export const SEED: DemoState = {
       id: "au-6",
       seq: 6,
       operation: "authority:issue",
-      summary: "Issued Declaration authority to Pema Choden — cap Nu. 500,000 per declaration",
+      summary: "Gave Pema Choden authority to submit and amend customs declarations at Bhutan National Single Window — up to Nu 1,000,000 per declaration",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "dorji",
       relationId: "rel-root",
@@ -3712,8 +4022,8 @@ export const SEED: DemoState = {
       reference: "AP-2026-0417",
       subjectId: "pema",
       againstKind: "authority",
-      againstId: "da-role-broker",
-      againstTitle: "Customs broker",
+      againstId: "g-pema-q2",
+      againstTitle: "Authority to submit customs declarations at Bhutan National Single Window",
       noticeReason:
         "Withdrawn pending an internal review of declaration values submitted in August.",
       noticeIssuedAt: day(0),
@@ -3729,14 +4039,14 @@ export const SEED: DemoState = {
       id: "ap-karma",
       reference: "AP-2026-0288",
       subjectId: "karma",
-      againstKind: "authority",
-      againstId: "da-role-warehouse",
-      againstTitle: "Warehouse supervisor",
+      againstKind: "relation",
+      againstId: "rel-karma",
+      againstTitle: "Karma Wangmo's appointment",
       noticeReason: "Withdrawn on departure from the company.",
       noticeIssuedAt: day(-40),
       submittedAt: day(-36),
       submission:
-        "My last working day was 8 August, not 31 July. I had four warehouse receipts outstanding on the date the role was withdrawn.",
+        "My last working day was 8 August, not 31 July. I had four declarations outstanding on the date my appointment was ended.",
       state: "rejected",
       windowWorkingDays: 10,
       decisionWorkingDays: 5,
@@ -3984,7 +4294,9 @@ export function firstRunState(s: DemoState): DemoState {
        credentials issued…) stay for the same reason: they are the issuers',
        and Pelden, a holder only, never sees them. */
     organizations: [
-      { ...entity, memberIds: ["dorji"], members: 1, createdAt: today },
+      /* No listing as an issuer of authority: that comes with its first
+         grant (Flow 8, D5), which the first day hasn't made. */
+      { ...entity, memberIds: ["dorji"], members: 1, createdAt: today, authorityListing: undefined },
       ...s.organizations.filter((o) => o.id !== PELDEN),
     ],
     activity: [],
@@ -4034,7 +4346,8 @@ export function firstRunState(s: DemoState): DemoState {
     presentationRequests: s.presentationRequests.filter((v) => !inOrg(PELDEN)(v)),
     presentationSessions: [],
     parkedOperations: [],
-    delegatedAuthorities: [],
+    authorityGrants: [],
+    authorityDraft: null,
     decisions: [],
     auditEntries: [
       {
@@ -4123,7 +4436,8 @@ export function dayZeroState(seed: DemoState): DemoState {
     presentationRequests: [],
     presentationSessions: [],
     parkedOperations: [],
-    delegatedAuthorities: [],
+    authorityGrants: [],
+    authorityDraft: null,
     decisions: [],
     auditEntries: [],
     appeals: [],

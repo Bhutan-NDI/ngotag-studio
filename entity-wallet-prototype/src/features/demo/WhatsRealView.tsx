@@ -167,39 +167,62 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
-    area: "Delegated authority",
+    area: "Giving authority to act",
     icon: "send",
     rows: [
       {
-        shown: "A credential arriving in someone's personal wallet",
+        shown: "A clearing agent collecting authority from a link, proving who she is with Bhutan NDI",
         reality:
-          "A row in browser storage, and a button labelled “simulate accepting”. Nobody's phone receives anything.",
-        needs: "Role and Capability issuance carrying the public constraint schema.",
-      },
-      {
-        shown: "A signed PASS / FAIL decision at a counterparty",
-        reality:
-          "Derived live, in the browser, by a stand-in that walks the real chain and fails closed. The logic is genuine; the service is not, and the signature is a random string of the right shape.",
+          "The claim page is real in its rules — nothing is shown before the identity matches, a dead link names nobody, three mismatches end it — but the Bhutan NDI app is a dashed panel: \"Share <name>'s ID\" picks one of four invented citizens, and \"Accept in the app\" stands in for the app's offer screen. No identity request is sent, no presentation verified, no credential offered or signed.",
         needs:
-          "The Authority Verification API itself, independently scaled, plus a live status query on the revocation agent.",
+          "The claim page outside Studio sign-in, the identity request through NDI's verification organisation with the grant's challenge, the G8 match, and an authority-only issuance route that the capability gate admits for one grant in ISSUING (EW-FLOW8-SD §7.1, §11.2).",
       },
       {
-        /* The one row here about a counterparty rather than about NDI. It is
-           needed because the verifier page is drawn as the Single Window
-           convincingly enough — its own chrome, "not part of NDI Studio" — that
-           the natural conclusion is that BNSW exists and is ready to integrate.
-           It is neither yet, and delegation is fast-follow scope precisely
-           because it waits on a counterparty like this one. */
+        shown: "The ID number matched without being kept",
+        reality:
+          "The number becomes a string hash mixed with the organisation's id the moment Give authority is pressed, and that is all that is stored — and it is cleared when the grant ends. The hash is not a keyed HMAC and would not protect a real 11-digit number; until then the number sits in the form's draft in your browser.",
+        needs: "An HMAC with a per-organisation key in the key management service, never logged (FLOW-AUT-01 S4).",
+      },
+      {
+        shown: "Pelden being added to NDI's list of trusted organisations on its first grant",
+        reality:
+          "A dashed step — \"NDI's list confirms\" or \"can't be confirmed for 24 hours\" — and a field on the organisation. No did:ethr is created, nothing is written to the Trust Registry, and no primary DID is switched.",
+        needs: "Authenticated Trust Registry writes, the Capability-type listing and the primary-DID switch after listing (FLOW-AUT-01 P5, P8; §7.1).",
+      },
+      {
+        shown: "The business licence the agent acts under, and whether it can be named",
+        reality:
+          "Pelden's licence comes from a dashed step, because the ministry doesn't offer one on request in the prototype. Whether a licence may be relied on by someone acting for the holder is a constant in lib/authority.ts standing in for the Trust Registry's delegable flag, which doesn't exist yet. Revoking it is a dashed step on the waiting authority.",
+        needs: "MoICE issuing revocable business licences marked delegable (FLOW-AUT-01 P7), the delegable flag (D9), and the held-credential index carrying licence numbers (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "Revocation ids, registered when the agent accepts",
+        reality: "A generated id on the grant, discarded if the offer isn't accepted. \"Accept — the registration is slow\" shows E17. Nothing is registered anywhere.",
+        needs: "Revocation for platform-issued credentials (FLOW-AUT-01 P6, D23).",
+      },
+      {
+        shown: "Seven days passing, thirty minutes passing",
+        reality: "Dashed buttons that move the date back. Real dates are also read: a link or approval left seven days lapses on load.",
+        needs: "The service's own timers.",
+      },
+      {
+        shown: "Who is told — approvers asked, the link ready, the Root told a link is out and how it ended",
+        reality:
+          "Where UX-EW-05 §3.5 gives the words they are used verbatim; the approvers' notice, \"the link is ready\" and the Root's notices are the prototype's. Each is a line in the organisation's activity feed naming who it goes to. The Root is also told when someone else cancels a grant, which D18 doesn't list (pr-8, optional).",
+        needs: "In-app and email delivery, and those lines in UX-EW-05 §3.5.",
+      },
+      {
+        shown: "Choices the specification leaves open, made here",
+        reality:
+          "The limit is always per declaration — the form offers nothing else, and every grant is written per transaction (pr-8 item 1). A link is \"used\" once the authority is accepted; opened again while an offer is out, it asks for identity again, then shows the same offer (pr-8 item 2). The duplicate warning also counts grants still waiting for approval or for the listing (pr-8, optional). SCR-AUT-01's heading is the specification's and is also Flow 3's page heading (align D1).",
+        needs: "The specification to settle each.",
+      },
+      {
+        /* The one row here about a counterparty rather than about NDI. */
         shown: "The Bhutan National Single Window checking an authority",
         reality:
-          "The Single Window is not live yet — its main system was still being procured when this was built (August 2026). The page is a stand-in drawn as BNSW because that is the eventual counterparty. Customs today runs on the Department of Revenue & Customs' eCMS, which licenses clearing agents and is the likely interim integration.",
-        needs:
-          "BNSW itself, or an eCMS integration in the meantime — and an agreed service level with whichever it is for the Authority Verification API.",
-      },
-      {
-        shown: "Revocation reaching a verifier within a minute",
-        reality: "Instant, because both sides are the same browser tab. Nothing propagates anywhere.",
-        needs: "Status lists, and cache invalidation on the revocation agent.",
+          "Flow 9's page, still ahead of its specification: it sends each declaration to the agent's wallet and to an NDI verification API, which EW-FLOW9-SD replaces. The Single Window is not live yet. It now reads Flow 8's grants, with no role chain and no grantor's relation in what it checks.",
+        needs: "Flow 9 itself (EW-FLOW9-SD), and BNSW's integration.",
       },
     ],
   },
@@ -388,7 +411,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
 ];
 
 const REAL = [
-  "The authority model — controllership, scope, approval policy, the Role and Capability chain, and how they relate.",
+  "The authority model — controllership, scope, approval policy, authority given to a person in their own wallet, and how they relate.",
   "The plain-language scope grammar, and the claim that a person can read an authority in five seconds.",
   "Every screen, state and refusal, including the ones nobody clicks their way to.",
   "The order of the flows, and which surface each step belongs to.",

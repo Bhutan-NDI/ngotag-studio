@@ -115,7 +115,7 @@ export function PeopleWhoCanActView() {
               <Link href="/people-who-can-act/give">
                 <GradientButton>
                   <Icon name="plus" size={15} strokeWidth={2} />
-                  Give someone authority
+                  Appoint someone
                 </GradientButton>
               </Link>
             ) : undefined

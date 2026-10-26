@@ -56,7 +56,10 @@ export function ApprovalsView() {
   const href = (operation: (typeof parkedOperations)[number]) =>
     operation.operation === "proof:present" && operation.targetId
       ? `/wallet/sharing/${operation.targetId}/approve`
-      : `/approvals/${operation.id}`;
+      : /* A colleague's grant of authority is decided on SCR-AUT-06 (Flow 8). */
+        operation.operation === "authority:issue" && operation.targetId
+        ? `/authority-to-act/${operation.targetId}/approve`
+        : `/approvals/${operation.id}`;
 
   return (
     <AppShell>

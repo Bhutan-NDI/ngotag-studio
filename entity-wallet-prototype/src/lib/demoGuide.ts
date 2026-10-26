@@ -59,14 +59,22 @@ export interface GuideStep {
  * has not designed yet, and made a forty-step demo of an onboarding review.
  * Those screens still exist; the guide no longer walks them.
  *
- * Appointing a controller and a delegate follow it, because being invited
- * is only half of getting ready: a member can see the organisation, and
- * somebody still has to be able to act for it. Both are invited first and
- * appointed second, in that order and never the other way round, and both
- * prove who they are at the appointment rather than at the invitation
- * (FLOW-ONB-02 §7.3). Giving a member authority follows FLOW-DEL-01 and
- * SCR-DEL-02 to 05; the delegate's role is Flow 8, which is not designed yet,
- * so its chapter follows Story B5 and says on screen that it is ahead of spec.
+ * Appointing a controller follows it, because being invited is only half of
+ * getting ready: a member can see the organisation, and somebody still has
+ * to be able to act for it. The member is invited first and appointed
+ * second, never the other way round, and proves who they are at the
+ * appointment rather than at the invitation (FLOW-ONB-02 §7.3). It follows
+ * FLOW-DEL-01 and SCR-DEL-02 to 05.
+ *
+ * Giving a clearing agent authority to act (Flow 8) comes after sharing
+ * with the bank, because it needs what the chapters before it produce: a
+ * verified business, a representative, and — from a dashed step, since the
+ * ministry doesn't offer one on request in the prototype — a business
+ * licence for the agent to act under. The agent is never invited: she needs
+ * no account and isn't a member (EW-FLOW8-SD D10). She collects her
+ * authority from a link, proving who she is with Bhutan NDI. The approval
+ * path, where a *Give authority to act* Controller gives it and the Root
+ * approves, starts three months on, from Walk a flow, as Flow 7's does.
  *
  * Approval to verify or issue (Flow 4) comes after, through both of its
  * doors: NDI recognising an organisation that was already verifying before
@@ -101,13 +109,13 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "A new company signs up", shows: "A person signs up — nothing about any company yet" },
   { title: "Verify the organisation", shows: "The authority that registered it, not NDI, confirms the company" },
   { title: "Pelden brings on its people", shows: "The owner invites a colleague; they join from the link" },
-  { title: "Give someone authority to act", shows: "Dorji chooses what Ugyen can do; Ugyen accepts with one wallet approval" },
-  { title: "A role in a wallet — Flow 8, ahead of spec", shows: "A clearing agent is invited, then given a role in their own wallet" },
+  { title: "Appoint someone", shows: "Dorji chooses what Ugyen can do; Ugyen accepts with one wallet approval" },
   { title: "Recognise Bank of Bhutan", shows: "NDI approves a bank already verifying — asking for less — and the bank accepts by name" },
   { title: "Pelden asks to verify customers", shows: "A verified business asks; one administrator reviews, a second decides" },
   { title: "Designate the ministry", shows: "A ministry becomes the authority for sole proprietorships, and agrees what people are asked" },
   { title: "Pelden gets its TPN", shows: "Pelden asks the tax office, shares its registration, and accepts what comes back" },
   { title: "Pelden shares with its bank", shows: "From the bank's website and back, then a request in the wallet — the whole credential, said so" },
+  { title: "Authority for the clearing agent", shows: "Dorji gives Pema authority to declare at the Single Window; she collects it with Bhutan NDI" },
   { title: "Where to go next", shows: "The other routes, and what's simulated" },
 ];
 
@@ -117,7 +125,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 0,
     title: "Onboarding onto the Entity Wallet",
     happening:
-      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden's owner invites a colleague and gives them authority to act, then — ahead of the specification — invites a clearing agent and gives them a role in their own wallet. Then NDI approves Bank of Bhutan and Pelden to verify customers, and designates the ministry that confirms sole proprietorships. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
+      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden's owner invites a colleague and appoints them to act for it. Then NDI approves Bank of Bhutan and Pelden to verify customers, designates the ministry that confirms sole proprietorships, Pelden gets its taxpayer number, shares its registration with its bank, and gives its clearing agent authority to act for it from her own Bhutan NDI app. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
     doThis:
       "Press **Next**. The guide takes you to each screen and tells you what to press; you do the clicking. **Minimise** tucks this card away when it's in the way.",
   },
@@ -355,14 +363,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
 
-  /* ---- 6 · Give someone authority to act (FLOW-DEL-01) ---- */
+  /* ---- 6 · Appoint someone (FLOW-DEL-01) ---- */
   {
     chapter: 6,
     title: "Choose what Ugyen can do",
     happening:
       "Four boxes, ticked in any combination, each saying what it allows — not a list of permissions. What Ugyen won't be able to do is worked out from the boxes left unticked, and the whole grant reads back as one sentence. Dorji confirms they're authorised to make the appointment; citing a document like a board resolution is optional and folded away.",
     doThis:
-      "Choose **Ugyen Phuntsho**, leave just **Receive credentials** ticked, tick the statement that you're authorised, then press **Give authority**.",
+      "Choose **Ugyen Phuntsho**, leave just **Receive credentials** ticked, tick the statement that you're authorised, then press **Appoint**.",
     say: "Membership let Ugyen in. This is the separate thing that lets Ugyen act — and Dorji can say exactly what it covers.",
     route: "/people-who-can-act/give",
     persona: "dorji",
@@ -401,59 +409,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/organisation",
   },
 
-  /* ---- 7 · A role in a wallet — Flow 8, ahead of spec ----
-     Story B5. Flow 3 issues nothing into anyone's wallet (EW-FLOW3-SD/D4);
-     role credentials are catalogue flow 8, and the chapter says so on its
-     first step rather than letting it pass as part of Flow 3. */
+  /* ---- 7 · Recognise Bank of Bhutan (FLOW-ACC-01, recognition) ---- */
   {
     chapter: 7,
-    title: "Invite the clearing agent",
-    happening:
-      "Ahead of the specification: this is Flow 8, not designed yet, and built from the user stories. Pema Choden, of Druk Sharpa Freight, clears Pelden's imports and acts from their own wallet, not the console — but is still invited first, like Ugyen.",
-    doThis:
-      "Type **pema.choden@druksharpa.bt**, leave **Member** selected and press **Send invitation**. Then press **Open the invitation as pema.choden@druksharpa.bt**.",
-    route: "/members/invite",
-    persona: "dorji",
-  },
-  {
-    chapter: 7,
-    title: "Pema sets up an account",
-    happening: "The same invitation Ugyen had: who sent it, what it gives, what it doesn't, and an account set up from the link.",
-    doThis:
-      "Enter **Pema Choden**, a password such as **Thimphu-Chorten-2026**, the same password again, then press **Set up account and accept**.",
-    match: "^/invitation/[^/]+$",
-  },
-  {
-    chapter: 7,
-    title: "Pema has joined",
-    happening: "Pema is a member of Pelden — still with no authority. Back to Dorji to appoint Pema as delegate.",
-    doThis: "Press **Next**.",
-    match: "^/invitation/[^/]+/accepted$",
-  },
-  {
-    chapter: 7,
-    title: "Issue a role into Pema's wallet",
-    happening:
-      "A delegate's authority is a credential in their own NDI Wallet. Its limits — what for, how much, with whom, until when — travel with it and are checked by every counterparty; \"What a counterparty reads\" shows them exactly as a verifier will.",
-    doThis:
-      "Leave **Role**, choose **Pema Choden**, name it **Customs clearing agent**, tick **Submit customs declarations**, type **500000** as the cap, tick **Bhutan National Single Window**, and press **Issue to Pema**. Then press **Accept it as Pema** (dashed — it stands in for Pema's phone).",
-    say: "Accepting in their own wallet is Pema's consent, and it proves who Pema is — the wallet is bound to Pema's citizen credential.",
-    route: "/delegated-authority/new",
-    persona: "dorji",
-  },
-  {
-    chapter: 7,
-    title: "Pelden is ready",
-    happening:
-      "Three people, three different things: Dorji is the representative, Ugyen can receive credentials for Pelden in the console, and Pema holds a role in their own wallet (Flow 8, ahead of spec). Each was invited first, and each proved who they are when they took authority on.",
-    doThis: "Press **Next**.",
-    route: "/members",
-    persona: "dorji",
-  },
-
-  /* ---- 8 · Recognise Bank of Bhutan (FLOW-ACC-01, recognition) ---- */
-  {
-    chapter: 8,
     title: "Seen operating without approval",
     happening:
       "Approval to verify or issue is about to be required. Until then, NDI only watches — and it has seen Bank of Bhutan asking customers for five things from their citizen credential to open an account. Every organisation on this list has until the date shown.",
@@ -462,7 +420,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshering",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "Ask for no more than the purpose needs",
     happening:
       "The proposal starts from what the bank was seen asking for, each item marked \"observed\". Opening an account needs the customer's name, ID number and photo — not their date of birth or home address. Anything not approved will be refused after the date.",
@@ -472,14 +430,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/accreditations/new$",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "Waiting for a second administrator",
     happening: "Kinzang proposed it, so it waits here for someone else. Nothing has changed for the bank yet.",
     doThis: "Press **Bank of Bhutan Ltd. · Verify**.",
     route: "/admin/accreditations",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "Kinzang can't approve it",
     happening:
       "Kinzang sees all of it — what the bank can ask for, the criteria, the public listing — but in place of Approve: \"You proposed this, so a different administrator has to approve it.\"",
@@ -487,7 +445,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/accreditations/acc-[^/]+$",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "Tshendu approves",
     happening:
       "The consequence is stated at the decision: every citizen's NDI wallet will trust the bank for this. Approving still lists nothing — the bank's owner has to accept.",
@@ -497,7 +455,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshendu",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "The bank is told",
     happening:
       "Yeshey Choden is Bank of Bhutan's owner. The dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
@@ -506,7 +464,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "yeshey",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "What the bank is being approved for",
     happening:
       "In plain words: what it can ask for, that anything else is refused before it reaches anyone, and that accepting puts the bank on NDI's public list of trusted organisations with Yeshey's name recorded. The bank keeps the public identity it has been verifying under.",
@@ -515,7 +473,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/verify-or-issue/acc-[^/]+$",
   },
   {
-    chapter: 8,
+    chapter: 7,
     title: "Approved, and listed",
     happening:
       "The listing publishes, then the bank is approved to verify, listed since today, under its public identity — and can ask for three things where it used to ask for five.",
@@ -524,9 +482,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "yeshey",
   },
 
-  /* ---- 9 · Pelden asks to verify customers (FLOW-ACC-02) ---- */
+  /* ---- 8 · Pelden asks to verify customers (FLOW-ACC-02) ---- */
   {
-    chapter: 9,
+    chapter: 8,
     title: "The way to ask",
     happening:
       "Pelden is verified, so its representative — and only its representative — is offered a way to ask NDI to verify customers or issue credentials.",
@@ -535,7 +493,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Ask for a check, not the value",
     happening:
       "Pelden sells tobacco and must check customers are over 18. A business can ask to verify, to issue, or both in one request; Pelden only needs to verify. Within each credential the yes-or-no checks come first: Pelden can learn that a customer is over 18 without ever seeing their date of birth.",
@@ -545,7 +503,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/verify-or-issue/ask",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Waiting for NDI",
     happening:
       "The request waits, dated, and Dorji can withdraw it. It never expires: if NDI takes longer than 10 working days, NDI is reminded, and Pelden keeps its place.",
@@ -553,7 +511,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/verify-or-issue",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Kinzang reviews",
     happening: "Business requests come to a review queue first. One administrator recommends; a different one decides.",
     doThis: "Under **Requests to review**, press **Pelden Trading Pvt. Ltd. · Verify**.",
@@ -561,7 +519,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshering",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Recommend, as submitted",
     happening:
       "The request as Pelden wrote it, who asked, when the authority verified Pelden, and NDI's criteria beside their evidence. Kinzang can't edit it — a decline would say what to change, and Pelden would read it word for word.",
@@ -569,7 +527,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/accreditations/acc-[^/]+/review$",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "A second administrator decides",
     happening:
       "Kinzang reviewed it, so it's Tshendu's to decide. Had Kinzang recommended declining, Tshendu could only confirm it — no approve, and no sending it back.",
@@ -578,7 +536,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshendu",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Tshendu approves it as asked",
     happening:
       "\"You can approve or decline this as the business asked for it. You can't change it.\" Kinzang's recommendation is shown. Approving publishes Pelden's listing — Pelden accepted by asking.",
@@ -586,7 +544,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/accreditations/acc-[^/]+$",
   },
   {
-    chapter: 9,
+    chapter: 8,
     title: "Pelden can verify customers",
     happening:
       "Approved to verify, listed under Pelden's public identity, able to ask one thing: whether a customer is over 18. Anything else it asks for will be refused, and shown here when it is.",
@@ -595,9 +553,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
 
-  /* ---- 10 · Designate the ministry (FLOW-ORG-02 Kind E, FLOW-ORG-03) ---- */
+  /* ---- 9 · Designate the ministry (FLOW-ORG-02 Kind E, FLOW-ORG-03) ---- */
   {
-    chapter: 10,
+    chapter: 9,
     title: "Nobody confirms sole proprietors yet",
     happening:
       "Companies are confirmed by the Corporate Regulatory Authority. Sole proprietorships and partnerships have nobody — which is why they can't be verified yet. The ministry that licenses them is already on the platform, so it can be designated where it is.",
@@ -606,7 +564,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshering",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Say what it will be able to do",
     happening:
       "The summary says, in outcome words, what the ministry will be able to do — and nothing else. Once switched on, the scope can't be edited.",
@@ -615,21 +573,21 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/designations/new$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Waiting for a second administrator",
     happening: "Kinzang proposed it, so it waits for someone else. Nothing has been sent to the ministry.",
     doThis: "Press the ministry's row under **Waiting for approval**.",
     route: "/admin/designations",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Kinzang can't approve it",
     happening: "In place of Approve: \"You proposed this designation, so a different administrator has to approve it.\"",
     doThis: "Press **Next** — the guide switches to Tshendu.",
     match: "^/admin/designations/dsg-[^/]+$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Tshendu approves",
     happening:
       "The consequence at the decision: the ministry will create the credential that makes these businesses real, and everyone on the platform will trust what it issues.",
@@ -639,7 +597,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshendu",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "The ministry is asked",
     happening:
       "Kesang Wangmo is the ministry's director and its owner on the platform. The dashboard says what NDI has proposed and how long is left.",
@@ -648,7 +606,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "kesang",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "What the ministry is taking on",
     happening:
       "The role in the ministry's own terms, and NDI's access stated plainly — including that NDI hosts its keys, so removing the access is a permission the ministry controls, not a technical barrier. Accepting switches nothing on.",
@@ -657,14 +615,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/designation/dsg-[^/]+$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Accepted — but not switched on",
     happening: "Before anything switches on, NDI checks the ministry can actually do this.",
     doThis: "Press **Next** — the guide switches to Kinzang.",
     match: "^/designation/dsg-[^/]+$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "One check failed",
     happening:
       "The ministry has the issuing identity a foundational issuer needs, but not the entitlement to publish what its credential contains — it has never needed one. The check says that's NDI's to grant.",
@@ -673,7 +631,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "tshering",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "NDI fixes its own part",
     happening:
       "Each check says passed or failed in words, what was observed, and who resolves it. This one is NDI's.",
@@ -682,7 +640,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/admin/designations/dsg-[^/]+/activation$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Designated, nothing live",
     happening:
       "The ministry's console: its designation, NDI's access with a way to remove it, and nothing live in its name. People can't verify with it until it agrees what they'll be asked.",
@@ -691,7 +649,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "kesang",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "What people will be asked",
     happening:
       "Exactly what a person's wallet will show, item by item, with why each is needed. NDI's draft also asks for the date of birth — which the register doesn't need, and the screen says so on the item.",
@@ -701,7 +659,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/authority/sole_proprietorship$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Three things, adopted as one",
     happening:
       "The credential, what people are asked, and NDI's permission to ask it — together, or not at all. Each can be stopped separately afterwards.",
@@ -709,7 +667,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/authority/sole_proprietorship/adopt$",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Live in the ministry's name",
     happening:
       "Sole proprietorships are live — version 1, adopted by Kesang, today. From now a sole proprietor can verify their business with the ministry.",
@@ -717,7 +675,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/authority",
   },
   {
-    chapter: 10,
+    chapter: 9,
     title: "Three different stops",
     happening:
       "Nothing is selected. Pausing NDI's access, stopping an entity type and changing what people are asked are three different things, each saying what stops and what carries on — and none of them un-verifies a business.",
@@ -726,9 +684,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/authority/stop",
   },
 
-  /* ---- 11 · Pelden gets its TPN (FLOW-CRD-01, FLOW-CRD-03) ---- */
+  /* ---- 10 · Pelden gets its TPN (FLOW-CRD-01, FLOW-CRD-03) ---- */
   {
-    chapter: 11,
+    chapter: 10,
     title: "What Pelden can get next",
     happening:
       "Credentials offices on NDI issue to businesses like Pelden. Each says what the office needs to see first — the taxpayer number needs Pelden's registration, which it holds; the bonded-warehouse authorisation needs the taxpayer number, which it doesn't yet.",
@@ -737,7 +695,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "One consent, said in full",
     happening:
       "What Pelden shares and what it may receive, side by side. The tax office receives all of Pelden's registration — every item is listed, including the ones it doesn't use — because a credential like this can't be shared in part. And nothing is added until someone here accepts what comes back.",
@@ -746,7 +704,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/get/off-tpn$",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Who has it now",
     happening:
       "Pelden's wallet shares the registration, the office checks it, and the request says who has it and when to expect an answer — not a status code.",
@@ -754,7 +712,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/requests/crq-[^/]+$",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "The tax office's queue",
     happening:
       "Deki Yangzom answers taxpayer registrations at the Department of Revenue & Customs. Least time left comes first, led by the registration number Pelden proved — what Deki will look up in the office's own register.",
@@ -763,7 +721,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "deki",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Decide on what was proved",
     happening:
       "Two panels: what Pelden proved, with the credential it came from, and — separately, below — the name and type NDI holds, which Deki hasn't verified. Deki enters the taxpayer number's details from the office's own register.",
@@ -773,14 +731,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/issuer/requests/crq-[^/]+$",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Sent",
     happening: "Issued, and on its way to Pelden. It isn't Pelden's yet — Pelden decides whether to accept it.",
     doThis: "Press **Next** — the guide switches to Dorji.",
     match: "^/issuer/requests/crq-[^/]+$",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Waiting for Pelden",
     happening: "The office has replied. What needs someone at Pelden comes first, with the date the offer lapses.",
     doThis: "Under **Waiting for you**, press **Review**.",
@@ -788,7 +746,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Check it, then accept",
     happening:
       "Every detail as offered, from an office on NDI's list of trusted organisations, in answer to Dorji's request. If something were wrong, the screen says to decline and contact the office.",
@@ -796,7 +754,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/requests/crq-[^/]+$",
   },
   {
-    chapter: 11,
+    chapter: 10,
     title: "Held, and on the record",
     happening:
       "The taxpayer number sits beside the registration it was asked for with. The Activity tab keeps the request — and an offer the wallet refused on its own, from a sender not on NDI's list, which nobody was notified about.",
@@ -804,9 +762,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/wallet/credentials",
   },
 
-  /* ---- 12 · Pelden shares with its bank (FLOW-PRS-01, FLOW-PRS-02) ---- */
+  /* ---- 11 · Pelden shares with its bank (FLOW-PRS-01, FLOW-PRS-02) ---- */
   {
-    chapter: 12,
+    chapter: 11,
     title: "Opening an account at the bank",
     happening:
       "Bank of Bhutan's own website — dashed, because it's another organisation's system. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
@@ -815,7 +773,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "Who is asking — before anything else",
     happening:
       "The wallet's own address, the bank's name as NDI lists it — never as the link says — and the bank's reference, with a sentence telling Dorji to continue only if he started this on the bank's site just now and sees that reference there.",
@@ -825,7 +783,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/present$",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "Share with Bank of Bhutan?",
     happening:
       "The one decision. The bank's reason in its own words, and every detail of Pelden's registration — the three the bank asked for marked, the rest marked as also shared — under the sentence: Bank of Bhutan will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
@@ -834,7 +792,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/sharing/pr-[^/]+$",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "Shared — back to the bank",
     happening:
       "One line and a five-second countdown back to the bank's registered address. Only Shared counts down: if the bank didn't have it yet, the person would have to press — so they read that it's waiting.",
@@ -842,7 +800,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/sharing/pr-[^/]+/done$",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "The bank acts on what it fetched",
     happening:
       "Back on the bank's page. The address carries a status anyone could type; the bank checks the application matches and acts only on what its own system fetched — the registration, verified, with its issuer on NDI's list.",
@@ -850,7 +808,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/simulated/bank/return$",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "A request with nobody at a website",
     happening:
       "Sharing: what's waiting, what was shared and who agreed, and what was refused. A bank re-checking a customer sends its request straight to the wallet; it waits here for seven days.",
@@ -859,7 +817,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "ugyen",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "Ugyen can see it, but not share it",
     happening:
       "Ugyen was appointed to receive credentials, not to share them. He sees the whole request and why he can't answer it — and instead of a dead end, the people who can, by name.",
@@ -868,7 +826,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     match: "^/wallet/sharing/pr-[^/]+$",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "Dorji answers",
     happening: "The request is waiting, passed on by Ugyen. Dorji may share with anyone, at once.",
     doThis: "On Bank of Bhutan's request, press **Answer**, then **Share with Bank of Bhutan**.",
@@ -876,7 +834,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     persona: "dorji",
   },
   {
-    chapter: 12,
+    chapter: 11,
     title: "What was shared, and what was refused",
     happening:
       "History answers the question a representative asks later — what did we give the bank, and who agreed? Refused is the only place a request NDI blocked appears: nobody is notified, because a notification would let anyone message the company.",
@@ -885,12 +843,71 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/wallet/sharing",
   },
 
+  /* ---- 12 · Authority for the clearing agent (FLOW-AUT-01) ---- */
+  {
+    chapter: 12,
+    title: "Who can act for Pelden",
+    happening:
+      "Pema Choden, of Druk Sharpa Freight, declares Pelden's imports at the Bhutan National Single Window. Today she'd carry a letter and copies of Pelden's licence and TPN. Instead Pelden gives her authority she carries in her own Bhutan NDI app. She isn't a member and needs no account here. Nobody holds authority yet.",
+    doThis: "Press **Give authority**.",
+    route: "/authority-to-act",
+    persona: "dorji",
+  },
+  {
+    chapter: 12,
+    title: "Where, what, under which licence",
+    happening:
+      "Where first, so what she can do and which licence follow from it. Declaring at the Single Window needs a business licence someone acting for Pelden can use, and Pelden has none in its wallet yet — the form says so rather than hiding the choice.",
+    doThis:
+      "Press **Have the ministry issue Pelden's business licence** (dashed). Enter **Pema Choden** and her citizen ID number **11512002960**, tick **Submit customs declarations** and **Amend customs declarations**, tick **BL-PLG-2025-00871**, type **1000000** as the limit, leave the end date — 90 days, at most a year — and press **Continue**.",
+    say: "The ID number is what makes a forwarded link useless: only the person whose citizen ID matches it can collect. It's never shown again, and it isn't in what she carries.",
+    route: "/authority-to-act/give",
+  },
+  {
+    chapter: 12,
+    title: "Check, and give",
+    happening:
+      "The terms as one sentence, then what Pema will carry — and, said outright, what she won't: not Pelden's licence, not its TPN, not who gave it. Dorji is the representative, so nobody else needs to approve.",
+    doThis: "Read it, then press **Give authority**.",
+    say: "People expect to hand an agent the company's documents. The screen says she gets neither — only the licence number she acts under.",
+    route: "/authority-to-act/give/check",
+  },
+  {
+    chapter: 12,
+    title: "Send Pema the link",
+    happening:
+      "It's Pelden's first authority, so Pelden is first added to NDI's list of trusted organisations as able to give authority — and nothing else. Then the link: Dorji sends it the way he usually reaches Pema; the platform has no contact for her and sends nothing.",
+    doThis:
+      "Press **NDI's list confirms Pelden Trading Pvt. Ltd.** (dashed). Then press **Copy link**, and **Open the link as Pema Choden** (dashed — it stands in for Pema's phone).",
+    match: "^/authority-to-act/g-[^/]+$",
+  },
+  {
+    chapter: 12,
+    title: "Pema collects it",
+    happening:
+      "Before Pema proves who she is, the page names only Pelden — and tells her to continue only if she expected it. Whoever else holds the link gets no further. Once her citizen ID matches, she sees exactly what she'll be able to do, and collects it in the app.",
+    doThis:
+      "Press **Continue with Bhutan NDI**, then **Share Pema Choden's ID** (dashed — the Bhutan NDI app). Read what she'll be able to do, then press **Accept in the app** (dashed).",
+    say: "Try sharing someone else's ID first: the page says the authority is for someone else, and nothing is given — Open the link again (dashed) to go on. Three tries and the link is dead.",
+    match: "^/authority/claim/[^/]+$",
+  },
+  {
+    chapter: 12,
+    title: "Pema can act for Pelden",
+    happening:
+      "Pema is under Active: what she may do, where, under which licence, up to what, until when, and who gave it. The authority is Pelden's — it stays in force if whoever gave it leaves — and it can't be passed on.",
+    doThis: "Press **Next**.",
+    say: "To see a Controller give authority and the representative approve it, use Demo controls → Walk a flow → A controller gives authority, the owner approves.",
+    route: "/authority-to-act",
+    persona: "dorji",
+  },
+
   /* ---- 13 · Where to go next ---- */
   {
     chapter: 13,
     title: "That's the story",
     happening:
-      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved; and Pelden shared its registration with its bank — whole, and said so — from the bank's website and from its wallet.",
+      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved; Pelden shared its registration with its bank — whole, and said so — from the bank's website and from its wallet; and Pelden gave its clearing agent authority to declare for it, which she collected in her own Bhutan NDI app without an account.",
     doThis:
       "To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },

@@ -16,6 +16,8 @@ import { INVITATION_DAYS } from "./deployment";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import * as sharing from "./sharing";
 import { NOTICE, namesOf, typesOf } from "./sharing";
+import * as auth from "./authority";
+import { formatDate } from "@/features/controllership/scopeModel";
 import {
   NDI_ORG,
   PELDEN,
@@ -29,14 +31,16 @@ import {
   isPlatformAdmin,
   roleIn,
   type Attribute,
-  type AuthorityKind,
+  type AuthorityDraft,
+  type AuthorityGrant,
+  type GrantStatus,
+  SIM_CITIZENS,
   type BulkUpload,
   type Certificate,
   type Connection,
   type ControllershipRelation,
   type CredDef,
   type Credential,
-  type DelegatedAuthority,
   type DemoState,
   type Did,
   type Ecosystem,
@@ -51,7 +55,6 @@ import {
   type PersonId,
   type Schema,
   type Scope,
-  type ScopeFilter,
   type OrgKind,
   type AppointmentDocument,
   type PresetId,
@@ -175,8 +178,14 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       share whole credentials, presentation sessions and return
  *       addresses. A version-20 save holds `verificationRequests` nothing
  *       reads and parked shares pointing at requests that no longer exist.
+ *  22 — Flow 8 (EW-FLOW8-SD, FLOW-AUT-01): pre-spec Role/Capability
+ *       `delegatedAuthorities` replaced by `authorityGrants` and a draft,
+ *       a Bhutan National Single Window organisation, Pelden's business
+ *       licences and its listing as an issuer of authority, and Rinzin's
+ *       *Give authority to act*. A version-21 save holds a chain nothing
+ *       reads and none of the grants every Flow 8 screen expects.
  */
-const SEED_VERSION = 21;
+const SEED_VERSION = 22;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -471,6 +480,274 @@ function rejectShare(s: DemoState, id: string, approver: PersonId, note: string)
     },
     notes: noteTo(s, [op.requestedBy], NOTICE.rejected(nameOf(s, approver), note), orgId),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Flow 8 — giving authority to act (FLOW-AUT-01)                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The grant transitions, pure, as approveShare is: the store runs each
+ * inside setState and reads the notes it produces from the state the click
+ * was made against. The rules they consult are `lib/authority.ts`'s.
+ */
+type GrantStep = { next: DemoState; notes: Note[] };
+
+const patchGrant = (s: DemoState, id: string, patch: Partial<AuthorityGrant>): DemoState => ({
+  ...s,
+  authorityGrants: s.authorityGrants.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+});
+
+/** The terminal states before issuance — the ID number's hash goes with them (S4). */
+const endGrant = (s: DemoState, id: string, status: GrantStatus, endReason: string, extra: Partial<AuthorityGrant> = {}): DemoState =>
+  patchGrant(s, id, {
+    status,
+    endReason,
+    statusAt: today(),
+    delegateIdKeyed: null,
+    revocationId: null,
+    offerExpiresAt: null,
+    ...extra,
+  });
+
+/** A short random bearer reference, for the claim link's path (FLOW-AUT-01 §7.2). */
+const claimRefOf = () => Array.from({ length: 16 }, () => "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * 56))).join("");
+const uuidish = () =>
+  "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = Math.floor(Math.random() * 16);
+    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+  });
+
+/** D18 — the grantor and, when the grantor isn't the Root, the Root. */
+function toldAbout(s: DemoState, g: AuthorityGrant, grantorText: string | null, rootText: string | null): Note[] {
+  const { grantor, root } = auth.toldOf(s, g);
+  return [
+    ...(grantorText ? noteTo(s, [grantor], grantorText, g.orgId) : []),
+    ...(root && rootText ? noteTo(s, [root], auth.NOTICE_GRANT.rootOutcome(nameOf(s, g.grantedBy), rootText), g.orgId) : []),
+  ];
+}
+
+/**
+ * Steps 6–7 once nothing more needs deciding: the organisation's listing as
+ * an issuer of authority confirmed (G3), then CLAIMABLE with a 7-day link.
+ * An organisation's first grant goes to AWAITING_LISTING first (A4): the
+ * publishing did:ethr is made in the grantor's session now, and the
+ * listing is confirmed by NDI's list — a dashed step on SCR-AUT-04.
+ *
+ * `grantorWaiting` is whether the grantor is looking at SCR-AUT-04 right
+ * now (they just pressed *Give authority*); if not — after an approval or
+ * a listing — they are told the link is ready.
+ */
+function towardClaimable(s: DemoState, id: string, grantorWaiting: boolean, actedBy: PersonId | null = null): GrantStep {
+  const g = s.authorityGrants.find((x) => x.id === id);
+  if (!g) return { next: s, notes: [] };
+  const org = s.organizations.find((o) => o.id === g.orgId);
+  if (org?.authorityListing?.status !== "CURRENT") {
+    const did = org?.authorityListing?.did ?? newDidId("did:ethr");
+    return {
+      next: {
+        ...patchGrant(s, id, { status: "AWAITING_LISTING", statusAt: today() }),
+        organizations: s.organizations.map((o) =>
+          o.id === g.orgId ? { ...o, authorityListing: { status: "PENDING" as const, did, listedAt: null, firstNotice: null } } : o,
+        ),
+      },
+      notes: [],
+    };
+  }
+  const name = auth.delegateNameOf(g);
+  const next = patchGrant(s, id, {
+    status: "CLAIMABLE",
+    statusAt: today(),
+    claimRef: claimRefOf(),
+    claimExpiresAt: auth.inDays(auth.CLAIM_DAYS),
+    issuerDid: org.authorityListing.did,
+  });
+  const { root } = auth.toldOf(s, g);
+  const what = `${auth.tasksPhrase(g.tasks)} at ${namesOf(g.counterparties.map((c) => auth.counterpartyName(s, c)))}`;
+  return {
+    next,
+    notes: [
+      ...(grantorWaiting ? [] : noteTo(s, [g.grantedBy], auth.NOTICE_GRANT.linkReady(name), g.orgId)),
+      /* D18 — the Root is told the moment a link is in circulation; not
+         when the Root is who just approved it, as Flow 7 doesn't tell the
+         Root of a share the Root approved. */
+      ...(root && root !== actedBy ? noteTo(s, [root], auth.NOTICE_GRANT.rootLinkOut(nameOf(s, g.grantedBy), name, what), g.orgId) : []),
+    ],
+  };
+}
+
+/**
+ * SCR-AUT-06's *Approve* — FLOW-AUT-01 A1, EW-FLOW8-SD §8.2.
+ *
+ * WHAT IS CHECKED AGAIN, IN WHAT ORDER
+ *
+ * 1. The approver: holds approval:decide here, and is not the grantor —
+ *    never one's own (§8.1), the rule approveOperation always kept.
+ * 2. G1 against the grantor (E16): their relation still ACTIVE and still
+ *    carrying authority:issue. If not, FAILED — unlike a share, nothing
+ *    reopens, because nobody outside is waiting on a grant (D22).
+ * 3. G2–G6 (E11): the organisation, the counterparty, the licence, the
+ *    dates. If any fails, FAILED.
+ *
+ * Only then is it approved, bound to the approval hash it was parked with
+ * (D20), and on to the listing and the link.
+ */
+function approveGrant(s: DemoState, opId: string, approver: PersonId, method: "web" | "wallet"): GrantStep {
+  const none = { next: s, notes: [] as Note[] };
+  const op = s.parkedOperations.find((p) => p.id === opId);
+  if (!op || op.state !== "parked" || op.operation !== "authority:issue" || !op.targetId) return none;
+  if (op.requestedBy === approver) return none;
+  const g = s.authorityGrants.find((x) => x.id === op.targetId);
+  if (!g || g.status !== "AWAITING_APPROVAL" || g.approvalHash !== op.payloadHash) return none;
+  if (!sharing.approversFor(s, g.orgId, g.grantedBy).includes(approver)) return none;
+
+  const signature = { personId: approver, at: today(), method };
+  const ops = (patch: Partial<ParkedOperation>) =>
+    s.parkedOperations.map((p) => (p.id === opId ? { ...p, signatures: [...p.signatures, signature], ...patch } : p));
+  const name = auth.delegateNameOf(g);
+  const grantorName = nameOf(s, g.grantedBy);
+
+  if (!auth.grantFor(s, g.grantedBy, g.orgId, "authority:issue")) {
+    const next = endGrant({ ...s, parkedOperations: ops({ state: "stale", invalidatedReason: auth.NOTICE_GRANT.approverLapsed(grantorName) }) }, g.id, "FAILED", auth.NOTICE_GRANT.grantorLapsed(name));
+    return { next, notes: toldAbout(s, g, auth.NOTICE_GRANT.grantorLapsed(name), auth.NOTICE_GRANT.grantorLapsed(name)) };
+  }
+
+  const problem = auth.recheck(s, g);
+  if (problem) {
+    const text = auth.NOTICE_GRANT.couldNot(name, problem);
+    const next = endGrant({ ...s, parkedOperations: ops({ state: "stale", invalidatedReason: text }) }, g.id, "FAILED", text);
+    return { next, notes: toldAbout(s, g, text, text) };
+  }
+
+  const relation = s.relations.find((x) => x.personId === approver && (x.orgId ?? PELDEN) === g.orgId && x.state === "ACTIVE");
+  const approved: DemoState = {
+    ...patchGrant(s, g.id, { approvedBy: approver, approvedRelationId: relation?.id ?? null }),
+    parkedOperations: ops({ state: "approved" }),
+    auditEntries: appendAudit(s, {
+      operation: "approval:decide",
+      summary: `Approved ${grantorName} giving ${name} authority to ${auth.tasksPhrase(g.tasks)}`,
+      actorId: approver,
+      relationId: relation?.id ?? null,
+      scopeVersion: relation?.scope.version ?? null,
+    }),
+  };
+  const step = towardClaimable(approved, g.id, true, approver);
+  const listed = step.next.authorityGrants.find((x) => x.id === g.id)?.status === "CLAIMABLE";
+  const approverName = nameOf(s, approver);
+  return {
+    next: step.next,
+    notes: [
+      ...noteTo(s, [g.grantedBy], listed ? auth.NOTICE_GRANT.approved(approverName, name) : `${approverName} approved giving ${name} authority.`, g.orgId),
+      ...step.notes,
+    ],
+  };
+}
+
+/** SCR-AUT-06's *Don't approve* — REJECTED, the grantor told with the note (D22). */
+function rejectGrant(s: DemoState, opId: string, approver: PersonId, note: string): GrantStep {
+  const none = { next: s, notes: [] as Note[] };
+  const op = s.parkedOperations.find((p) => p.id === opId);
+  if (!op || op.state !== "parked" || op.operation !== "authority:issue" || !op.targetId || op.requestedBy === approver) return none;
+  const g = s.authorityGrants.find((x) => x.id === op.targetId);
+  if (!g || g.status !== "AWAITING_APPROVAL") return none;
+  if (!sharing.approversFor(s, g.orgId, g.grantedBy).includes(approver)) return none;
+  const name = auth.delegateNameOf(g);
+  const text = auth.NOTICE_GRANT.rejected(nameOf(s, approver), name, note);
+  const relation = s.relations.find((x) => x.personId === approver && (x.orgId ?? PELDEN) === g.orgId && x.state === "ACTIVE");
+  const next = endGrant(
+    {
+      ...s,
+      parkedOperations: s.parkedOperations.map((p) => (p.id === opId ? { ...p, state: "rejected" as const, decisionReason: note || null } : p)),
+      auditEntries: appendAudit(s, {
+        operation: "approval:decide",
+        summary: `Didn't approve ${nameOf(s, g.grantedBy)} giving ${name} authority`,
+        actorId: approver,
+        relationId: relation?.id ?? null,
+        scopeVersion: relation?.scope.version ?? null,
+      }),
+    },
+    g.id,
+    "REJECTED",
+    text,
+    { rejection: { by: approver, note, at: today() } },
+  );
+  return { next, notes: noteTo(s, [g.grantedBy], text, g.orgId) };
+}
+
+/**
+ * Endings that come with a date — E15, A1's lapse, an issued authority's
+ * end date — for every list at once, and the people D18 names told.
+ */
+function endByDate(s: DemoState, now = today()): GrantStep {
+  const notes: Note[] = [];
+  let next = s;
+  for (const g of s.authorityGrants) {
+    const ending = auth.grantEnding(g, now);
+    if (!ending) continue;
+    if (ending.status === "EXPIRED") {
+      next = patchGrant(next, g.id, { status: "EXPIRED", statusAt: now, endReason: ending.endReason, delegateIdKeyed: null });
+      continue;
+    }
+    next = endGrant(next, g.id, ending.status, ending.endReason);
+    if (g.approvalId) {
+      next = {
+        ...next,
+        parkedOperations: next.parkedOperations.map((p) =>
+          p.id === g.approvalId && p.state === "parked" ? { ...p, state: "expired" as const, decisionReason: "Nobody decided this in seven days." } : p,
+        ),
+      };
+    }
+    notes.push(...toldAbout(s, g, ending.endReason, ending.endReason));
+  }
+  return { next, notes };
+}
+
+/**
+ * The grant a claim link still opens: claimable and in date, or with an
+ * offer out that hasn't been accepted. Anything else — unknown, lapsed,
+ * cancelled, failed, or used — is E7. "Used" is read as the delegate
+ * having accepted (ACTIVE, or ISSUING while the registration finishes),
+ * which FLOW-AUT-01 E7 leaves undefined (pr-8 item 2).
+ */
+function claimable(s: DemoState, ref: string): AuthorityGrant | undefined {
+  const g = s.authorityGrants.find((x) => x.claimRef === ref);
+  if (!g) return undefined;
+  if (g.status === "CLAIMABLE" && g.claimExpiresAt !== null && g.claimExpiresAt >= today()) return g;
+  if (g.status === "ISSUING" && !g.accepted) return g;
+  return undefined;
+}
+
+/**
+ * Step 16 — the revocation id registered, the grant ACTIVE, the grantor and
+ * the Root told. On the organisation's first authority, where it has shared
+ * credentials with that counterparty before, SCR-AUT-01's first-grant
+ * notice is raised (EW-FLOW9-SD §7).
+ */
+function activate(s: DemoState, id: string): GrantStep {
+  const g = s.authorityGrants.find((x) => x.id === id);
+  if (!g || g.status !== "ISSUING") return { next: s, notes: [] };
+  const name = auth.delegateNameOf(g);
+  const first = !s.authorityGrants.some((x) => x.orgId === g.orgId && x.id !== id && x.credentialRef);
+  const cp = g.counterparties[0];
+  const sharedBefore = s.presentationRequests.some((r) => (r.orgId ?? PELDEN) === g.orgId && r.verifierOrgId === cp && r.status === "SHARED");
+  let next = patchGrant(s, id, { status: "ACTIVE", statusAt: today(), accepted: true, offerExpiresAt: null, credentialRef: `urn:uuid:${uuidish()}` });
+  if (first && sharedBefore) {
+    next = {
+      ...next,
+      organizations: next.organizations.map((o) =>
+        o.id === g.orgId && o.authorityListing ? { ...o, authorityListing: { ...o.authorityListing, firstNotice: cp } } : o,
+      ),
+    };
+  }
+  next = {
+    ...next,
+    auditEntries: appendAudit(next, {
+      operation: "authority:accept",
+      summary: `${name} collected their authority to ${auth.tasksPhrase(g.tasks)} — it is active`,
+      actorId: g.delegatePersonId ?? g.grantedBy,
+    }),
+  };
+  return { next, notes: toldAbout(s, g, auth.NOTICE_GRANT.active(name), auth.NOTICE_GRANT.active(name)) };
 }
 
 /** Today, as the seed writes dates. Anything created in a demo is dated now. */
@@ -1081,30 +1358,56 @@ interface DemoActions {
   approveOperation: (id: string, method: "web" | "wallet") => void;
   rejectOperation: (id: string, reason: string) => void;
 
-  /* ---- Delegated authority (Pattern B) ---- */
+  /* ---- Giving authority to act (Flow 8, FLOW-AUT-01) ----
+     Every rule is `lib/authority.ts`'s, run here before anything changes;
+     the screens render the answers. The delegate's side (SCR-AUT-05) is
+     driven by the claim reference alone — no sign-in, no account (D10). */
 
-  /** Issues a Role or Capability into a person's own wallet. Awaits their
-   *  acceptance — acceptance is the holder's consent and cannot be assumed. */
-  issueAuthority: (input: {
-    kind: AuthorityKind;
-    title: string;
-    recipientId: string;
-    parentId: string | null;
-    taskScopes: string[];
-    valueCap: { amount: number; currency: "BTN"; perTransaction: boolean } | null;
-    counterparties: ScopeFilter;
-    validFrom: string;
-    validUntil: string;
-  }) => DelegatedAuthority;
-  acceptAuthority: (id: string) => void;
-  /** Reversible. */
-  suspendAuthority: (id: string, reason: string) => void;
-  reactivateAuthority: (id: string) => void;
+  /** G1, G2 and the approval policy for the person driving (SCR-AUT-01/02/03). */
+  giveVerdict: (orgId?: string) => auth.GiveVerdict;
+  /** Who may give authority here — E1 names them. */
+  whoCanGive: (orgId?: string) => PersonId[];
+  /** Whether the person driving holds authority:issue here — *Cancel*, as well as *Give authority* (E14). */
+  mayIssueAuthority: (orgId?: string) => boolean;
+  /** SCR-AUT-02's choices: counterparties the vocabulary names, their tasks, the organisation's licences (G4, G5). */
+  authorityChoices: (orgId?: string) => { counterparties: auth.CounterpartyOption[]; tasks: auth.Task[]; licences: auth.LicenceOption[] };
+  /** SCR-AUT-02 → SCR-AUT-03: keep the form; null clears it. */
+  saveAuthorityDraft: (draft: AuthorityDraft | null) => void;
+  /** G4–G7 against a draft (SCR-AUT-02 *Continue*). */
+  checkAuthorityDraft: (draft: AuthorityDraft) => auth.DraftCheck;
   /**
-   * Final, and deliberately does NOT cascade a status onto its children —
-   * see the note at the implementation. Raises the holder's appeal notice.
+   * SCR-AUT-03's *Give authority* — steps 3–7. AUTO goes on to the link
+   * (through A4 for a first grant); SINGLE_APPROVER parks for one other
+   * person (A1). The ID number is hashed here and never kept.
    */
-  revokeAuthority: (id: string, reason: string) => void;
+  giveAuthority: () =>
+    | { ok: true; grantId: string; status: GrantStatus }
+    | { ok: false; error: "E1" | "E2" | "E5" | "E6" | "A3" | "no_approver" | "no_draft" };
+  /** SCR-AUT-01 / SCR-AUT-04 *Cancel this authority* — any state before the delegate accepts (E14). */
+  cancelGrant: (grantId: string) => { ok: true } | { ok: false; error: "not_permitted" | "too_late" };
+  /** SCR-AUT-06 — the approvers for a grant: approval:decide here, never the grantor. */
+  grantApprovers: (grantId: string) => PersonId[];
+  /** Simulated — NDI's list of trusted organisations confirms the listing, or can't for 24 hours (A4, E3). */
+  settleAuthorityListing: (grantId: string, confirmed: boolean) => void;
+  /** Simulated — seven days pass with nobody collecting or approving (E15, A1). */
+  lapseGrant: (grantId: string) => void;
+  /** Simulated — the ministry issues Pelden its business licence (FLOW-CRD-01, its own flow). */
+  simulateLicenceIssued: () => void;
+  /** Simulated — the ministry revokes a licence a waiting grant names (AC-06 → E11 at claim). */
+  simulateLicenceRevoked: (licenceNumber: string) => void;
+  /** SCR-AUT-01 — the first-grant notice, once read. */
+  dismissFirstGrantNotice: () => void;
+  /** SCR-AUT-05 step 9 — what the link may show before identity: the organisation's name, or nothing (S3, E7). */
+  openClaim: (ref: string) => { kind: "valid"; orgName: string } | { kind: "invalid" };
+  /** SCR-AUT-05 steps 11–12 — the citizen credential presented; G8 and the re-checks. */
+  presentCitizenCredential: (
+    ref: string,
+    cid: string,
+  ) => { ok: true; grantId: string } | { ok: false; error: "E7" } | { ok: false; error: "E9"; ended: boolean } | { ok: false; error: "E11" };
+  /** SCR-AUT-05 steps 14–16 — what happened to the offer in the app (simulated). */
+  answerOffer: (ref: string, outcome: "accept" | "accept_unregistered" | "decline" | "expire" | "send_failed") => void;
+  /** SCR-AUT-05 E17 — the revocation id finally registers. */
+  finishRegistration: (grantId: string) => void;
 
   /**
    * Runs a verification and keeps the decision.
@@ -1253,9 +1556,9 @@ interface DemoActions {
    */
   startFirstDay: () => void;
   /**
-   * Pelden's first day after its people have joined: Ugyen and Pema have
-   * accepted their invitations and hold no authority — where the controller
-   * and delegate appointments start when walked on their own.
+   * Pelden's first day after its colleague has joined: Ugyen has accepted
+   * his invitation and holds no authority — where appointing someone starts
+   * when walked on its own, and where Flow 8's first grant starts.
    */
   startTeamReady: () => void;
   /**
@@ -1626,6 +1929,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       };
     });
   }, [state.presentationRequests, hydrated]);
+
+  /* FLOW-AUT-01 E15, A1 — a link nobody collected and an approval nobody
+     gave lapse on their seventh day; an issued authority expires on its end
+     date (D13, D14). For every list at once, with the grantor and the Root
+     told (D18). */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.authorityGrants.some((g) => auth.grantEnding(g, now))) return;
+    const step = endByDate(state, now);
+    setState((s) => endByDate(s, now).next);
+    step.notes.forEach((n) =>
+      setState((s) => ({ ...s, activity: [{ id: rid("a"), text: n.text, at: now, orgId: n.orgId }, ...s.activity].slice(0, 20) })),
+    );
+  }, [state, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -2228,6 +2546,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           approveShare(s0, id, persona, method).notes.forEach((n) => log(n.text, n.orgId));
           return;
         }
+        /* A grant of authority is approved on SCR-AUT-06, with G1 against
+           the grantor and G2–G6 again (approveGrant). */
+        if (s0.parkedOperations.find((p) => p.id === id)?.operation === "authority:issue") {
+          const persona = s0.harness.persona;
+          setState((s) => approveGrant(s, id, persona, method).next);
+          approveGrant(s0, id, persona, method).notes.forEach((n) => log(n.text, n.orgId));
+          return;
+        }
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
@@ -2293,6 +2619,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           rejectShare(s0, id, persona, reason).notes.forEach((n) => log(n.text, n.orgId));
           return;
         }
+        if (s0.parkedOperations.find((p) => p.id === id)?.operation === "authority:issue") {
+          const persona = s0.harness.persona;
+          setState((s) => rejectGrant(s, id, persona, reason).next);
+          rejectGrant(s0, id, persona, reason).notes.forEach((n) => log(n.text, n.orgId));
+          return;
+        }
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
@@ -2315,175 +2647,387 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         });
       },
 
-      issueAuthority: (input) => {
-        const authority: DelegatedAuthority = {
-          id: rid("da"),
-          kind: input.kind,
-          title: input.title,
-          recipientId: input.recipientId,
-          parentId: input.parentId,
-          /* Every Pattern B credential traces back to a controllership
-             relation. The owner's root authority is what these are issued
-             out of, so that is the relation recorded on them. */
-          relationId: SEED.relations.filter(inOrg(PELDEN)).find((r) => r.isRootAuthority)?.id ?? "rel-root",
-          taskScopes: input.taskScopes,
-          valueCap: input.valueCap,
-          counterparties: input.counterparties,
-          validFrom: input.validFrom,
-          validUntil: input.validUntil,
-          status: "ACTIVE",
-          acceptance: "sent",
-          issuedAt: today(),
-          acceptedAt: null,
-        };
-        setState((s) => ({
-          ...s,
-          delegatedAuthorities: [authority, ...s.delegatedAuthorities],
-          auditEntries: appendAudit(s, {
-            operation: "authority:issue",
-            summary: `Issued ${input.title} to ${
-              s.people.find((p) => p.id === input.recipientId)?.name ?? "a recipient"
-            }`,
-            actorId: s.harness.persona,
-            relationId: authority.relationId,
-            scopeVersion: 1,
-          }),
-        }));
-        return authority;
+      /* ---- Giving authority to act (Flow 8) ---- */
+
+      giveVerdict: (orgId) => {
+        const s0 = stateRef.current;
+        return auth.giveVerdict(s0, s0.harness.persona, orgId ?? s0.activeOrgId);
       },
 
-      acceptAuthority: (id) =>
-        setState((s) => {
-          const authority = s.delegatedAuthorities.find((a) => a.id === id);
-          if (!authority) return s;
-          const holder = s.people.find((p) => p.id === authority.recipientId);
-          return {
-            ...s,
-            /* Accepting happens in the holder's own NDI Wallet, which is bound
-               to their citizen credential — so the acceptance is also the
-               proof of who they are. A delegate who joined by invitation is
-               confirmed here, the way a controller is confirmed on accepting
-               their duties. */
-            people: s.people.map((p) => (p.id === authority.recipientId ? anchored(p) : p)),
-            activity: [
-              { id: rid("a"), text: `${holder?.name ?? "The holder"} accepted ${authority.title}`, at: today(), orgId: PELDEN },
-              ...s.activity,
-            ].slice(0, 20),
-            delegatedAuthorities: s.delegatedAuthorities.map((a) =>
-              a.id === id ? { ...a, acceptance: "accepted", acceptedAt: today() } : a,
-            ),
-            auditEntries: appendAudit(s, {
-              operation: "authority:accept",
-              summary: `${
-                s.people.find((p) => p.id === authority.recipientId)?.name ?? "The holder"
-              } accepted ${authority.title}`,
-              actorId: authority.recipientId,
-              relationId: authority.relationId,
-            }),
+      whoCanGive: (orgId) => {
+        const s0 = stateRef.current;
+        return auth.whoCanGive(s0, orgId ?? s0.activeOrgId);
+      },
+
+      mayIssueAuthority: (orgId) => {
+        const s0 = stateRef.current;
+        return Boolean(auth.grantFor(s0, s0.harness.persona, orgId ?? s0.activeOrgId, "authority:issue"));
+      },
+
+      authorityChoices: (orgId) => {
+        const s0 = stateRef.current;
+        return {
+          counterparties: auth.counterpartyOptions(s0),
+          tasks: auth.VOCABULARY,
+          licences: auth.licenceOptions(s0, orgId ?? s0.activeOrgId),
+        };
+      },
+
+      saveAuthorityDraft: (draft) => setState((s) => ({ ...s, authorityDraft: draft })),
+
+      checkAuthorityDraft: (draft) => auth.checkDraft(stateRef.current, draft),
+
+      giveAuthority: () => {
+        const s0 = stateRef.current;
+        const me = s0.harness.persona;
+        const d = s0.authorityDraft;
+        if (!d) return { ok: false, error: "no_draft" };
+        /* G1, G2 — the person and the organisation, read again at submission:
+           the screen that offered the button is not the boundary. */
+        const verdict = auth.giveVerdict(s0, me, d.orgId);
+        if (verdict.kind === "no_permission") return { ok: false, error: "E1" };
+        if (verdict.kind === "not_in_standing") return { ok: false, error: "E2" };
+        if (verdict.kind === "no_approver") return { ok: false, error: "no_approver" };
+        /* G4–G7. */
+        const check = auth.checkDraft(s0, d);
+        if (check.counterpartyDown) return { ok: false, error: "E5" };
+        if (Object.keys(check.errors).length) return { ok: false, error: "E6" };
+        if (check.duplicate && !d.duplicateOk) return { ok: false, error: "A3" };
+
+        const found = auth.grantFor(s0, me, d.orgId, "authority:issue");
+        const id = rid("g");
+        const tasks = d.tasks.filter((t) => auth.VOCABULARY.some((v) => v.scope === t && v.counterparty === d.counterparty));
+        const valueCapNu = Number(auth.digitsOnly(d.limit));
+        const approvalHash = auth.fingerprint([d.orgId, d.name.trim(), ...tasks, d.counterparty, ...d.licences, String(valueCapNu), d.until, id]);
+        const grant: AuthorityGrant = {
+          id,
+          orgId: d.orgId,
+          kind: "CAPABILITY",
+          name: d.name.trim(),
+          delegateName: null,
+          /* S4 — the number becomes its keyed hash here and is not kept. */
+          delegateIdKeyed: auth.keyedFor(d.orgId, d.cid),
+          delegateDid: null,
+          delegatePersonId: null,
+          tasks,
+          counterparties: [d.counterparty],
+          licenceNumbers: d.licences,
+          valueCapNu,
+          perTransaction: true,
+          validFrom: today(),
+          validUntil: d.until,
+          issuerDid: null,
+          revocationId: null,
+          grantedBy: me,
+          grantedRelationId: found?.relation.id ?? "",
+          approvedBy: null,
+          approvedRelationId: null,
+          approvalId: null,
+          credentialRef: null,
+          claimRef: null,
+          claimExpiresAt: null,
+          approvalHash,
+          status: "AWAITING_APPROVAL",
+          submittedAt: today(),
+          statusAt: today(),
+          endReason: null,
+          mismatches: 0,
+          offerExpiresAt: null,
+          accepted: false,
+        };
+        const where = auth.counterpartyName(s0, d.counterparty);
+        const audited = (s: DemoState): DemoState => ({
+          ...s,
+          authorityDraft: null,
+          auditEntries: appendAudit(s, {
+            operation: "authority:issue",
+            /* Who, what, where, which licence, the limit and the end date —
+               never the ID number, in any form (FLOW-AUT-01 §10 logging). */
+            summary: `Gave ${grant.name} authority to ${auth.tasksPhrase(tasks)} at ${where}, under licence ${namesOf(d.licences)}, up to ${auth.nu(valueCapNu)} per declaration, until ${d.until}`,
+            actorId: me,
+            relationId: found?.relation.id ?? null,
+            scopeVersion: found?.relation.scope.version ?? null,
+          }),
+        });
+
+        if (verdict.policy === "SINGLE_APPROVER") {
+          /* A1 — one other person, bound to the hash of what was submitted. */
+          const opId = rid("park");
+          const operation: ParkedOperation = {
+            id: opId,
+            orgId: d.orgId,
+            operation: "authority:issue",
+            summary: `Give ${grant.name} authority to ${auth.tasksPhrase(tasks)} at ${where}`,
+            requestedBy: me,
+            relationId: found?.relation.id ?? "",
+            scopeVersion: found?.relation.scope.version ?? 1,
+            targetId: id,
+            targetRelyingParty: where,
+            payloadHash: approvalHash,
+            policy: "SINGLE_APPROVER",
+            requiredSignatures: 1,
+            signatures: [],
+            state: "parked",
+            decisionReason: null,
+            createdAt: today(),
+            expiresAt: auth.inDays(auth.APPROVAL_DAYS),
           };
-        }),
-
-      suspendAuthority: (id, reason) =>
-        setState((s) => {
-          const authority = s.delegatedAuthorities.find((a) => a.id === id);
-          if (!authority) return s;
-          return {
-            ...s,
-            delegatedAuthorities: s.delegatedAuthorities.map((a) =>
-              a.id === id
-                ? { ...a, status: "SUSPENDED", endedAt: today(), endedReason: reason }
-                : a,
-            ),
-            auditEntries: appendAudit(s, {
-              operation: "authority:suspend",
-              summary: `Suspended ${authority.title}`,
-              actorId: s.harness.persona,
-              relationId: authority.relationId,
+          setState((s) =>
+            audited({
+              ...s,
+              authorityGrants: [{ ...grant, approvalId: opId }, ...s.authorityGrants],
+              parkedOperations: [operation, ...s.parkedOperations],
             }),
-          };
-        }),
+          );
+          noteTo(s0, verdict.approvers, auth.NOTICE_GRANT.approve(nameOf(s0, me), grant.name, operation.expiresAt), d.orgId).forEach((n) => log(n.text, n.orgId));
+          return { ok: true, grantId: id, status: "AWAITING_APPROVAL" };
+        }
 
-      reactivateAuthority: (id) =>
+        /* AUTO — straight on to the listing and the link (steps 5–7). */
+        const withGrant = audited({ ...s0, authorityGrants: [grant, ...s0.authorityGrants] });
+        const step = towardClaimable(withGrant, id, true);
+        setState((s) => towardClaimable(audited({ ...s, authorityGrants: [grant, ...s.authorityGrants] }), id, true).next);
+        step.notes.forEach((n) => log(n.text, n.orgId));
+        return { ok: true, grantId: id, status: step.next.authorityGrants.find((g) => g.id === id)?.status ?? "CLAIMABLE" };
+      },
+
+      cancelGrant: (grantId) => {
+        const s0 = stateRef.current;
+        const me = s0.harness.persona;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        if (!g) return { ok: false, error: "too_late" };
+        /* E14 — anyone holding authority:issue here, not only the grantor. */
+        if (!auth.grantFor(s0, me, g.orgId, "authority:issue")) return { ok: false, error: "not_permitted" };
+        if (!auth.cancellable(g)) return { ok: false, error: "too_late" };
+        const by = nameOf(s0, me);
+        const reason = `Cancelled by ${by} on ${formatDate(today())}. The link no longer works.`;
         setState((s) => {
-          const authority = s.delegatedAuthorities.find((a) => a.id === id);
-          if (!authority) return s;
-          return {
+          const live = s.authorityGrants.find((x) => x.id === grantId);
+          if (!live || !auth.cancellable(live)) return s;
+          return endGrant(
+            {
+              ...s,
+              parkedOperations: s.parkedOperations.map((p) =>
+                p.id === live.approvalId && p.state === "parked"
+                  ? { ...p, state: "stale" as const, invalidatedReason: `${by} cancelled this before anyone approved it.` }
+                  : p,
+              ),
+              auditEntries: appendAudit(s, {
+                operation: "authority:cancel",
+                summary: `Cancelled the authority for ${auth.delegateNameOf(live)} before it was collected`,
+                actorId: me,
+              }),
+            },
+            grantId,
+            "CANCELLED",
+            reason,
+            { cancelledBy: me },
+          );
+        });
+        /* The grantor, if someone else cancelled it; and the Root, if the
+           grantor isn't the Root — cancellation isn't in D18's list, and is
+           added here (pr-8, optional). */
+        const { grantor, root } = auth.toldOf(s0, g);
+        const name = auth.delegateNameOf(g);
+        if (grantor !== me) noteTo(s0, [grantor], `${by} cancelled the authority for ${name}. The link no longer works.`, g.orgId).forEach((n) => log(n.text, n.orgId));
+        if (root && root !== me) noteTo(s0, [root], auth.NOTICE_GRANT.rootOutcome(nameOf(s0, g.grantedBy), `${by} cancelled the authority for ${name}.`), g.orgId).forEach((n) => log(n.text, n.orgId));
+        return { ok: true };
+      },
+
+      grantApprovers: (grantId) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        return g ? sharing.approversFor(s0, g.orgId, g.grantedBy) : [];
+      },
+
+      settleAuthorityListing: (grantId, confirmed) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        if (!g || g.status !== "AWAITING_LISTING") return;
+        if (!confirmed) {
+          /* E3 after 24 hours: FAILED, nothing given; the listing is tried
+             again from scratch by the next grant. */
+          setState((s) => ({
+            ...endGrant(s, grantId, "FAILED", auth.NOTICE_GRANT.listingFailed),
+            organizations: s.organizations.map((o) => (o.id === g.orgId && o.authorityListing?.status === "PENDING" ? { ...o, authorityListing: undefined } : o)),
+          }));
+          toldAbout(s0, g, auth.NOTICE_GRANT.listingFailed, auth.NOTICE_GRANT.listingFailed).forEach((n) => log(n.text, n.orgId));
+          return;
+        }
+        /* Step 6, A4: listed CURRENT for the Capability type only, and the
+           did:ethr made primary once listed (§7.1). Every grant waiting on
+           the listing goes on to its link. */
+        const run = (s: DemoState): GrantStep => {
+          let next: DemoState = {
             ...s,
-            delegatedAuthorities: s.delegatedAuthorities.map((a) =>
-              a.id === id ? { ...a, status: "ACTIVE", endedAt: null, endedReason: null } : a,
+            organizations: s.organizations.map((o) =>
+              o.id === g.orgId && o.authorityListing
+                ? { ...o, authorityListing: { ...o.authorityListing, status: "CURRENT" as const, listedAt: today() } }
+                : o,
             ),
-            auditEntries: appendAudit(s, {
-              operation: "authority:reactivate",
-              summary: `Reinstated ${authority.title}`,
-              actorId: s.harness.persona,
-              relationId: authority.relationId,
-            }),
           };
-        }),
+          const notes: Note[] = [];
+          for (const w of s.authorityGrants.filter((x) => x.orgId === g.orgId && x.status === "AWAITING_LISTING")) {
+            const step = towardClaimable(next, w.id, w.id === grantId);
+            next = step.next;
+            notes.push(...step.notes);
+          }
+          return { next, notes };
+        };
+        setState((s) => run(s).next);
+        run(s0).notes.forEach((n) => log(n.text, n.orgId));
+      },
 
-      revokeAuthority: (id, reason) =>
-        setState((s) => {
-          const authority = s.delegatedAuthorities.find((a) => a.id === id);
-          if (!authority) return s;
+      lapseGrant: (grantId) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        if (!g) return;
+        /* Seven days are moved back rather than waited for; the same
+           date-driven ending every list reads then ends it. */
+        const back = (s: DemoState) =>
+          patchGrant(s, grantId, g.status === "CLAIMABLE" ? { claimExpiresAt: auth.inDays(-1) } : { submittedAt: auth.inDays(-(auth.APPROVAL_DAYS + 1)) });
+        setState((s) => endByDate(back(s)).next);
+        endByDate(back(s0)).notes.forEach((n) => log(n.text, n.orgId));
+      },
 
-          /* Revoking a role does NOT mark its children revoked, and that is
-             deliberate rather than an omission. A capability hanging off a
-             withdrawn role is still a valid credential in the holder's
-             wallet — what has changed is that the chain above it is broken,
-             which is what the verification service discovers when it walks
-             it. Cascading a status onto the children would hide the very
-             mechanism Act 5 exists to show, and would also be a lie about
-             what the holder's wallet contains. */
-          const reference = `AP-${new Date().getFullYear()}-${Math.floor(
-            1000 + Math.random() * 8999,
-          )}`;
+      simulateLicenceIssued: () => {
+        const s0 = stateRef.current;
+        const licence = SEED.heldCredentials.find((c) => c.id === "hc-licence-plg");
+        if (!licence || s0.heldCredentials.some((c) => c.id === licence.id)) return;
+        setState((s) => ({ ...s, heldCredentials: [{ ...licence, orgId: PELDEN, receivedAt: today() }, ...s.heldCredentials] }));
+        log("Ministry of Industry, Commerce & Employment issued Pelden's business licence BL-PLG-2025-00871", PELDEN);
+      },
 
-          return {
-            ...s,
-            delegatedAuthorities: s.delegatedAuthorities.map((a) =>
-              a.id === id
-                ? {
-                    ...a,
-                    status: "REVOKED",
-                    endedAt: today(),
-                    endedReason: reason,
-                    appealReference: reference,
-                  }
-                : a,
+      simulateLicenceRevoked: (licenceNumber) => {
+        setState((s) => ({
+          ...s,
+          heldCredentials: s.heldCredentials.map((c) => (auth.licenceNumberOf(c) === licenceNumber ? { ...c, status: "revoked" as const } : c)),
+        }));
+        log(`Ministry of Industry, Commerce & Employment revoked business licence ${licenceNumber}`);
+      },
+
+      dismissFirstGrantNotice: () =>
+        setState((s) => ({
+          ...s,
+          organizations: s.organizations.map((o) =>
+            o.id === s.activeOrgId && o.authorityListing ? { ...o, authorityListing: { ...o.authorityListing, firstNotice: null } } : o,
+          ),
+        })),
+
+      openClaim: (ref) => {
+        const s0 = stateRef.current;
+        const g = claimable(s0, ref);
+        /* S3 — before identity, the organisation's name and nothing more;
+           an unknown, lapsed, cancelled or used link, nothing at all (E7). */
+        return g ? { kind: "valid", orgName: auth.orgName(s0, g.orgId) } : { kind: "invalid" };
+      },
+
+      presentCitizenCredential: (ref, cid) => {
+        const s0 = stateRef.current;
+        const g = claimable(s0, ref);
+        if (!g) return { ok: false, error: "E7" };
+        const name = auth.delegateNameOf(g);
+        const citizen = SIM_CITIZENS.find((c) => c.cid === auth.digitsOnly(cid));
+
+        /* G8 — the keyed hash of the presented number against the grant's. */
+        if (auth.keyedFor(g.orgId, cid) !== g.delegateIdKeyed) {
+          const mismatches = g.mismatches + 1;
+          if (mismatches >= auth.MAX_MISMATCHES) {
+            /* E9, the third time: FAILED, the grantor and the Root told. */
+            const text = auth.NOTICE_GRANT.someoneElse(name);
+            setState((s) => endGrant(s, g.id, "FAILED", text, { mismatches }));
+            toldAbout(s0, g, text, text).forEach((n) => log(n.text, n.orgId));
+            return { ok: false, error: "E9", ended: true };
+          }
+          setState((s) =>
+            patchGrant(
+              { ...s, auditEntries: appendAudit(s, { operation: "authority:claim", summary: `Someone else tried to collect the authority for ${name}`, actorId: g.grantedBy }) },
+              g.id,
+              { mismatches },
             ),
-            /* The holder is notified with a reason and an appeal reference.
-               Withdrawal without a route to challenge it is the thing the
-               appeal right exists to prevent, so the notice is created here
-               rather than being something an operator remembers to send. */
-            appeals: [
+          );
+          return { ok: false, error: "E9", ended: false };
+        }
+
+        /* G2–G6 again (E11). */
+        const problem = auth.recheck(s0, g);
+        if (problem) {
+          const text = auth.NOTICE_GRANT.couldNot(name, problem);
+          setState((s) => endGrant(s, g.id, "FAILED", text));
+          toldAbout(s0, g, text, text).forEach((n) => log(n.text, n.orgId));
+          return { ok: false, error: "E11" };
+        }
+
+        /* Opened again while an offer is still out (pr-8 item 2): the same
+           offer is shown again once the identity matches — nothing new is
+           generated, and nothing is shown before the match. An offer whose
+           30 minutes have passed is withdrawn first (E13), so this one is
+           new, with a new revocation id. */
+        const offerLive = g.status === "ISSUING" && g.offerExpiresAt !== null && g.offerExpiresAt > Date.now();
+        if (!offerLive) {
+          setState((s) =>
+            patchGrant(
               {
-                id: rid("ap"),
-                reference,
-                subjectId: authority.recipientId,
-                againstKind: "authority" as const,
-                againstId: authority.id,
-                againstTitle: authority.title,
-                noticeReason: reason,
-                noticeIssuedAt: today(),
-                submittedAt: null,
-                submission: null,
-                state: "notice_issued" as const,
-                windowWorkingDays: 10,
-                decisionWorkingDays: 5,
-                evidence: [],
+                ...s,
+                auditEntries: appendAudit(s, {
+                  operation: "authority:claim",
+                  summary: `${citizen?.name ?? name} proved who they are and is collecting their authority`,
+                  actorId: g.grantedBy,
+                }),
               },
-              ...s.appeals,
-            ],
-            auditEntries: appendAudit(s, {
-              operation: "authority:revoke",
-              summary: `Revoked ${authority.title} held by ${
-                s.people.find((p) => p.id === authority.recipientId)?.name ?? "the holder"
-              }`,
-              actorId: s.harness.persona,
-              relationId: authority.relationId,
-            }),
-          };
-        }),
+              g.id,
+              {
+                status: "ISSUING",
+                statusAt: today(),
+                /* The verified name, from the citizen credential (D11). */
+                delegateName: citizen?.name ?? name,
+                delegatePersonId: citizen?.personId ?? null,
+                delegateDid: g.delegateDid ?? newDidId("did:key"),
+                /* Generated now, registered only if accepted (D23). */
+                revocationId: uuidish(),
+                offerExpiresAt: Date.now() + auth.OFFER_MS,
+              },
+            ),
+          );
+        }
+        return { ok: true, grantId: g.id };
+      },
+
+      answerOffer: (ref, outcome) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.claimRef === ref && x.status === "ISSUING" && !x.accepted);
+        if (!g) return;
+        const name = auth.delegateNameOf(g);
+        if (outcome === "expire" || outcome === "send_failed") {
+          /* E13, E12 — back to CLAIMABLE; the unregistered id discarded. */
+          setState((s) => patchGrant(s, g.id, { status: "CLAIMABLE", statusAt: today(), revocationId: null, offerExpiresAt: null }));
+          return;
+        }
+        if (outcome === "decline") {
+          /* A2 — nothing registered, the grantor and the Root told. */
+          setState((s) => endGrant(s, g.id, "DECLINED", auth.NOTICE_GRANT.declined(name)));
+          toldAbout(s0, g, auth.NOTICE_GRANT.declined(name), auth.NOTICE_GRANT.declined(name)).forEach((n) => log(n.text, n.orgId));
+          return;
+        }
+        if (outcome === "accept_unregistered") {
+          /* E17 — accepted; the registration fails and is retried. The
+             grant stays ISSUING and can no longer be cancelled. */
+          setState((s) => patchGrant(s, g.id, { accepted: true, offerExpiresAt: null }));
+          return;
+        }
+        const step = activate(s0, g.id);
+        setState((s) => activate(s, g.id).next);
+        step.notes.forEach((n) => log(n.text, n.orgId));
+      },
+
+      finishRegistration: (grantId) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        if (!g || g.status !== "ISSUING" || !g.accepted) return;
+        const step = activate(s0, grantId);
+        setState((s) => activate(s, grantId).next);
+        step.notes.forEach((n) => log(n.text, n.orgId));
+      },
 
       runVerification: (input) => {
         /* Derived from state at the moment of asking, which is the whole
@@ -2515,14 +3059,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             /* Upholding an appeal reinstates what was withdrawn. An appeal
                process that concluded in someone's favour and left the
                authority revoked would be a complaints box, not a remedy. */
-            delegatedAuthorities:
+            /* Withdrawing and reinstating authority is catalogue flow 11,
+               which has no specification yet; an upheld appeal against a
+               withdrawn grant puts it back as it was. */
+            authorityGrants:
               outcome === "upheld_reinstated" && appeal.againstKind === "authority"
-                ? s.delegatedAuthorities.map((d) =>
-                    d.id === appeal.againstId
-                      ? { ...d, status: "ACTIVE", endedAt: null, endedReason: null }
-                      : d,
+                ? s.authorityGrants.map((g) =>
+                    g.id === appeal.againstId && g.status === "REVOKED"
+                      ? { ...g, status: "ACTIVE" as const, statusAt: today(), endReason: null }
+                      : g,
                   )
-                : s.delegatedAuthorities,
+                : s.authorityGrants,
             auditEntries: appendAudit(s, {
               operation: outcome === "upheld_reinstated" ? "appeal:uphold" : "appeal:reject",
               summary:
@@ -3243,9 +3790,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep },
         })),
 
-      /* The first day, plus the two invitations the guide sends in chapters
-         5 and 7, accepted — each through the same joinOrganisation every
-         acceptance uses, so the state is the one the guide would reach. */
+      /* The first day, plus the invitation the guide sends in chapter 5,
+         accepted — through the same joinOrganisation every acceptance uses,
+         so the state is the one the guide would reach. */
       startTeamReady: () =>
         setState((s) => {
           let next: DemoState = {
@@ -3253,10 +3800,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             activeOrgId: PELDEN,
             harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep },
           };
-          for (const [personId, email, name] of [
-            ["ugyen", "ugyen.phuntsho@peldentrading.bt", "Ugyen Phuntsho"],
-            ["pema", "pema.choden@druksharpa.bt", "Pema Choden"],
-          ] as const) {
+          /* Ugyen only. Pema, the clearing agent, needs no account to act
+             for Pelden — she receives authority from a link (EW-FLOW8-SD
+             D10) — so she is never invited. */
+          for (const [personId, email, name] of [["ugyen", "ugyen.phuntsho@peldentrading.bt", "Ugyen Phuntsho"]] as const) {
             const inv: OrgInvitation = {
               id: `inv-${personId}-team`,
               kind: "M",

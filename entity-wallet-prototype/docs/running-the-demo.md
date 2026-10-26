@@ -16,9 +16,9 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
-approval to verify or issue, designating an authority, receiving a credential
-and sharing one — thirteen chapters, 86 steps, starting on the platform's day
-zero:
+approval to verify or issue, designating an authority, receiving a credential,
+sharing one and giving a clearing agent authority to act — thirteen chapters,
+87 steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -51,24 +51,16 @@ zero:
    same way the platform admins did — and lands in Pelden's console as a
    member with no authority. Back as Dorji, the Members page lists Ugyen:
    identity not yet confirmed, authority none.
-6. **Give someone authority to act** (FLOW-DEL-01) — Dorji chooses Ugyen and
+6. **Appoint someone** (FLOW-DEL-01) — Dorji chooses Ugyen and
    ticks what they can do (**Receive credentials**) from four boxes that
    combine, sees what Ugyen won't be able to do worked out from the rest,
    and confirms they're authorised to make the
    appointment; citing a document is optional and folded away. Ugyen reviews
    who appointed them and what they can and can't do, then **one approval in
-   their NDI wallet** both confirms who they are and accepts.
-7. **A role in a wallet — Flow 8, ahead of spec** — Dorji invites Pema Choden, the
-   clearing agent at Druk Sharpa Freight (`pema.choden@druksharpa.bt`); Pema
-   sets up from the link. Then Dorji issues Pema a **role** — *Customs
-   clearing agent*, customs declarations only, Nu. 500,000 per transaction,
-   Bhutan National Single Window only, for a year — into Pema's own wallet.
-   **Accept it as Pema** (dashed, stands in for Pema's phone) is both Pema's
-   consent and the proof of who Pema is. Members then shows three people,
-   three authorities: Dorji the representative, Ugyen able to receive
-   credentials, Pema with a role in their own wallet. The screen is marked
-   **Flow 8 · ahead of spec**.
-8. **Recognise Bank of Bhutan** (FLOW-ACC-01, recognition) — Kinzang opens
+   their NDI wallet** both confirms who they are and accepts. (The page was
+   *Give someone authority to act*; UX-EW-01 v0.23 renamed it so it isn't
+   confused with Flow 8.)
+7. **Recognise Bank of Bhutan** (FLOW-ACC-01, recognition) — Kinzang opens
    **Accreditations**, where the bank is listed as seen verifying without an
    approval, asking for five things from the citizen credential. Kinzang
    proposes approving it, removing the date of birth and the address that
@@ -78,12 +70,12 @@ zero:
    public list of trusted organisations** with Yeshey's name recorded — and
    accepts with one wallet approval. The listing publishes and the bank is
    approved to verify, for three items where it used to ask for five.
-9. **Pelden asks to verify customers** (FLOW-ACC-02) — Dorji, as Pelden's
+8. **Pelden asks to verify customers** (FLOW-ACC-02) — Dorji, as Pelden's
    representative, asks to check customers are **over 18** — a check only,
    so Pelden never sees anyone's date of birth. Kinzang reviews and
    recommends approval without being able to edit it; Tshendu approves it as
    asked, and Pelden is listed.
-10. **Designate the ministry** (FLOW-ORG-02 Kind E, FLOW-ORG-03) — nobody
+9. **Designate the ministry** (FLOW-ORG-02 Kind E, FLOW-ORG-03) — nobody
     confirms sole proprietorships yet. Kinzang proposes the Ministry of
     Industry, Commerce & Employment, already on the platform; Tshendu
     approves. Kesang Wangmo, the ministry's director, reads what it is taking
@@ -92,7 +84,7 @@ zero:
     Kesang reads what people will be asked, sends back the date of birth the
     register doesn't need, and adopts for sole proprietorships. Then **Stop
     something** shows three different stops, none pre-selected.
-11. **Pelden gets its TPN** (FLOW-CRD-01, FLOW-CRD-03) — Dorji opens **Get a
+10. **Pelden gets its TPN** (FLOW-CRD-01, FLOW-CRD-03) — Dorji opens **Get a
     credential**, asks the Department of Revenue & Customs for the taxpayer
     number, and reads exactly what is shared: all of Pelden's registration,
     every item listed. Deki Yangzom, the tax office's officer, opens the
@@ -100,7 +92,7 @@ zero:
     kept apart as unverified. Deki issues; Dorji checks the details and
     accepts, and the Activity tab shows an offer the wallet refused on its
     own.
-12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
+11. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
     Bhutan's website (dashed), Dorji presses **Share from NDI Entity Wallet**,
     checks the bank's reference on the wallet's page, signs in, and reads
     every detail of the registration under *Bank of Bhutan will receive all
@@ -109,29 +101,40 @@ zero:
     asks again with nobody at a website: Ugyen, who can receive but not
     share, passes it to Dorji, who shares. History shows who shared; Refused
     shows a sender NDI doesn't list, which nobody was told about.
+12. **Authority for the clearing agent** (FLOW-AUT-01) — Dorji gives Pema
+    Choden, Druk Sharpa Freight's clearing agent, authority to submit and
+    amend customs declarations at the Bhutan National Single Window, under
+    Pelden's business licence (issued from a dashed step), up to Nu 1,000,000
+    per declaration, for 90 days. Pema is never invited: she needs no
+    account. The check screen says what she'll carry and what she won't —
+    not the licence, not the TPN. Pelden's first authority adds it to NDI's
+    list (dashed), then Dorji sends the link himself; Pema opens it, proves
+    who she is with Bhutan NDI (dashed), sees the full authority and accepts
+    it in the app (dashed). She is listed under *Active*.
 13. **Where to go next.**
 
-Both appointments follow the same rule: **invite first, appoint second**, and
-identity is confirmed **at the appointment, not at the invitation**
-(FLOW-ONB-02 §7.3). Giving authority follows FLOW-DEL-01; the role in a
-wallet is Flow 8, which has no specification yet, so it follows Story B5 and
-is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
+Appointing follows the rule **invite first, appoint second**, and identity
+is confirmed **at the appointment, not at the invitation** (FLOW-ONB-02
+§7.3); it follows FLOW-DEL-01. Giving a clearing agent authority is Flow 8 —
+FLOW-AUT-01, EW-FLOW8-SD and UX-EW-05 SCR-AUT-01 to 06 — where the agent is
+never invited and is identified when she collects it. Flow 4 follows FLOW-ACC-01
 v0.2, FLOW-ACC-02 v0.3 and UX-EW-02 v0.3 SCR-ACC-01 to 06 — the first-release
 simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
 and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01, FLOW-PRS-02 and
 EW-FLOW7-SD v0.2, with UX-EW-04 v0.2 SCR-PRS-01 to 06; the approval path —
 a Controller shares, the Root approves — is a Walk a flow entry, because the
 onboarding story never appoints anyone with *Share*. The screens for what
-comes after — verification at the Single Window, revocation, appeals, and
-Bank of Bhutan being verified — still exist and are described further down,
-but the guide and the demo controls no longer walk them.
+comes after — verification at the Single Window (Flow 9, ahead of its
+specification), appeals, and Bank of Bhutan being verified — still exist and
+are described further down, but the guide and the demo controls no longer
+walk them.
 
 ### The first day is really empty
 
 Registering Pelden lands on a first day, not on the story's three-months-in
 seed. Only Dorji is a member; nobody else from Pelden's side of the story has
 an account yet, so the persona switcher and the sign-in panel do not offer
-them, the Members page lists Dorji alone, and **Give someone authority**
+them, the Members page lists Dorji alone, and **Appoint someone**
 says there is nobody to choose yet and offers to invite someone.
 Everyone else arrives the way the member chapter shows: an invitation Dorji
 sends and they accept. The activity feed is Pelden's own — it shows who joined
@@ -151,10 +154,10 @@ Two things to do in the room before you say anything:
 1. **Open the demo controls** — bottom-left of the window, the small
    `Prototype · data simulated` chip with a **Demo controls** button beside it.
    That panel is your remote: the guided demo, the onboarding flows (root
-   admin, platform admin, new company, member, controller and delegate
-   appointment), who you are signed in as, and reset. Each flow starts from
+   admin, platform admin, new company, member, appointing someone, and
+   Flows 4 to 8), who you are signed in as, and reset. Each flow starts from
    the state it needs — day zero, the platform with its two admins, Pelden's
-   first day, or the first day with Ugyen and Pema joined — never from whatever the
+   first day, or the first day with Ugyen joined — never from whatever the
    last person left. Each screen's states are folded under **For reviewers**.
 2. **Press Reset demo** if anyone has touched it before you. The demo persists
    to browser storage, so it remembers whatever the last person did. Reset —
@@ -200,7 +203,7 @@ since removed — go to the route each one names).
 | 1 · The entity becomes real | The platform never asserts the entity's identity — a register does | 5 min |
 | 2 · Authority is granted, narrowly | Authority is a scoped, accepted relation, not a role dropdown | 6 min |
 | 3 · The Controller works, under approval | Least disclosure, an approval gate, dual attribution | 6 min |
-| 4 · Authority is delegated to a wallet | Constraints that travel with the credential | 3 min |
+| 4 · Authority given to act, in a wallet | Now Flow 8 — see its section | 5 min |
 | 5 · Authority is checked at the point of use | PASS, then FAIL with the failing link named | 4 min |
 | 6 · There is recourse | Revocation carries a reason and an appeal | 3 min |
 
@@ -302,7 +305,7 @@ available but not prompted.
 > "Nothing has happened here yet, and the console doesn't pretend otherwise."
 
 Pressing **Next** to act 2 moves the story on to Pelden three months in —
-Rinzin appointed, credentials held, an authority issued to Pema. Say so out
+Rinzin appointed, credentials held, Pema holding authority to act. Say so out
 loud: *"Let's skip ahead a few months."* Your account and anything you did in
 the onboarding flows are kept.
 
@@ -313,12 +316,12 @@ the onboarding flows are kept.
 For the Gate 2 review. Demo controls → **Walk a flow** offers the
 onboardings in focus — **Root signs in**, **Root invites a platform admin**,
 **Create an account**, **Register the company**, **Invite a member**,
-**Give someone authority** and **A role in a wallet (Flow 8, ahead of spec)** — each on its first
+**Appoint someone** — each on its first
 screen as the right person, from a known starting state: the root and admin
 flows on day zero, the company flows on the platform with its two admins
-(Kinzang and Tshendu) and no business, the member flow on Pelden's first day, and the
-two appointments on the first day with Ugyen and Pema already joined and
-holding no authority. The other walkthroughs below are still built but not in the controls:
+(Kinzang and Tshendu) and no business, the member flow on Pelden's first day, and
+appointing on the first day with Ugyen already joined and holding no
+authority. The other walkthroughs below are still built but not in the controls:
 switch person with **Driving as** and go to the route named in the heading.
 
 ### FLOW-ONB-02 · Root invites a platform admin — `/sign-in`
@@ -370,7 +373,7 @@ its only member.
    behalf yet.
 5. Back as Dorji, **Members** lists them — identity *not yet confirmed*
    (joining never asks the register), authority *none — membership only* —
-   and the dashboard's activity shows who joined. **Give someone authority**
+   and the dashboard's activity shows who joined. **Appoint someone**
    now offers them; confirming who they are happens when they accept.
 
 Invite a second colleague at an address the story does not know and they get
@@ -511,8 +514,11 @@ shown **straight after act 5**, while the revocation is fresh.
 
 Switch to **Pema** and open **Appeals**.
 
-> "She has just lost her role. Here is the notice, with the reason Dorji
+> "Her authority has been withdrawn. Here is the notice, with the reason Dorji
 > actually typed, and a reference. She did not have to go looking for it."
+
+(Withdrawing authority and appeals are catalogue flow 11, which has no
+specification yet; this screen predates it.)
 
 Type an answer in the box and press **Submit the appeal**.
 
@@ -527,19 +533,16 @@ Switch to **Dorji** and open **Appeals** again.
 
 Press **Uphold and reinstate**.
 
-> "That puts the role back exactly as it was. An appeal process that concluded
-> in someone's favour and left the authority revoked would be a complaints
-> box, not a remedy."
-
-**Then go back to `/verifier/bnsw` and submit the declaration again. It
-passes.** The chain is whole because the link was restored.
+> "That puts the authority back exactly as it was. An appeal process that
+> concluded in someone's favour and left the authority revoked would be a
+> complaints box, not a remedy."
 
 ---
 
-## The Act 2 walkthrough — giving someone authority to act (Flow 3)
+## The Act 2 walkthrough — appointing someone (Flow 3)
 
-**Walk a flow → Give someone authority**, as Dorji, on Pelden's first day
-with Ugyen and Pema joined. About five minutes. It follows FLOW-DEL-01 and
+**Walk a flow → Appoint someone**, as Dorji, on Pelden's first day
+with Ugyen joined. About five minutes. It follows FLOW-DEL-01 and
 UX-EW-01 SCR-DEL-02 to 05.
 
 ### 1 · Choose what they can do — `/people-who-can-act/give`
@@ -563,11 +566,11 @@ Worth showing:
 - **Share** asks for a reach: only organisations Dorji names, or any that
   asks. The ones Dorji can name are the organisations NDI has approved to
   verify — on the story's first day, only Bank of Bhutan; the list grows as
-  Flow 4 approves more. Named with none chosen, **Give authority** stays unavailable (E12).
+  Flow 4 approves more. Named with none chosen, **Appoint** stays unavailable (E12).
   With approval on and nobody else able to approve, it says before you
   submit that Dorji will be asked each time (A1). *Give authority to act*
   works the same way with its own approval setting.
-- Untick everything: **Give authority** is unavailable — choose at least one
+- Untick everything: **Appoint** is unavailable — choose at least one
   thing (E13).
 - Tick **Approve** with **Share**: the screen says Ugyen can approve what
   others share, never what they share themselves (A2). The approvals queue
@@ -580,7 +583,7 @@ Worth showing:
 - Someone who can already act is shown but can't be chosen (E3). Driven as
   Ugyen, the page says only Dorji can give authority (E1).
 
-Leave **Receive credentials**, tick the statement, **Give authority**.
+Leave **Receive credentials**, tick the statement, **Appoint**.
 
 ### 2 · Waiting — `/people-who-can-act`
 
@@ -748,7 +751,7 @@ isn't on NDI's list — nobody was notified.
 ## Flow 7 — presenting a credential
 
 Two ways in, from **Demo controls → Walk a flow → Presenting a credential**,
-and chapter 12 of the guided demo walks both routes in one go.
+and chapter 11 of the guided demo walks both routes in one go.
 
 The rules to point at: the **whole credential is shared** — every attribute,
 the asked-for ones marked, never a choice of attributes (EW-FLOW7-SD D4,
@@ -824,6 +827,90 @@ answer this yet*), with **NDI's list answers** to release it.
 Who is told is written to the dashboard's activity feed, naming who it goes
 to — UX-EW-04 has no notification copy yet, so the wording is the
 prototype's (see the what's-real page).
+
+---
+
+## Flow 8 — giving authority to act
+
+A business gives a named person — its clearing agent, or an employee —
+limited, time-bound authority to act for it at the Bhutan National Single
+Window, and that person collects it into their own Bhutan NDI app. It
+follows FLOW-AUT-01 v0.2, EW-FLOW8-SD v0.2 and UX-EW-05 v0.2, SCR-AUT-01 to
+06. Chapter 12 of the guided demo walks the representative's path; **Demo
+controls → Walk a flow → Giving authority to act** has three entries.
+
+The rules to point at:
+
+- **Who may give it comes from the relation**, never the person: the Root,
+  or a Controller appointed with *Give authority to act*. Anyone else sees
+  *Authority* but, in place of **Give authority**, the reason and who can
+  (E1). Whether someone else must approve comes from that box's setting —
+  one approver by default; the Root's own grants go at once.
+- **The agent needs no account** and isn't a member. She is identified when
+  she collects it, by the citizen ID number the grantor typed — kept only as
+  a keyed hash, never shown again, and not in what she carries.
+- **One kind of authority, no chains, no passing it on** (D1, D3). It names
+  the licence number she acts under, never the licence or the TPN — the
+  check screen says so in the sentence that must survive review.
+- **It is the organisation's**, not the grantor's: it stays in force if
+  whoever gave it leaves (D15).
+- **At most a year**, 90 days by default; the limit is per declaration.
+
+### The representative gives it — **The owner gives a clearing agent authority**, as Dorji
+
+Starts on Pelden's first day, so it is Pelden's first grant. **Authority**
+is empty: *Nobody can act for Pelden Trading Pvt. Ltd. outside the wallet
+yet…* Press **Give authority**.
+
+The form asks where first (only the Single Window is offered), then what
+(*Submit customs declarations*, *Amend customs declarations*), then which
+licence. Pelden has none yet, so the form says *Declaring at Bhutan National
+Single Window needs a business licence that someone acting for you can use.
+You don't have one yet.* with **Get a business licence** — press **Have the
+ministry issue Pelden's business licence** (dashed) instead. Enter **Pema
+Choden**, **11512002960**, tick both tasks and **BL-PLG-2025-00871**, type
+**1000000**, leave the date, **Continue**.
+
+**Check and give** reads the terms as one sentence, then *What they carry* —
+including what she won't. **Give authority**. Pelden isn't yet on NDI's
+list as able to give authority, so SCR-AUT-04 shows *Setting up Pelden
+Trading Pvt. Ltd. to give authority…*; press **NDI's list confirms…**
+(dashed). The link appears with **Copy link** and **Show QR code** — Dorji
+sends it himself. Press **Open the link as Pema Choden** (dashed).
+
+On the claim page — no sign-in — only Pelden's name and *Only continue if
+you expected authority from Pelden Trading Pvt. Ltd.* Press **Continue with
+Bhutan NDI**, then in the dashed app panel **Share Pema Choden's ID**. The
+full authority appears, addressed to her; press **Accept in the app**
+(dashed). Back as Dorji, **Authority** lists her under *Active*.
+
+Things worth trying on the way:
+
+| Try | Shows |
+|---|---|
+| Share someone else's ID on the claim page | E9 — *This authority is for someone else…*; the third ends it, and Dorji is told |
+| **Let seven days pass** on the waiting link | E15 — *…didn't collect their authority by…*, under Ended |
+| **Have the ministry revoke BL-PLG-2025-00871**, then collect | E11 at collection — nothing is given |
+| **Decline in the app**, **Let 30 minutes pass**, **The offer can't be sent**, **Accept — the registration is slow** | A2, E13, E12, E17 |
+| **Cancel this authority** while it waits | E14 — *Cancelled. The link no longer works.*, and the link reads as dead |
+| Give Pema the same again | A3 — *Pema Choden already has authority for this until…* |
+
+### A Controller gives it, the representative approves — as Rinzin, then Dorji
+
+Starts three months on. Rinzin holds *Give authority to act* at its default,
+so **Check and give** says *Dorji Wangchuk will be asked to approve before
+the link is ready*, and SCR-AUT-04 says *Sent to Dorji Wangchuk to approve.*
+Switch to Dorji: **Approvals** lists it (and Sangay Wangmo's, seeded); it
+opens SCR-AUT-06 — *Rinzin Dema wants to give … authority* — with **Approve —
+the link will be ready for …** and **Don't approve** with a note. Rinzin
+can't approve her own: she sees the content and *You can't approve your
+own.* Dorji is told whenever someone else's link goes out and when it is
+collected, declined, fails, lapses or is cancelled — in the activity feed.
+
+### Collecting from a link — **Collect authority from a link**
+
+Opens the seeded link for Kinley Wangdi with nobody signed in. **Share
+Kinley Wangdi's ID** matches; anyone else's doesn't.
 
 ---
 
@@ -920,131 +1007,26 @@ Point at the disclosed line:
 
 ---
 
-## The Acts 4 and 5 walkthrough
+## The Single Window page — Flow 9, ahead of its specification
 
-About seven minutes, and the part worth rehearsing. **This is the strongest
-thing in the demo** — if you are short on time, cut Act 2 and show this.
-
-### 1 · Issue the authority — act button **4**
-
-You land on `/delegated-authority/new` as Dorji. The form is prefilled with a
-sensible capability, so you can talk rather than type.
-
-Point at the right-hand panel — **What a counterparty reads**:
-
-> "Everything on the left ends up in that panel, and that panel is public.
-> Whoever Pema shows this credential to can read all of it and check it
-> themselves. They do not call us to ask."
-
-Two things to say while you are here:
-
-- **Change the cap** to something like `250000` and watch the panel update.
-  > "This is not a setting. It is a term written into a credential that
-  > strangers will enforce."
-- **Point at the expiry** — 90 days by default, and there is no
-  "never expires" option at all.
-  > "Expiry is what limits the damage when a withdrawal comes late or never
-  > happens. So it is short unless someone deliberately lengthens it."
-- **Leave "Hangs off" on Customs broker.** It defaults there, and it is what
-  makes act 5 work — the capability depends on the role, so withdrawing the
-  role withdraws this too.
-  > "This is where the chain comes from. A capability almost always derives
-  > from a role, and that dependency is the thing act five is about."
-
-Press **Issue to Pema**. You get *awaiting acceptance*:
-
-> "Nothing has been granted yet. It is an offer sitting in her wallet.
-> Accepting it is her consent — until she does, she holds no authority and
-> nothing can be done in her name."
-
-Press **Simulate Pema accepting**, then **See it checked at a counterparty**.
-
-### 2 · The PASS — `/verifier/bnsw`
-
-**Stop and point out the chrome.** No sidebar, no NDI logo, different colours,
-and a line reading *Not part of NDI Studio*.
-
-> "We have left the product. This stands in for the Single Window's own
-> website — a different organisation's system — and it is about to check
-> Pema's authority without asking Pelden Trading anything."
+`/verifier/bnsw` stands in for the Bhutan National Single Window's own
+website, where Pema declares under the authority Flow 8 gave her. It
+predates EW-FLOW9-SD and says so in its footer: it still sends each
+declaration to her wallet and to an NDI verification API, which the
+specification replaces with one sign-in and `client-service` checks. Flow 9
+is rebuilt next. It now reads Flow 8's grants — no role chain, and no
+grantor's relation in what it checks.
 
 **Say plainly that BNSW is not live yet** if anyone from customs, trade or
-GovTech is in the room — they will know. Its main system is still being
-procured; customs today runs on DRC's eCMS, which is the likely interim
-counterparty. That is also why delegation is fast-follow rather than first
-release: it waits on a counterparty being ready. The page footer and
-`/whats-real` both say so.
-
-Leave the value at `420000`. Press **Submit declaration**.
-
-You get a wallet hand-off — a QR and *waiting for Pema to authorise*. Say:
-
-> "She is authorising **this declaration**, on her own phone. Not signing in.
-> Not authorising everything. That specific transaction."
-
-(There is a **Skip the wait** link if you are pressed for time.)
-
-Then the decision: a green **PASS**, five checks each naming what it looked
-at, the four-link authority chain, and a signature.
-
-> "Five constraints, all checked by them, not us. And notice what the bank
-> learned about Pema: her name. Not her citizenship number, not her address,
-> not what else she is allowed to do."
-
-### 3 · The FAIL — the moment the demo exists for
-
-Switch to **Dorji** in the demo controls, then go to **Delegated authority**
-and press **Withdraw** on **Customs broker** — the *role*, not the capability.
-It is the top row, in bold, marked *2 depend on it*; the Declaration
-authority you just issued sits indented beneath it. Point at that before you
-click:
-
-> "The list is the chain. Everything indented under this row hangs off it.
-> Watch what withdrawing it does to them."
-
-**Do not rush the blast-radius panel.** It is computed from what actually
-depends on that role:
-
-> "It is telling him that Declaration authority — the thing he issued five
-> minutes ago — stops working too. Because it hangs off this. He is not
-> withdrawing one credential, he is withdrawing a branch."
-
-Type a reason. Point out that it is required:
-
-> "Pema gets told this, with a reference she can appeal against. Withdrawing
-> someone's authority without telling them why leaves them nothing to
-> challenge."
-
-Press **Revoke — final**, confirm, and you land back at the Single Window.
-
-**Submit the same declaration again.** Same value, same person, same
-counterparty.
-
-> "Nothing about Pema's credential changed. It is still in her wallet, still
-> valid, still unexpired."
-
-**FAIL.** The chain now shows *Customs broker* struck through as revoked — and
-the capability below it marked *valid in itself, but unreachable*.
-
-> "That is the whole system in one screen. Her capability is fine. What broke
-> is the authority above it. And this counterparty found that out by walking
-> the chain, in under a second, without anyone telling them to."
-
-### 4 · If someone asks about the service going down
-
-Press **Submit with the service unreachable**.
-
-> "Not verified — and treated as a failure. There is no spinner that eventually
-> shrugs and lets it through. If we cannot establish the authority, there is no
-> authority."
-
-### Other things you can show on the verifier
+GovTech is in the room. Its main system is still being procured; customs
+today runs on DRC's eCMS.
 
 | Try | What it demonstrates |
 |---|---|
-| Value `900000` | The cap refusing it, naming the cap |
-| The **fail** state in the switcher | The FAIL without having to revoke anything |
-| `/delegated-authority/da-cap-lapsed/revoke` | An authority that expired on its own |
+| Value `420000`, **Submit declaration** | PASS: the checks, each naming what it looked at |
+| Value `1200000` | The limit refusing it, per declaration |
+| **Submit with the service unreachable** | Fails closed |
+| The **fail** state in the switcher | A withdrawn authority (withdrawing is flow 11, not built) |
 
 ---
 
@@ -1068,8 +1050,12 @@ Worth showing:
 | `/people-who-can-act` | **only_you**, **pending**, **accepted**, **declined**, **expired** | SCR-DEL-05, including a verified name that differs from the account |
 | `/onboarding/foundational` | **not_yet_accepted**, **declined**, **sole_proprietorship** | Verified but not usable yet; no delegation for a proprietor |
 | `/verifier/bnsw` | **pass**, **fail**, **service_unreachable** | All three outcomes, no setup needed |
-| `/delegated-authority/.../revoke` | **suspended**, **revoked** | Reversible vs final |
-| `/delegated-authority` | **empty** | First-run, before anything is delegated |
+| `/authority-to-act` | **empty**, **no_permission**, **not_in_standing**, **first_grant**, **offline** | SCR-AUT-01: E1 and E2 in place of *Give authority*, and the first-grant notice |
+| `/authority-to-act/give` | **licence_unavailable**, **counterparty_unavailable**, **field_error**, **duplicate**, **no_permission** | SCR-AUT-02's E4, E5, E6 and A3 |
+| `/authority-to-act/give/check` | **default_auto**, **default_approval**, **error** | SCR-AUT-03 with and without an approver |
+| `/authority-to-act/g-…` | **waiting_approval**, **setting_up**, **setting_up_long**, **collecting**, **done**, **ended**, **no_permission** | SCR-AUT-04, A1, A4, E3 |
+| `/authority-to-act/g-sangay/approve` | **own**, **cant_go_ahead**, **grantor_lapsed**, **already_decided**, **no_permission** | SCR-AUT-06, E11, E16 |
+| `/authority/claim/…` | **error_link**, **error_no_app**, **error_not_you**, **error_no_answer**, **error_cant_give**, **error_offer_expired**, **declined**, **finishing** | SCR-AUT-05, E7–E13, A2, E17 |
 | `/dashboard` | **all_clear**, **access_suspended** | An empty queue, and a pulled authority |
 | `/wallet/offers/...` | **out_of_scope**, **requires_approval** | Both refusal shapes on any offer |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
@@ -1112,12 +1098,13 @@ Worth showing:
 
 Demo controls → **Driving as**. The four people the story is about:
 
-- **Dorji Wangchuk** — owner. Sees everything, including Controllership and
-  Delegated authority.
+- **Dorji Wangchuk** — owner. Sees everything, including Who can act and
+  Authority.
 - **Rinzin Dema** — controller. Sees Wallet. **No Controllership group at
   all.**
-- **Pema Choden** — clearing agent. Sees almost nothing; she works through her
-  own phone wallet and a counterparty's website.
+- **Pema Choden** — clearing agent. Not a member of Pelden and needs no
+  account: she collects her authority from a link and uses it at the Single
+  Window's website.
 - **Ugyen Phuntsho** — warehouse manager. Holds nothing until act 2 grants it,
   which is exactly why he is the one to build an authority for. Before that,
   his wallet correctly says he has no authority here.

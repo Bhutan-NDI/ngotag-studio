@@ -183,7 +183,11 @@ const PRIMARY: NavItem[] = [
       { label: "Audit", href: "/controllership/audit", icon: "fileText" },
     ],
   },
-  { label: "Delegated authority", icon: "send", href: "/delegated-authority", personas: OWNER },
+  /* Flow 8 — SCR-AUT-01. Read from the scope, like Approvals: anyone
+     whose relation here holds credential:list may see who can act for the
+     organisation; giving authority is decided on the page, from
+     authority:issue (UX-EW-05 SCR-AUT-01). Never from who the person is. */
+  { label: "Authority", icon: "send", href: "/authority-to-act", needs: "holder" },
   /* SCR-ACC-04 — whether the organisation is approved to verify or issue,
      and the way to ask. Any member may look; only the owner or the
      representative may act, which the page decides from the record. Not
@@ -289,7 +293,7 @@ interface SidebarProps {
 
 export function Sidebar({ open = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { harness, relations, currentPerson, organizations, activeOrgId, appeals, delegatedAuthorities } = useDemo();
+  const { harness, relations, currentPerson, organizations, activeOrgId, appeals, authorityGrants, mayOperate } = useDemo();
   const persona = harness.persona;
   const org = organizations.find((o) => o.id === activeOrgId);
   const can = (c: OrgCapability) => Boolean(org?.capabilities.includes(c));
@@ -323,6 +327,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       if (item.needs === "no-holder" && can("holder")) return false;
       if (item.needs && item.needs !== "no-holder" && !can(item.needs)) return false;
       if (item.label === "Approvals") return canDecideApprovals;
+      if (item.href === "/authority-to-act") return mayOperate(activeOrgId, "credential:list");
       /* Appeals exist for someone who has held an authority that could be
          taken away — or for the owner, who decides them. A colleague who
          joined a minute ago has nothing to appeal, and a nav row for it
@@ -332,7 +337,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           (item.personas as string[] | undefined)?.includes(persona) === true &&
           (persona === "dorji" ||
           appeals.some((a) => a.subjectId === persona) ||
-          delegatedAuthorities.some((d) => d.recipientId === persona) ||
+          authorityGrants.some((g) => g.delegatePersonId === persona) ||
           relations.some((r) => r.personId === persona))
         );
       }
@@ -425,7 +430,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             const href = item.href ?? "#";
             return (
               <Link
-                key={item.label}
+                key={item.href ?? item.label}
                 href={href}
                 onClick={onClose}
                 aria-current={isCurrent(href) ? "page" : undefined}

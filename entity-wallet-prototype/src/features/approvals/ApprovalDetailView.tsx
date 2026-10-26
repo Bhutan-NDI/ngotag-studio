@@ -79,12 +79,15 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
 
   const operation = parkedOperations.find((p) => p.id === operationId);
   const isShare = operation?.operation === "proof:present" && Boolean(operation.targetId);
+  /* A grant of authority likewise goes to SCR-AUT-06 (Flow 8). */
+  const isGrant = operation?.operation === "authority:issue" && Boolean(operation.targetId);
 
   useEffect(() => {
     if (isShare && operation?.targetId) router.replace(`/wallet/sharing/${operation.targetId}/approve`);
-  }, [isShare, operation?.targetId, router]);
+    if (isGrant && operation?.targetId) router.replace(`/authority-to-act/${operation.targetId}/approve`);
+  }, [isShare, isGrant, operation?.targetId, router]);
 
-  if (isShare) return null;
+  if (isShare || isGrant) return null;
 
   if (!operation) {
     return (

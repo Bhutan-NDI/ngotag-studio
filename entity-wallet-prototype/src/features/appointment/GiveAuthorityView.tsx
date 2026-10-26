@@ -23,7 +23,12 @@ import { LOCAL_MS } from "@/lib/demoTiming";
 import { PRESETS, describeGrant, shareTargets } from "./presets";
 
 /**
- * SCR-DEL-02 — Give someone authority to act. FLOW-DEL-01 steps 1–4.
+ * SCR-DEL-02 — Appoint someone. FLOW-DEL-01 steps 1–4.
+ *
+ * Named *Appoint someone* since UX-EW-01 v0.23, so that appointing a
+ * Controller is not confused with the *Give authority to act* box or with
+ * Flow 8's *Give authority*, which gives someone authority in their own
+ * wallet (UX-EW-05 SCR-AUT-02).
  *
  * ONE SCREEN, FOUR BOXES
  *
@@ -189,7 +194,7 @@ export function GiveAuthorityView() {
   }
 
   const header = (
-    <PageHeader crumbs={[{ label: "People who can act" }, { label: "Give authority" }]} title="Give someone authority to act" />
+    <PageHeader crumbs={[{ label: "People who can act" }, { label: "Appoint someone" }]} title="Appoint someone" />
   );
 
   if (face === "not_representative") {
@@ -528,13 +533,13 @@ export function GiveAuthorityView() {
                 ? `Choose at least one organisation ${chosenName} may share credentials with.`
                 : refused === "E13"
                   ? `Choose at least one thing ${chosenName} can do.`
-                  : `Only the representative can give people authority to act for ${short}.`}
+                  : `Only the representative can appoint people to act for ${short}.`}
           </p>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2.5">
           <GradientButton onClick={submit} disabled={!canSubmit || busy}>
-            {busy ? "Sending…" : "Give authority"}
+            {busy ? "Sending…" : "Appoint"}
           </GradientButton>
           <Link href="/members/invite">
             <HairlineButton>Invite someone first</HairlineButton>

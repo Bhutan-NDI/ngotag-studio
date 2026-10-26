@@ -16,6 +16,9 @@ import { ROUND_TRIP_MS, SKIP_AFTER_MS, WALLET_HANDOFF_MS } from "@/lib/demoTimin
 import { useDemo } from "@/lib/demoStore";
 import type { VerificationDecision } from "@/lib/demoData";
 
+/* The vocabulary's scope for declaring (EW-FLOW8-SD §5.2). */
+const SUBMIT = "nsw:submit-declaration";
+
 /**
  * D5 — the counterparty's own site, and the signed decision it renders.
  *
@@ -42,7 +45,7 @@ import type { VerificationDecision } from "@/lib/demoData";
  * personal attribute the declaration did not need.
  */
 export function VerifierView() {
-  const { delegatedAuthorities, personById, runVerification, decisions } = useDemo();
+  const { authorityGrants, runVerification, decisions } = useDemo();
 
   const screenState = useScreenState("D5", [
     "ready",
@@ -56,15 +59,16 @@ export function VerifierView() {
   const [decision, setDecision] = useState<VerificationDecision | null>(null);
   const [skippable, setSkippable] = useState(false);
 
-  /* The capability Pema files declarations under. Found by task rather than
-     by id, so it still resolves if the demo issued a fresh one in act 4. */
+  /* The authority the agent declares under: Flow 8's grant to submit
+     declarations here, found by task rather than by id so a grant given in
+     the demo is picked up. Read from the grant record only to keep this
+     stand-in page working until Flow 9 (EW-FLOW9-SD) is built — the real
+     counterparty sees only what is presented to it. */
   const capability =
-    delegatedAuthorities.find(
-      (a) => a.taskScopes.includes("customs:declaration") && a.kind === "capability" && a.status === "ACTIVE",
-    ) ??
-    delegatedAuthorities.find((a) => a.taskScopes.includes("customs:declaration"));
+    authorityGrants.find((a) => a.tasks.includes(SUBMIT) && a.status === "ACTIVE") ??
+    authorityGrants.find((a) => a.tasks.includes(SUBMIT) && a.credentialRef);
 
-  const holder = capability ? personById(capability.recipientId) : null;
+  const holder = capability ? { name: capability.delegateName ?? capability.name } : null;
 
   /* The state switcher shows a seeded decision of the requested kind, so
      every outcome is reachable without having to drive the story into it. */
@@ -102,7 +106,7 @@ export function VerifierView() {
             10000 + Math.random() * 89999,
           )}`,
           declaredValue: Number(value) || 0,
-          task: "customs:declaration",
+          task: SUBMIT,
           unreachable,
         });
         setDecision(result);
@@ -122,7 +126,7 @@ export function VerifierView() {
         10000 + Math.random() * 89999,
       )}`,
       declaredValue: Number(value) || 0,
-      task: "customs:declaration",
+      task: SUBMIT,
     });
     setDecision(result);
     setPhase("ready");
@@ -179,9 +183,9 @@ export function VerifierView() {
         {!capability ? (
           <Panel>
             <p className="relative z-[4] text-[13.5px] leading-[1.6] text-muted">
-              No declaration authority exists yet. Issue one first — the story
-              runner&rsquo;s act 4 does that — and this page will have something
-              to check.
+              Nobody has authority to declare for Pelden yet. Give it under
+              Authority, and collect it from the link, and this page will have
+              something to check.
             </p>
           </Panel>
         ) : (
@@ -219,7 +223,7 @@ export function VerifierView() {
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-faint">Under</dt>
-                    <dd className="m-0 text-body">{capability.title}</dd>
+                    <dd className="m-0 text-body">Authority to act for Pelden Trading</dd>
                   </div>
                 </dl>
 
@@ -291,8 +295,10 @@ export function VerifierView() {
         )}
 
         <p className="text-[12px] leading-[1.5] text-faint">
-          Prototype. The Single Window is not live yet, and there is no
-          Authority Verification API behind this page —{" "}
+          Prototype · Flow 9, ahead of its specification (EW-FLOW9-SD): it still
+          sends each declaration to the agent&rsquo;s wallet and to an NDI
+          verification API, which the specification replaces. The Single
+          Window is not live yet —{" "}
           <Link href="/dashboard" className="ndi-plainlink text-muted">
             back to the console
           </Link>

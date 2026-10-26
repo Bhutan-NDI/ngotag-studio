@@ -1,9 +1,10 @@
+import { taskLabel } from "./authority";
 import {
   PELDEN,
   inOrg,
   type AuthorityChainLink,
+  type AuthorityGrant,
   type ConstraintCheck,
-  type DelegatedAuthority,
   type DemoState,
   type VerificationDecision,
 } from "./demoData";
@@ -42,14 +43,23 @@ import {
  * wrong: the store owns it, and the store hands screens the result.
  */
 
-/** The chain from the entity's foundational credential down to an authority. */
-function walkChain(state: DemoState, authority: DelegatedAuthority): AuthorityChainLink[] {
+/**
+ * What an authority rests on, from the entity's foundational credential
+ * down to the grant itself.
+ *
+ * Two links, not a chain of relations and roles. Since Flow 8's
+ * specification the authority is the organisation's (EW-FLOW8-SD D15) — it
+ * doesn't depend on the relation of whoever granted it — and there is no
+ * Role above a Capability and no re-delegation (D1, D3). This is the
+ * minimum that keeps Flow 9's stand-in page working; Flow 9 itself
+ * (EW-FLOW9-SD, the checks through `client-service`) is rebuilt on its own.
+ */
+function walkChain(state: DemoState, authority: AuthorityGrant): AuthorityChainLink[] {
   const links: AuthorityChainLink[] = [];
 
-  const entity =
-    state.organizations.find((o) => o.id === state.activeOrgId)?.name ?? "The entity";
+  const entity = state.organizations.find((o) => o.id === authority.orgId)?.name ?? "The entity";
 
-  const foundational = state.heldCredentials.filter(inOrg(PELDEN)).find((c) => c.isFoundational);
+  const foundational = state.heldCredentials.filter(inOrg(authority.orgId)).find((c) => c.isFoundational);
   if (foundational) {
     links.push({
       id: foundational.id,
@@ -65,60 +75,20 @@ function walkChain(state: DemoState, authority: DelegatedAuthority): AuthorityCh
     });
   }
 
-  const relation = state.relations.find((r) => r.id === authority.relationId);
-  if (relation) {
-    const person = state.people.find((p) => p.id === relation.personId);
-    links.push({
-      id: relation.id,
-      label: relation.isRootAuthority ? "Root authority" : "Controllership",
-      kind: "relation",
-      heldBy: person?.name ?? "Unknown",
-      status:
-        relation.state === "ACTIVE"
-          ? "valid"
-          : relation.state === "SUSPENDED"
-            ? "suspended"
-            : relation.state === "EXPIRED"
-              ? "expired"
-              : "revoked",
-    });
-  }
-
-  /* Ancestors, oldest first. Collected by walking up from the authority and
-     then reversing, because the chain reads downward from the root and the
-     parent pointers only go the other way. */
-  const ancestry: DelegatedAuthority[] = [];
-  let cursor: DelegatedAuthority | undefined = authority;
-  const seen = new Set<string>();
-  while (cursor) {
-    /* A parent cycle would spin here forever. It cannot happen through the
-       UI, but a verification service that can be hung by malformed data is
-       not one you would deploy. */
-    if (seen.has(cursor.id)) break;
-    seen.add(cursor.id);
-    ancestry.unshift(cursor);
-    cursor = cursor.parentId
-      ? state.delegatedAuthorities.find((a) => a.id === cursor?.parentId)
-      : undefined;
-  }
-
-  for (const item of ancestry) {
-    const holder = state.people.find((p) => p.id === item.recipientId);
-    links.push({
-      id: item.id,
-      label: item.title,
-      kind: item.kind,
-      heldBy: holder?.name ?? "Unknown",
-      status:
-        item.status === "ACTIVE"
-          ? "valid"
-          : item.status === "SUSPENDED"
-            ? "suspended"
-            : item.status === "EXPIRED"
-              ? "expired"
-              : "revoked",
-    });
-  }
+  links.push({
+    id: authority.id,
+    label: `Authority to act for ${entity.replace(/ (Pvt\. )?Ltd\.$/, "")}`,
+    kind: "capability",
+    heldBy: authority.delegateName ?? authority.name,
+    status:
+      authority.status === "ACTIVE"
+        ? "valid"
+        : authority.status === "SUSPENDED"
+          ? "suspended"
+          : authority.status === "EXPIRED"
+            ? "expired"
+            : "revoked",
+  });
 
   return links;
 }
@@ -174,15 +144,14 @@ export function verifyAuthority(
   state: DemoState,
   input: VerificationRequestInput,
 ): VerificationDecision {
-  const authority = state.delegatedAuthorities.find((a) => a.id === input.authorityId);
-  const entity =
-    state.organizations.find((o) => o.id === state.activeOrgId)?.name ?? "The entity";
+  const authority = state.authorityGrants.find((a) => a.id === input.authorityId);
+  const entity = state.organizations.find((o) => o.id === (authority?.orgId ?? PELDEN))?.name ?? "The entity";
 
   const base = {
     id: `dec-${Math.random().toString(36).slice(2, 8)}`,
     verifier: input.verifier,
     entity,
-    actorId: authority?.recipientId ?? "unknown",
+    actorId: authority?.delegatePersonId ?? "unknown",
     authorityId: input.authorityId,
     declarationRef: input.declarationRef,
     declarationHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random()
@@ -236,71 +205,40 @@ export function verifyAuthority(
   });
   if (brokenLink && brokenLink.status !== "valid") {
     reasons.push(
-      `The ${brokenLink.label} ${LINK_NOUN[brokenLink.kind]} this authority depends on ${
-        LINK_VERB[brokenLink.status]
-      }.`,
-      "An authority cannot be relied on while anything it hangs off has stopped being valid.",
-    );
-  }
-
-  /* ---- Acceptance ---- */
-  if (authority.acceptance !== "accepted") {
-    checks.push({
-      label: "Accepted by the holder",
-      detail: "The holder has not accepted this authority",
-      outcome: "fail",
-    });
-    reasons.push(
-      "The holder has not accepted this authority, so it has never taken effect.",
+      brokenLink.kind === "capability"
+        ? `This authority ${LINK_VERB[brokenLink.status]}.`
+        : `The ${brokenLink.label} ${LINK_NOUN[brokenLink.kind]} this authority depends on ${LINK_VERB[brokenLink.status]}.`,
+      "An authority cannot be relied on once it, or the registration behind it, has stopped being valid.",
     );
   }
 
   /* ---- Task ---- */
-  const taskOk = authority.taskScopes.includes(input.task);
+  const taskOk = authority.tasks.includes(input.task);
   checks.push({
     label: "Task in scope",
-    detail: taskOk
-      ? `${input.task} is one of the granted tasks`
-      : `${input.task} was not granted`,
+    detail: taskOk ? `${taskLabel(input.task)} is one of the granted tasks` : `${taskLabel(input.task)} was not granted`,
     outcome: taskOk ? "pass" : "fail",
   });
-  if (!taskOk) reasons.push(`This authority does not cover ${input.task}.`);
+  if (!taskOk) reasons.push(`This authority does not cover ${taskLabel(input.task).toLowerCase()}.`);
 
-  /* ---- Value cap ---- */
-  if (authority.valueCap) {
-    const withinCap = input.declaredValue <= authority.valueCap.amount;
-    checks.push({
-      label: "Value within cap",
-      detail: `${formatNu(input.declaredValue)} declared against a ${formatNu(
-        authority.valueCap.amount,
-      )} ${authority.valueCap.perTransaction ? "per-transaction" : "total"} cap`,
-      outcome: withinCap ? "pass" : "fail",
-    });
-    if (!withinCap) {
-      reasons.push(
-        `The declared value exceeds the ${formatNu(authority.valueCap.amount)} cap on this authority.`,
-      );
-    }
-  }
+  /* ---- Value limit, per declaration (pr-8 item 1) ---- */
+  const withinCap = input.declaredValue <= authority.valueCapNu;
+  checks.push({
+    label: "Value within limit",
+    detail: `${formatNu(input.declaredValue)} declared against ${formatNu(authority.valueCapNu)} per declaration`,
+    outcome: withinCap ? "pass" : "fail",
+  });
+  if (!withinCap) reasons.push(`The declared value is more than the ${formatNu(authority.valueCapNu)} this authority allows per declaration.`);
 
   /* ---- Counterparty ---- */
-  const counterpartyOk =
-    authority.counterparties.mode === "any" ||
-    authority.counterparties.values.includes(input.verifier);
+  const verifierOrg = state.organizations.find((o) => o.name === input.verifier);
+  const counterpartyOk = Boolean(verifierOrg && authority.counterparties.includes(verifierOrg.id));
   checks.push({
     label: "Counterparty bound",
-    detail: counterpartyOk
-      ? `${input.verifier} matches the bound counterparty`
-      : `${input.verifier} is not a bound counterparty`,
+    detail: counterpartyOk ? `${input.verifier} matches the bound counterparty` : `${input.verifier} is not a bound counterparty`,
     outcome: counterpartyOk ? "pass" : "fail",
   });
-  if (!counterpartyOk) {
-    reasons.push(`This authority may only be used with ${
-      authority.counterparties.mode === "list"
-        ? authority.counterparties.values.join(" and ")
-        : "its bound counterparties"
-    }.`);
-  }
+  if (!counterpartyOk) reasons.push("This authority may not be used here.");
 
   /* ---- Validity window ---- */
   const today = new Date().toISOString().slice(0, 10);

@@ -185,7 +185,7 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
               <Link href="/people-who-can-act/give">
                 <GradientButton>
                   <Icon name="userCheck" size={16} strokeWidth={2} />
-                  Give someone authority
+                  Appoint someone
                 </GradientButton>
               </Link>
             ) : (

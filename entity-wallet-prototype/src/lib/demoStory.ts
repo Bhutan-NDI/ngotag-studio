@@ -1,86 +1,6 @@
 import type { PersonaId } from "./demoData";
 
 /**
- * The six acts, as the story runner drives them.
- *
- * One entity, one grant, one delegation, one failure. This is the only place
- * the running order lives: the runner reads it, and so does anything that
- * wants to say "you are in act 3 of 6". Adding a screen to the demo does not
- * mean adding an act — an act is a thing the audience learns, and there are
- * six of those.
- *
- * `route` is the act's entry point, not its whole path. Act 2 walks four
- * screens; the runner only has to put you at the first one, because from
- * there the screens lead into each other the way they will in the real
- * product. A runner that clicked through every screen for you would be a
- * video, and a demo whose screens do not lead anywhere is worth finding out
- * about before the room does.
- */
-export interface Act {
-  number: number;
-  /** What happens. Shown in the runner. */
-  title: string;
-  /** What the audience is meant to take away. The reason the act exists. */
-  learns: string;
-  /** Who the console is driven as. Switching mid-story is the point. */
-  persona: PersonaId;
-  route: string;
-}
-
-export const ACTS: Act[] = [
-  {
-    number: 1,
-    title: "The entity becomes real",
-    learns:
-      "An organisation can hold credentials — and the platform never asserts its identity by itself. A government register confirms it.",
-    persona: "dorji",
-    route: "/onboarding",
-  },
-  {
-    number: 2,
-    title: "Authority is granted, narrowly",
-    learns:
-      "Authority is a scoped, legally-grounded relation that the controller has to accept. Not a role dropdown.",
-    persona: "dorji",
-    route: "/controllership/relations/new",
-  },
-  {
-    number: 3,
-    title: "The Controller works, under approval",
-    learns:
-      "Least disclosure by default, an approval gate that actually holds, and an audit trail that records both the entity and the person.",
-    persona: "rinzin",
-    route: "/dashboard",
-  },
-  {
-    number: 4,
-    title: "Authority is delegated to a person's wallet",
-    learns:
-      "The entity issues authority into someone's own wallet, carrying constraints any verifier can read.",
-    persona: "dorji",
-    route: "/delegated-authority/new",
-  },
-  {
-    number: 5,
-    title: "Authority is checked at the point of use",
-    learns:
-      "The same authority passes, then fails once a role above it is withdrawn — with the failing link named. This is why the system exists.",
-    persona: "pema",
-    route: "/verifier/bnsw",
-  },
-  {
-    number: 6,
-    title: "There is recourse",
-    learns:
-      "Revocation is not arbitrary power. It carries a reason, a reference and a way to appeal.",
-    persona: "pema",
-    route: "/appeals",
-  },
-];
-
-export const actByNumber = (n: number): Act | undefined => ACTS.find((a) => a.number === n);
-
-/**
  * The Gate 2 flows, as jumps in the demo controls.
  *
  * The guided demo is the story told to someone new to the idea; Gate 2 is a
@@ -100,7 +20,7 @@ export const actByNumber = (n: number): Act | undefined => ACTS.find((a) => a.nu
  * setting the entry needs, applied when it is chosen, so neither route can
  * be started in a deployment where it would not exist.
  */
-export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive" | "share";
+export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive" | "share" | "authority";
 
 /**
  * The flows the demo controls offer — the onboardings the prototype is
@@ -139,17 +59,27 @@ export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "
  * able to verify. The approval path starts three months on, where Rinzin
  * is appointed with *Share* to the bank and needs an approver — the state
  * the onboarding story never reaches.
+ *
+ * Flow 8 has three. The representative giving a clearing agent authority
+ * starts from the team-ready state, so the organisation's first grant goes
+ * through being added to NDI's list (A4) and the business licence comes
+ * from a dashed step, as in the guide. The approval path starts three
+ * months on, where Rinzin holds *Give authority to act* and needs an
+ * approver (Journey T). Collecting from a link opens the seeded link for
+ * Kinley Wangdi, three months on, with nobody signed in — the delegate has
+ * no account (D10).
  */
 export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "root", code: "FLOW-ONB-02", title: "Root admin onboarding" },
   { id: "admin", code: "FLOW-ONB-02", title: "Platform admin onboarding" },
   { id: "company", code: "FLOW-ONB-01 · Flow 2", title: "New company onboarding" },
   { id: "members", code: "FLOW-ONB-02 · Kind M", title: "Member onboarding" },
-  { id: "appoint", code: "Flow 3 · Flow 8 ahead of spec", title: "Giving authority to act" },
+  { id: "appoint", code: "Flow 3", title: "Appointing someone to act" },
   { id: "accredit", code: "Flow 4", title: "Approval to verify or issue" },
   { id: "designate", code: "Flow 5", title: "Designating an authority" },
   { id: "receive", code: "Flow 6", title: "Receiving a credential" },
   { id: "share", code: "Flow 7", title: "Presenting a credential" },
+  { id: "authority", code: "Flow 8", title: "Giving authority to act" },
 ];
 
 export interface FlowEntry {
@@ -166,8 +96,8 @@ export interface FlowEntry {
    * - `platformReady` — two platform admins set up, no business yet: where a
    *   company comes on, and where an authority is designated.
    * - `firstDay` — Pelden registered a moment ago, Dorji its only member.
-   * - `teamReady` — the first day, with Ugyen and Pema joined and no
-   *   authority yet: where the appointments start.
+   * - `teamReady` — the first day, with Ugyen joined and no authority
+   *   yet: where appointing starts, and Flow 8's first grant.
    * - `livedIn` — the story three months in, for the acts beyond onboarding.
    */
   start: "dayZero" | "platformReady" | "firstDay" | "teamReady" | "livedIn";
@@ -186,12 +116,14 @@ export const FLOW_ENTRIES: FlowEntry[] = [
     start: "platformReady",
   },
   { group: "members", label: "Invite a member", persona: "dorji", route: "/members", start: "firstDay" },
-  { group: "appoint", label: "Give someone authority", persona: "dorji", route: "/people-who-can-act/give", start: "teamReady" },
-  { group: "appoint", label: "A role in a wallet (Flow 8, ahead of spec)", persona: "dorji", route: "/delegated-authority/new", start: "teamReady" },
+  { group: "appoint", label: "Appoint someone", persona: "dorji", route: "/people-who-can-act/give", start: "teamReady" },
   { group: "accredit", label: "Recognise an organisation already verifying", persona: "tshering", route: "/admin/accreditations", start: "teamReady" },
   { group: "accredit", label: "A business asks to verify", persona: "dorji", route: "/organisation", start: "teamReady" },
   { group: "designate", label: "Designate the ministry for sole proprietorships", persona: "tshering", route: "/admin/designations", start: "platformReady" },
   { group: "receive", label: "Pelden asks for its TPN", persona: "dorji", route: "/wallet/get", start: "teamReady" },
   { group: "share", label: "Share from Bank of Bhutan's website", persona: "dorji", route: "/simulated/bank", start: "teamReady" },
   { group: "share", label: "A controller shares, the owner approves", persona: "rinzin", route: "/wallet/sharing", start: "livedIn" },
+  { group: "authority", label: "The owner gives a clearing agent authority", persona: "dorji", route: "/authority-to-act", start: "teamReady" },
+  { group: "authority", label: "A controller gives authority, the owner approves", persona: "rinzin", route: "/authority-to-act/give", start: "livedIn" },
+  { group: "authority", label: "Collect authority from a link", persona: null, route: "/authority/claim/c7Qm2xVb9TkPa4Lw", start: "livedIn" },
 ];

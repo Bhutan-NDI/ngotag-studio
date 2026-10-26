@@ -298,7 +298,7 @@ export function FoundationalCredentialView() {
         </HairlineButton>
         {delegation ? (
           <>
-            <HairlineButton onClick={() => open("/people-who-can-act/give")}>Give someone authority to act</HairlineButton>
+            <HairlineButton onClick={() => open("/people-who-can-act/give")}>Appoint someone</HairlineButton>
             <button type="button" onClick={() => open("/people-who-can-act")} className="ndi-plainlink text-[12.5px] font-medium text-muted">
               See who can act
             </button>
