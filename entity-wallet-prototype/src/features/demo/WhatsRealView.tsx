@@ -310,6 +310,64 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
+    area: "Presenting a credential",
+    icon: "send",
+    rows: [
+      {
+        shown: "Bank of Bhutan's website, its application number and its return page",
+        reality:
+          "A dashed stand-in at /simulated/bank, drawn to the verifier integration guide's §5. Pressing its button creates a session in your browser; its return page reads the session back from the demo store and shows what the fetched status means. No bank system exists, and nothing leaves the browser.",
+        needs: "A first bank's eKYB journey changed to start a session, redirect, park a pending application and fetch the result from its back end (EW-FLOW7-SD §13 item 4).",
+      },
+      {
+        shown: "Signing in with Bhutan NDI when the link opens",
+        reality:
+          "The dashed step signs in as whoever the demo is driven as. The 15- and 30-minute windows are real timestamps in your browser; nothing about the session survives on a server.",
+        needs: "Studio keeping the session reference through the existing Bhutan NDI sign-in, and the presentation-session routes (§7.1).",
+      },
+      {
+        shown: "The proof request arriving, the checks, and the share being sent",
+        reality:
+          "No invitation is received, no DIDComm request arrives and nothing is presented or signed. V1/V2 read whether the organisation has the verifier capability; V7 reads the held credentials. The bank's verified result is the demo's own data.",
+        needs: "Organisation-level presentation in the agent (shared with Flow 6), the holder-side request record and checks V1–V7, and the issuer check in verification (D5).",
+      },
+      {
+        shown: "Requests arriving with nobody at a website, a refused sender, and NDI's list being unreachable",
+        reality: "Dashed buttons on Sharing that add requests to the demo store, and one that makes NDI's list answer.",
+        needs: "A verifier sending a proof request on an existing connection, the connection counterparty record (§6), and Trust Registry re-checks with back-off.",
+      },
+      {
+        shown: "A bank cancelling a request",
+        reality: "A dashed button that marks the request cancelled and removes any approval waiting on it.",
+        needs: "The verifier's DELETE on its session, or a problem report on the exchange.",
+      },
+      {
+        shown: "Who is told — requests waiting, passed on, approvers asked, the representative told of a share, a share approved or not",
+        reality:
+          "UX-EW-04 has no copy for these yet. The prototype's wording (lib/sharing.ts, NOTICE) names the organisation, the credential types and the date, never a value, and is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. The 10-minute notice for a request left undecided on a website isn't simulated; keeping it for later sends the same notice at once.",
+        needs: "A notification copy table in UX-EW-04 §3.5, and in-app and email delivery.",
+      },
+      {
+        shown: "A request held while NDI's list is checked",
+        reality:
+          "UX-EW-04's Sharing states start at OPEN, while FLOW-PRS-01 E8 tells the person the request is under Sharing. The prototype lists it on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer, and tells nobody until it passes.",
+        needs: "A RECEIVED row in SCR-PRS-05 (or E8 reworded), to be settled in the specification.",
+      },
+      {
+        shown: "Where NDI sends people back to",
+        reality:
+          "Return addresses are kept in your browser; the fresh Bhutan NDI sign-in for each change is a dashed step, and \"sent to every owner and to NDI\" is a line in the activity feed.",
+        needs: "SCR-PRS-06's registration with exact matching, step-up sign-in, audit and notification.",
+      },
+      {
+        shown: "A sharer whose appointment ends while their share waits for approval",
+        reality:
+          "The store checks for it when the share is approved (FLOW-PRS-02 E11), but nothing in the prototype ends an appointment, so it is shown through the state switcher on the approval screen.",
+        needs: "Ending or suspending an appointment (catalogue flow 11).",
+      },
+    ],
+  },
+  {
     area: "The record",
     icon: "fileText",
     rows: [

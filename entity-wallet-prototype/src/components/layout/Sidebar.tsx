@@ -152,7 +152,11 @@ const PRIMARY: NavItem[] = [
          something waiting to be accepted (SCR-CRD-03). */
       { label: "Get a credential", href: "/wallet/get", icon: "issue" },
       { label: "Requests and offers", href: "/wallet/requests", icon: "download" },
-      { label: "Verification requests", href: "/wallet/verification-requests", icon: "verify" },
+      /* Flow 7 — what banks and agencies ask for, what was shared and who
+         agreed, and what was refused (SCR-PRS-05). Its own page, not part
+         of Requests and offers: receiving and giving are opposite
+         decisions, and one list invites the same reflex for both (UXD-45). */
+      { label: "Sharing", href: "/wallet/sharing", icon: "send" },
     ],
   },
   /* Approvals is the one item whose visibility comes from the scope rather
@@ -222,7 +226,18 @@ const PRIMARY: NavItem[] = [
       { label: "Schemas", href: "/schemas", icon: "layers" },
     ],
   },
-  { label: "Verification", icon: "verify", href: "/verification", personas: ORG_OWNERS, needs: "verifier" },
+  /* Verifying, and — since Flow 7 — where NDI may send a verifier's
+     customers back to (SCR-PRS-06), beside it as UX-EW-04 places it. */
+  {
+    label: "Verification",
+    icon: "verify",
+    personas: ORG_OWNERS,
+    needs: "verifier",
+    children: [
+      { label: "Verify credentials", href: "/verification", icon: "verify" },
+      { label: "Return addresses", href: "/verification/return-addresses", icon: "link" },
+    ],
+  },
 
   /* ---- NDI Studio — NDI's own organisation only ----------------------
      These were taken out of the nav when this console became one entity's

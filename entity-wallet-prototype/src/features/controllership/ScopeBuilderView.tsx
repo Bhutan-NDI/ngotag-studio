@@ -87,7 +87,7 @@ export function ScopeBuilderView({ relationId }: { relationId: string }) {
     relations,
     heldCredentials,
     offers,
-    verificationRequests,
+    presentationRequests,
     personById,
     updateRelationScope,
     sendRelationForAcceptance,
@@ -111,9 +111,10 @@ export function ScopeBuilderView({ relationId }: { relationId: string }) {
 
   const relyingParties = useMemo(() => {
     const parties = new Set<string>();
-    verificationRequests.forEach((v) => parties.add(v.relyingParty));
+    /* Only verifiers NDI lists: a refused sender is never someone to share with. */
+    presentationRequests.filter((v) => v.status !== "BLOCKED").forEach((v) => parties.add(v.verifierName));
     return [...parties].sort();
-  }, [verificationRequests]);
+  }, [presentationRequests]);
 
   /* Working copy. The draft is only written back on save, so abandoning a
      half-built scope leaves the stored one alone. */

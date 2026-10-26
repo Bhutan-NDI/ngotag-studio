@@ -654,34 +654,130 @@ export interface CredentialOffer {
 }
 
 /**
- * A relying party asking the entity for a presentation. It arrives as a task
- * in the console — not a deep link — because the entity has no device.
+ * Flow 7 — a proof request a verifier sent the organisation, on the
+ * holder's side (EW-FLOW7-SD §4.1). One record for both ways a request
+ * arrives: by redirect from the verifier's website (FLOW-PRS-01, with a
+ * session) and on a connection the organisation already has (FLOW-PRS-02).
+ *
+ * WHY THE WHOLE CREDENTIAL, AND NO "DISCLOSING" FIELD
+ *
+ * The pre-spec screen kept a list of the attributes a Controller chose to
+ * disclose, ticked down from what the bank asked for. Entity credentials
+ * are JSON-LD, and a JSON-LD credential signed the way the platform signs
+ * cannot be presented in part (D4). So there is nothing to choose below the
+ * credential: `asked` is what the verifier's request names, kept so the
+ * consent can mark it, and `chosen` is which held credential answers each
+ * descriptor — every attribute of it goes.
+ *
+ * WHERE THE VERIFIER'S NAME COMES FROM
+ *
+ * `verifierName` is the name NDI lists for the verifier organisation, never
+ * one the link or the request supplied (UXD-41). The one exception is a
+ * BLOCKED request whose sender isn't on the platform at all: there is no
+ * listing to read, so the name is what it *claimed*, and the Refused tab
+ * says "claiming to be" for that reason (FLOW-PRS-02 E1).
  */
-export interface VerificationRequestTask {
+export type PresentationStatus =
+  | "RECEIVED"
+  | "BLOCKED"
+  | "OPEN"
+  | "AWAITING_APPROVAL"
+  | "SHARED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "WITHDRAWN"
+  | "FAILED";
+
+/** Why a check refused a request (EW-FLOW7-SD §6). Shown only on *Refused*. */
+export type BlockedReason = "VERIFIER_NOT_TRUSTED" | "OUT_OF_SCOPE" | "UNSUPPORTED_FORMAT" | "NO_CHALLENGE" | "NO_PURPOSE";
+
+/** One input descriptor: a credential type, and the fields the request names in it. */
+export interface AskedDescriptor {
+  id: string;
+  credentialType: string;
+  fields: string[];
+}
+
+export interface PresentationRequest {
   id: string;
   /** Whose wallet was asked. Absent means Pelden Trading's. */
   orgId?: string;
-  relyingParty: string;
-  relyingPartyDid: string;
-  relyingPartyTrusted: boolean;
-  credentialType: string;
-  /** Everything asked for. */
-  requestedAttributes: string[];
-  /** The subset that is actually required — the least-disclosure default. */
-  requiredAttributes: string[];
-  requestsControllershipProof: boolean;
-  decision: ScopeDecision;
-  decisionReason: string | null;
-  /**
-   * What the Controller chose to disclose. Recorded so an approver decides on
-   * the actual disclosure rather than on the request — approving "a
-   * presentation to Bank of Bhutan" without knowing which attributes it
-   * carries is not an approval of anything.
-   */
-  disclosing?: string[];
-  state: "ready" | "parked" | "signing" | "presented" | "declined" | "expired";
+  /** The verifier organisation on the platform — null when the sender isn't one. */
+  verifierOrgId: string | null;
+  verifierName: string;
+  verifierDid: string;
+  /** The verifier's reason, in its own words (V6). */
+  purpose: string;
+  asked: AskedDescriptor[];
+  /** FLOW-PRS-01's session, or null for a request on an existing connection. */
+  sessionId: string | null;
+  /** The verifier's own reference, shown with the only-continue-if sentence (D21). */
+  displayReference: string | null;
+  status: PresentationStatus;
+  blockedReason?: BlockedReason | null;
+  /** Which held credential answers each descriptor, recorded at *Share*. */
+  chosen?: Record<string, string> | null;
+  /** The relation of whoever chose *Share* — `initiatedBy` in §4.1. */
+  initiatedBy?: PersonId | null;
+  initiatedAt?: string | null;
+  approvedBy?: PersonId | null;
+  /** The approval waiting on this share (a `proof:present` parked operation). */
+  approvalId?: string | null;
+  /** Who declined, or who shared under AUTO — the person on the History row. */
+  decidedBy?: PersonId | null;
+  decidedAt?: string | null;
+  /** Members who passed it to people who can answer (D13, A4). */
+  passedBy?: PersonId[];
+  /** The last approver's rejection, which sent it back to OPEN (D15). */
+  rejection?: { by: PersonId; note: string; at: string } | null;
+  /** E16/E11 — the sharer whose permission lapsed before approval. */
+  lapsedSharer?: PersonId | null;
+  /** E12 — an identical request already OPEN. */
+  repeatOf?: string | null;
+  /** Why it FAILED, in §3.5's words. */
+  failure?: string | null;
   receivedAt: string;
   expiresAt: string;
+}
+
+/**
+ * The verifier's side of FLOW-PRS-01 (EW-FLOW7-SD §4.2): what its back end
+ * creates when the person presses *Share from NDI Entity Wallet*. The
+ * browser only ever carries `id`. Its status follows the request once there
+ * is one (§5.1's mapping, `sessionStatusOf`); before that it is stored.
+ */
+export type SessionStatus = "CREATED" | "OPENED" | "SHARED" | "PENDING" | "DECLINED" | "EXPIRED" | "FAILED";
+
+export interface PresentationSession {
+  id: string;
+  verifierOrgId: string;
+  asked: AskedDescriptor[];
+  purpose: string;
+  /** Which registered return address — never a URL (D9). */
+  returnUrlId: string;
+  /** The verifier website's own value, returned unchanged. */
+  state: string;
+  displayReference: string;
+  status: SessionStatus;
+  /** Milliseconds, because the windows are minutes (D16). */
+  createdAt: number;
+  firstLoadedAt: number | null;
+  boundOrgId: string | null;
+  requestId: string | null;
+  /** The person went back to the verifier without a final answer. */
+  returnedPending?: boolean;
+}
+
+/** SCR-PRS-06 — an address NDI may send people back to, and its history. */
+export interface ReturnAddress {
+  id: string;
+  orgId: string;
+  returnUrlId: string;
+  url: string;
+  addedBy: PersonId;
+  addedAt: string;
+  removedBy?: PersonId | null;
+  removedAt?: string | null;
 }
 
 export interface ApprovalSignature {
@@ -1930,7 +2026,12 @@ export interface DemoState {
   relations: ControllershipRelation[];
   heldCredentials: HeldCredential[];
   offers: CredentialOffer[];
-  verificationRequests: VerificationRequestTask[];
+  /** Flow 7 — proof requests verifiers sent, in every state (SCR-PRS-05). */
+  presentationRequests: PresentationRequest[];
+  /** Flow 7 — the verifiers' sessions behind FLOW-PRS-01's redirects. */
+  presentationSessions: PresentationSession[];
+  /** Flow 7 — where NDI may send people back to, per verifier (SCR-PRS-06). */
+  returnAddresses: ReturnAddress[];
   parkedOperations: ParkedOperation[];
   delegatedAuthorities: DelegatedAuthority[];
   /** Act 5 keeps both decisions so PASS and FAIL can sit side by side. */
@@ -3009,98 +3110,162 @@ export const SEED: DemoState = {
     },
   ],
 
-  verificationRequests: [
+  /*
+   * Flow 7 — what verifiers have asked Pelden for, three months in. Each is
+   * here for a case the screens must show from the seed, before anyone has
+   * walked anything (UX-EW-04 SCR-PRS-05):
+   *
+   * - pr-bob-earlier: Rinzin chose to share with the bank and Dorji hasn't
+   *   approved yet — Journey P's middle, AWAITING_APPROVAL.
+   * - pr-moice-tender: the ministry checking bidders asks for a tax
+   *   clearance Pelden holds only expired — D17, shown but not answerable.
+   * - pr-drc-check: a verifier outside Rinzin's reach — FLOW-PRS-02 E5 for
+   *   her, an ordinary share for Dorji.
+   * - History: the account the bank opened (Dorji, AUTO), a loan Rinzin
+   *   shared and Dorji approved, and a request that expired after Karma's
+   *   appointment ended under it.
+   * - Refused: a sender not on NDI's list, and the bank asking for
+   *   something outside what it is approved to ask for — neither notified.
+   */
+  presentationRequests: [
     {
-      /* Act 3's portal task. Five attributes asked for, two actually
-         required — least disclosure has something to defend here. */
-      id: "vr-bob",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: [
-        "registered_name",
-        "registration_number",
-        "entity_type",
-        "registered_address",
-        "incorporation_date",
-      ],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: true,
-      decision: "requires_approval",
-      decisionReason: "Presenting to Bank of Bhutan is in scope and needs one approver.",
-      state: "ready",
-      receivedAt: day(-5),
-      expiresAt: day(2),
-    },
-    {
-      /* Already sent for approval, so the queue has something in it before
-         the story is walked. Deliberately a *different* request from vr-bob:
-         a parked operation and a request that still says "ready" would
-         contradict each other, and the screen would show one of them as
-         wrong. */
-      id: "vr-bob-earlier",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number", "entity_type"],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: false,
-      decision: "requires_approval",
-      decisionReason: "Presenting to Bank of Bhutan is in scope and needs one approver.",
-      disclosing: ["registered_name", "registration_number"],
-      state: "parked",
+      id: "pr-bob-earlier",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Annual review of a business customer's registration, as banking rules require.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "AWAITING_APPROVAL",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "rinzin",
+      initiatedAt: day(-1),
+      approvalId: "park-present-bob",
       receivedAt: day(-3),
       expiresAt: day(4),
     },
     {
-      /* The relying-party filter doing its job — in scope by credential
-         type, denied by counterparty. */
-      id: "vr-druk",
-      relyingParty: "Druk Trading House",
-      relyingPartyDid: "did:polygon:0x067c37a944b618effbd0dfe9f463e5f60e458b07",
-      relyingPartyTrusted: false,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number", "registered_address"],
-      requiredAttributes: ["registered_name"],
-      requestsControllershipProof: false,
-      decision: "out_of_scope",
-      decisionReason:
-        "Your authority allows presentations to Bhutan National Single Window and Bank of Bhutan. Druk Trading House is not among them.",
-      state: "ready",
+      id: "pr-moice-tender",
+      verifierOrgId: "org-moice",
+      verifierName: "Ministry of Industry, Commerce & Employment",
+      verifierDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      purpose: "Checking that every bidder on tender MoICE/T/2026/031 is registered and has cleared its taxes.",
+      asked: [
+        { id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "status"] },
+        { id: "tax", credentialType: "Tax Clearance Certificate", fields: ["tpn", "assessment_year"] },
+      ],
+      sessionId: null,
+      displayReference: null,
+      status: "OPEN",
+      receivedAt: day(-1),
+      expiresAt: day(6),
+    },
+    {
+      id: "pr-drc-check",
+      verifierOrgId: "org-drc",
+      verifierName: "Department of Revenue & Customs",
+      verifierDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+      purpose: "Confirming your registered name and number before we update your taxpayer record.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "OPEN",
       receivedAt: day(-2),
       expiresAt: day(5),
     },
     {
-      id: "vr-bnsw-done",
-      relyingParty: "Bhutan National Single Window",
-      relyingPartyDid: "did:polygon:0xc70c2d3625bec5a34d5b3746b830d36f2525f163",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number"],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: true,
-      decision: "requires_approval",
-      decisionReason: null,
-      state: "presented",
-      receivedAt: day(-14),
-      expiresAt: day(-7),
+      id: "pr-bob-loan",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Assessing a working-capital loan application.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
+      sessionId: null,
+      displayReference: "LN-2026-0381",
+      status: "SHARED",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "rinzin",
+      initiatedAt: day(-15),
+      approvedBy: "dorji",
+      approvalId: "park-approved-bob-loan",
+      decidedBy: "rinzin",
+      decidedAt: day(-14),
+      receivedAt: day(-15),
+      expiresAt: day(-8),
     },
     {
-      id: "vr-lapsed",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Tax Clearance Certificate",
-      requestedAttributes: ["registered_name", "tpn", "assessment_year"],
-      requiredAttributes: ["registered_name", "tpn"],
-      requestsControllershipProof: false,
-      decision: "requires_approval",
-      decisionReason: null,
-      state: "expired",
+      id: "pr-bob-account",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Opening a business current account.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "registered_address"] }],
+      sessionId: null,
+      displayReference: "EKYB-20177",
+      status: "SHARED",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "dorji",
+      initiatedAt: day(-106),
+      decidedBy: "dorji",
+      decidedAt: day(-106),
+      receivedAt: day(-106),
+      expiresAt: day(-99),
+    },
+    {
+      id: "pr-lapsed",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Confirming tax clearance before renewing an overdraft.",
+      asked: [{ id: "tax", credentialType: "Tax Clearance Certificate", fields: ["tpn", "assessment_year"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "EXPIRED",
+      lapsedSharer: "karma",
       receivedAt: day(-30),
       expiresAt: day(-23),
+    },
+    {
+      id: "pr-druk",
+      verifierOrgId: null,
+      verifierName: "Druk Trading House",
+      verifierDid: "did:polygon:0x067c37a944b618effbd0dfe9f463e5f60e458b07",
+      purpose: "Supplier onboarding.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "registered_address"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "BLOCKED",
+      blockedReason: "VERIFIER_NOT_TRUSTED",
+      receivedAt: day(-2),
+      expiresAt: day(5),
+    },
+    {
+      id: "pr-bob-scope",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Checking a trade-finance customer's transport permits.",
+      asked: [{ id: "permit", credentialType: "Freight Forwarder Permit", fields: ["permit_number", "vehicle_classes"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "BLOCKED",
+      blockedReason: "OUT_OF_SCOPE",
+      receivedAt: day(-9),
+      expiresAt: day(-2),
+    },
+  ],
+  presentationSessions: [],
+  /* Bank of Bhutan's one registered return address — its eKYB journey's
+     return page. Removing it is how FLOW-PRS-01 E15 is reached live. */
+  returnAddresses: [
+    {
+      id: "ra-bob-ekyb",
+      orgId: "org-bob",
+      returnUrlId: "ekyb-return",
+      url: "https://www.bob.bt/ekyb/return",
+      addedBy: "yeshey",
+      addedAt: day(-40),
     },
   ],
 
@@ -3110,11 +3275,11 @@ export const SEED: DemoState = {
          would actually commit to — B7 shows it for that reason. */
       id: "park-present-bob",
       operation: "proof:present",
-      summary: "Present Business Registration to Bank of Bhutan",
+      summary: "Share Business Registration with Bank of Bhutan",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
-      targetId: "vr-bob-earlier",
+      targetId: "pr-bob-earlier",
       targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:c0a71e94b83f2d6508a1c47fe9b230da75146c8be03f9a27",
       policy: "SINGLE_APPROVER",
@@ -3168,23 +3333,22 @@ export const SEED: DemoState = {
          out in 8.4 and the one a system would be broken to execute. */
       id: "park-stale",
       operation: "proof:present",
-      summary: "Present Tax Clearance Certificate to Bank of Bhutan",
+      summary: "Share Tax Clearance Certificate with Bank of Bhutan",
       requestedBy: "karma",
       relationId: "rel-karma",
       scopeVersion: 2,
-      targetId: "vr-lapsed",
+      targetId: "pr-lapsed",
       targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:b61f7c05e298a4d3706b1cfe45a9d823017e5b9c4af26d10",
-      policy: "DUAL_CONTROL",
-      requiredSignatures: 2,
-      signatures: [
-        { personId: "dorji", at: day(-8), method: "wallet" },
-        { personId: "sonam", at: day(-8), method: "web" },
-      ],
+      policy: "SINGLE_APPROVER",
+      requiredSignatures: 1,
+      signatures: [{ personId: "dorji", at: day(-8), method: "web" }],
       state: "stale",
       decisionReason: null,
-      invalidatedReason:
-        "Karma Wangmo's controllership was terminated after this was approved, so it was never run.",
+      /* FLOW-PRS-02 E11: approving re-checks the sharer, and Karma's
+         appointment had ended — so nothing went, and the request went back
+         to OPEN, where it later expired. */
+      invalidatedReason: "Karma Wangmo can no longer share this, so it hasn't been sent.",
       createdAt: day(-9),
       expiresAt: day(-2),
     },
@@ -3207,14 +3371,14 @@ export const SEED: DemoState = {
       expiresAt: day(-28),
     },
     {
-      id: "park-approved-bnsw",
+      id: "park-approved-bob-loan",
       operation: "proof:present",
-      summary: "Present Business Registration to Bhutan National Single Window",
+      summary: "Share Business Registration with Bank of Bhutan",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
-      targetId: "vr-bnsw-done",
-      targetRelyingParty: "Bhutan National Single Window",
+      targetId: "pr-bob-loan",
+      targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:e572b0491ac8d36f7be24051c9da8317064fb2e85d1a7c63",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
@@ -3462,7 +3626,7 @@ export const SEED: DemoState = {
       id: "au-5",
       seq: 5,
       operation: "proof:present",
-      summary: "Presented Business Registration to Bhutan National Single Window",
+      summary: "Shared Business Registration with Bhutan National Single Window",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "rinzin",
       relationId: "rel-rinzin",
@@ -3867,7 +4031,8 @@ export function firstRunState(s: DemoState): DemoState {
       ...(foundational ? [{ ...foundational, receivedAt: today }] : []),
     ],
     offers: s.offers.filter((o) => !inOrg(PELDEN)(o)),
-    verificationRequests: s.verificationRequests.filter((v) => !inOrg(PELDEN)(v)),
+    presentationRequests: s.presentationRequests.filter((v) => !inOrg(PELDEN)(v)),
+    presentationSessions: [],
     parkedOperations: [],
     delegatedAuthorities: [],
     decisions: [],
@@ -3955,7 +4120,8 @@ export function dayZeroState(seed: DemoState): DemoState {
     relations: [],
     heldCredentials: [],
     offers: [],
-    verificationRequests: [],
+    presentationRequests: [],
+    presentationSessions: [],
     parkedOperations: [],
     delegatedAuthorities: [],
     decisions: [],

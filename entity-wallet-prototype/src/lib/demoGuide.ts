@@ -80,6 +80,15 @@ export interface GuideStep {
  * using its registration to get the next credential — its taxpayer number —
  * from an office that decides on what was proved, not on what NDI says.
  *
+ * Sharing with the bank (Flow 7) follows it: what the organisation holds is
+ * worth something only when someone else can check it. Pelden opens an
+ * account from Bank of Bhutan's website and is taken back there; then the
+ * bank asks again with nobody at a website, Ugyen — who can see but not
+ * share — passes it to Dorji, and Dorji shares. The approval path, where a
+ * Controller shares and the Root approves, needs a Controller appointed
+ * with *Share*, which the onboarding story never makes; it is a Walk a flow
+ * entry from the story three months on, and the chapter's last step says so.
+ *
  * Member onboarding is here because the first day is now genuinely empty.
  * When it still listed the seed's colleagues, the room's first question on
  * seeing them was "how did these people get here?" — and the answer, an
@@ -98,6 +107,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "Pelden asks to verify customers", shows: "A verified business asks; one administrator reviews, a second decides" },
   { title: "Designate the ministry", shows: "A ministry becomes the authority for sole proprietorships, and agrees what people are asked" },
   { title: "Pelden gets its TPN", shows: "Pelden asks the tax office, shares its registration, and accepts what comes back" },
+  { title: "Pelden shares with its bank", shows: "From the bank's website and back, then a request in the wallet — the whole credential, said so" },
   { title: "Where to go next", shows: "The other routes, and what's simulated" },
 ];
 
@@ -794,12 +804,93 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/wallet/credentials",
   },
 
-  /* ---- 12 · Where to go next ---- */
+  /* ---- 12 · Pelden shares with its bank (FLOW-PRS-01, FLOW-PRS-02) ---- */
   {
     chapter: 12,
+    title: "Opening an account at the bank",
+    happening:
+      "Bank of Bhutan's own website — dashed, because it's another organisation's system. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
+    doThis: "Press **Share from NDI Entity Wallet** (dashed).",
+    route: "/simulated/bank",
+    persona: "dorji",
+  },
+  {
+    chapter: 12,
+    title: "Who is asking — before anything else",
+    happening:
+      "The wallet's own address, the bank's name as NDI lists it — never as the link says — and the bank's reference, with a sentence telling Dorji to continue only if he started this on the bank's site just now and sees that reference there.",
+    doThis:
+      "Check the reference matches the bank's page, press **Continue**, then **Sign in as Dorji Wangchuk** (dashed — it stands in for the Bhutan NDI sign-in on the phone).",
+    say: "Being sent from a site you trust to a page asking you to sign in is exactly what phishing looks like. The address and the listed name are the only reassurance, so they come first.",
+    match: "^/present$",
+  },
+  {
+    chapter: 12,
+    title: "Share with Bank of Bhutan?",
+    happening:
+      "The one decision. The bank's reason in its own words, and every detail of Pelden's registration — the three the bank asked for marked, the rest marked as also shared — under the sentence: Bank of Bhutan will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
+    doThis: "Read the list, then press **Share with Bank of Bhutan**.",
+    say: "A credential like this can't be shared in part. The screen says so rather than promising less — there's nothing to untick.",
+    match: "^/wallet/sharing/pr-[^/]+$",
+  },
+  {
+    chapter: 12,
+    title: "Shared — back to the bank",
+    happening:
+      "One line and a five-second countdown back to the bank's registered address. Only Shared counts down: if the bank didn't have it yet, the person would have to press — so they read that it's waiting.",
+    doThis: "Let the countdown run, or press **Go back to Bank of Bhutan**.",
+    match: "^/wallet/sharing/pr-[^/]+/done$",
+  },
+  {
+    chapter: 12,
+    title: "The bank acts on what it fetched",
+    happening:
+      "Back on the bank's page. The address carries a status anyone could type; the bank checks the application matches and acts only on what its own system fetched — the registration, verified, with its issuer on NDI's list.",
+    doThis: "Press **Next** — the guide switches to Ugyen.",
+    match: "^/simulated/bank/return$",
+  },
+  {
+    chapter: 12,
+    title: "A request with nobody at a website",
+    happening:
+      "Sharing: what's waiting, what was shared and who agreed, and what was refused. A bank re-checking a customer sends its request straight to the wallet; it waits here for seven days.",
+    doThis: "In the dashed panel, press **Bank of Bhutan asks on its connection**, then **Answer**.",
+    route: "/wallet/sharing",
+    persona: "ugyen",
+  },
+  {
+    chapter: 12,
+    title: "Ugyen can see it, but not share it",
+    happening:
+      "Ugyen was appointed to receive credentials, not to share them. He sees the whole request and why he can't answer it — and instead of a dead end, the people who can, by name.",
+    doThis: "Press **Pass to someone who can**, then **Next** — the guide switches to Dorji.",
+    say: "Who may share comes from the box Dorji ticked when he appointed Ugyen — not from Ugyen's job title.",
+    match: "^/wallet/sharing/pr-[^/]+$",
+  },
+  {
+    chapter: 12,
+    title: "Dorji answers",
+    happening: "The request is waiting, passed on by Ugyen. Dorji may share with anyone, at once.",
+    doThis: "On Bank of Bhutan's request, press **Answer**, then **Share with Bank of Bhutan**.",
+    route: "/wallet/sharing",
+    persona: "dorji",
+  },
+  {
+    chapter: 12,
+    title: "What was shared, and what was refused",
+    happening:
+      "History answers the question a representative asks later — what did we give the bank, and who agreed? Refused is the only place a request NDI blocked appears: nobody is notified, because a notification would let anyone message the company.",
+    doThis: "Press **History**. Then press **A sender not on NDI's list asks** (dashed) and press **Refused**.",
+    say: "To see a colleague share and Dorji approve, use Demo controls → Walk a flow → A controller shares, the owner approves.",
+    route: "/wallet/sharing",
+  },
+
+  /* ---- 13 · Where to go next ---- */
+  {
+    chapter: 13,
     title: "That's the story",
     happening:
-      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; and Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved.",
+      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved; and Pelden shared its registration with its bank — whole, and said so — from the bank's website and from its wallet.",
     doThis:
       "To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },

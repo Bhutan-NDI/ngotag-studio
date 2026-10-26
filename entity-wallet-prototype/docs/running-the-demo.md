@@ -16,8 +16,9 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
-approval to verify or issue, and designating an authority — twelve chapters, 68
-steps, starting on the platform's day zero:
+approval to verify or issue, designating an authority, receiving a credential
+and sharing one — thirteen chapters, 86 steps, starting on the platform's day
+zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -99,7 +100,16 @@ steps, starting on the platform's day zero:
     kept apart as unverified. Deki issues; Dorji checks the details and
     accepts, and the Activity tab shows an offer the wallet refused on its
     own.
-12. **Where to go next.**
+12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
+    Bhutan's website (dashed), Dorji presses **Share from NDI Entity Wallet**,
+    checks the bank's reference on the wallet's page, signs in, and reads
+    every detail of the registration under *Bank of Bhutan will receive all
+    of the details below — not only the ones it asked for.* He shares and is
+    counted back to the bank, which acts on what it fetched. Then the bank
+    asks again with nobody at a website: Ugyen, who can receive but not
+    share, passes it to Dorji, who shares. History shows who shared; Refused
+    shows a sender NDI doesn't list, which nobody was told about.
+13. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
@@ -108,10 +118,13 @@ wallet is Flow 8, which has no specification yet, so it follows Story B5 and
 is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
 v0.2, FLOW-ACC-02 v0.3 and UX-EW-02 v0.3 SCR-ACC-01 to 06 — the first-release
 simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
-and UX-EW-03 SCR-CRD-01 to 10. The screens for what comes after onboarding —
-presenting, approvals, verification, revocation, appeals, and Bank of
-Bhutan being verified — still exist and are described further down, but
-the guide and the demo controls no longer walk them.
+and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01, FLOW-PRS-02 and
+EW-FLOW7-SD v0.2, with UX-EW-04 v0.2 SCR-PRS-01 to 06; the approval path —
+a Controller shares, the Root approves — is a Walk a flow entry, because the
+onboarding story never appoints anyone with *Share*. The screens for what
+comes after — verification at the Single Window, revocation, appeals, and
+Bank of Bhutan being verified — still exist and are described further down,
+but the guide and the demo controls no longer walk them.
 
 ### The first day is really empty
 
@@ -732,6 +745,88 @@ isn't on NDI's list — nobody was notified.
 
 ---
 
+## Flow 7 — presenting a credential
+
+Two ways in, from **Demo controls → Walk a flow → Presenting a credential**,
+and chapter 12 of the guided demo walks both routes in one go.
+
+The rules to point at: the **whole credential is shared** — every attribute,
+the asked-for ones marked, never a choice of attributes (EW-FLOW7-SD D4,
+UXD-42); a sender NDI doesn't list never becomes a request anyone can answer,
+and nobody is told about it (D3); and whether someone may share, and whether
+someone else must approve, comes from the *Share* box ticked when they were
+appointed — its reach and its approval — never from who they are.
+
+### From the bank's website — **Share from Bank of Bhutan's website**, as Dorji
+
+Starts on Bank of Bhutan's account form at `/simulated/bank` — dashed,
+because it's another organisation's website. **Share from NDI Entity Wallet**
+creates a session and sends you to `/present?session=…` (SCR-PRS-01): the
+wallet's address, *Bank of Bhutan is asking for your organisation's details*,
+*You're on the NDI Entity Wallet. Nothing is shared until you choose.*, and
+the bank's application number with *Only continue if you started this on Bank
+of Bhutan's website just now and see this reference there.* **Continue**,
+then the dashed **Sign in as Dorji Wangchuk**; with one organisation there's
+no choice to make, so *Getting Bank of Bhutan's request…* and on.
+
+**Share with Bank of Bhutan?** (SCR-PRS-02): the bank's reason in quotes,
+labelled as theirs; the reference again; then *Bank of Bhutan will receive all
+of the details below — not only the ones it asked for.* above every attribute
+of the registration, each marked *Asked for* or *Also shared*; and *None of
+your other credentials is shared.* Dorji is the representative (AUTO), so
+**Share with Bank of Bhutan** sends at once. SCR-PRS-03 says *Shared with Bank
+of Bhutan. Taking you back in 5 seconds.* — the only outcome that counts
+down — and returns to the bank's registered address, where the bank shows
+what its own system fetched, not what the address said.
+
+**Keep for later** instead returns with *Bank of Bhutan doesn't have this
+yet. It's saved under Sharing until …*, no countdown. Driving as Pema (no
+appointment) gives E4; removing the bank's address on **Verification →
+Return addresses** as Yeshey gives E15 (*Done. Go back to Bank of Bhutan's
+website to continue.*, no link).
+
+### A controller shares, the owner approves — as Rinzin, then Dorji
+
+Starts three months on, at **Sharing** (SCR-PRS-05) as Rinzin, who may share
+the registration with Bank of Bhutan and the Single Window, with an approver.
+*Waiting* holds three requests:
+
+- **Bank of Bhutan** — *Waiting for Dorji Wangchuk to approve*: Rinzin chose
+  it yesterday. Opening it as Rinzin says *Sent to Dorji Wangchuk to
+  approve.*; she can't approve her own.
+- **Department of Revenue & Customs** — **Answer** shows everything and, in
+  place of *Share*, *You can share only with Bhutan National Single Window
+  and Bank of Bhutan. Dorji Wangchuk can share with Department of Revenue &
+  Customs.* and **Pass to someone who can** (E5).
+- **Ministry of Industry, Commerce & Employment** — asks for the tax
+  clearance too, which Pelden holds only expired: *…which can't be shared
+  right now: it expired on …*, and *Share* is unavailable (E3, D17).
+
+The dashed **Bank of Bhutan asks on its connection** adds a request Rinzin can
+share: **Answer** shows *Dorji Wangchuk will be asked to approve before Bank
+of Bhutan gets this.* before **Share with Bank of Bhutan**, which sends it to
+him. Switch to **Dorji**: **Approve** opens SCR-PRS-04 — *Rinzin Dema wants to
+share this with Bank of Bhutan*, the same list, *Rinzin Dema chose to share
+this on …*, and **Approve and share with Bank of Bhutan** or **Don't
+approve** with an optional note. Not approving puts the request back to
+*Waiting* with *Dorji Wangchuk didn't approve sharing this: <note>.* — the
+bank isn't refused. Approving shares it; Rinzin is told, and the History row
+names both.
+
+**History** has the account Dorji opened, the loan Rinzin shared and Dorji
+approved, and a request that expired. **Refused** has *Request claiming to be
+from Druk Trading House refused — not on NDI's list of trusted organisations.*
+and the bank asking for something it isn't approved to ask for — neither was
+notified. The other dashed buttons add a refused sender and a request held
+while NDI's list can't be reached (*Checking Bank of Bhutan — you can't
+answer this yet*), with **NDI's list answers** to release it.
+
+Who is told is written to the dashboard's activity feed, naming who it goes
+to — UX-EW-04 has no notification copy yet, so the wording is the
+prototype's (see the what's-real page).
+
+---
+
 ## The Act 3 walkthrough
 
 About six minutes, as **Rinzin**. The story: an ordinary working day, and the
@@ -749,7 +844,7 @@ You arrive at `/dashboard` as Rinzin.
 Point at the ordering:
 
 > "Approvals first, because somebody else is blocked until they are decided.
-> Then relying parties who are waiting. Then offers, which nobody is waiting
+> Then organisations asking for something. Then offers, which nobody is waiting
 > on. Sorted by expiry, a lapsing offer would sit above a colleague."
 
 Note that **Rinzin has no Approvals item in the sidebar** — her authority does
@@ -794,47 +889,13 @@ Point at what replaced the buttons:
 > her to widen her own authority from here — this is exactly the moment
 > somebody would reach for that, and it must not exist."
 
-### 4 · Least disclosure — `Bank of Bhutan is asking for a proof`
+### 4 · Sharing, and the approval — `Sharing`
 
-Back to the dashboard, open the **Bank of Bhutan** request.
-
-**This is the screen to slow down on.** The bank asked for five attributes.
-Two are ticked.
-
-> "The bank asked for five. Only two are actually needed, and those are the
-> only two ticked. Least disclosure is not a warning here — it is the state
-> the screen opens in. She has to consciously add anything else."
-
-Tick **registered_address**. A note appears saying she is going beyond what is
-needed.
-
-> "Worth having a reason you could give out loud."
-
-Untick it. Point at the counter — **Disclosing 2 of 5 requested** — then press
-**Send for approval**.
-
-> "Her authority lets her present to the bank, but not without an approver.
-> So nothing goes out."
-
-### 5 · The approval — switch to Dorji
-
-Switch persona to **Dorji Wangchuk** and open **Approvals**.
-
-> "Now the gate. Note that Rinzin never saw this queue — she cannot approve her
-> own work."
-
-Open the presentation. Three things to show:
-
-- **The attributes, struck through where withheld.**
-  > "He is approving the disclosure, not the request. If he only saw 'present
-  > to Bank of Bhutan' he would not know what was going out."
-- **The fingerprint** — "what you would sign".
-  > "That covers this exact operation. Signing it from his phone commits him to
-  > this and nothing else. If any detail changed, the fingerprint changes."
-- **The authority it was done under**, with the scope version.
-
-Press **Approve and sign from wallet**. After the hand-off, the presentation
-goes out.
+The pre-spec screen here let Rinzin tick which attributes to disclose. That
+is gone: an entity credential is shared whole (EW-FLOW7-SD D4), and the
+screen says so. Walk it as **Flow 7 — A controller shares, the owner
+approves** above: Rinzin shares with the bank, Dorji approves on SCR-PRS-04,
+and neither ever approves their own.
 
 ### 6 · The record — `Controllership → Audit`
 
@@ -854,7 +915,7 @@ Point at the disclosed line:
 |---|---|
 | `/approvals/park-stale` | Approved, then invalidated before it ran |
 | `/approvals` → the dual-control card | 1 of 2 signatures, needing a different person |
-| `/wallet/verification-requests/vr-druk` | In scope by credential type, refused by counterparty |
+| `/wallet/sharing/pr-drc-check` (as Rinzin) | Her *Share* reach doesn't include the tax office: the reason, and *Pass to someone who can* |
 | `/dashboard` → **access_suspended** state | A controller whose authority was pulled mid-session |
 
 ---
@@ -1012,6 +1073,12 @@ Worth showing:
 | `/dashboard` | **all_clear**, **access_suspended** | An empty queue, and a pulled authority |
 | `/wallet/offers/...` | **out_of_scope**, **requires_approval** | Both refusal shapes on any offer |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
+| `/present?session=…` | **signed_out**, **choose**, **checking**, **error_unknown**, **error_expired**, **error_used**, **no_organisation**, **refused**, **no_request**, **offline** | SCR-PRS-01: FLOW-PRS-01 E1–E4, E7, E8, E11 |
+| `/wallet/sharing/…` | **with_approval**, **cant_satisfy**, **no_approver**, **recheck_error**, **send_error**, **already_answered**, **cancelled**, **no_permission**, **outside_reach**, **offline** | SCR-PRS-02, including E6/E13 (no approver while the Root is inactive) |
+| `/wallet/sharing/…/done` | **pending_approval**, **pending_kept**, **pending_passed**, **pending_checking**, **declined**, **refused**, **failed**, **cancelled**, **no_return** | SCR-PRS-03: only *Shared* counts down |
+| `/wallet/sharing/…/approve` | **own**, **initiator_lapsed**, **recheck_error**, **already_decided**, **send_error**, **cancelled**, **no_permission** | SCR-PRS-04, including E16/E11 — nothing in the prototype ends an appointment |
+| `/wallet/sharing` | **empty**, **loading**, **error**, **offline** | SCR-PRS-05's three empty tabs |
+| `/verification/return-addresses` (as Yeshey) | **empty**, **error_invalid**, **sign_in_again**, **no_permission**, **offline** | SCR-PRS-06 |
 | `/controllership/audit` | **filtered_empty** | A filter finding nothing, trail still intact |
 | `/onboarding` | **none_supported**, **no_permission** | No authority connected yet; Kind E by someone who isn't the owner |
 | `/onboarding/details` | **invalid_format**, **loading**, **already_claimed** | The shape check, and E3 saying nothing about why |

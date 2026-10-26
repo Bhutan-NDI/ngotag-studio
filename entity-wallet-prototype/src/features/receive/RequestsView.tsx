@@ -48,7 +48,7 @@ type Face = "live" | "default" | "empty" | "loading" | "error" | "offline" | "no
 
 export function RequestsView() {
   const router = useRouter();
-  const { credentialRequests, offers, offerings, personById, withdrawCredentialRequest, simulateAskForMore, hydrated } = useDemo();
+  const { credentialRequests, offers, offerings, personById, withdrawCredentialRequest, simulateAskForMore, hydrated, presentationRequests } = useDemo();
   const holder = useHolder();
   const forced = useScreenState("SCR-CRD-03", ["live", "default", "empty", "loading", "error", "offline", "no_permission"]) as Face;
   const [withdrawing, setWithdrawing] = useState<CredentialRequest | null>(null);
@@ -57,6 +57,7 @@ export function RequestsView() {
   useSimulatedDelivery(requests);
   const legacy = offers.filter(inOrg(holder.orgId)).filter((o) => o.state === "pending" || o.state === "parked");
   const waiting = requests.filter((r) => r.state === "OFFER_READY" || r.state === "NEEDS_CONSENT");
+  const sharingWaiting = presentationRequests.filter(inOrg(holder.orgId)).filter((r) => r.status === "OPEN" || r.status === "AWAITING_APPROVAL").length;
 
   const canAct = holder.can("credential:receive") || holder.can("credential:accept");
   const natural: Face = !requests.length && !legacy.length ? "empty" : !canAct ? "no_permission" : "default";
@@ -126,6 +127,19 @@ export function RequestsView() {
         {face === "no_permission" ? (
           <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
             You can see where things stand. {holder.rootName} can answer or accept them.
+          </p>
+        ) : null}
+
+        {/* UXD-45 — requests to share live on their own page; this one only
+            counts them and links there, so receiving and giving never share
+            a list (UX-EW-04 SCR-PRS-05). */}
+        {sharingWaiting ? (
+          <p className="m-0 text-[13px] text-muted">
+            {sharingWaiting === 1 ? "1 request to share is waiting" : `${sharingWaiting} requests to share are waiting`} —{" "}
+            <Link href="/wallet/sharing" className="ndi-plainlink text-accent">
+              see Sharing
+            </Link>
+            .
           </p>
         ) : null}
 
