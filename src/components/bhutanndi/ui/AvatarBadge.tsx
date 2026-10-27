@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface AvatarBadgeProps {
   /** Real display name (or email as a fallback) the initial is derived from. Never hardcode a placeholder letter. */
@@ -24,16 +24,24 @@ export function AvatarBadge({
   className = '',
 }: AvatarBadgeProps): React.JSX.Element {
   const initial = name?.trim()?.[0]?.toUpperCase() || '?'
+  // A missing or unreadable image falls back to the initial instead of a
+  // broken-image icon; reset when a new image is set.
+  const [imageFailed, setImageFailed] = useState(false)
+  useEffect(() => setImageFailed(false), [src])
 
-  if (src) {
+  if (src && !imageFailed) {
     return (
       <img
         src={src}
         alt={name?.trim() || 'Profile'}
+        onError={() => setImageFailed(true)}
         className={`flex-none rounded-full object-cover ${className}`.trim()}
         style={{
           width: size,
           height: size,
+          // Fixed-size badge: don't let the global img { max-width: 100% }
+          // shrink it inside a tight parent.
+          maxWidth: 'none',
           boxShadow: '0 0 0 2px var(--background)',
         }}
       />

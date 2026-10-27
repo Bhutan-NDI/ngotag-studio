@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
@@ -23,6 +24,7 @@ import Sessions from './Sessions'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getUserProfile } from '@/app/api/Auth'
 import { isBhutanndiTheme } from '@/lib/active-theme'
+import { setUserProfileDetails } from '@/lib/userSlice'
 
 export default function UserProfile(): React.JSX.Element {
   const token = useAppSelector((state) => state.auth.token)
@@ -74,6 +76,8 @@ export default function UserProfile(): React.JSX.Element {
 
   const updateProfile = (updatedProfile: IUserProfile): void => {
     setPrePopulatedUserProfile(updatedProfile)
+    // Keep the top-bar avatar and name in sync with the saved profile.
+    dispatch(setUserProfileDetails(updatedProfile))
     setUserEmail(updatedProfile.email)
     // Note: Don't set isEditProfileOpen here as it will be handled by toggleEditProfile
   }
@@ -108,10 +112,15 @@ export default function UserProfile(): React.JSX.Element {
     <Sheet open={isEditProfileOpen} onOpenChange={toggleEditProfile}>
       <SheetContent
         side="right"
-        className="w-[500px] overflow-y-auto sm:w-[600px]"
+        // Above the bhutanndi top bar (z-60); h-dvh follows the visible
+        // height, which shrinks when the phone keyboard opens.
+        className="z-[70] h-dvh w-full gap-0 overflow-hidden p-0 sm:w-[600px] sm:max-w-[600px]"
       >
-        <SheetHeader>
+        <SheetHeader className="border-border shrink-0 border-b px-4 pt-6 pb-4 sm:px-6">
           <SheetTitle>Edit Profile</SheetTitle>
+          <SheetDescription>
+            Update your name and profile photo.
+          </SheetDescription>
         </SheetHeader>
         <EditUserProfile
           toggleEditProfile={toggleEditProfile}
@@ -124,7 +133,7 @@ export default function UserProfile(): React.JSX.Element {
 
   if (isBhutanndiTheme()) {
     return (
-      <div className="p-6">
+      <div className="min-w-0">
         <PageHeader crumbs={[{ label: 'Profile' }]} title="Profile" />
 
         <div className="mt-6 mb-8">
@@ -152,8 +161,8 @@ export default function UserProfile(): React.JSX.Element {
   }
 
   return (
-    <div className="p-6">
-      <h1 className="text-foreground mb-6 text-2xl font-semibold">
+    <div className="p-4 sm:p-6">
+      <h1 className="text-foreground mb-6 text-xl font-semibold sm:text-2xl">
         User Profile
       </h1>
 
