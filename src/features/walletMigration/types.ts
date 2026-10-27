@@ -109,7 +109,8 @@ export interface IMigration {
   rotation: IRotationProgress | null
   webhookConfirmedAt: string | null
   downloadMethod: DownloadMethod | null
-  completedAt: string | null
+  // Only platforms with the completedAt column send it (ngotag-platform #130).
+  completedAt?: string | null
 }
 
 /** Body of POST /orgs/:orgId/agents/migrate (CreateOrgAgentMigrationDto). */
@@ -128,4 +129,4 @@ export interface IMigrationWithPreflight {
 
 export type MigrationResult<T> =
   | { ok: true; data: T }
-  | { ok: false; message: string; code?: string }
+  | { ok: false; message: string; code?: string; statusCode?: number }

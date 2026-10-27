@@ -1,4 +1,4 @@
-import { MigrationStatus } from './types'
+import { IMigration, MigrationStatus } from './types'
 
 /** Feature flag: hides the entry button, banner and status polling when off. */
 export const isWalletMigrationEnabled =
@@ -58,6 +58,17 @@ export const failedMoveDayStep = (error: string | null): number => {
 }
 
 export const MOVED_CHIP_DAYS = 30
+
+/**
+ * When a COMPLETED move finished. Platforms without `completedAt` still give
+ * the time: COMPLETED is terminal, so the last change is the completion.
+ */
+export const completedTime = (migration: IMigration): string | null => {
+  if (migration.status !== 'COMPLETED') {
+    return null
+  }
+  return migration.completedAt ?? migration.lastChangedDateTime ?? null
+}
 
 const BTT = 'Asia/Thimphu'
 

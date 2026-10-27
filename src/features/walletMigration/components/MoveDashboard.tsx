@@ -1,7 +1,7 @@
 'use client'
 
 import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
-import { formatBtt, hoursUntil } from '../config'
+import { completedTime, formatBtt, hoursUntil } from '../config'
 
 import { Card } from '@/components/ui/card'
 import { IMigration } from '../types'
@@ -74,6 +74,7 @@ export function MoveDashboard({
 }: Readonly<{ migration: IMigration }>): React.JSX.Element {
   const { status } = migration
   const counts = connectionCounts(migration.rotation?.counts)
+  const completedAt = completedTime(migration)
 
   const phases = [
     { key: 'STABILISING', label: 'First 48 hours' },
@@ -171,11 +172,9 @@ export function MoveDashboard({
           {status === 'COMPLETED' && (
             <p className="text-sm">
               Your organisation now runs on its own agent
-              {migration.completedAt
-                ? ` (moved ${formatBtt(migration.completedAt)})`
-                : ''}
-              . Message forwarding stays on, so citizens whose phones were
-              offline can still reach you when they return.
+              {completedAt ? ` (moved ${formatBtt(completedAt)})` : ''}. Message
+              forwarding stays on, so citizens whose phones were offline can
+              still reach you when they return.
             </p>
           )}
           {counts && counts.total > 0 ? (

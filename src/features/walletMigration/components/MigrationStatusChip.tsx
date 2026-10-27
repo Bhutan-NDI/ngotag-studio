@@ -7,7 +7,12 @@ import {
   Loader2,
   PauseCircle,
 } from 'lucide-react'
-import { MOVED_CHIP_DAYS, formatBtt, hoursUntil } from '../config'
+import {
+  MOVED_CHIP_DAYS,
+  completedTime,
+  formatBtt,
+  hoursUntil,
+} from '../config'
 
 import { Badge } from '@/components/ui/badge'
 import { IMigration } from '../types'
@@ -93,9 +98,8 @@ const chipFor = (
             className: warn,
           }
     case 'COMPLETED': {
-      const completed = migration.completedAt
-        ? new Date(migration.completedAt)
-        : null
+      const completedAt = completedTime(migration)
+      const completed = completedAt ? new Date(completedAt) : null
       const recent =
         completed &&
         Date.now() - completed.getTime() < MOVED_CHIP_DAYS * 24 * 3_600_000

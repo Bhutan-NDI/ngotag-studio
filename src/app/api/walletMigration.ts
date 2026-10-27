@@ -56,20 +56,28 @@ const call = async <T>(
       ok: false,
       message: err?.message,
       code: asCode(err?.code) ?? asCode(err?.errorCode),
+      statusCode: err?.statusCode,
     }
   }
 }
 
-/** The active move, or the latest finished one; null when the org never moved. */
+/**
+ * The active move, or the latest finished one; null when the org never moved.
+ * Older platforms answer "never moved" with a 404 instead of null.
+ */
 export const getMigration = async (
   orgId: string,
 ): Promise<MigrationResult<IMigration | null>> => {
   if (MOCK_MIGRATION_API) {
     return mockGetMigration(orgId)
   }
-  return call<IMigration | null>(() =>
+  const result = await call<IMigration | null>(() =>
     axiosGet({ url: migrationUrl(orgId), config: getHeaderConfigs() }),
   )
+  if (!result.ok && result.statusCode === 404) {
+    return { ok: true, data: null }
+  }
+  return result
 }
 
 export interface IStepUpSession {
