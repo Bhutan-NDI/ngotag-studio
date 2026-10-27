@@ -1,7 +1,13 @@
 'use client'
 
-import { CheckCircle2, Circle, Loader2, RotateCw, XCircle } from 'lucide-react'
+import {
+  CHECK_LABELS,
+  CHECK_STATUS_LABEL,
+  CheckIcon,
+  Failure,
+} from './PreflightParts'
 import { IMigration, MigrationResult } from '../types'
+import { Loader2, RotateCw } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 import {
   Select,
@@ -11,7 +17,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { StepCard, StepState } from './StepCard'
-import { getCheckError, getMigrationError } from '../errorMessages'
 import {
   rerunPreflight,
   runRehearsal,
@@ -19,9 +24,11 @@ import {
 } from '@/app/api/walletMigration'
 
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoveConfirmDialog } from './MoveConfirmDialog'
+import { describeMigrationError } from '../errorMessages'
 import { formatBtt } from '../config'
 
 // Off-peak suggestions, Bhutan time (spec SCR-WM-04).
@@ -44,39 +51,22 @@ const bttDate = (offsetDays: number): string => {
   })
 }
 
-const CheckIcon = ({ state }: { state: string }): React.JSX.Element => {
-  if (state === 'passed') {
-    return <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden />
+const minutes = (ms: number | null): string => {
+  if (ms === null) {
+    return '—'
   }
-  if (state === 'failed') {
-    return <XCircle className="text-destructive h-4 w-4" aria-hidden />
-  }
-  if (state === 'running') {
-    return <Loader2 className="text-primary h-4 w-4 animate-spin" aria-hidden />
-  }
-  return <Circle className="text-muted-foreground h-4 w-4" aria-hidden />
+  return `${Math.max(1, Math.round(ms / 60_000))} minutes`
 }
 
-const CHECK_STATE_LABEL: Record<string, string> = {
-  passed: 'Passed',
-  failed: 'Failed',
-  running: 'Checking',
-  waiting: 'Waiting',
-}
-
-const Reference = ({ id }: { id?: string }): React.JSX.Element | null => {
-  if (!id) {
-    return null
-  }
-  return <p className="text-muted-foreground mt-1 text-xs">Reference: {id}</p>
-}
+// Failed checks that need something from the owner on the re-run.
+const NEEDS_API_KEY = ['API_KEY_REQUIRED', 'AGENT_TOKEN_REJECTED']
 
 interface ChecksRehearsalScheduleProps {
   orgId: string
   orgName: string
   migration: IMigration
   isOwner: boolean
-  onResult: (result: MigrationResult<IMigration>) => void
+  onResult: (migration: IMigration) => void
 }
 
 /** SCR-WM-04: checks, then rehearsal, then booking the move (P-01 cards). */
@@ -87,42 +77,52 @@ export function ChecksRehearsalSchedule({
   isOwner,
   onResult,
 }: Readonly<ChecksRehearsalScheduleProps>): React.JSX.Element {
-  const [busy, setBusy] = useState<'checks' | 'rehearsal' | 'schedule' | null>(
-    null,
-  )
+  type Busy = 'checks' | 'rehearsal' | 'schedule'
+  const [busy, setBusy] = useState<Busy | null>(null)
   const [date, setDate] = useState(bttDate(1))
   const [time, setTime] = useState(SLOT_TIMES[0])
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [changingSlot, setChangingSlot] = useState(false)
   const [actionError, setActionError] = useState<{
-    kind: 'checks' | 'rehearsal'
+    kind: Busy
     message: string
   } | null>(null)
-  const [scheduleError, setScheduleError] = useState<string | null>(null)
+  const [apiKey, setApiKey] = useState('')
+  const [backupsConfirmed, setBackupsConfirmed] = useState(false)
 
-  const { status } = migration
-  const checksPassed = !['PREFLIGHT_RUNNING', 'PREFLIGHT_FAILED'].includes(
-    status,
+  const { status, phase, preflight, rehearsalStatus } = migration
+  const failedChecks =
+    preflight?.checks.filter((c) => c.status === 'FAIL') ?? []
+  const needsApiKey = failedChecks.some((c) =>
+    NEEDS_API_KEY.includes(c.code ?? ''),
   )
-  const rehearsed = ['REHEARSED', 'SCHEDULED', 'FAILED'].includes(status)
+  const needsBackups = failedChecks.some(
+    (c) => c.code === 'BACKUPS_NOT_CONFIRMED',
+  )
+  const rehearsed = status === 'REHEARSED'
+  const scheduled = rehearsed && phase === 'SCHEDULED'
+  const slotMissed = rehearsed && migration.error === 'SLOT_MISSED'
 
   const checksState: StepState =
-    status === 'PREFLIGHT_RUNNING'
+    busy === 'checks'
       ? 'running'
-      : status === 'PREFLIGHT_FAILED'
-        ? 'failed'
-        : 'done'
-  const rehearsalState: StepState = !checksPassed
-    ? 'locked'
-    : status === 'REHEARSING'
-      ? 'running'
-      : status === 'REHEARSAL_FAILED'
-        ? 'failed'
-        : rehearsed
+      : !preflight
+        ? 'action'
+        : preflight.passed
           ? 'done'
+          : 'failed'
+  const rehearsalState: StepState = !preflight?.passed
+    ? 'locked'
+    : rehearsalStatus === 'RUNNING' || busy === 'rehearsal'
+      ? 'running'
+      : rehearsed
+        ? 'done'
+        : rehearsalStatus === 'FAILED'
+          ? 'failed'
           : 'action'
   const scheduleState: StepState = !rehearsed
     ? 'locked'
-    : status === 'SCHEDULED'
+    : scheduled && !changingSlot
       ? 'done'
       : 'action'
 
@@ -144,46 +144,71 @@ export function ChecksRehearsalSchedule({
         ? 'Pick a date within the next 14 days.'
         : null
 
-  const run = async (
-    kind: 'checks' | 'rehearsal',
-    action: (id: string) => Promise<MigrationResult<IMigration>>,
-  ): Promise<void> => {
-    setBusy(kind)
+  const fail = (
+    kind: Busy,
+    result: MigrationResult<unknown> & { ok: false },
+  ): void =>
+    setActionError({
+      kind,
+      message: describeMigrationError(result.code, result.message),
+    })
+
+  const runChecks = async (): Promise<void> => {
+    setBusy('checks')
     setActionError(null)
-    const result = await action(orgId)
+    const result = await rerunPreflight(orgId, {
+      ...(apiKey ? { apiKey } : {}),
+      ...(backupsConfirmed ? { backupsConfirmed: true } : {}),
+    })
     setBusy(null)
+    setApiKey('')
     if (!result.ok) {
-      const content = getMigrationError(result.code)
-      setActionError({
-        kind,
-        message: result.code
-          ? `${content.message} ${content.recovery}`
-          : result.message || content.message,
-      })
+      fail('checks', result)
       return
     }
-    onResult(result)
+    onResult(result.data.migration)
   }
 
-  const confirmSchedule = async (): Promise<void> => {
+  const rehearse = async (): Promise<void> => {
+    setBusy('rehearsal')
+    setActionError(null)
+    const result = await runRehearsal(orgId)
+    setBusy(null)
+    if (!result.ok) {
+      fail('rehearsal', result)
+      return
+    }
+    onResult(result.data)
+  }
+
+  const confirmSchedule = async (confirmationName: string): Promise<void> => {
     setBusy('schedule')
-    setScheduleError(null)
-    const result = await scheduleMigration(orgId, scheduledFor)
+    setActionError(null)
+    const result = await scheduleMigration(
+      orgId,
+      confirmationName,
+      scheduledFor,
+    )
     setBusy(null)
+    setConfirmOpen(false)
     if (!result.ok) {
-      setScheduleError(getMigrationError(result.code).message)
-      setConfirmOpen(false)
+      fail('schedule', result)
       return
     }
-    setConfirmOpen(false)
-    onResult(result)
+    setChangingSlot(false)
+    onResult(result.data)
   }
 
-  const failedCheck = migration.preflight.find((c) => c.state === 'failed')
-  const rehearsalError =
-    status === 'REHEARSAL_FAILED'
-      ? getMigrationError(migration.errorCode)
-      : null
+  const errorFor = (kind: Busy): React.ReactNode => {
+    if (actionError?.kind !== kind) {
+      return null
+    }
+    return (
+      <p role="alert" className="text-destructive mt-3 text-sm">
+        {actionError.message}
+      </p>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -193,54 +218,83 @@ export function ChecksRehearsalSchedule({
         description="We check that your new agent is ready to receive the wallet."
         state={checksState}
       >
-        <ul className="divide-border/60 divide-y rounded-lg border">
-          {migration.preflight.map((check) => (
-            <li
-              key={check.key}
-              className="flex items-center gap-3 px-3 py-2.5 text-sm"
-            >
-              <CheckIcon state={check.state} />
-              <span className="flex-1">{check.label}</span>
-              <span className="text-muted-foreground text-xs">
-                {CHECK_STATE_LABEL[check.state]}
-              </span>
-            </li>
-          ))}
-        </ul>
-        {failedCheck && (
-          <div className="border-destructive/30 bg-destructive/5 mt-4 rounded-md border px-3 py-2.5 text-sm">
-            <p className="font-medium">{getCheckError(failedCheck).message}</p>
-            <p className="text-muted-foreground mt-1">
-              {getCheckError(failedCheck).recovery}
+        {!preflight ? (
+          <p className="text-muted-foreground text-sm">
+            The checks haven&apos;t run yet.
+          </p>
+        ) : (
+          <>
+            <ul className="divide-border/60 divide-y rounded-lg border">
+              {preflight.checks.map((check) => (
+                <li key={check.id} className="px-3 py-2.5 text-sm">
+                  <div className="flex items-center gap-3">
+                    <CheckIcon status={check.status} />
+                    <span className="flex-1">
+                      {CHECK_LABELS[check.id] ?? check.id}
+                    </span>
+                    <span className="text-muted-foreground text-xs">
+                      {CHECK_STATUS_LABEL[check.status]}
+                    </span>
+                  </div>
+                  {check.status === 'FAIL' && (
+                    <Failure code={check.code} detail={check.detail} />
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="text-muted-foreground mt-2 text-xs">
+              Last checked {formatBtt(preflight.ranAt)}
             </p>
-            {failedCheck.errorCode && (
-              <p className="text-muted-foreground mt-1 text-xs">
-                Reference: {failedCheck.errorCode}
-              </p>
+          </>
+        )}
+
+        {isOwner && status === 'CREATED' && (
+          <div className="mt-4 space-y-3">
+            {needsApiKey && (
+              <div className="max-w-sm space-y-1.5">
+                <Label htmlFor="recheckApiKey">API key</Label>
+                <Input
+                  id="recheckApiKey"
+                  type="password"
+                  autoComplete="off"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </div>
             )}
+            {needsBackups && (
+              <div className="flex items-start gap-2">
+                <Checkbox
+                  id="recheckBackups"
+                  checked={backupsConfirmed}
+                  onCheckedChange={(checked) =>
+                    setBackupsConfirmed(checked === true)
+                  }
+                />
+                <Label
+                  htmlFor="recheckBackups"
+                  className="leading-snug font-normal"
+                >
+                  My new agent&apos;s wallet database is backed up.
+                </Label>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy !== null || (needsApiKey && !apiKey)}
+              onClick={runChecks}
+            >
+              {busy === 'checks' ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCw className="mr-2 h-4 w-4" />
+              )}
+              {preflight ? 'Re-run checks' : 'Run checks'}
+            </Button>
           </div>
         )}
-        {isOwner && checksState !== 'running' && status !== 'SCHEDULED' && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-5"
-            disabled={busy !== null}
-            onClick={() => run('checks', rerunPreflight)}
-          >
-            {busy === 'checks' ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RotateCw className="mr-2 h-4 w-4" />
-            )}
-            Re-run checks
-          </Button>
-        )}
-        {actionError?.kind === 'checks' && (
-          <p role="alert" className="text-destructive mt-3 text-sm">
-            {actionError.message}
-          </p>
-        )}
+        {errorFor('checks')}
       </StepCard>
 
       <StepCard
@@ -259,84 +313,73 @@ export function ChecksRehearsalSchedule({
             Rehearsing. This doesn&apos;t pause your organisation.
           </p>
         )}
-        {rehearsalError && (
-          <div className="border-destructive/30 bg-destructive/5 rounded-md border px-3 py-2.5 text-sm">
-            <p className="font-medium">{rehearsalError.message}</p>
-            <p className="text-muted-foreground mt-1">
-              {rehearsalError.recovery}
-            </p>
-            <Reference id={migration.referenceId} />
-          </div>
+        {rehearsalState === 'failed' && (
+          <Failure code={migration.rehearsal?.code ?? 'JOB_FAILED'} />
         )}
-        {migration.rehearsal && rehearsed && (
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-muted-foreground">Connections</dt>
-              <dd className="font-medium">
-                {migration.rehearsal.records.connections}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Credentials</dt>
-              <dd className="font-medium">
-                {migration.rehearsal.records.credentials}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Proofs</dt>
-              <dd className="font-medium">
-                {migration.rehearsal.records.proofs}
-              </dd>
-            </div>
+        {rehearsed && (
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <div>
               <dt className="text-muted-foreground">Measured duration</dt>
               <dd className="font-medium">
-                {migration.rehearsal.durationMinutes} minutes
+                {minutes(migration.rehearsalDurationMs)}
               </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Expected pause</dt>
               <dd className="font-medium">
-                about {migration.rehearsal.predictedPauseMinutes} minutes
+                about {minutes(migration.predictedFreezeMs)}
               </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Wallet download</dt>
               <dd className="font-medium">
-                {migration.rehearsal.downloadMethod === 'direct'
-                  ? 'Direct to your agent'
-                  : 'Through the platform'}
+                {migration.downloadMethod === 'PUSH'
+                  ? 'Through the platform'
+                  : 'Direct to your agent'}
               </dd>
             </div>
+            {migration.counts?.entries !== undefined && (
+              <div>
+                <dt className="text-muted-foreground">Wallet records</dt>
+                <dd className="font-medium">
+                  {migration.counts.entries.toLocaleString()}
+                </dd>
+              </div>
+            )}
+            {migration.counts?.keys !== undefined && (
+              <div>
+                <dt className="text-muted-foreground">Keys</dt>
+                <dd className="font-medium">{migration.counts.keys}</dd>
+              </div>
+            )}
           </dl>
         )}
-        {migration.rehearsal?.downloadMethod === 'platform' && (
+        {rehearsed && migration.downloadMethod === 'PUSH' && (
           <p className="text-muted-foreground mt-2 text-sm">
             Your agent couldn&apos;t download the wallet file directly.
             We&apos;ll send it through the platform instead.
           </p>
         )}
         {isOwner &&
-          (rehearsalState === 'action' || rehearsalState === 'failed') && (
+          (rehearsalState === 'action' ||
+            rehearsalState === 'failed' ||
+            (rehearsed && !scheduled)) && (
             <Button
               size="sm"
+              variant={rehearsed ? 'outline' : 'default'}
               className="mt-5"
               disabled={busy !== null}
-              onClick={() => run('rehearsal', runRehearsal)}
+              onClick={rehearse}
             >
               {busy === 'rehearsal' && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {rehearsalState === 'failed'
-                ? 'Run rehearsal again'
-                : 'Run rehearsal'}
+              {rehearsalState === 'action'
+                ? 'Run rehearsal'
+                : 'Run rehearsal again'}
             </Button>
           )}
-        {actionError?.kind === 'rehearsal' && (
-          <p role="alert" className="text-destructive mt-3 text-sm">
-            {actionError.message}
-          </p>
-        )}
+        {errorFor('rehearsal')}
       </StepCard>
 
       <StepCard
@@ -350,27 +393,42 @@ export function ChecksRehearsalSchedule({
             Complete first: the rehearsal must finish.
           </p>
         )}
-        {status === 'SCHEDULED' && migration.scheduledFor && (
-          <p className="text-sm">
-            Move scheduled for{' '}
-            <span className="font-semibold">
-              {formatBtt(migration.scheduledFor)}
-            </span>
-            . Final checks run before the switch, and if any fails, the move
-            cancels itself and nothing changes.
-          </p>
+        {scheduleState === 'done' && migration.scheduledFor && (
+          <>
+            <p className="text-sm">
+              Move booked for{' '}
+              <span className="font-semibold">
+                {formatBtt(migration.scheduledFor)}
+              </span>
+              . Final checks run before the switch, and if any fails, the move
+              cancels itself and nothing changes.
+            </p>
+            {isOwner && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-4"
+                onClick={() => setChangingSlot(true)}
+              >
+                Change time
+              </Button>
+            )}
+          </>
         )}
         {scheduleState === 'action' && (
           <>
-            {migration.rehearsal && (
-              <p className="mb-3 text-sm">
-                Expected pause: about{' '}
-                <span className="font-semibold">
-                  {migration.rehearsal.predictedPauseMinutes} minutes
-                </span>
-                .
-              </p>
+            {slotMissed && (
+              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                {describeMigrationError('SLOT_MISSED')}
+              </div>
             )}
+            <p className="mb-3 text-sm">
+              Expected pause: about{' '}
+              <span className="font-semibold">
+                {minutes(migration.predictedFreezeMs)}
+              </span>
+              .
+            </p>
             {isOwner ? (
               <div className="flex flex-wrap items-end gap-3">
                 <div className="space-y-1.5">
@@ -404,8 +462,16 @@ export function ChecksRehearsalSchedule({
                   disabled={busy !== null || slotError !== null}
                   onClick={() => setConfirmOpen(true)}
                 >
-                  {status === 'FAILED' ? 'Reschedule' : 'Schedule move'}
+                  {scheduled ? 'Move to this time' : 'Schedule move'}
                 </Button>
+                {changingSlot && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setChangingSlot(false)}
+                  >
+                    Keep current time
+                  </Button>
+                )}
               </div>
             ) : (
               <p className="text-muted-foreground text-sm">
@@ -415,11 +481,9 @@ export function ChecksRehearsalSchedule({
             {isOwner && slotError && (
               <p className="text-destructive mt-2 text-sm">{slotError}</p>
             )}
-            {scheduleError && (
-              <p className="text-destructive mt-2 text-sm">{scheduleError}</p>
-            )}
           </>
         )}
+        {errorFor('schedule')}
       </StepCard>
 
       <MoveConfirmDialog

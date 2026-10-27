@@ -1,18 +1,14 @@
 // Organisation wallet migration (UX-NGOTAG-WM-01 v0.6).
-// Status, phase and error-code names are provisional until the platform API
-// is agreed (SAD-NGOTAG-WM-01 §5.2 / §7.6). Keep them in one place so the
-// switch from dummy data to the real API only touches this file and the
-// API wrappers.
+// Mirrors what the platform returns from GET /orgs/:orgId/agents/migrate
+// (PUBLIC_MIGRATION_FIELDS in agent-service, org-migration branch).
 
 export type MigrationStatus =
-  | 'PREFLIGHT_RUNNING'
-  | 'PREFLIGHT_FAILED'
-  | 'PREFLIGHT_PASSED'
-  | 'REHEARSING'
-  | 'REHEARSAL_FAILED'
+  | 'CREATED'
   | 'REHEARSED'
-  | 'SCHEDULED'
   | 'FROZEN'
+  | 'EXPORTING'
+  | 'IMPORTING'
+  | 'VERIFYING'
   | 'CUTOVER'
   | 'STABILISING'
   | 'ROTATING'
@@ -20,95 +16,114 @@ export type MigrationStatus =
   | 'FAILED'
   | 'DISASTER_RESTORED'
 
-export type MigrationErrorCode =
-  | 'TARGET_NOT_PRISTINE'
-  | 'STORAGE_VERSION_MISMATCH'
-  | 'AGENT_UNREACHABLE'
-  | 'PUBLIC_ENDPOINT_UNREACHABLE'
-  | 'STEP_UP_REQUIRED'
-  | 'ORG_BULK_JOB_ACTIVE'
-  | 'UNSUPPORTED_FEATURES'
-  | 'RELAY_WS_UNSUPPORTED'
-  | 'RELAY_REQUIRES_SHARED_REDIS'
-  | 'EXPORT_FAILED'
-  | 'IMPORT_FAILED'
-  | 'BUDGET_EXCEEDED'
-  | 'CUTOVER_FAILED'
-  | 'VERIFICATION_FAILED'
-  | 'ORG_AGENT_MIGRATING'
-  | 'MIGRATION_ALREADY_EXISTS'
+/** Derived by the platform from the status; "scheduled" and "cancelled" only appear here. */
+export type MigrationPhase =
+  | 'PREPARE'
+  | 'SCHEDULED'
+  | 'MOVE'
+  | 'FIRST_48_HOURS'
+  | 'CHANGE_OF_ADDRESS'
+  | 'COMPLETE'
+  | 'CANCELLED'
+  | 'RESTORED'
 
-export type CheckState = 'waiting' | 'running' | 'passed' | 'failed'
+export type PreflightCheckId =
+  | 'ORG_IS_SHARED'
+  | 'AGENT_REACHABLE'
+  | 'TOKEN_IS_ROOT'
+  | 'ENDPOINT_MATCHES'
+  | 'RELEASE_MATCHES'
+  | 'CONFIG_MATCHES'
+  | 'TARGET_PRISTINE'
+  | 'DIDCOMM_REACHABLE'
+  | 'NO_BULK_JOB'
+  | 'WEBHOOK_DELIVERS'
+  | 'DOWNLOAD_METHOD'
+  | 'NO_OUT_OF_SCOPE_ARTEFACTS'
+  | 'NO_WEBSOCKET_ENDPOINTS'
+  | 'SHARED_REDIS'
+  | 'BACKUPS_CONFIRMED'
+
+export type PreflightCheckStatus = 'PASS' | 'FAIL' | 'SKIPPED'
 
 export interface IPreflightCheck {
-  key: string
-  label: string
-  state: CheckState
-  errorCode?: MigrationErrorCode
-  /** Extra detail for the message, e.g. the found/required versions. */
-  detail?: Record<string, string>
+  id: PreflightCheckId
+  status: PreflightCheckStatus
+  /** Stable code mapped to a message; never raw error text. */
+  code?: string
+  /** Non-secret facts, e.g. the version found and the one required. */
+  detail?: Record<string, string | number | boolean | string[]>
 }
 
-export interface IRehearsalResult {
-  records: {
-    connections: number
-    credentials: number
-    proofs: number
-    dids: number
-  }
-  durationMinutes: number
-  predictedPauseMinutes: number
-  downloadMethod: 'direct' | 'platform'
+export interface IPreflightReport {
+  ranAt: string
+  passed: boolean
+  checks: IPreflightCheck[]
 }
 
-export interface IMoveDayProgress {
-  /** Index into MOVE_DAY_STEPS of the step currently running (or failed). */
-  currentStep: number
-  elapsedMinutes: number
-  expectedMinutes: number
-  limitMinutes: number
-  failedCheck?: string
+export type DownloadMethod = 'PULL' | 'PUSH'
+
+export interface IRehearsalRecord {
+  step?: 'EXPORT' | 'IMPORT'
+  code?: string
+  downloadMethod?: DownloadMethod
+  exportMs?: number
+  importMs?: number
+  exportCleanup?: 'DELETED' | 'FAILED'
+  finishedAt?: string
 }
 
-export interface IConnectionUpdateProgress {
-  updated: number
-  waiting: number
-  refused: number
-  inactive: number
-}
-
-export interface IHealthCheck {
-  key: string
-  label: string
-  ok: boolean
+export interface IRotationProgress {
+  job: { status: string; startedAt?: string; completedAt?: string }
+  /** total, pending, retrying, failed, waiting, stale, refused, updated */
+  counts: Record<string, number>
+  polledAt: string
 }
 
 export interface IMigration {
   id: string
+  createDateTime: string
+  lastChangedDateTime: string
   orgId: string
   status: MigrationStatus
-  adminUrl: string
-  publicUrl: string
-  createdAt: string
-  preflight: IPreflightCheck[]
-  rehearsal?: IRehearsalResult
-  scheduledFor?: string
-  moveDay?: IMoveDayProgress
-  stabilisationEndsAt?: string
-  /** First-48-hours checks: issuing, verifying, webhooks, forwarding. */
-  healthChecks?: IHealthCheck[]
-  connections?: IConnectionUpdateProgress
-  forwardedLast30Days?: number
-  completedAt?: string
-  errorCode?: MigrationErrorCode
-  /** Shown to the user as a support reference, never on its own. */
-  referenceId?: string
+  phase: MigrationPhase | null
+  startedBy: string
+  targetAdminEndpoint: string | null
+  targetDidcommEndpoint: string | null
+  counts: { entries?: number; keys?: number; skipped?: number } | null
+  releaseVersion: string | null
+  storageVersion: string | null
+  rehearsalDurationMs: number | null
+  predictedFreezeMs: number | null
+  scheduledFor: string | null
+  freezeDeadline: string | null
+  stabilisationEndsAt: string | null
+  purgedAt: string | null
+  /** Why the move failed or was put back, e.g. CANCELLED_BY_OWNER, SLOT_MISSED. */
+  error: string | null
+  backupsConfirmedAt: string | null
+  preflight: IPreflightReport | null
+  rehearsalStatus: 'RUNNING' | 'DONE' | 'FAILED' | null
+  rehearsalStartedAt: string | null
+  rehearsal: IRehearsalRecord | null
+  rotation: IRotationProgress | null
+  webhookConfirmedAt: string | null
+  downloadMethod: DownloadMethod | null
+  completedAt: string | null
 }
 
+/** Body of POST /orgs/:orgId/agents/migrate (CreateOrgAgentMigrationDto). */
 export interface IStartMovePayload {
-  adminUrl: string
-  publicUrl: string
+  targetAdminEndpoint: string
+  targetDidcommEndpoint: string
   apiKey: string
+  backupsConfirmed: boolean
+}
+
+/** create and preflight answer with the move plus the report they just ran. */
+export interface IMigrationWithPreflight {
+  migration: IMigration
+  preflight: IPreflightReport | null
 }
 
 export type MigrationResult<T> =

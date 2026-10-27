@@ -1,76 +1,101 @@
-// Dummy data for the wallet migration screens until the platform API exists.
+// Dummy data for the wallet migration screens, shaped exactly like the
+// platform's responses (PUBLIC_MIGRATION_FIELDS, org-migration branch), so the
+// screens behave the same with NEXT_PUBLIC_WALLET_MIGRATION_MOCK=false.
 //
-// A move is kept in localStorage per org (never the API key) and its status is
-// derived from the time elapsed, on a compressed timeline: checks take seconds,
-// move day ~25 s, the "first 48 hours" ~30 s and connection updates ~30 s.
+// The move is kept in localStorage per org (never the API key) and moves on a
+// compressed timeline: rehearsal ~6 s, move day ~25 s from scheduling, the
+// "first 48 hours" ~30 s and connection updates ~30 s.
 //
 // Demo triggers — put one of these words in the agent admin address:
-//   not-pristine  first checks run fails with TARGET_NOT_PRISTINE
-//   old-version   first checks run fails with STORAGE_VERSION_MISMATCH
-//   unreachable   first checks run fails with AGENT_UNREACHABLE
-//   rehearsal-fail first rehearsal fails with EXPORT_FAILED
-//   verify-fail   first move day aborts at "Verify your new agent"
-//   slow          first move day aborts with BUDGET_EXCEEDED
-//   disaster      ends in DISASTER_RESTORED instead of COMPLETED
-// A re-run or reschedule then succeeds, as if the owner fixed the problem.
+//   not-pristine   first checks fail with TARGET_NOT_PRISTINE
+//   old-release    first checks fail with RELEASE_MISMATCH
+//   unreachable    first checks fail with AGENT_UNREACHABLE
+//   rehearsal-fail first rehearsal fails (JOB_FAILED during export)
+//   slot-missed    first booked slot is missed (back to REHEARSED, SLOT_MISSED)
+//   verify-fail    move day fails at VERIFYING (VERIFICATION_FAILED:RELAY_PROBE)
+//   slow           move day fails with FREEZE_BUDGET_EXCEEDED during import
+//   disaster       ends in DISASTER_RESTORED during the first 48 hours
+// A re-run of the checks or rehearsal, or a new booking, then succeeds.
 
 import {
   IMigration,
+  IMigrationWithPreflight,
   IPreflightCheck,
+  IPreflightReport,
   IStartMovePayload,
-  MigrationErrorCode,
+  MigrationPhase,
   MigrationResult,
+  MigrationStatus,
+  PreflightCheckId,
 } from './types'
-import { MOVE_DAY_STEPS } from './config'
 
-const CHECK_MS = 1_200
 const REHEARSAL_MS = 6_000
 const START_DELAY_MS = 8_000
-const STEP_MS = 3_000
+const STEP_MS = 4_000
 const STABILISE_MS = 30_000
+const WEBHOOK_CONFIRM_MS = 6_000
 const ROTATE_MS = 30_000
 const LATENCY_MS = 400
-
-const EXPECTED_MINUTES = 20
-const LIMIT_MINUTES = 30
 const TOTAL_CONNECTIONS = 1240
 
-const PREFLIGHT_CHECKS: { key: string; label: string }[] = [
-  { key: 'reachable', label: 'Agent admin address reachable' },
-  { key: 'public', label: 'Public DIDComm address reachable' },
-  { key: 'version', label: 'Agent version' },
-  { key: 'pristine', label: 'New agent wallet is empty' },
-  { key: 'features', label: 'Organisation features supported' },
-  { key: 'jobs', label: 'No bulk issuance running' },
+const CHECK_IDS: PreflightCheckId[] = [
+  'ORG_IS_SHARED',
+  'AGENT_REACHABLE',
+  'TOKEN_IS_ROOT',
+  'ENDPOINT_MATCHES',
+  'RELEASE_MATCHES',
+  'CONFIG_MATCHES',
+  'TARGET_PRISTINE',
+  'DIDCOMM_REACHABLE',
+  'NO_BULK_JOB',
+  'WEBHOOK_DELIVERS',
+  'DOWNLOAD_METHOD',
+  'NO_OUT_OF_SCOPE_ARTEFACTS',
+  'NO_WEBSOCKET_ENDPOINTS',
+  'SHARED_REDIS',
+  'BACKUPS_CONFIRMED',
 ]
 
 const FAILING_CHECK: Record<
   string,
-  { key: string; code: MigrationErrorCode; detail?: Record<string, string> }
+  { id: PreflightCheckId; code: string; detail?: IPreflightCheck['detail'] }
 > = {
-  'not-pristine': { key: 'pristine', code: 'TARGET_NOT_PRISTINE' },
-  'old-version': {
-    key: 'version',
-    code: 'STORAGE_VERSION_MISMATCH',
+  'not-pristine': { id: 'TARGET_PRISTINE', code: 'TARGET_NOT_PRISTINE' },
+  'old-release': {
+    id: 'RELEASE_MATCHES',
+    code: 'RELEASE_MISMATCH',
     detail: { found: '0.5.6', required: '0.6.1' },
   },
-  unreachable: { key: 'reachable', code: 'AGENT_UNREACHABLE' },
+  unreachable: { id: 'AGENT_REACHABLE', code: 'AGENT_UNREACHABLE' },
 }
 
-type Stage = 'preflight' | 'rehearsal' | 'scheduled'
+// Checks that can't run once the agent is unreachable.
+const NEEDS_AGENT: PreflightCheckId[] = [
+  'TOKEN_IS_ROOT',
+  'ENDPOINT_MATCHES',
+  'RELEASE_MATCHES',
+  'CONFIG_MATCHES',
+  'TARGET_PRISTINE',
+  'WEBHOOK_DELIVERS',
+  'DOWNLOAD_METHOD',
+]
 
 interface IMockRecord {
   id: string
   orgId: string
-  adminUrl: string
-  publicUrl: string
-  createdAt: string
-  stage: Stage
-  stageStartedAt: number
+  targetAdminEndpoint: string
+  targetDidcommEndpoint: string
+  createDateTime: string
+  backupsConfirmed: boolean
   preflightRuns: number
+  preflight: IPreflightReport | null
   rehearsalRuns: number
-  moveAttempts: number
-  scheduledFor?: string
+  rehearsalStartedAt: number | null
+  bookings: number
+  bookedAt: number | null
+  scheduledFor: string | null
+  /** Set once the owner cancels; the move is kept, like on the platform. */
+  cancelledAt: string | null
 }
 
 const storageKey = (orgId: string): string => `walletMigrationMock:${orgId}`
@@ -96,212 +121,218 @@ const wait = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, LATENCY_MS))
 
 const trigger = (record: IMockRecord, word: string): boolean =>
-  record.adminUrl.toLowerCase().includes(word)
+  record.targetAdminEndpoint.toLowerCase().includes(word)
 
-const preflightChecks = (
-  record: IMockRecord,
-  elapsed: number,
-): IPreflightCheck[] => {
+const iso = (ms: number): string => new Date(ms).toISOString()
+
+const runPreflight = (record: IMockRecord): IPreflightReport => {
   const failing =
     record.preflightRuns === 1
       ? Object.entries(FAILING_CHECK).find(([word]) =>
           trigger(record, word),
         )?.[1]
       : undefined
-  const failIndex = failing
-    ? PREFLIGHT_CHECKS.findIndex((c) => c.key === failing.key)
-    : -1
-
-  return PREFLIGHT_CHECKS.map((check, i) => {
-    const done = elapsed >= (i + 1) * CHECK_MS
-    const running = !done && elapsed >= i * CHECK_MS
-    if (failIndex !== -1 && i > failIndex) {
-      return { ...check, state: 'waiting' }
+  const checks: IPreflightCheck[] = CHECK_IDS.map((id) => {
+    if (failing && id === failing.id) {
+      return { id, status: 'FAIL', code: failing.code, detail: failing.detail }
     }
-    if (i === failIndex && done) {
-      return {
-        ...check,
-        state: 'failed',
-        errorCode: failing?.code,
-        detail: failing?.detail,
-      }
+    if (id === 'BACKUPS_CONFIRMED' && !record.backupsConfirmed) {
+      return { id, status: 'FAIL', code: 'BACKUPS_NOT_CONFIRMED' }
     }
-    return {
-      ...check,
-      state: done ? 'passed' : running ? 'running' : 'waiting',
+    if (failing?.id === 'AGENT_REACHABLE' && NEEDS_AGENT.includes(id)) {
+      return { id, status: 'SKIPPED' }
     }
+    if (id === 'DOWNLOAD_METHOD') {
+      return { id, status: 'PASS', detail: { method: 'PULL' } }
+    }
+    return { id, status: 'PASS' }
   })
+  return {
+    ranAt: iso(Date.now()),
+    passed: checks.every((c) => c.status !== 'FAIL'),
+    checks,
+  }
 }
 
-const allPassed = (): IPreflightCheck[] =>
-  PREFLIGHT_CHECKS.map((c) => ({ ...c, state: 'passed' }))
+const blank = (record: IMockRecord): IMigration => ({
+  id: record.id,
+  createDateTime: record.createDateTime,
+  lastChangedDateTime: iso(Date.now()),
+  orgId: record.orgId,
+  status: 'CREATED',
+  phase: 'PREPARE',
+  startedBy: 'mock-owner',
+  targetAdminEndpoint: record.targetAdminEndpoint,
+  targetDidcommEndpoint: record.targetDidcommEndpoint,
+  counts: null,
+  releaseVersion: '0.6.1',
+  storageVersion: null,
+  rehearsalDurationMs: null,
+  predictedFreezeMs: null,
+  scheduledFor: null,
+  freezeDeadline: null,
+  stabilisationEndsAt: null,
+  purgedAt: null,
+  error: null,
+  backupsConfirmedAt: record.backupsConfirmed ? record.createDateTime : null,
+  preflight: record.preflight,
+  rehearsalStatus: null,
+  rehearsalStartedAt: null,
+  rehearsal: null,
+  rotation: null,
+  webhookConfirmedAt: null,
+  downloadMethod: record.preflight ? 'PULL' : null,
+  completedAt: null,
+})
+
+const failed = (m: IMigration, error: string): IMigration => ({
+  ...m,
+  status: 'FAILED',
+  phase: 'CANCELLED',
+  error,
+})
+
+const at = (
+  m: IMigration,
+  status: MigrationStatus,
+  phase: MigrationPhase,
+): IMigration => ({ ...m, status, phase })
 
 const derive = (record: IMockRecord, now: number): IMigration => {
-  const base: IMigration = {
-    id: record.id,
-    orgId: record.orgId,
-    adminUrl: record.adminUrl,
-    publicUrl: record.publicUrl,
-    createdAt: record.createdAt,
-    status: 'PREFLIGHT_RUNNING',
-    preflight: allPassed(),
-  }
-  const elapsed = now - record.stageStartedAt
+  let m = blank(record)
 
-  if (record.stage === 'preflight') {
-    const preflight = preflightChecks(record, elapsed)
-    const failed = preflight.find((c) => c.state === 'failed')
-    const passed = preflight.every((c) => c.state === 'passed')
-    return {
-      ...base,
-      preflight,
-      status: failed
-        ? 'PREFLIGHT_FAILED'
-        : passed
-          ? 'PREFLIGHT_PASSED'
-          : 'PREFLIGHT_RUNNING',
-      errorCode: failed?.errorCode,
-    }
-  }
-
-  const rehearsal = {
-    records: {
-      connections: TOTAL_CONNECTIONS,
-      credentials: 3518,
-      proofs: 2210,
-      dids: 3,
-    },
-    durationMinutes: 12,
-    predictedPauseMinutes: 18,
-    downloadMethod: 'direct' as const,
-  }
-
-  if (record.stage === 'rehearsal') {
-    if (elapsed < REHEARSAL_MS) {
-      return { ...base, status: 'REHEARSING' }
-    }
-    if (record.rehearsalRuns === 1 && trigger(record, 'rehearsal-fail')) {
-      return {
-        ...base,
-        status: 'REHEARSAL_FAILED',
-        errorCode: 'EXPORT_FAILED',
-        referenceId: `WM-${record.id.slice(0, 8).toUpperCase()}`,
+  // Rehearsal
+  if (record.rehearsalStartedAt !== null) {
+    m.rehearsalStartedAt = iso(record.rehearsalStartedAt)
+    const done = now - record.rehearsalStartedAt >= REHEARSAL_MS
+    if (!done) {
+      m.rehearsalStatus = 'RUNNING'
+    } else if (
+      record.rehearsalRuns === 1 &&
+      trigger(record, 'rehearsal-fail')
+    ) {
+      m.rehearsalStatus = 'FAILED'
+      m.rehearsal = { step: 'EXPORT', code: 'JOB_FAILED', finishedAt: iso(now) }
+    } else {
+      m = {
+        ...at(m, 'REHEARSED', 'PREPARE'),
+        rehearsalStatus: 'DONE',
+        rehearsalDurationMs: 12 * 60_000,
+        predictedFreezeMs: 18 * 60_000,
+        storageVersion: '1.0',
+        counts: { entries: 48_210, keys: 3, skipped: 0 },
+        rehearsal: {
+          downloadMethod: 'PULL',
+          exportMs: 5 * 60_000,
+          importMs: 7 * 60_000,
+          exportCleanup: 'DELETED',
+          finishedAt: iso(record.rehearsalStartedAt + REHEARSAL_MS),
+        },
       }
     }
-    return { ...base, status: 'REHEARSED', rehearsal }
   }
 
-  // Scheduled: move day starts START_DELAY_MS after scheduling, whatever slot
-  // was picked, so the demo doesn't have to wait for the real date.
-  const scheduled = { ...base, rehearsal, scheduledFor: record.scheduledFor }
-  if (elapsed < START_DELAY_MS) {
-    return { ...scheduled, status: 'SCHEDULED' }
+  if (record.cancelledAt) {
+    return failed(m, 'CANCELLED_BY_OWNER')
+  }
+  if (m.status !== 'REHEARSED' || record.bookedAt === null) {
+    return m
   }
 
-  const moveT = elapsed - START_DELAY_MS
-  const step = Math.min(MOVE_DAY_STEPS.length, Math.floor(moveT / STEP_MS))
-  const elapsedMinutes = Math.round(
-    (moveT / (STEP_MS * MOVE_DAY_STEPS.length)) * EXPECTED_MINUTES,
-  )
-  const moveDay = {
-    currentStep: step,
-    elapsedMinutes: Math.min(elapsedMinutes, EXPECTED_MINUTES),
-    expectedMinutes: EXPECTED_MINUTES,
-    limitMinutes: LIMIT_MINUTES,
+  // Booked: move day starts START_DELAY_MS after booking, whatever slot was
+  // picked, so the demo doesn't wait for the real date.
+  m = { ...m, phase: 'SCHEDULED', scheduledFor: record.scheduledFor }
+  const sinceBooking = now - record.bookedAt
+  if (sinceBooking < START_DELAY_MS) {
+    return m
+  }
+  if (record.bookings === 1 && trigger(record, 'slot-missed')) {
+    return { ...m, phase: 'PREPARE', scheduledFor: null, error: 'SLOT_MISSED' }
   }
 
-  const firstAttempt = record.moveAttempts === 1
-  const failAt = firstAttempt
-    ? trigger(record, 'verify-fail')
-      ? { step: 4, code: 'VERIFICATION_FAILED' as const }
-      : trigger(record, 'slow')
-        ? { step: 3, code: 'BUDGET_EXCEEDED' as const }
-        : null
-    : null
-  if (failAt && step >= failAt.step) {
+  const frozenAt = record.bookedAt + START_DELAY_MS
+  const freezeBudgetMs = 30 * 60_000
+  m.freezeDeadline = iso(frozenAt + freezeBudgetMs)
+  const moveT = now - frozenAt
+  const step = Math.floor(moveT / STEP_MS)
+  const steps: MigrationStatus[] = [
+    'FROZEN',
+    'EXPORTING',
+    'IMPORTING',
+    'VERIFYING',
+    'CUTOVER',
+  ]
+  const firstMove = record.bookings === 1
+  if (firstMove && trigger(record, 'slow') && step >= 2) {
+    return failed(m, 'FREEZE_BUDGET_EXCEEDED')
+  }
+  if (firstMove && trigger(record, 'verify-fail') && step >= 3) {
+    return failed(m, 'VERIFICATION_FAILED:RELAY_PROBE')
+  }
+  if (step < steps.length) {
+    return at(m, steps[step], 'MOVE')
+  }
+
+  // After the switch
+  const moveDayMs = steps.length * STEP_MS
+  const switchedAt = frozenAt + moveDayMs
+  const afterSwitch = now - switchedAt
+  m.stabilisationEndsAt = iso(switchedAt + STABILISE_MS)
+  if (afterSwitch >= WEBHOOK_CONFIRM_MS) {
+    m.webhookConfirmedAt = iso(switchedAt + WEBHOOK_CONFIRM_MS)
+  }
+  if (afterSwitch < STABILISE_MS) {
+    if (trigger(record, 'disaster') && afterSwitch >= STABILISE_MS / 2) {
+      return at(m, 'DISASTER_RESTORED', 'RESTORED')
+    }
+    // Show "48 hours" counting down on the compressed clock.
+    const left = (STABILISE_MS - afterSwitch) / STABILISE_MS
+    const leftMs = left * 48 * 3_600_000
     return {
-      ...scheduled,
-      status: 'FAILED',
-      errorCode: failAt.code,
-      referenceId: `WM-${record.id.slice(0, 8).toUpperCase()}`,
-      moveDay: {
-        ...moveDay,
-        currentStep: failAt.step,
-        elapsedMinutes:
-          failAt.code === 'BUDGET_EXCEEDED'
-            ? LIMIT_MINUTES
-            : moveDay.elapsedMinutes,
-        failedCheck:
-          failAt.code === 'VERIFICATION_FAILED'
-            ? 'webhook delivery'
-            : undefined,
-      },
+      ...at(m, 'STABILISING', 'FIRST_48_HOURS'),
+      stabilisationEndsAt: iso(now + leftMs),
     }
   }
 
-  if (step < MOVE_DAY_STEPS.length) {
-    return { ...scheduled, status: step < 5 ? 'FROZEN' : 'CUTOVER', moveDay }
+  const rotateT = afterSwitch - STABILISE_MS
+  const share = Math.min(1, rotateT / ROTATE_MS)
+  const updated = Math.round(TOTAL_CONNECTIONS * 0.95 * share)
+  const refused = Math.round(12 * share)
+  const stale = Math.round(41 * share)
+  const rotation = {
+    job: {
+      status: share >= 1 ? 'COMPLETED' : 'RUNNING',
+      startedAt: iso(switchedAt + STABILISE_MS),
+    },
+    counts: {
+      total: TOTAL_CONNECTIONS,
+      updated,
+      refused,
+      stale,
+      failed: 0,
+      retrying: 0,
+      waiting: 0,
+      pending: TOTAL_CONNECTIONS - updated - refused - stale,
+    },
+    polledAt: iso(now),
   }
-
-  const doneMoveDay = { ...moveDay, elapsedMinutes: 17 }
-  const moveDayMs = STEP_MS * MOVE_DAY_STEPS.length
-  const afterMove = moveT - moveDayMs
-  if (afterMove < STABILISE_MS) {
-    const remaining = (STABILISE_MS - afterMove) / STABILISE_MS
-    const remainingMs = remaining * 48 * 3_600_000
-    return {
-      ...scheduled,
-      status: 'STABILISING',
-      moveDay: doneMoveDay,
-      stabilisationEndsAt: new Date(now + remainingMs).toISOString(),
-      healthChecks: [
-        { key: 'issuing', label: 'Issuing works', ok: true },
-        { key: 'verifying', label: 'Verifying works', ok: true },
-        { key: 'webhooks', label: 'Webhooks arriving', ok: true },
-        { key: 'forwarding', label: 'Message forwarding healthy', ok: true },
-      ],
-    }
-  }
-
-  const rotateT = afterMove - STABILISE_MS
   if (rotateT < ROTATE_MS) {
-    const share = rotateT / ROTATE_MS
-    const updated = Math.round(TOTAL_CONNECTIONS * 0.86 * share)
-    const refused = Math.round(12 * share)
-    const inactive = Math.round(41 * share)
-    return {
-      ...scheduled,
-      status: 'ROTATING',
-      moveDay: doneMoveDay,
-      connections: {
-        updated,
-        refused,
-        inactive,
-        waiting: TOTAL_CONNECTIONS - updated - refused - inactive,
-      },
-    }
+    return { ...at(m, 'ROTATING', 'CHANGE_OF_ADDRESS'), rotation }
   }
-
-  if (trigger(record, 'disaster')) {
-    return { ...scheduled, status: 'DISASTER_RESTORED', moveDay: doneMoveDay }
-  }
-
-  const updated = TOTAL_CONNECTIONS - 12 - 41 - 0
   return {
-    ...scheduled,
-    status: 'COMPLETED',
-    moveDay: doneMoveDay,
-    completedAt: new Date(now).toISOString(),
-    connections: { updated, waiting: 0, refused: 12, inactive: 41 },
-    forwardedLast30Days: 87,
+    ...at(m, 'COMPLETED', 'COMPLETE'),
+    rotation,
+    completedAt: iso(switchedAt + STABILISE_MS + ROTATE_MS),
   }
 }
 
 const notFound = (): MigrationResult<never> => ({
   ok: false,
   message: 'No move found for this organisation.',
-  code: 'NOT_FOUND',
 })
+
+const isActive = (m: IMigration): boolean =>
+  !['COMPLETED', 'FAILED', 'DISASTER_RESTORED'].includes(m.status)
 
 export const mockGetMigration = async (
   orgId: string,
@@ -314,97 +345,131 @@ export const mockGetMigration = async (
 export const mockStartMigration = async (
   orgId: string,
   payload: IStartMovePayload,
-): Promise<MigrationResult<IMigration>> => {
+): Promise<MigrationResult<IMigrationWithPreflight>> => {
   await wait()
-  if (load(orgId)) {
+  const existing = load(orgId)
+  if (existing && isActive(derive(existing, Date.now()))) {
     return {
       ok: false,
-      message: 'A move is already in progress.',
-      code: 'MIGRATION_ALREADY_EXISTS',
+      message: 'A move is already in progress for this organisation.',
     }
   }
   const record: IMockRecord = {
     id: crypto.randomUUID(),
     orgId,
-    adminUrl: payload.adminUrl,
-    publicUrl: payload.publicUrl,
-    createdAt: new Date().toISOString(),
-    stage: 'preflight',
-    stageStartedAt: Date.now(),
+    targetAdminEndpoint: payload.targetAdminEndpoint,
+    targetDidcommEndpoint: payload.targetDidcommEndpoint,
+    createDateTime: iso(Date.now()),
+    backupsConfirmed: payload.backupsConfirmed,
     preflightRuns: 1,
+    preflight: null,
     rehearsalRuns: 0,
-    moveAttempts: 0,
+    rehearsalStartedAt: null,
+    bookings: 0,
+    bookedAt: null,
+    scheduledFor: null,
+    cancelledAt: null,
   }
+  record.preflight = runPreflight(record)
   save(record)
-  return { ok: true, data: derive(record, Date.now()) }
+  const migration = derive(record, Date.now())
+  return { ok: true, data: { migration, preflight: migration.preflight } }
 }
 
-const update = async (
+export const mockRerunPreflight = async (
   orgId: string,
-  change: (record: IMockRecord) => IMockRecord,
+  body: { backupsConfirmed?: boolean },
+): Promise<MigrationResult<IMigrationWithPreflight>> => {
+  await wait()
+  const record = load(orgId)
+  if (!record || derive(record, Date.now()).status !== 'CREATED') {
+    return notFound()
+  }
+  const next: IMockRecord = {
+    ...record,
+    preflightRuns: record.preflightRuns + 1,
+    backupsConfirmed: body.backupsConfirmed ?? record.backupsConfirmed,
+  }
+  next.preflight = runPreflight(next)
+  save(next)
+  const migration = derive(next, Date.now())
+  return { ok: true, data: { migration, preflight: migration.preflight } }
+}
+
+export const mockRunRehearsal = async (
+  orgId: string,
 ): Promise<MigrationResult<IMigration>> => {
   await wait()
   const record = load(orgId)
   if (!record) {
     return notFound()
   }
-  const next = change(record)
+  if (!record.preflight?.passed) {
+    return { ok: false, message: 'The move checks have not passed yet.' }
+  }
+  const next: IMockRecord = {
+    ...record,
+    rehearsalRuns: record.rehearsalRuns + 1,
+    rehearsalStartedAt: Date.now(),
+  }
   save(next)
   return { ok: true, data: derive(next, Date.now()) }
 }
 
-export const mockRerunPreflight = (
+export const mockScheduleMigration = async (
   orgId: string,
-): Promise<MigrationResult<IMigration>> =>
-  update(orgId, (r) => ({
-    ...r,
-    stage: 'preflight',
-    stageStartedAt: Date.now(),
-    preflightRuns: r.preflightRuns + 1,
-  }))
-
-export const mockRunRehearsal = (
-  orgId: string,
-): Promise<MigrationResult<IMigration>> =>
-  update(orgId, (r) => ({
-    ...r,
-    stage: 'rehearsal',
-    stageStartedAt: Date.now(),
-    rehearsalRuns: r.rehearsalRuns + 1,
-  }))
-
-export const mockScheduleMigration = (
-  orgId: string,
-  scheduledFor: string,
-): Promise<MigrationResult<IMigration>> =>
-  update(orgId, (r) => ({
-    ...r,
-    stage: 'scheduled',
-    stageStartedAt: Date.now(),
-    moveAttempts: r.moveAttempts + 1,
-    scheduledFor,
-  }))
+  confirmationName: string,
+  scheduledFor?: string,
+): Promise<MigrationResult<IMigration>> => {
+  await wait()
+  const record = load(orgId)
+  if (!record) {
+    return notFound()
+  }
+  if (derive(record, Date.now()).status !== 'REHEARSED') {
+    return { ok: false, message: 'The move has not been rehearsed yet.' }
+  }
+  if (!confirmationName.trim()) {
+    return { ok: false, message: 'The organisation name does not match.' }
+  }
+  const next: IMockRecord = {
+    ...record,
+    bookings: record.bookings + 1,
+    bookedAt: Date.now(),
+    scheduledFor: scheduledFor ?? iso(Date.now()),
+  }
+  save(next)
+  return { ok: true, data: derive(next, Date.now()) }
+}
 
 export const mockCancelMigration = async (
   orgId: string,
-): Promise<MigrationResult<null>> => {
+): Promise<MigrationResult<IMigration>> => {
   await wait()
-  try {
-    localStorage.removeItem(storageKey(orgId))
-  } catch {
-    // ignore
+  const record = load(orgId)
+  if (!record) {
+    return notFound()
   }
-  return { ok: true, data: null }
+  const current = derive(record, Date.now())
+  if (!['CREATED', 'REHEARSED'].includes(current.status)) {
+    return {
+      ok: false,
+      message: 'The move has already started and can no longer be cancelled.',
+    }
+  }
+  const next = { ...record, cancelledAt: iso(Date.now()) }
+  save(next)
+  return { ok: true, data: derive(next, Date.now()) }
 }
 
 export const mockStepUpSignIn = async (
   password: string,
-): Promise<MigrationResult<{ token: string }>> => {
+): Promise<MigrationResult<{ accessToken: string; sessionId?: string }>> => {
   await wait()
   if (!password) {
     return { ok: false, message: 'Password is required' }
   }
-  return { ok: true, data: { token: 'mock-step-up-token' } }
+  return { ok: true, data: { accessToken: 'mock-step-up-token' } }
 }
 
 /** Demo only: forget the dummy move for an org. */

@@ -25,30 +25,39 @@ const chipFor = (
     'border-green-300 bg-green-50 text-green-700 hover:bg-green-50 dark:border-green-700 dark:bg-green-950 dark:text-green-400'
   const spin = <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
 
+  const needsAttention = {
+    label: 'Move needs attention',
+    icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+    className: warn,
+  }
+  const preparing = {
+    label: 'Move in progress: preparing',
+    icon: spin,
+    className: info,
+  }
+
   switch (migration.status) {
-    case 'PREFLIGHT_RUNNING':
-    case 'PREFLIGHT_PASSED':
-    case 'REHEARSING':
+    case 'CREATED':
+      return (migration.preflight && !migration.preflight.passed) ||
+        migration.rehearsalStatus === 'FAILED'
+        ? needsAttention
+        : preparing
     case 'REHEARSED':
-      return {
-        label: 'Move in progress: preparing',
-        icon: spin,
-        className: info,
+      if (migration.phase === 'SCHEDULED' && migration.scheduledFor) {
+        return {
+          label: `Move scheduled: ${formatBtt(migration.scheduledFor)}`,
+          icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
+          className: info,
+        }
       }
-    case 'PREFLIGHT_FAILED':
-    case 'REHEARSAL_FAILED':
-      return {
-        label: 'Move needs attention',
-        icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
-        className: warn,
-      }
-    case 'SCHEDULED':
-      return {
-        label: `Move scheduled: ${migration.scheduledFor ? formatBtt(migration.scheduledFor) : ''}`,
-        icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
-        className: info,
-      }
+      return migration.error === 'SLOT_MISSED' ||
+        migration.rehearsalStatus === 'FAILED'
+        ? needsAttention
+        : preparing
     case 'FROZEN':
+    case 'EXPORTING':
+    case 'IMPORTING':
+    case 'VERIFYING':
     case 'CUTOVER':
       return {
         label: 'Moving now: issuing and verifying paused',
@@ -72,11 +81,17 @@ const chipFor = (
         className: info,
       }
     case 'FAILED':
-      return {
-        label: 'Move cancelled automatically: reschedule',
-        icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
-        className: warn,
-      }
+      return migration.error === 'CANCELLED_BY_OWNER'
+        ? {
+            label: 'Move cancelled',
+            icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+            className: warn,
+          }
+        : {
+            label: 'Move cancelled automatically',
+            icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+            className: warn,
+          }
     case 'COMPLETED': {
       const completed = migration.completedAt
         ? new Date(migration.completedAt)

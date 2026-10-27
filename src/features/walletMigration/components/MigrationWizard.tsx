@@ -14,6 +14,7 @@ import {
 import {
   CANCELLABLE_STATUSES,
   MOCK_MIGRATION_API,
+  PAUSED_STATUSES,
   isWalletMigrationEnabled,
 } from '../config'
 import React, { useEffect, useRef, useState } from 'react'
@@ -32,6 +33,7 @@ import PageContainer from '@/components/layout/page-container'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StartMoveForm } from './StartMoveForm'
 import { cancelMigration } from '@/app/api/walletMigration'
+import { describeMigrationError } from '../errorMessages'
 import { getOrganizationById } from '@/app/api/organization'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { resetMockMigration } from '../mockMigrationApi'
@@ -52,7 +54,7 @@ export default function MigrationWizard(): React.JSX.Element {
   const { migration, loading, error, refresh, applyResult } =
     useMigrationStatus(orgId)
 
-  const [rescheduling, setRescheduling] = useState(false)
+  const [startingNew, setStartingNew] = useState(false)
   const [showMoveDayResult, setShowMoveDayResult] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -99,15 +101,12 @@ export default function MigrationWizard(): React.JSX.Element {
   // Keep showing the move-day success panel once the switch finishes, until
   // the owner opens the dashboard (SCR-WM-05 → SCR-WM-06).
   useEffect(() => {
-    if (status === 'FROZEN' || status === 'CUTOVER') {
+    if (status && PAUSED_STATUSES.includes(status)) {
       sawMoveDay.current = true
     }
     if (status === 'STABILISING' && sawMoveDay.current) {
       sawMoveDay.current = false
       setShowMoveDayResult(true)
-    }
-    if (status !== 'FAILED') {
-      setRescheduling(false)
     }
   }, [status])
 
@@ -122,14 +121,15 @@ export default function MigrationWizard(): React.JSX.Element {
     if (!result.ok) {
       // Keep the dialog open: the move is still planned on the server.
       setCancelError(
-        `The move wasn't cancelled and is still planned. ${
-          result.message || 'Please try again.'
-        }`,
+        `The move wasn't cancelled and is still planned. ${describeMigrationError(
+          result.code,
+          result.message,
+        )}`,
       )
       return
     }
     setCancelOpen(false)
-    applyResult({ ok: true, data: null })
+    applyResult({ ok: true, data: result.data })
   }
 
   const renderBody = (): React.ReactNode => {
@@ -171,7 +171,7 @@ export default function MigrationWizard(): React.JSX.Element {
         </Alert>
       )
     }
-    if (!migration) {
+    if (!migration || startingNew) {
       if (agentTypeError) {
         return (
           <Alert variant="destructive">
@@ -197,8 +197,17 @@ export default function MigrationWizard(): React.JSX.Element {
       return isOwner ? (
         <StartMoveForm
           orgId={orgId}
-          onStarted={(data) => applyResult({ ok: true, data })}
-          onCancel={() => router.push('/dashboard')}
+          onStarted={(data) => {
+            setStartingNew(false)
+            applyResult({ ok: true, data: data.migration })
+          }}
+          onCancel={() => {
+            if (startingNew) {
+              setStartingNew(false)
+            } else {
+              router.push('/dashboard')
+            }
+          }}
         />
       ) : (
         <Card className="text-muted-foreground p-6 text-sm">
@@ -208,23 +217,53 @@ export default function MigrationWizard(): React.JSX.Element {
     }
 
     const { status: current } = migration
-    if (current === 'FROZEN' || current === 'CUTOVER' || showMoveDayResult) {
+    const startNew = (): void => setStartingNew(true)
+
+    if (current === 'FAILED') {
+      // The platform keeps a cancelled or failed move; a new move starts over.
+      if (
+        migration.error === 'CANCELLED_BY_OWNER' ||
+        !migration.freezeDeadline
+      ) {
+        return (
+          <Card className="p-6 text-sm">
+            <p className="font-medium">
+              {migration.error === 'CANCELLED_BY_OWNER'
+                ? 'The move was cancelled. Nothing changed.'
+                : describeMigrationError(migration.error)}
+            </p>
+            <p className="text-muted-foreground mt-1">
+              Your organisation stays on the shared agent.
+            </p>
+            {migration.error && migration.error !== 'CANCELLED_BY_OWNER' && (
+              <p className="text-muted-foreground mt-1 text-xs">
+                Reference: {migration.error}
+              </p>
+            )}
+            {isOwner && agentType === 'shared' && (
+              <Button size="sm" className="mt-4" onClick={startNew}>
+                Start a new move
+              </Button>
+            )}
+          </Card>
+        )
+      }
       return (
         <MoveDayProgress
           migration={migration}
-          isOwner={isOwner}
-          onReschedule={() => setRescheduling(true)}
-          onOpenDashboard={() => setShowMoveDayResult(false)}
+          isOwner={isOwner && agentType === 'shared'}
+          onStartNewMove={startNew}
+          onOpenDashboard={() => undefined}
         />
       )
     }
-    if (current === 'FAILED' && !rescheduling) {
+    if (PAUSED_STATUSES.includes(current) || showMoveDayResult) {
       return (
         <MoveDayProgress
           migration={migration}
           isOwner={isOwner}
-          onReschedule={() => setRescheduling(true)}
-          onOpenDashboard={() => undefined}
+          onStartNewMove={startNew}
+          onOpenDashboard={() => setShowMoveDayResult(false)}
         />
       )
     }
@@ -241,7 +280,7 @@ export default function MigrationWizard(): React.JSX.Element {
         orgName={orgName}
         migration={migration}
         isOwner={isOwner}
-        onResult={applyResult}
+        onResult={(updated) => applyResult({ ok: true, data: updated })}
       />
     )
   }

@@ -22,7 +22,8 @@ interface MoveConfirmDialogProps {
   scheduledFor: string
   loading: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: () => void
+  /** Called with what the owner typed; the platform checks it again. */
+  onConfirm: (confirmationName: string) => void
 }
 
 /**
@@ -46,7 +47,8 @@ export function MoveConfirmDialog({
       setTyped('')
     }
   }, [open])
-  const matches = typed === orgName
+  // Same rule as the platform: trimmed, otherwise exact.
+  const matches = typed.trim() !== '' && typed.trim() === orgName.trim()
 
   return (
     <Dialog
@@ -111,7 +113,7 @@ export function MoveConfirmDialog({
             type="button"
             variant="destructive"
             disabled={!matches || loading}
-            onClick={onConfirm}
+            onClick={() => onConfirm(typed.trim())}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm and schedule the move

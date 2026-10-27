@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { formatBtt, hoursUntil } from '../config'
 
 import { Card } from '@/components/ui/card'
@@ -18,7 +18,7 @@ const Segment = ({
   total: number
   className: string
 }): React.JSX.Element | null => {
-  if (value <= 0) {
+  if (value <= 0 || total <= 0) {
     return null
   }
   return (
@@ -31,19 +31,49 @@ const Segment = ({
 }
 
 /**
+ * The platform's rotation buckets (total, pending, retrying, failed, waiting,
+ * stale, refused, updated), grouped the way the spec words them.
+ */
+const connectionCounts = (
+  counts: Record<string, number> | undefined,
+): {
+  updated: number
+  waiting: number
+  refused: number
+  inactive: number
+  failed: number
+  total: number
+} | null => {
+  if (!counts) {
+    return null
+  }
+  const n = (key: string): number => counts[key] ?? 0
+  const grouped = {
+    updated: n('updated'),
+    waiting: n('pending') + n('retrying') + n('waiting'),
+    refused: n('refused'),
+    inactive: n('stale'),
+    failed: n('failed'),
+  }
+  const sum =
+    grouped.updated +
+    grouped.waiting +
+    grouped.refused +
+    grouped.inactive +
+    grouped.failed
+  return { ...grouped, total: n('total') || sum }
+}
+
+/**
  * SCR-WM-06: first 48 hours, updating connections, moved. Read-only for
- * everyone; there is no switch-back (problems are fixed forward).
+ * everyone; there is no switch-back (problems are fixed forward). Shows only
+ * what the platform records.
  */
 export function MoveDashboard({
   migration,
 }: Readonly<{ migration: IMigration }>): React.JSX.Element {
-  const { status, connections } = migration
-  const total = connections
-    ? connections.updated +
-      connections.waiting +
-      connections.refused +
-      connections.inactive
-    : 0
+  const { status } = migration
+  const counts = connectionCounts(migration.rotation?.counts)
 
   const phases = [
     { key: 'STABILISING', label: 'First 48 hours' },
@@ -113,24 +143,22 @@ export function MoveDashboard({
             . After that, your citizens&apos; connections start updating
             automatically.
           </p>
-          <ul className="space-y-2">
-            {(migration.healthChecks ?? []).map((check) => (
-              <li key={check.key} className="flex items-center gap-2 text-sm">
-                {check.ok ? (
-                  <CheckCircle2
-                    className="h-4 w-4 text-green-600"
-                    aria-hidden
-                  />
-                ) : (
-                  <XCircle className="text-destructive h-4 w-4" aria-hidden />
-                )}
-                <span className="flex-1">{check.label}</span>
-                <span className="text-muted-foreground text-xs">
-                  {check.ok ? 'Healthy' : 'Problem'}
+          <div className="flex items-center gap-2 text-sm">
+            {migration.webhookConfirmedAt ? (
+              <>
+                <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden />
+                <span>
+                  Webhooks from your agent confirmed{' '}
+                  {formatBtt(migration.webhookConfirmedAt)}
                 </span>
-              </li>
-            ))}
-          </ul>
+              </>
+            ) : (
+              <>
+                <Clock className="text-muted-foreground h-4 w-4" aria-hidden />
+                <span>Waiting for the first webhook from your agent</span>
+              </>
+            )}
+          </div>
           <p className="text-muted-foreground text-sm">
             If something isn&apos;t working, contact support. Problems are fixed
             on your new agent.
@@ -138,90 +166,90 @@ export function MoveDashboard({
         </div>
       )}
 
-      {(status === 'ROTATING' || status === 'COMPLETED') &&
-        connections &&
-        total > 0 && (
-          <div className="mt-5 space-y-3">
-            {status === 'COMPLETED' && (
-              <p className="text-sm">
-                Your organisation now runs on its own agent. Message forwarding
-                stays on, so citizens whose phones were offline can still reach
-                you when they return.
-              </p>
-            )}
-            <div
-              className="bg-muted flex h-3 w-full overflow-hidden rounded-full"
-              role="img"
-              aria-label={`${connections.updated} updated, ${connections.waiting} waiting, ${connections.refused} refused, ${connections.inactive} inactive`}
-            >
-              <Segment
-                label="Updated"
-                value={connections.updated}
-                total={total}
-                className="bg-green-500"
-              />
-              <Segment
-                label="Refused"
-                value={connections.refused}
-                total={total}
-                className="bg-destructive"
-              />
-              <Segment
-                label="Inactive"
-                value={connections.inactive}
-                total={total}
-                className="bg-amber-400"
-              />
-            </div>
-            <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-              <div>
-                <dt className="text-muted-foreground">Updated</dt>
-                <dd className="font-medium">{connections.updated}</dd>
+      {(status === 'ROTATING' || status === 'COMPLETED') && (
+        <div className="mt-5 space-y-3">
+          {status === 'COMPLETED' && (
+            <p className="text-sm">
+              Your organisation now runs on its own agent
+              {migration.completedAt
+                ? ` (moved ${formatBtt(migration.completedAt)})`
+                : ''}
+              . Message forwarding stays on, so citizens whose phones were
+              offline can still reach you when they return.
+            </p>
+          )}
+          {counts && counts.total > 0 ? (
+            <>
+              <div
+                className="bg-muted flex h-3 w-full overflow-hidden rounded-full"
+                role="img"
+                aria-label={`${counts.updated} updated, ${counts.waiting} waiting, ${counts.refused} refused, ${counts.inactive} inactive`}
+              >
+                <Segment
+                  label="Updated"
+                  value={counts.updated}
+                  total={counts.total}
+                  className="bg-green-500"
+                />
+                <Segment
+                  label="Refused"
+                  value={counts.refused}
+                  total={counts.total}
+                  className="bg-destructive"
+                />
+                <Segment
+                  label="Inactive"
+                  value={counts.inactive}
+                  total={counts.total}
+                  className="bg-amber-400"
+                />
               </div>
-              <div>
-                <dt className="text-muted-foreground">Waiting</dt>
-                <dd className="font-medium">{connections.waiting}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Refused</dt>
-                <dd className="font-medium">{connections.refused}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Inactive (30 days)</dt>
-                <dd className="font-medium">{connections.inactive}</dd>
-              </div>
-            </dl>
-            {status === 'ROTATING' && (
-              <p className="text-muted-foreground text-sm">
-                Phones that are offline get the update when they next open the
-                app.
-              </p>
-            )}
-            {connections.refused > 0 && (
-              <p className="text-muted-foreground text-sm">
-                {connections.refused} connections refused the update.
-                They&apos;ll keep working through message forwarding.
-              </p>
-            )}
-            {connections.inactive > 0 && (
-              <p className="text-muted-foreground text-sm">
-                {connections.inactive} connections haven&apos;t responded in 30
-                days. These citizens may be offline, or may have removed the
-                connection or the app. Their connections keep working through
-                message forwarding.
-              </p>
-            )}
-            {status === 'COMPLETED' &&
-              migration.forwardedLast30Days !== undefined && (
-                <p className="text-sm">
-                  Messages forwarded in the last 30 days:{' '}
-                  <span className="font-semibold">
-                    {migration.forwardedLast30Days}
-                  </span>
+              <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div>
+                  <dt className="text-muted-foreground">Updated</dt>
+                  <dd className="font-medium">{counts.updated}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Waiting</dt>
+                  <dd className="font-medium">{counts.waiting}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Refused</dt>
+                  <dd className="font-medium">{counts.refused}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Inactive (30 days)</dt>
+                  <dd className="font-medium">{counts.inactive}</dd>
+                </div>
+              </dl>
+              {status === 'ROTATING' && (
+                <p className="text-muted-foreground text-sm">
+                  Phones that are offline get the update when they next open the
+                  app.
                 </p>
               )}
-          </div>
-        )}
+              {counts.refused > 0 && (
+                <p className="text-muted-foreground text-sm">
+                  {counts.refused} connections refused the update. They&apos;ll
+                  keep working through message forwarding.
+                </p>
+              )}
+              {counts.inactive > 0 && (
+                <p className="text-muted-foreground text-sm">
+                  {counts.inactive} connections haven&apos;t responded in 30
+                  days. These citizens may be offline, or may have removed the
+                  connection or the app. Their connections keep working through
+                  message forwarding.
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              Connection update progress will appear here shortly.
+            </p>
+          )}
+        </div>
+      )}
     </Card>
   )
 }

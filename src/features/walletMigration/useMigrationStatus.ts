@@ -1,10 +1,11 @@
 'use client'
 
-import { IMigration, MigrationResult, MigrationStatus } from './types'
+import { IMigration, MigrationResult } from './types'
 import {
+  MOCK_MIGRATION_API,
+  PAUSED_STATUSES,
   POLL_IDLE_MS,
   POLL_RUNNING_MS,
-  RUNNING_STATUSES,
   isWalletMigrationEnabled,
 } from './config'
 import {
@@ -38,14 +39,34 @@ export const loadMigration = async (
   return result.ok
 }
 
-// Move day and the compressed dummy timeline change quickly from SCHEDULED
-// until the move settles, so poll fast for those too.
-const needsFastPolling = (status: MigrationStatus | null): boolean =>
-  status !== null &&
-  (RUNNING_STATUSES.includes(status) ||
-    status === 'SCHEDULED' ||
-    status === 'STABILISING' ||
-    status === 'ROTATING')
+const SOON_MS = 10 * 60_000
+
+/**
+ * Fast (5 s) while something is about to change: a rehearsal running, a
+ * booked slot within 10 minutes, and move day. The demo timeline is
+ * compressed, so it also polls fast through the later phases.
+ */
+const needsFastPolling = (migration: IMigration | null): boolean => {
+  if (!migration) {
+    return false
+  }
+  if (PAUSED_STATUSES.includes(migration.status)) {
+    return true
+  }
+  if (migration.rehearsalStatus === 'RUNNING') {
+    return true
+  }
+  if (migration.phase === 'SCHEDULED' && migration.scheduledFor) {
+    if (MOCK_MIGRATION_API) {
+      return true
+    }
+    return new Date(migration.scheduledFor).getTime() - Date.now() < SOON_MS
+  }
+  return (
+    MOCK_MIGRATION_API &&
+    (migration.status === 'STABILISING' || migration.status === 'ROTATING')
+  )
+}
 
 /**
  * The one status poller (P-04), mounted once in the page layout: every 5 s
@@ -56,12 +77,12 @@ const needsFastPolling = (status: MigrationStatus | null): boolean =>
  */
 export const useMigrationPoller = (orgId?: string | null): void => {
   const dispatch = useAppDispatch()
-  const status = useAppSelector((state) => {
+  const migration = useAppSelector((state) => {
     const { walletMigration } = state
-    return walletMigration.orgId === orgId ? walletMigration.status : null
+    return walletMigration.orgId === orgId ? walletMigration.migration : null
   })
-  const statusRef = useRef(status)
-  statusRef.current = status
+  const migrationRef = useRef(migration)
+  migrationRef.current = migration
 
   useEffect(() => {
     if (!orgId || !isWalletMigrationEnabled) {
@@ -78,7 +99,7 @@ export const useMigrationPoller = (orgId?: string | null): void => {
     const tick = async (): Promise<void> => {
       try {
         const due =
-          needsFastPolling(statusRef.current) ||
+          needsFastPolling(migrationRef.current) ||
           Date.now() - lastFetch >= POLL_IDLE_MS
         if (due) {
           lastFetch = Date.now()

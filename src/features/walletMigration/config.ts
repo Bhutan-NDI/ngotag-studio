@@ -14,39 +14,48 @@ export const MOCK_MIGRATION_API =
 export const POLL_RUNNING_MS = 5_000
 export const POLL_IDLE_MS = 60_000
 
-/** Statuses where a step is actively running and the page should poll fast. */
-export const RUNNING_STATUSES: MigrationStatus[] = [
-  'PREFLIGHT_RUNNING',
-  'REHEARSING',
+/** Move day: issuing and verifying are paused (SCR-WM-08). Matches the
+ * platform's ORG_AGENT_MIGRATION_FROZEN_STATUSES. */
+export const PAUSED_STATUSES: MigrationStatus[] = [
   'FROZEN',
+  'EXPORTING',
+  'IMPORTING',
+  'VERIFYING',
   'CUTOVER',
 ]
 
-/** Issuing and verifying are paused (SCR-WM-08). */
-export const PAUSED_STATUSES: MigrationStatus[] = ['FROZEN', 'CUTOVER']
+/** The platform only accepts a cancel before the move starts. */
+export const CANCELLABLE_STATUSES: MigrationStatus[] = ['CREATED', 'REHEARSED']
 
-/** Before move day the owner can still cancel the move. */
-export const CANCELLABLE_STATUSES: MigrationStatus[] = [
-  'PREFLIGHT_RUNNING',
-  'PREFLIGHT_FAILED',
-  'PREFLIGHT_PASSED',
-  'REHEARSING',
-  'REHEARSAL_FAILED',
-  'REHEARSED',
-  'SCHEDULED',
+/** Move-day steps (SAD Annex E.3) and the platform status that runs each. */
+export const MOVE_DAY_STEPS: { status: MigrationStatus; label: string }[] = [
+  { status: 'FROZEN', label: 'Pause issuing and verifying, and hold messages' },
+  { status: 'EXPORTING', label: 'Export wallet' },
+  { status: 'IMPORTING', label: 'Import into your agent' },
+  { status: 'VERIFYING', label: 'Verify your new agent' },
+  { status: 'CUTOVER', label: 'Switch to your agent and forward messages' },
 ]
 
-/** Move-day steps (SAD Annex E.3), shown in this order on SCR-WM-05. */
-export const MOVE_DAY_STEPS = [
-  'Pause issuing and verifying',
-  'Hold incoming messages',
-  'Export wallet',
-  'Import into your agent',
-  'Verify your new agent',
-  'Switch to your agent',
-  'Forward held messages',
-  'Resume',
-]
+/** Error codes that tell which move-day step failed (the rest aren't step-specific). */
+export const failedMoveDayStep = (error: string | null): number => {
+  const code = error ?? ''
+  if (/^(RELAY_FAILED|ALERT_FAILED)/.test(code)) {
+    return 0
+  }
+  if (/^EXPORT/.test(code)) {
+    return 1
+  }
+  if (/^(IMPORT|DOWNLOAD_FAILED)/.test(code)) {
+    return 2
+  }
+  if (/^VERIFICATION_FAILED/.test(code)) {
+    return 3
+  }
+  if (/^(CUTOVER_FAILED|INVITATION_FAILED)/.test(code)) {
+    return 4
+  }
+  return -1
+}
 
 export const MOVED_CHIP_DAYS = 30
 

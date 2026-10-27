@@ -1,6 +1,6 @@
 'use client'
 
-import { PAUSED_STATUSES, isWalletMigrationEnabled } from '../config'
+import { PAUSED_STATUSES, formatBtt, isWalletMigrationEnabled } from '../config'
 import React, { useEffect } from 'react'
 import { useMigrationPoller, useMigrationStatus } from '../useMigrationStatus'
 
@@ -66,21 +66,11 @@ function PausedBannerInner(): React.JSX.Element | null {
     return <div aria-live="polite" className="sr-only" />
   }
 
-  const remainingMinutes = migration?.moveDay
-    ? Math.max(
-        0,
-        migration.moveDay.expectedMinutes - migration.moveDay.elapsedMinutes,
-      )
+  // The platform gives the latest time the pause can last (after that it
+  // cancels itself), not a start time, so show that.
+  const latestEnd = migration?.freezeDeadline
+    ? formatBtt(migration.freezeDeadline, false)
     : null
-  const remainingMs = (remainingMinutes ?? 0) * 60_000
-  const expectedUntil =
-    remainingMinutes === null
-      ? null
-      : new Date(Date.now() + remainingMs).toLocaleTimeString('en-GB', {
-          timeZone: 'Asia/Thimphu',
-          hour: '2-digit',
-          minute: '2-digit',
-        })
 
   return (
     <div aria-live="polite">
@@ -92,8 +82,8 @@ function PausedBannerInner(): React.JSX.Element | null {
         <p className="min-w-0 flex-1">
           Issuing and verifying are paused while your organisation moves to its
           own agent
-          {expectedUntil ? ` (expected until about ${expectedUntil} BTT)` : ''}.
-          Messages from citizens are being held safely.
+          {latestEnd ? ` (until ${latestEnd} at the latest)` : ''}. Messages
+          from citizens are being held safely.
         </p>
         <Link href="/wallet-migration" className="font-semibold underline">
           View progress

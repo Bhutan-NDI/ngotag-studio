@@ -9,18 +9,19 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { IStepUpSession, stepUpSignIn } from '@/app/api/walletMigration'
 import React, { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { stepUpSignIn } from '@/app/api/walletMigration'
 import { useAppSelector } from '@/lib/hooks'
 
 interface StepUpSignInDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onVerified: (token: string) => void
+  /** The new session; the create call is sent with its token. */
+  onVerified: (session: IStepUpSession) => void
 }
 
 /**
@@ -66,7 +67,7 @@ export function StepUpSignInDialog({
       setError(result.message || 'Sign in failed. Please try again.')
       return
     }
-    onVerified(result.data.token)
+    onVerified(result.data)
   }
 
   return (

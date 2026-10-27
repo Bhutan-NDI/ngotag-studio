@@ -3,24 +3,36 @@
 import * as yup from 'yup'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Download, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Field, FieldProps, Form, Formik, FormikHelpers } from 'formik'
-import { IMigration, IStartMovePayload } from '../types'
+import { IMigrationWithPreflight, IStartMovePayload } from '../types'
+import { IStepUpSession, startMigration } from '@/app/api/walletMigration'
 import { PUBLIC_HOST_MESSAGE, isHttpsUrl, isPublicHost } from '../agentUrl'
 import React, { useState } from 'react'
 
+import { BeforeYouStart } from './BeforeYouStart'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StepUpSignInDialog } from './StepUpSignInDialog'
-import { getMigrationError } from '../errorMessages'
-import { startMigration } from '@/app/api/walletMigration'
+import { describeMigrationError } from '../errorMessages'
 
-interface IStartMoveValues extends IStartMovePayload {
+interface IStartMoveValues {
+  adminUrl: string
+  publicUrl: string
+  apiKey: string
   setupConfirmed: boolean
   backupsConfirmed: boolean
+}
+
+const originOf = (value?: string): string | null => {
+  try {
+    return value ? new URL(value.trim()).origin : null
+  } catch {
+    return null
+  }
 }
 
 const initialValues: IStartMoveValues = {
@@ -52,9 +64,14 @@ const validationSchema = yup.object({
       isHttpsUrl,
     )
     .test('public', PUBLIC_HOST_MESSAGE, isPublicHost)
-    .notOneOf(
-      [yup.ref('adminUrl')],
-      'Must be different from the admin address',
+    // The platform needs the two on different origins (scheme, host, port).
+    .test(
+      'different',
+      'Must be a different address from the admin address',
+      (value, context) => {
+        const admin = originOf(context.parent.adminUrl)
+        return !admin || originOf(value) !== admin
+      },
     ),
   apiKey: yup.string().required('API key is required'),
   setupConfirmed: yup
@@ -63,40 +80,9 @@ const validationSchema = yup.object({
   backupsConfirmed: yup.boolean().oneOf([true], 'Please confirm your backups'),
 })
 
-// Placeholder until the real checklist (network flows N1–N6 and hosting,
-// SAD §5.3) is published.
-const downloadChecklist = (): void => {
-  const content = [
-    '# Dedicated agent setup checklist',
-    '',
-    'Complete every item before starting the move. Full details: SAD-NGOTAG-WM-01 §5.3.',
-    '',
-    '## Network',
-    '- [ ] N1 Admin address reachable over HTTPS from the platform IP addresses only',
-    '- [ ] N2 Public DIDComm address reachable over HTTPS from the internet',
-    '- [ ] N3 Valid TLS certificate on both addresses',
-    '- [ ] N4 Outbound HTTPS to the platform allowed',
-    '- [ ] N5 Webhook delivery to the platform allowed',
-    '- [ ] N6 Wallet file download from the platform allowed',
-    '',
-    '## Hosting',
-    '- [ ] Agent runs the required version',
-    '- [ ] Wallet database is empty (freshly installed agent)',
-    '- [ ] Wallet database backups are scheduled and tested',
-  ].join('\n')
-  const url = URL.createObjectURL(
-    new Blob([content], { type: 'text/markdown' }),
-  )
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'dedicated-agent-setup-checklist.md'
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
 interface StartMoveFormProps {
   orgId: string
-  onStarted: (migration: IMigration) => void
+  onStarted: (data: IMigrationWithPreflight) => void
   onCancel: () => void
 }
 
@@ -123,31 +109,28 @@ export function StartMoveForm({
     setStepUpOpen(true)
   }
 
-  const onStepUpVerified = async (token: string): Promise<void> => {
+  const onStepUpVerified = async (session: IStepUpSession): Promise<void> => {
     setStepUpOpen(false)
     if (!pending) {
       return
     }
     const { values, helpers } = pending
     helpers.setSubmitting(true)
-    const result = await startMigration(
-      orgId,
-      {
-        adminUrl: values.adminUrl.trim(),
-        publicUrl: values.publicUrl.trim(),
-        apiKey: values.apiKey,
-      },
-      token,
-    )
+    const payload: IStartMovePayload = {
+      targetAdminEndpoint: values.adminUrl.trim(),
+      targetDidcommEndpoint: values.publicUrl.trim(),
+      apiKey: values.apiKey,
+      backupsConfirmed: values.backupsConfirmed,
+    }
+    // Sent with the fresh session's token: the platform requires a sign-in
+    // within the last five minutes for this call.
+    const result = await startMigration(orgId, payload, session)
     // Never keep the API key around after submitting (P-05).
     helpers.setFieldValue('apiKey', '')
     helpers.setSubmitting(false)
     setPending(null)
     if (!result.ok) {
-      const content = getMigrationError(result.code)
-      setError(
-        result.code ? `${content.message} ${content.recovery}` : result.message,
-      )
+      setError(describeMigrationError(result.code, result.message))
       return
     }
     onStarted(result.data)
@@ -163,16 +146,7 @@ export function StartMoveForm({
         don&apos;t need to do anything.
       </p>
 
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="mt-4"
-        onClick={downloadChecklist}
-      >
-        <Download className="mr-2 h-4 w-4" />
-        Download setup checklist
-      </Button>
+      <BeforeYouStart orgId={orgId} />
 
       {error && (
         <Alert variant="destructive" className="mt-4">
@@ -197,8 +171,9 @@ export function StartMoveForm({
                 readOnly={isSubmitting}
               />
               <p className="text-muted-foreground text-xs">
-                The address our platform uses to manage your agent. Allow only
-                our IP addresses.
+                The HTTPS address that reaches your agent&apos;s admin port (
+                <code>adminPort</code>). Our platform uses it to manage your
+                agent. Allow only our IP addresses.
               </p>
               {touched.adminUrl && errors.adminUrl && (
                 <p className="text-destructive text-sm">{errors.adminUrl}</p>
@@ -215,7 +190,9 @@ export function StartMoveForm({
                 readOnly={isSubmitting}
               />
               <p className="text-muted-foreground text-xs">
-                The address citizens&apos; wallets send messages to.
+                The address citizens&apos; wallets send messages to. Enter it
+                exactly as the first <code>endpoint</code> in your agent&apos;s
+                configuration.
               </p>
               {touched.publicUrl && errors.publicUrl && (
                 <p className="text-destructive text-sm">{errors.publicUrl}</p>
@@ -269,8 +246,8 @@ export function StartMoveForm({
                   htmlFor="setupConfirmed"
                   className="leading-snug font-normal"
                 >
-                  I have set up the agent using the checklist, and it runs the
-                  required version.
+                  I have set up the agent as described in Before you start, and
+                  it runs the required release.
                 </Label>
               </div>
               {touched.setupConfirmed && errors.setupConfirmed && (
