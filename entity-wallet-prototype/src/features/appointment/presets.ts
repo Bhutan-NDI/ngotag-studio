@@ -135,7 +135,10 @@ export function scopeFor(choice: Choice, validFrom: string, validUntil: string |
   grants.push(g("credential:list"));
   if (on("share")) {
     grants.push(g("proof:present", choice.shareNeedsApproval ? "SINGLE_APPROVER" : "AUTO", reach));
-    grants.push(g("connection:create", "AUTO", reach));
+    /* The reach is presenting's alone (§4.2): it limits whom credentials go
+       to, and opening a connection sends nothing. The connection itself is
+       open to any organisation, as the specification's table has it. */
+    grants.push(g("connection:create"));
   }
   if (on("approve")) grants.push(g("approval:decide"));
   if (on("give_authority")) grants.push(g("authority:issue", choice.issueNeedsApproval ? "SINGLE_APPROVER" : "AUTO"));

@@ -98,7 +98,7 @@ export interface Organization {
   id: string;
   /**
    * The entity type its authority verified it as (FLOW-ORG-01). Decides,
-   * among other things, whether giving others authority is offered at all
+   * among other things, whether appointing someone is offered at all
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
@@ -503,6 +503,12 @@ export interface ControllershipRelation {
   activatedAt: string | null;
   suspendedAt?: string | null;
   endedReason?: string | null;
+  /**
+   * Why a pending appointment became EXPIRED (EW-FLOW3-SD §5.1). One state,
+   * because none of them ever authorised anything; four reasons, because
+   * each tells the person something different.
+   */
+  expiryReason?: ExpiryReason | null;
   /*
    * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
    * older relations, which were authored operation by operation before the
@@ -551,6 +557,32 @@ export type ShareReach = "named" | "any";
  */
 export function standsNow(r: Pick<ControllershipRelation, "state" | "expiresAt">, today: string): boolean {
   return r.state === "ACTIVE" || (r.state === "PENDING_ACCEPTANCE" && !(r.expiresAt && r.expiresAt < today));
+}
+
+/**
+ * The four reasons an appointment that was never accepted ends: the
+ * appointee said no, the representative withdrew it (D19), 14 days passed,
+ * or the organisation or its representative stopped standing behind it.
+ */
+export type ExpiryReason = "DECLINED" | "WITHDRAWN" | "TIMED_OUT" | "BASIS_LOST";
+
+/**
+ * Whether a member can be appointed now, and if not, which refusal applies
+ * (FLOW-DEL-01 P3). Split since FLOW-DEL-01 v0.8: someone who can already
+ * act is E3, and someone with an appointment still waiting for them is E14 —
+ * they can't act yet, so the screen mustn't say they can. The store refuses
+ * with this, and SCR-DEL-02 shows the same answer, so the two never differ.
+ */
+export function appointmentHeld(
+  relations: Pick<ControllershipRelation, "orgId" | "personId" | "isRootAuthority" | "state" | "expiresAt">[],
+  orgId: string,
+  personId: string,
+  today: string,
+): "E3" | "E14" | null {
+  const theirs = relations.filter((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today));
+  if (theirs.some((r) => r.state === "ACTIVE")) return "E3";
+  if (theirs.length) return "E14";
+  return null;
 }
 
 /**

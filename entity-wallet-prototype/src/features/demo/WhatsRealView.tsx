@@ -91,6 +91,13 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
           "NDI's dedicated verification organisation, a proof request whose challenge carries the appointment, and the versioned acceptance and attestation texts.",
       },
       {
+        shown: "Withdrawing an appointment before it is accepted, and the appointee being told",
+        reality:
+          "Recorded in your browser. Nobody is notified: the appointee finds out by opening the appointment, which then says it was withdrawn. That an acceptance arriving first wins is a check in the demo store, not a lock on anything.",
+        needs:
+          "The withdraw route on the relation, serialised with acceptance on the server, and a notification to the appointee.",
+      },
+      {
         shown: "\"Tell us you're waiting\" and \"email me when it's done\"",
         reality: "Recorded in your browser. Nobody is emailed.",
         needs: "An interest store keeping the type and an address only, and a notification service.",

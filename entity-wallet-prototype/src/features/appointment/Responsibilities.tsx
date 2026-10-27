@@ -16,8 +16,17 @@ import { Icon } from "@/components/ui/icons";
  * draft (EW-FLOW3-SD §10 item 5); the prototype's is a placeholder and says
  * so. The statute is cited in this comment only: Companies Act 2016,
  * ss.111 and 114.
+ *
+ * ONE SENTENCE SAYS "KEYS", AND ONLY ON SCR-DEL-01
+ *
+ * UXD-60 lets that one word through §2.4's ban in one sentence, on the
+ * representative's screen: NDI holds the organisation's keys and they never
+ * will. It states a legal limit plainly, and UC-19 checks it was understood.
+ * Everywhere else the ban holds — so the sentence is a prop the
+ * representative's screen turns on, and the appointee's screen and the full
+ * terms leave it out.
  */
-export function Responsibilities({ orgName }: { orgName: string }) {
+export function Responsibilities({ orgName, keysSentence = false }: { orgName: string; keysSentence?: boolean }) {
   return (
     <div className="flex flex-col gap-2">
       <h2 className="m-0 font-display text-[15px] font-semibold text-strong">Your responsibilities</h2>
@@ -34,8 +43,8 @@ export function Responsibilities({ orgName }: { orgName: string }) {
         ))}
       </ul>
       <p className="m-0 text-[13px] leading-[1.6] text-muted">
-        Everything you do for {orgName} is recorded against your name. NDI holds {orgName}&rsquo;s
-        keys; you never will.
+        Everything you do for {orgName} is recorded against your name.
+        {keysSentence ? <> NDI holds {orgName}&rsquo;s keys; you never will.</> : null}
       </p>
     </div>
   );
@@ -59,7 +68,7 @@ export function FullTerms({ orgName }: { orgName: string }) {
           <p className="m-0">
             By accepting, you agree to act for {orgName} on the platform within what you can do; to keep
             its information confidential and use it only for its purposes; and that every action you take
-            is recorded against your name. NDI holds {orgName}&rsquo;s keys and you never will.
+            is recorded against your name.
           </p>
           <p className="m-0 mt-2 text-faint">
             Version 0.1, prototype wording. The final text is being drafted with GovTech, and the exact
