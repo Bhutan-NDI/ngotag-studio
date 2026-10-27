@@ -10,7 +10,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { NextCredentialAction } from "@/features/onboarding/NextCredentialAction";
-import { accSeenByOrg, inOrg, shortOrgName } from "@/lib/demoData";
+import { accSeenByOrg, inOrg, shortOrgName, type PresetId } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
@@ -52,8 +52,8 @@ export function OrganisationView() {
      through its replacement. */
   const accs = accreditations.filter((a) => a.orgId === activeOrgId && accSeenByOrg(a));
   /* A forced face with no appointment shows the guided grant, Receive. */
-  const minePresets = presetsOf(mine);
-  const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {
+  const minePresets: PresetId[] = mine ? presetsOf(mine) : ["receive"];
+  const grant = describeGrant(minePresets, {
     name: "You",
     orgName: short,
     shareWith: mine ? shareTargetsOf(mine) : null,

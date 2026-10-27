@@ -802,6 +802,9 @@ export interface ParkedOperation {
   expiresAt: string;
   /** Set when `stale` — why an approved operation stopped being valid. */
   invalidatedReason?: string | null;
+  /** For `authority:issue`: the credential held back, issued only once the
+   *  approval is given (FLOW-DEL-01 A1). */
+  heldAuthority?: DelegatedAuthority;
 }
 
 export type AuthorityKind = "role" | "capability";
@@ -3340,8 +3343,10 @@ export const SEED: DemoState = {
       expiresAt: day(2),
     },
     {
-      /* Dual control, half collected. The plan folds multi-sig into B7 as a
-         variant rather than building D3, and this is that variant. */
+      /* Dual control, nothing collected yet: two approvers, neither of them
+         Dorji, who asked — a requester never signs their own (A2). The plan
+         folds multi-sig into B7 as a variant rather than building D3, and
+         this is that variant. */
       id: "park-issue-highvalue",
       operation: "authority:issue",
       summary: "Issue Declaration authority to Pema Choden — cap Nu. 1,200,000",
@@ -3353,7 +3358,7 @@ export const SEED: DemoState = {
       payloadHash: "sha256:7d19a4fe0c38b5217e9c460da3f8b12a4e07c1685bd93fa2",
       policy: "DUAL_CONTROL",
       requiredSignatures: 2,
-      signatures: [{ personId: "dorji", at: day(-1), method: "wallet" }],
+      signatures: [],
       state: "parked",
       decisionReason: null,
       createdAt: day(-1),
