@@ -64,6 +64,9 @@ const STATUS_TONE: Record<string, Tone> = {
      can be undone; termination is not a warning, it is an outcome. */
   suspended: "warning",
   terminated: "negative",
+  /* An appointment the representative took back before it was accepted
+     (DEL-01/E15). Their own correction, not a failure, so neutral. */
+  withdrawn: "neutral",
 
   /* Approvals in flight. `parked` is the one to get right: it is the normal,
      healthy state of an operation that policy holds back, so it must not
@@ -114,7 +117,6 @@ const STATUS_TONE: Record<string, Tone> = {
   proposed: "pending",
   listing: "pending",
   lapsed: "neutral",
-  withdrawn: "neutral",
   resigned: "neutral",
   replaced: "neutral",
   held: "warning",

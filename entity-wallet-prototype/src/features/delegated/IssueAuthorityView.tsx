@@ -576,7 +576,7 @@ export function IssueAuthorityView() {
                   {/* Checkboxes, not pills. The pills read as labels: in review
                       nobody could tell they were choices, or which were chosen.
                       A checkbox says both before anyone touches it, and it is
-                      the same control "Give someone authority" uses for the
+                      the same control "Appoint someone" uses for the
                       organisations someone may share with. */}
                   {!anyCounterparty ? (
                     <div className="flex flex-col gap-2">

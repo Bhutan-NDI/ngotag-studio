@@ -182,10 +182,10 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
             ) : isOwner && org?.kind !== "sole_proprietorship" ? (
               /* UXD-24: never for a sole proprietorship — a proprietor
                  delegating to themselves is not a task. */
-              <Link href="/people-who-can-act/give">
+              <Link href="/people-who-can-act/appoint">
                 <GradientButton>
                   <Icon name="userCheck" size={16} strokeWidth={2} />
-                  Give someone authority
+                  Appoint someone
                 </GradientButton>
               </Link>
             ) : (

@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
@@ -14,10 +15,10 @@ import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/for
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
-import { draftFor, objectionHolds, type OrgKind } from "@/lib/demoData";
+import { draftAsked, draftFor, openObjectionFor, type ArtefactObjection, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { AskedList, kindSingular, kindTitle, useAuthority } from "./shared";
+import { AskedList, kindPlural, kindSingular, kindTitle, kindsInWords, useAuthority } from "./shared";
 
 /**
  * SCR-ADO-01 — What people will be asked. FLOW-ORG-03 step 3: the officer
@@ -36,32 +37,64 @@ import { AskedList, kindSingular, kindTitle, useAuthority } from "./shared";
  * its name is on it (EW-FLOW5-SD/D7), so the screen says so. And there is
  * an objection route on the item it concerns: the sole proprietorship draft
  * asks for the date of birth, which confirming a licence holder doesn't
- * need (P5, E4). Sending it back takes it out of what is adopted; nothing
- * is overridden, and it doesn't have to be agreed today.
+ * need (P5). It doesn't have to be agreed today.
+ *
+ * AN OBJECTION HOLDS, AND ONLY TWO THINGS RELEASE IT
+ *
+ * FLOW-ORG-03 A5: the officer's objection — against this entity type, or
+ * the whole draft — holds adoption of what it covers until NDI revises the
+ * draft (a new draft to read, which closes it) or the officer withdraws it.
+ * The officer can't take an item out alone, and NDI can't close it alone,
+ * so the screen offers exactly those two ways out: "Withdraw the
+ * objection", and a dashed stand-in for NDI's revision, which the prototype
+ * has no NDI side for.
  *
  * For a type already live, this is where its current version is read, and
  * where a change — a new version — starts.
  */
-type Face = "live" | "default" | "loading" | "empty" | "error" | "offline" | "no_permission";
+type Face = "live" | "default" | "loading" | "empty" | "error" | "objection_open" | "offline" | "no_permission";
 
 export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
   const router = useRouter();
   const params = useSearchParams();
   const changing = params.get("change") === "1";
-  const { adoptions, artefactObjections, personById, objectToArtefacts, resolveObjection, hydrated } = useDemo();
-  const forced = useScreenState("SCR-ADO-01", ["live", "default", "loading", "empty", "error", "offline", "no_permission"]) as Face;
+  const { adoptions, artefactObjections, draftRevisions, currentPerson, personById, objectToArtefacts, withdrawObjection, reviseDraft, hydrated } = useDemo();
+  const forced = useScreenState("SCR-ADO-01", ["live", "default", "loading", "empty", "error", "objection_open", "offline", "no_permission"]) as Face;
 
   const [objecting, setObjecting] = useState(false);
+  const [whole, setWhole] = useState(false);
   const [note, setNote] = useState("");
 
   const { org, active: d, owner } = useAuthority();
   const draft = draftFor(kind);
-  const objection = artefactObjections.find((o) => o.designationId === d?.id && o.entityType === kind);
-  const held = objectionHolds(objection);
   const live = adoptions.find((a) => a.designationId === d?.id && a.entityType === kind && a.state === "ACTIVE");
   const viewingLive = Boolean(live) && !changing;
-  const asked = viewingLive ? live!.asked : objection?.item ? draft.asked.filter((a) => a.item !== objection.item) : draft.asked;
-  const flagged = viewingLive || objection ? null : draft.overBroad;
+  /* NDI's latest draft for this type — its revision, once it has revised. */
+  const current = draftAsked(draftRevisions, d?.id, kind);
+  const asked = viewingLive ? live!.asked : current;
+  /* The over-broad item is flagged only while the draft still asks for it. */
+  const overBroad = draft.overBroad && current.some((a) => a.item === draft.overBroad) ? draft.overBroad : null;
+  /* The switcher's open-objection face, for when none is open here. */
+  const sampleObjection: ArtefactObjection = {
+    id: "sample-objection",
+    designationId: d?.id ?? "sample",
+    entityType: kind,
+    item: overBroad,
+    note: "Our register doesn't need the date of birth to answer.",
+    by: currentPerson.id,
+    at: new Date().toISOString().slice(0, 10),
+    closedAt: null,
+    closedHow: null,
+  };
+  const objection = openObjectionFor(artefactObjections, d?.id, kind) ?? (forced === "objection_open" ? sampleObjection : undefined);
+  const held = Boolean(objection);
+  /* What the open objection holds — this type, or every type in the draft. */
+  const heldWords = objection?.entityType === null && d ? kindsInWords(d.entityTypes) : kindPlural(kind);
+  /* How the last objection here closed, so a revised draft says why it changed. */
+  const lastClosed = artefactObjections
+    .filter((o) => o.designationId === d?.id && o.closedAt && (o.entityType === null || o.entityType === kind))
+    .sort((a, b) => (b.closedAt ?? "").localeCompare(a.closedAt ?? ""))[0];
+  const flagged = viewingLive || objection ? null : overBroad;
 
   const natural: Face = !d || !d.entityTypes.includes(kind) ? "empty" : !owner ? "no_permission" : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -112,26 +145,40 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
           </p>
         ) : null}
         {objection ? (
+          <div role="status" className="flex flex-col gap-2 rounded-[12px] border px-4 py-3" style={{ borderColor: "var(--ndi-warning)" }}>
+            <p className="m-0 text-[13.5px] leading-[1.6] text-body">
+              Your objection has gone to NDI. Adopting {heldWords} is on hold until they revise the draft or you
+              withdraw your objection.
+            </p>
+            <p className="m-0 text-[12.5px] leading-[1.55] text-muted">
+              Sent to NDI on {formatDate(objection.at)} by {personById(objection.by).name}
+              {objection.entityType === null ? ", against the whole draft" : objection.item ? `, about ${objection.item.toLowerCase()}` : ""}: &ldquo;{objection.note}&rdquo;
+            </p>
+            <div>
+              <HairlineButton
+                onClick={() => (forced === "live" ? withdrawObjection(objection.id) : undefined)}
+                disabled={!canContinue}
+              >
+                Withdraw the objection
+              </HairlineButton>
+            </div>
+          </div>
+        ) : lastClosed && !viewingLive ? (
           <p role="status" className="m-0 flex items-start gap-2 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
-            <Icon name="check" size={14} strokeWidth={2.4} className="mt-[2px] flex-none" style={{ color: "var(--ndi-success)" }} />
-            <span>
-              Sent back to NDI on {formatDate(objection.at)}
-              {objection.item ? `: ${objection.item} is out of what people will be asked` : ""}. &ldquo;{objection.note}&rdquo;
-              {held
-                ? " Nothing can be adopted until you and NDI agree a change."
-                : !objection.item && objection.resolvedAt
-                  ? ` You and NDI agreed a change on ${formatDate(objection.resolvedAt)}.`
-                  : ""}
-            </span>
+            <Icon name="info" size={14} strokeWidth={2} className="mt-[2px] flex-none" />
+            {lastClosed.closedHow === "REVISED"
+              ? `NDI revised the draft on ${formatDate(lastClosed.closedAt!)}, in answer to your objection. This is the new draft — read it before adopting.`
+              : `You withdrew your objection on ${formatDate(lastClosed.closedAt!)}. This is NDI's draft as it stood.`}
           </p>
         ) : null}
-        {held && d ? (
+        {objection && forced === "live" ? (
           <SimulatedStep
-            standsFor="NDI and the ministry agreeing a change to the draft"
-            action={<SimulatedAction onClick={() => resolveObjection(d.id, kind)}>Mark it agreed</SimulatedAction>}
+            standsFor="NDI revising the draft in answer to the objection"
+            action={<SimulatedAction onClick={() => reviseDraft(objection.id)}>NDI revises the draft</SimulatedAction>}
           >
-            An objection to the draft as a whole is resolved by agreement, not by override. The prototype has no NDI side
-            for revising a draft, so this stands in for it.
+            Only NDI can revise its draft, and only the officer can withdraw the objection — neither closes it alone. The
+            prototype has no NDI side for drafting, so this stands in for NDI sending a new draft
+            {objection.item ? ` without the ${objection.item.toLowerCase()}` : ""}.
           </SimulatedStep>
         ) : null}
 
@@ -182,15 +229,27 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
                     rows={3}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
-                    placeholder={draft.overBroad ? `Our register doesn't need the ${draft.overBroad.toLowerCase()} to answer.` : ""}
+                    placeholder={overBroad ? `Our register doesn't need the ${overBroad.toLowerCase()} to answer.` : ""}
                   />
                 </label>
+                {d && d.entityTypes.length > 1 ? (
+                  <Checkbox
+                    checked={whole}
+                    onChange={setWhole}
+                    label="Object to the whole draft"
+                    description={`Holds adopting ${kindsInWords(d.entityTypes)}, not only ${kindPlural(kind)}.`}
+                  />
+                ) : null}
+                <p className="m-0 text-[12.5px] leading-[1.5] text-muted">
+                  Adopting what this covers is on hold until NDI revises the draft or you withdraw the objection.
+                </p>
                 <div className="flex flex-wrap gap-2.5">
                   <GradientButton
                     disabled={!note.trim()}
                     onClick={() => {
-                      objectToArtefacts(d!.id, kind, draft.overBroad, note);
+                      objectToArtefacts(d!.id, whole ? null : kind, whole ? null : overBroad, note);
                       setObjecting(false);
+                      setWhole(false);
                       setNote("");
                     }}
                   >
@@ -223,11 +282,9 @@ export function WhatPeopleAreAskedView({ kind }: { kind: OrgKind }) {
                 </GradientButton>
               )}
               {/* An objection route must exist or review is theatre (SCR-ADO-01),
-                  so it's on every draft. Hidden only while an objection is
-                  open, or once the flagged item has been taken out; after a
-                  whole-draft objection is agreed, the officer can raise
-                  another. */}
-              {viewingLive || (objection && !(objection.resolvedAt && !objection.item)) ? null : (
+                  so it's on every draft. Hidden only while one is open — the
+                  open one is withdrawn above, not stacked on. */}
+              {viewingLive || objection ? null : (
                 <HairlineButton onClick={() => setObjecting(true)} disabled={!canContinue || objecting}>
                   Raise an objection
                 </HairlineButton>

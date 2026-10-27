@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
+import { Dialog } from "@/components/ui/Dialog";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -17,7 +18,7 @@ import { ENFORCEMENT_DATE, VERIFICATION_ORG_NAME, roleIn, type Accreditation } f
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, inline, legalBasisText, sampleAccreditation } from "./shared";
+import { ScopeList, asSentence, inline, legalBasisText, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-03 — What you're being approved for. FLOW-ACC-01 steps 4–7.
@@ -33,7 +34,9 @@ import { ScopeList, inline, legalBasisText, sampleAccreditation } from "./shared
  * unchanged, UXD-29); the public identity it will be listed under — one of
  * the two places a DID is shown, because the officer is accepting it too
  * (UXD-31); and that NDI hosts the keys. Declining is offered on equal
- * footing, with what declining does.
+ * footing, with what declining does — and, because a decline is final
+ * (E3: NDI would have to propose again), it is confirmed first, in words
+ * that restate that (UX-EW-02 §2.3, SC 3.3.4), never a bare "Are you sure?".
  *
  * SET UP, THEN THE WALLET, THEN ACCEPTED
  *
@@ -112,6 +115,7 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   const [step, setStep] = useState<"idle" | "setting_up" | "set_up_failed" | "not_set_up" | "wallet" | "not_confirmed" | "done" | "declined">("idle");
   const [scan, setScan] = useState<"awaiting_scan" | "waiting">("awaiting_scan");
   const [busy, setBusy] = useState(false);
+  const [confirmDecline, setConfirmDecline] = useState(false);
   /* The store's refusal, said rather than swallowed: an owner pressing Accept
      after NDI withdrew it, or after someone else changed it, otherwise saw
      nothing happen. */
@@ -177,7 +181,7 @@ export function AcceptAccreditationView({ id }: { id: string }) {
   if (face === "withdrawn")
     return outcome(
       <>
-        NDI has withdrawn this approval: {acc?.withdrawal?.note ?? "it no longer needs to be accepted"}. Nothing is listed, and
+        NDI has withdrawn this approval: {asSentence(acc?.withdrawal?.note ?? "it no longer needs to be accepted")} Nothing is listed, and
         NDI would need to propose it again.
       </>,
       <Link href="/legal/support" className="ndi-plainlink text-[13.5px] font-medium text-accent">
@@ -392,13 +396,7 @@ export function AcceptAccreditationView({ id }: { id: string }) {
                 <Icon name="wallet" size={15} strokeWidth={2} />
                 {busy ? "Checking…" : face === "not_confirmed" ? "Try again" : "Accept with your NDI wallet"}
               </GradientButton>
-              <HairlineButton
-                onClick={() => {
-                  declineAccreditationAsOrg(a.id);
-                  setStep("declined");
-                }}
-                disabled={readOnly || busy}
-              >
+              <HairlineButton onClick={() => setConfirmDecline(true)} disabled={readOnly || busy}>
                 Decline
               </HairlineButton>
               <HairlineButton onClick={() => window.print()}>Print</HairlineButton>
@@ -406,6 +404,21 @@ export function AcceptAccreditationView({ id }: { id: string }) {
             <p className="m-0 text-[12.5px] text-muted">You can decline. Nothing is listed and NDI is told.</p>
           </div>
         ) : null}
+
+        <Dialog
+          open={confirmDecline}
+          onClose={() => setConfirmDecline(false)}
+          tone="danger"
+          title={`Decline NDI's approval for ${short}?`}
+          lead="Nothing is listed and NDI is told."
+          consequences={["This can't be undone here. For it to be approved again, NDI would need to propose it again."]}
+          confirmLabel="Decline"
+          onConfirm={() => {
+            setConfirmDecline(false);
+            declineAccreditationAsOrg(a.id);
+            setStep("declined");
+          }}
+        />
       </div>
     </AppShell>
   );
