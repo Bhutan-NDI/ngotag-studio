@@ -881,8 +881,10 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     chapter: 12,
     title: "Dorji answers",
-    happening: "The request is waiting, passed on by Ugyen. Dorji may share with anyone, at once.",
+    happening:
+      "The request is waiting, passed on by Ugyen — the dashboard's activity shows what Dorji was sent: \"Ugyen Phuntsho passed you a request from Bank of Bhutan: they can't share it themselves.\" Dorji may share with anyone, at once.",
     doThis: "On Bank of Bhutan's request, press **Answer**, then **Share with Bank of Bhutan**.",
+    say: "Every notice goes by email too, so none carries a value from the credential — only who is asking, who passed it and by when.",
     route: "/wallet/sharing",
     persona: "dorji",
   },

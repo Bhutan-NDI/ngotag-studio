@@ -121,8 +121,8 @@ wallet is Flow 8, which has no specification yet, so it follows Story B5 and
 is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
 v0.2, FLOW-ACC-02 v0.4 and UX-EW-02 v0.5 SCR-ACC-01 to 06 — the first-release
 simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
-and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01, FLOW-PRS-02 and
-EW-FLOW7-SD v0.2, with UX-EW-04 v0.2 SCR-PRS-01 to 06; the approval path —
+and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02
+v0.3 and EW-FLOW7-SD v0.3, with UX-EW-04 v0.3 SCR-PRS-01 to 06; the approval path —
 a Controller shares, the Root approves — is a Walk a flow entry, because the
 onboarding story never appoints anyone with *Share*. The screens for what
 comes after — verification at the Single Window, revocation, appeals, and
@@ -876,7 +876,11 @@ down — and returns to the bank's registered address, where the bank shows
 what its own system fetched, not what the address said.
 
 **Keep for later** instead returns with *Bank of Bhutan doesn't have this
-yet. It's saved under Sharing until …*, no countdown. Driving as Pema (no
+yet. It's saved under Sharing until …*, no countdown, and tells the others
+who may answer (A3). **Sign in while NDI's list can't be reached** (dashed)
+instead of the plain sign-in holds the request (E8): *We're checking Bank of
+Bhutan…*, and going back is pending; Sharing then lists it as *Checking Bank
+of Bhutan — you can't answer this yet* until **NDI's list answers**. Driving as Pema (no
 appointment) gives E4; removing the bank's address on **Verification →
 Return addresses** as Yeshey gives E15 (*Done. Go back to Bank of Bhutan's
 website to continue.*, no link).
@@ -913,13 +917,18 @@ names both.
 approved, and a request that expired. **Refused** has *Request claiming to be
 from Druk Trading House refused — not on NDI's list of trusted organisations.*
 and the bank asking for something it isn't approved to ask for — neither was
-notified. The other dashed buttons add a refused sender and a request held
-while NDI's list can't be reached (*Checking Bank of Bhutan — you can't
-answer this yet*), with **NDI's list answers** to release it.
+notified. The other dashed buttons add a refused sender, and a request held
+while NDI's list can't be reached — which, having come with nobody at a
+website, isn't listed until **NDI's list answers** (FLOW-PRS-02 E2). A
+request opened from the bank's website and left undecided gets **Ten minutes
+pass…**, which tells the others who may answer (FLOW-PRS-01 A3).
 
 Who is told is written to the dashboard's activity feed, naming who it goes
-to — UX-EW-04 has no notification copy yet, so the wording is the
-prototype's (see the what's-real page).
+to, in UX-EW-04 §3.5's notification wording — *Ugyen Phuntsho passed you a
+request from Bank of Bhutan: they can't share it themselves. Answer by …* —
+never a value, and never an approver's note, which stays in the wallet.
+Refused shares and approvals — one's own, or outside the reach — are rows in
+the audit trail.
 
 ---
 
@@ -1175,7 +1184,7 @@ Worth showing:
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
 | `/present?session=…` | **signed_out**, **choose**, **checking**, **error_unknown**, **error_expired**, **error_used**, **no_organisation**, **refused**, **no_request**, **offline** | SCR-PRS-01: FLOW-PRS-01 E1–E4, E7, E8, E11 |
 | `/wallet/sharing/…` | **with_approval**, **cant_satisfy**, **no_approver**, **recheck_error**, **send_error**, **already_answered**, **cancelled**, **no_permission**, **outside_reach**, **offline** | SCR-PRS-02, including E6/E13 (no approver while the Root is inactive) |
-| `/wallet/sharing/…/done` | **pending_approval**, **pending_kept**, **pending_passed**, **pending_checking**, **declined**, **refused**, **failed**, **cancelled**, **no_return** | SCR-PRS-03: only *Shared* counts down |
+| `/wallet/sharing/…/done` | **pending_approval**, **pending_kept**, **pending_passed**, **pending_checking**, **declined**, **refused**, **failed**, **cancelled**, **expired**, **no_return** | SCR-PRS-03: only *Shared* counts down |
 | `/wallet/sharing/…/approve` | **own**, **initiator_lapsed**, **recheck_error**, **already_decided**, **send_error**, **cancelled**, **no_permission** | SCR-PRS-04, including E16/E11 — nothing in the prototype ends an appointment |
 | `/wallet/sharing` | **empty**, **loading**, **error**, **offline** | SCR-PRS-05's three empty tabs |
 | `/verification/return-addresses` (as Yeshey) | **empty**, **error_invalid**, **sign_in_again**, **no_permission**, **offline** | SCR-PRS-06 |

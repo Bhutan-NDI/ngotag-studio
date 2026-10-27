@@ -13,6 +13,7 @@ import { Icon } from "@/components/ui/icons";
 import { shortOrgName } from "@/lib/demoData";
 import { useDemo, type SessionLook } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
+import { REDEEM_WITHIN_MS } from "@/lib/sharing";
 
 import { ReferenceCheck } from "./shared";
 
@@ -61,7 +62,8 @@ type Phase = "signed_out" | "signing_in" | "choose" | "loading" | "checking" | "
 
 export function OpeningRequestView({ sessionId }: { sessionId: string | null }) {
   const router = useRouter();
-  const { hydrated, currentPerson, openPresentationSession, redeemPresentationSession, returnToVerifier, sharingOrgs } = useDemo();
+  const { hydrated, currentPerson, presentationSessions, openPresentationSession, redeemPresentationSession, returnToVerifier, sharingOrgs } =
+    useDemo();
   const forced = useScreenState("SCR-PRS-01", [
     "live",
     "signed_out",
@@ -81,6 +83,14 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
   const [phase, setPhase] = useState<Phase>("signed_out");
   const [usedRequest, setUsedRequest] = useState<string | null>(null);
   const [address, setAddress] = useState("");
+  /* Simulated: NDI's list can't be reached when the request arrives (E8). */
+  const [registryDown, setRegistryDown] = useState(false);
+  /* The clock for the 30-minute window, read every few seconds. */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 5_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -92,6 +102,13 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
 
   const verifier = look && look.kind !== "unknown" ? look.verifierName : "The organisation";
   const reference = look?.kind === "ready" ? look.displayReference : null;
+
+  /* SC 2.2.1's security exception (UX-EW-04 §2.3): the 30 minutes to
+     redeem run during sign-in, and the time left is stated once five
+     minutes remain. Gone once the link is redeemed. */
+  const session = presentationSessions.find((x) => x.id === sessionId);
+  const msLeft = session && session.firstLoadedAt !== null && !session.boundOrgId ? session.firstLoadedAt + REDEEM_WITHIN_MS - now : null;
+  const minutesLeft = msLeft !== null && msLeft > 0 && msLeft <= 5 * 60_000 ? Math.ceil(msLeft / 60_000) : null;
 
   const natural: Face = !look
     ? "loading"
@@ -115,14 +132,17 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
   const face: Face = forced === "live" ? natural : forced;
   const usedId = usedRequest ?? (look?.kind === "used" ? look.requestId : null);
 
-  const redeem = (orgId: string) => {
+  const redeem = (orgId: string, listDown = registryDown) => {
     if (!sessionId) return;
     setPhase("loading");
     /* Steps 4–6 run behind "Getting <verifier>'s request…": they take
        seconds and the person can do nothing about them. */
     window.setTimeout(() => {
-      const res = redeemPresentationSession(sessionId, orgId);
+      const res = redeemPresentationSession(sessionId, orgId, { registryDown: listDown });
       if (res.ok) router.push(`/wallet/sharing/${res.requestId}`);
+      /* E8 — held while NDI's list is checked; going back now is pending,
+         and the request waits on Sharing as "Checking …". */
+      else if (res.error === "E8") setPhase("checking");
       else if (res.error === "E7") setPhase("refused");
       else if (res.error === "E4") setPhase("no_organisation");
       else if (res.error === "E3") {
@@ -132,13 +152,14 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
     }, ROUND_TRIP_MS);
   };
 
-  const afterSignIn = () => {
+  const afterSignIn = (listDown: boolean) => {
+    setRegistryDown(listDown);
     const orgs = sharingOrgs();
     if (orgs.length === 0) {
       /* E4 — the session is DECLINED: nobody here acts for a verified holder. */
       if (sessionId) redeemPresentationSession(sessionId, "");
       setPhase("no_organisation");
-    } else if (orgs.length === 1) redeem(orgs[0].id);
+    } else if (orgs.length === 1) redeem(orgs[0].id, listDown);
     else setPhase("choose");
   };
 
@@ -183,6 +204,14 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
         </div>
 
         {reference && !error ? <ReferenceCheck verifier={verifier} reference={reference} /> : null}
+
+        {minutesLeft !== null && !error && (face === "signed_out" || face === "choose") ? (
+          <p role="status" className="m-0 flex items-center gap-2 text-[13.5px] text-body">
+            <Icon name="info" size={14} strokeWidth={2} className="flex-none text-muted" />
+            {minutesLeft === 1 ? "Less than a minute" : `${minutesLeft} minutes`} left to sign in and continue. After that, start again on{" "}
+            {verifier}&rsquo;s website.
+          </p>
+        ) : null}
 
         {face === "offline" ? (
           <p role="alert" className="m-0 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
@@ -255,10 +284,16 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
                 {phase === "signing_in" && forced === "live" ? (
                   <SimulatedStep
                     standsFor="the Bhutan NDI sign-in on your phone"
-                    action={<SimulatedAction onClick={afterSignIn}>Sign in as {currentPerson.name}</SimulatedAction>}
+                    action={
+                      <>
+                        <SimulatedAction onClick={() => afterSignIn(false)}>Sign in as {currentPerson.name}</SimulatedAction>
+                        <SimulatedAction onClick={() => afterSignIn(true)}>Sign in while NDI&rsquo;s list can&rsquo;t be reached</SimulatedAction>
+                      </>
+                    }
                   >
                     Sign-in sends you to the Bhutan NDI app and back. The request waits for you here; nothing about it changes while
-                    you sign in.
+                    you sign in. The second button also stands in for NDI&rsquo;s list of trusted organisations being out of reach when
+                    the request arrives, so it is held and checked again.
                   </SimulatedStep>
                 ) : null}
               </>

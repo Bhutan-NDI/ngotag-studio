@@ -806,6 +806,10 @@ export interface PresentationRequest {
   repeatOf?: string | null;
   /** Why it FAILED, in §3.5's words. */
   failure?: string | null;
+  /** FLOW-PRS-01 — who redeemed the session: the sharer A3's notice leaves out. */
+  openedBy?: PersonId | null;
+  /** FLOW-PRS-01 A3 — when the people who may answer were told it was left undecided. Once only. */
+  undecidedToldAt?: string | null;
   receivedAt: string;
   expiresAt: string;
 }
@@ -831,7 +835,17 @@ export interface PresentationSession {
   status: SessionStatus;
   /** Milliseconds, because the windows are minutes (D16). */
   createdAt: number;
+  /** Set by the page once it has loaded in a browser, never by the request
+   *  that serves it — so a link preview neither starts the 30 minutes nor
+   *  uses the link (EW-FLOW7-SD v0.3 §4.2, D16). */
   firstLoadedAt: number | null;
+  /**
+   * When it was redeemed and the organisation it is bound to from then on
+   * (EW-FLOW7-SD v0.3 §4.2, S7). Never returned to the verifier: before
+   * anything is shared it would tell whoever started the session which
+   * organisation opened the link (§8).
+   */
+  redeemedAt: number | null;
   boundOrgId: string | null;
   requestId: string | null;
   /** The person went back to the verifier without a final answer. */

@@ -202,8 +202,13 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       share whole credentials, presentation sessions and return
  *       addresses. A version-24 save holds `verificationRequests` nothing
  *       reads and parked shares pointing at requests that no longer exist.
+ *  26 — Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02 v0.3 and UX-EW-04 v0.3:
+ *       a session records when it was redeemed (EW-FLOW7-SD v0.3 §4.2), and
+ *       a request records who opened it from a website and when the people
+ *       who may answer were told it was left undecided (A3). A version-25
+ *       save holds sessions with no redemption time.
  */
-const SEED_VERSION = 25;
+const SEED_VERSION = 26;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -357,6 +362,34 @@ type Note = { text: string; orgId: string };
 const noteTo = (s: DemoState, to: PersonId[], text: string, orgId: string): Note[] =>
   to.length ? [{ text: `To ${namesFor(s, to)}: ${text}`, orgId }] : [];
 
+/** The organisation's name as the notices write it — "Pelden Trading". */
+const orgNameOf = (s: Pick<DemoState, "organizations">, orgId: string) =>
+  shortOrgName(s.organizations.find((o) => o.id === orgId)?.name ?? "your organisation");
+
+/**
+ * A share or an approval the store refused, on the record (FLOW-PRS-01 v0.2
+ * and FLOW-PRS-02 v0.3 §10): the relation, the request, the operation and
+ * the reason — never an attribute value. A refusal with no trace would
+ * leave unrecorded the one attempt an investigation most wants to see.
+ */
+function refusedOnRecord(s: DemoState, actor: PersonId, r: PresentationRequest, reason: string, relationId?: string): DemoState {
+  const orgId = r.orgId ?? PELDEN;
+  const relation = relationId
+    ? s.relations.find((x) => x.id === relationId)
+    : s.relations.find((x) => x.personId === actor && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
+  return {
+    ...s,
+    auditEntries: appendAudit(s, {
+      operation: /^(approving|deciding)/.test(reason) ? "approval:decide" : "proof:present",
+      summary: `Refused ${reason}: ${r.verifierName}'s request for ${typesOf(r)}`,
+      actorId: actor,
+      relationId: relation?.id ?? null,
+      scopeVersion: relation?.scope.version ?? null,
+      relyingPartyDid: r.verifierDid,
+    }),
+  };
+}
+
 /**
  * SCR-PRS-04's *Approve and share with <verifier>* — FLOW-PRS-01 A1,
  * FLOW-PRS-02 A1. Pure, so the store can run it inside setState and read
@@ -383,11 +416,14 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
   const none = { next: s, notes: [] as Note[] };
   const op = s.parkedOperations.find((p) => p.id === id);
   if (!op || op.state !== "parked" || !op.targetId) return none;
-  if (op.requestedBy === approver) return none;
   const r = s.presentationRequests.find((x) => x.id === op.targetId);
   if (!r || sharing.statusOf(r) !== "AWAITING_APPROVAL" || r.approvalId !== id) return none;
   const orgId = r.orgId ?? PELDEN;
-  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver)) return none;
+  /* Never one's own, and only someone holding approval:decide. Refused —
+     and the refusal is on the record (FLOW-PRS-01/02 §10, AC-03). */
+  if (op.requestedBy === approver) return { next: refusedOnRecord(s, approver, r, "approving their own share"), notes: [] };
+  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver))
+    return { next: refusedOnRecord(s, approver, r, "approving without approval:decide"), notes: [] };
 
   const signature = { personId: approver, at: today(), method };
   const ops = (patch: Partial<ParkedOperation>) =>
@@ -397,16 +433,19 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
 
   const relation = s.relations.find((x) => x.id === op.relationId);
   if (!relation || relation.state !== "ACTIVE" || !sharing.mayShare(s, op.requestedBy, r)) {
+    const lapsed = {
+      ...s,
+      parkedOperations: ops({ state: "stale", invalidatedReason: `${sharerName} can no longer share this, so it hasn't been sent.` }),
+      presentationRequests: reqs({ status: "OPEN", approvalId: null, lapsedSharer: op.requestedBy, initiatedBy: null, initiatedAt: null }),
+    };
     return {
-      next: {
-        ...s,
-        parkedOperations: ops({ state: "stale", invalidatedReason: `${sharerName} can no longer share this, so it hasn't been sent.` }),
-        presentationRequests: reqs({ status: "OPEN", approvalId: null, lapsedSharer: op.requestedBy, initiatedBy: null, initiatedAt: null }),
-      },
+      /* E16/E11 on the record: the share the sharer's standing no longer
+         covers, refused at approval (§10). */
+      next: refusedOnRecord(lapsed, op.requestedBy, r, `sharing, at approval — ${sharerName} can no longer share this`, op.relationId),
       notes: noteTo(
         s,
         sharing.answerersFor(s, r).filter((x) => x !== op.requestedBy),
-        NOTICE.lapsed(sharerName, r.verifierName, r.expiresAt),
+        NOTICE.reopened(r.verifierName, sharerName, r.expiresAt),
         orgId,
       ),
     };
@@ -436,11 +475,11 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
   return {
     next,
     notes: [
-      ...noteTo(s, [op.requestedBy], NOTICE.approved(approverName, r.verifierName), orgId),
+      ...noteTo(s, [op.requestedBy], NOTICE.approved(approverName, typesOf(r), r.verifierName), orgId),
       /* D20 — the Root is told whenever anyone else shares, on approval
          too; not when the Root is the one who just approved it. */
       ...(root && root !== approver && root !== op.requestedBy
-        ? noteTo(s, [root], NOTICE.rootTold(sharerName, r.verifierName, typesOf(r), approverName), orgId)
+        ? noteTo(s, [root], NOTICE.rootTold(sharerName, orgNameOf(s, orgId), typesOf(r), r.verifierName, approverName), orgId)
         : []),
     ],
   };
@@ -454,11 +493,13 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
 function rejectShare(s: DemoState, id: string, approver: PersonId, note: string): { next: DemoState; notes: Note[] } {
   const none = { next: s, notes: [] as Note[] };
   const op = s.parkedOperations.find((p) => p.id === id);
-  if (!op || op.state !== "parked" || !op.targetId || op.requestedBy === approver) return none;
+  if (!op || op.state !== "parked" || !op.targetId) return none;
   const r = s.presentationRequests.find((x) => x.id === op.targetId);
   if (!r || sharing.statusOf(r) !== "AWAITING_APPROVAL" || r.approvalId !== id) return none;
   const orgId = r.orgId ?? PELDEN;
-  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver)) return none;
+  if (op.requestedBy === approver) return { next: refusedOnRecord(s, approver, r, "deciding their own share"), notes: [] };
+  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver))
+    return { next: refusedOnRecord(s, approver, r, "deciding a share without approval:decide"), notes: [] };
   const relation = s.relations.find((x) => x.personId === approver && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
   return {
     next: {
@@ -476,7 +517,7 @@ function rejectShare(s: DemoState, id: string, approver: PersonId, note: string)
         relyingPartyDid: r.verifierDid,
       }),
     },
-    notes: noteTo(s, [op.requestedBy], NOTICE.rejected(nameOf(s, approver), note), orgId),
+    notes: noteTo(s, [op.requestedBy], NOTICE.rejected(nameOf(s, approver), r.verifierName, Boolean(note.trim())), orgId),
   };
 }
 
@@ -1102,7 +1143,9 @@ interface DemoActions {
   redeemPresentationSession: (
     sessionId: string,
     orgId: string,
-  ) => { ok: true; requestId: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E7"; requestId?: string | null };
+    /** Simulated — NDI's list can't be reached when the request arrives (FLOW-PRS-01 E8). */
+    opts?: { registryDown?: boolean },
+  ) => { ok: true; requestId: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E7" | "E8"; requestId?: string | null };
   /** SCR-PRS-02 — *Share*. AUTO sends; SINGLE_APPROVER asks someone else. */
   shareRequest: (
     requestId: string,
@@ -1117,6 +1160,8 @@ interface DemoActions {
   passRequest: (requestId: string) => { ok: true; to: PersonId[] } | { ok: false; error: "E10" | "not_permitted" };
   /** SCR-PRS-02 — *Keep for later* (FLOW-PRS-01 A3): open for 7 days, people who may answer told. */
   keepForLater: (requestId: string) => void;
+  /** Simulated — a website request has sat OPEN ten minutes with no decision (FLOW-PRS-01 A3). Told once. */
+  remindUndecided: (requestId: string) => void;
   /** SCR-PRS-03 — back to the verifier's registered address, or null when it's gone (E15). */
   returnToVerifier: (sessionId: string) => { url: string | null; status: string };
   /** Simulated — the verifier cancels (FLOW-PRS-01 E14, FLOW-PRS-02 E7). */
@@ -1762,6 +1807,27 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         activity: [{ id: rid("a"), text, at: today(), orgId: orgId ?? s.activeOrgId }, ...s.activity].slice(0, 20),
       })),
     [],
+  );
+
+  /* FLOW-PRS-01 A3 — a website request left undecided: on *Keep for later*,
+     or after ten minutes OPEN. Those who may answer are told once, except
+     the person who started on it (UX-EW-04 §3.5). */
+  const tellUndecided = useCallback(
+    (s0: DemoState, r: PresentationRequest, starter: PersonId | null) => {
+      const orgId = r.orgId ?? PELDEN;
+      const to = sharing.answerersFor(s0, r).filter((id) => id !== starter);
+      setState((s) => ({
+        ...s,
+        presentationRequests: s.presentationRequests.map((x) => (x.id === r.id ? { ...x, undecidedToldAt: x.undecidedToldAt ?? today() } : x)),
+      }));
+      if (!to.length || r.undecidedToldAt) return;
+      const name = s0.people.find((p) => p.id === starter)?.name ?? "Someone";
+      log(
+        `To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.undecided(r.verifierName, orgNameOf(s0, orgId), name, r.expiresAt)}`,
+        orgId,
+      );
+    },
+    [log],
   );
 
   const actions = useMemo<DemoActions>(
@@ -5122,6 +5188,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           status: "CREATED",
           createdAt: Date.now(),
           firstLoadedAt: null,
+          redeemedAt: null,
           boundOrgId: null,
           requestId: null,
         };
@@ -5160,7 +5227,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { kind: "ready", verifierName, displayReference: session.displayReference, sessionId };
       },
 
-      redeemPresentationSession: (sessionId, orgId) => {
+      redeemPresentationSession: (sessionId, orgId, opts) => {
         const s0 = stateRef.current;
         const session = s0.presentationSessions.find((x) => x.id === sessionId);
         if (!session) return { ok: false, error: "E1" };
@@ -5182,6 +5249,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            request (§6). A verifier no longer listed is BLOCKED (E7). */
         const verifier = sharing.listedVerifier(s0, session.verifierOrgId);
         const listed = s0.organizations.find((o) => o.id === session.verifierOrgId);
+        /* E8 — NDI's list can't be reached at V1: held RECEIVED and checked
+           again, never passed unchecked. The person may go back pending, and
+           finds it on Waiting as "Checking …" (UX-EW-04 v0.3). */
+        const held = Boolean(opts?.registryDown);
         const id = rid("pr");
         const request: PresentationRequest = {
           id,
@@ -5193,8 +5264,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           asked: session.asked,
           sessionId,
           displayReference: session.displayReference,
-          status: verifier ? "OPEN" : "BLOCKED",
-          blockedReason: verifier ? null : "VERIFIER_NOT_TRUSTED",
+          status: held ? "RECEIVED" : verifier ? "OPEN" : "BLOCKED",
+          blockedReason: held || verifier ? null : "VERIFIER_NOT_TRUSTED",
+          openedBy: s0.harness.persona,
           receivedAt: today(),
           expiresAt: sharing.expiresFromToday(),
         };
@@ -5202,9 +5274,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ...s,
           presentationRequests: [request, ...s.presentationRequests],
           presentationSessions: s.presentationSessions.map((x) =>
-            x.id === sessionId ? { ...x, boundOrgId: orgId, requestId: id, status: "OPENED" as const } : x,
+            x.id === sessionId ? { ...x, boundOrgId: orgId, redeemedAt: Date.now(), requestId: id, status: "OPENED" as const } : x,
           ),
         }));
+        if (held) return { ok: false, error: "E8", requestId: id };
         return verifier ? { ok: true, requestId: id } : { ok: false, error: "E7", requestId: id };
       },
 
@@ -5216,8 +5289,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            the second sees who answered (E10, AC-09). */
         if (!r || sharing.statusOf(r) !== "OPEN") return { ok: false, error: "E10" };
         const verdict = sharing.shareVerdict(s0, me, r);
-        if (verdict.kind === "no_permission") return { ok: false, error: "E4" };
-        if (verdict.kind === "outside_reach") return { ok: false, error: "E5" };
+        /* Refused through the API as well as on the screen, and recorded
+           (§10): no proof:present (E4/E10), or outside the reach (E5). */
+        if (verdict.kind === "no_permission" || verdict.kind === "outside_reach") {
+          setState((s) => refusedOnRecord(s, me, r, verdict.kind === "no_permission" ? "sharing without Share" : "sharing outside the reach the Root set"));
+          return { ok: false, error: verdict.kind === "no_permission" ? "E4" : "E5" };
+        }
         if (verdict.kind === "no_approver") return { ok: false, error: "E13" };
         const matches = sharing.matchRequest(s0, r);
         if (!sharing.satisfiable(matches)) return { ok: false, error: "E3" };
@@ -5244,7 +5321,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           const root = sharing.rootOf(s0, orgId);
           if (root && root !== me) {
             const rootName = s0.people.find((p) => p.id === root)?.name ?? "The representative";
-            log(`To ${rootName}: ${NOTICE.rootTold(myName, r.verifierName, types, null)}`, orgId);
+            log(`To ${rootName}: ${NOTICE.rootTold(myName, orgNameOf(s0, orgId), types, r.verifierName, null)}`, orgId);
           }
           return { ok: true, status: "SHARED" };
         }
@@ -5303,7 +5380,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             relyingPartyDid: r.verifierDid,
           }),
         }));
-        log(`To ${namesOf(verdict.approvers.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.approve(myName, types, r.verifierName, r.expiresAt)}`, orgId);
+        log(`To ${namesOf(verdict.approvers.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.approve(myName, types, r.verifierName)}`, orgId);
         return { ok: true, status: "AWAITING_APPROVAL", approvers: verdict.approvers };
       },
 
@@ -5345,11 +5422,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (!mayOperate(s0, me, orgId, "credential:list")) return { ok: false, error: "not_permitted" };
         const to = sharing.whoCanShare(s0, r, me);
         const myName = s0.people.find((p) => p.id === me)?.name ?? "Someone";
+        const relation = s0.relations.find((x) => x.personId === me && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
         setState((s) => ({
           ...s,
           presentationRequests: s.presentationRequests.map((x) =>
             x.id === requestId ? { ...x, passedBy: [...(x.passedBy ?? []).filter((p) => p !== me), me] } : x,
           ),
+          /* A pass is on the record like consent and decline (§10). */
+          auditEntries: appendAudit(s, {
+            operation: "credential:list",
+            summary: `Passed ${r.verifierName}'s request for ${typesOf(r)} to ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id)) || "nobody"}`,
+            actorId: me,
+            relationId: relation?.id ?? null,
+            scopeVersion: relation?.scope.version ?? null,
+            relyingPartyDid: r.verifierDid,
+          }),
         }));
         if (to.length)
           log(`To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.passed(myName, r.verifierName, r.expiresAt)}`, orgId);
@@ -5366,9 +5453,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         }));
         /* A3 — kept, so the people who may answer are told now rather than
            after ten undecided minutes. */
-        const to = sharing.answerersFor(s0, r);
-        if (to.length)
-          log(`To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.ready(r.verifierName, typesOf(r), r.expiresAt)}`, r.orgId ?? PELDEN);
+        tellUndecided(s0, r, s0.harness.persona);
+      },
+
+      remindUndecided: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || !r.sessionId || sharing.statusOf(r) !== "OPEN" || r.undecidedToldAt) return;
+        tellUndecided(s0, r, r.openedBy ?? null);
       },
 
       returnToVerifier: (sessionId) => {
@@ -5457,7 +5549,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (request.status === "OPEN") {
           const to = sharing.answerersFor(s0, request);
           if (to.length)
-            log(`To ${namesOf(to.map((pid) => s0.people.find((p) => p.id === pid)?.name ?? pid))}: ${NOTICE.ready(request.verifierName, typesOf(request), request.expiresAt)}`, orgId);
+            log(
+              `To ${namesOf(to.map((pid) => s0.people.find((p) => p.id === pid)?.name ?? pid))}: ${NOTICE.ready(request.verifierName, orgNameOf(s0, orgId), request.purpose, request.expiresAt)}`,
+              orgId,
+            );
         }
         return id;
       },
@@ -5476,7 +5571,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (passes) {
           const to = sharing.answerersFor(s0, r);
           if (to.length)
-            log(`To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.ready(r.verifierName, typesOf(r), r.expiresAt)}`, r.orgId ?? PELDEN);
+            log(
+              `To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.ready(r.verifierName, orgNameOf(s0, r.orgId ?? PELDEN), r.purpose, r.expiresAt)}`,
+              r.orgId ?? PELDEN,
+            );
         }
       },
 
@@ -5565,7 +5663,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [hydrated, log],
+    [hydrated, log, tellUndecided],
   );
 
   /**

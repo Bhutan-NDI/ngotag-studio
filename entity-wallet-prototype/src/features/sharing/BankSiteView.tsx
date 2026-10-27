@@ -67,7 +67,9 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
     PENDING: "We're waiting for your organisation to finish sharing. We'll continue as soon as it arrives.",
     CREATED: "We haven't received your details yet.",
     OPENED: "We haven't received your details yet.",
-    DECLINED: "Your organisation didn't share the details. You can try again or provide them another way.",
+    /* EW-FLOW7-VIG v0.2 §5.2: the session doesn't say whether a person
+       declined or the request was blocked, so nothing suggests trying again. */
+    DECLINED: "We didn't receive your details. You can provide them another way.",
     EXPIRED: "That didn't complete. You can try again.",
     FAILED: "That didn't complete. You can try again.",
   };

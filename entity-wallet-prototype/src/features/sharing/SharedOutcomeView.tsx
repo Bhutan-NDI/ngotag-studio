@@ -36,7 +36,7 @@ import { namesOf, statusOf } from "@/lib/sharing";
  * already on the page. *Stay in the wallet* stops the countdown and opens
  * Sharing.
  */
-type Face = "live" | "shared" | "pending_approval" | "pending_kept" | "pending_passed" | "pending_checking" | "declined" | "refused" | "failed" | "cancelled" | "no_return" | "offline";
+type Face = "live" | "shared" | "pending_approval" | "pending_kept" | "pending_passed" | "pending_checking" | "declined" | "refused" | "failed" | "cancelled" | "expired" | "no_return" | "offline";
 
 export function SharedOutcomeView({ requestId, why }: { requestId: string; why: string | null }) {
   const router = useRouter();
@@ -52,6 +52,7 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
     "refused",
     "failed",
     "cancelled",
+    "expired",
     "no_return",
     "offline",
   ]) as Face;
@@ -77,11 +78,13 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
                 ? "refused"
                 : st === "FAILED"
                   ? "failed"
-                  : st === "EXPIRED" || st === "WITHDRAWN"
-                    ? "cancelled"
-                    : why === "passed"
-                      ? "pending_passed"
-                      : "pending_kept";
+                  : st === "EXPIRED"
+                    ? "expired"
+                    : st === "WITHDRAWN"
+                      ? "cancelled"
+                      : why === "passed"
+                        ? "pending_passed"
+                        : "pending_kept";
   const face: Face = forced === "live" ? natural : forced;
 
   const [left, setLeft] = useState(5);
@@ -122,8 +125,11 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
     pending_checking: { lead: `We can't check ${v} right now. We've kept the request — you'll find it under Sharing.` },
     declined: { lead: "You've declined. Nothing has been shared." },
     refused: { lead: `${v}'s request can't be answered through the NDI Entity Wallet. Nothing has been shared.` },
-    failed: { lead: `Something went wrong sharing this. Nothing has been sent. Go back to ${v} and try again.` },
+    /* E12 (V1/V2) says the bank can't receive it; anything else is E13. */
+    failed: { lead: r?.failure && st === "FAILED" ? r.failure : `Something went wrong sharing this. Nothing has been sent. Go back to ${v} and try again.` },
     cancelled: { lead: `${v} has cancelled this request. Nothing has been shared.` },
+    /* FLOW-PRS-02 E6's words: a kept request nobody answered in its seven days. */
+    expired: { lead: `This request from ${v} expired on ${formatDate(r?.expiresAt ?? new Date().toISOString())}. Nothing was shared.` },
     no_return: { lead: `Done. Go back to ${v}'s website to continue.` },
     offline: { lead: r && st === "SHARED" ? `Shared with ${v}.` : `${v} doesn't have this yet.`, more: "You're offline, so this is the outcome as we last knew it. Going back still works." },
   };

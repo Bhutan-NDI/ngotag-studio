@@ -379,22 +379,28 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "The verifier's DELETE on its session, or a problem report on the exchange.",
       },
       {
-        shown: "Who is told — requests waiting, passed on, approvers asked, the representative told of a share, a share approved or not",
+        shown: "Who is told — a request waiting, one left undecided, passed on, approvers asked, a share approved or not, the representative told of a share, a request open again",
         reality:
-          "UX-EW-04 has no copy for these yet. The prototype's wording (lib/sharing.ts, NOTICE) names the organisation, the credential types and the date, never a value, and is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. The 10-minute notice for a request left undecided on a website isn't simulated; keeping it for later sends the same notice at once.",
-        needs: "A notification copy table in UX-EW-04 §3.5, and in-app and email delivery.",
+          "The wording is UX-EW-04 §3.5's notification table, word for word, and each is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. Ten minutes passing with a website request undecided is a dashed button on Sharing; keeping it for later sends the same notice at once. An approver's note is never in the notice, only in the wallet.",
+        needs: "In-app and email delivery, with the link opening the right screen after sign-in.",
       },
       {
         shown: "A request held while NDI's list is checked",
         reality:
-          "UX-EW-04's Sharing states start at OPEN, while FLOW-PRS-01 E8 tells the person the request is under Sharing. The prototype lists it on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer, and tells nobody until it passes.",
-        needs: "A RECEIVED row in SCR-PRS-05 (or E8 reworded), to be settled in the specification.",
+          "A dashed sign-in on the wallet's page, and a dashed button on Sharing, stand in for NDI's list being out of reach. As UX-EW-04 v0.3 says, a request held this way from a website is listed on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer; one that arrived on a connection isn't listed at all until it passes. Nobody is told until it does.",
+        needs: "Trust Registry re-checks with back-off, and the RECEIVED state on the holder-side request record.",
       },
       {
         shown: "Where NDI sends people back to",
         reality:
           "Return addresses are kept in your browser; the fresh Bhutan NDI sign-in for each change is a dashed step, and \"sent to every owner and to NDI\" is a line in the activity feed.",
         needs: "SCR-PRS-06's registration with exact matching, step-up sign-in, audit and notification.",
+      },
+      {
+        shown: "Refused shares and approvals on the record",
+        reality:
+          "A share refused for want of Share or outside its reach, an approval of one's own share, and a sharer whose standing lapsed before approval each add a row to the audit trail in your browser, with the relation, the request and the reason (FLOW-PRS-01/02 §10). The screens never offer the first two, so they are reached only by calling the store.",
+        needs: "The same rows written by the presentation-request routes when they refuse, in the append-only store.",
       },
       {
         shown: "A sharer whose appointment ends while their share waits for approval",

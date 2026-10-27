@@ -253,34 +253,56 @@ export function sessionLapsed(session: PresentationSession, now = Date.now()): b
 /**
  * What the flows tell people, by in-app notice and email (FLOW-PRS-02 S6).
  *
- * UX-EW-04 §3.5 doesn't give this copy yet (pr-7 item 2, open). These are
- * the prototype's choice, written to its rules: the verifier's listed name,
- * the credential *types* and never a value, the date that matters, and §2.4's
- * verbs — share, approve, never present. The D20 line is written as
- * UX-EW-03 writes the Root's note for requests: who shared, with whom,
- * which credentials. The prototype writes each to the organisation's
- * activity feed, naming who it goes to, because there is no inbox to put it
- * in; the what's-real page says so.
+ * Word for word from UX-EW-04 §3.5's notification table (v0.3). Each goes
+ * by email as well as in the wallet, so none carries an attribute value or
+ * free text a colleague wrote — an approver's note stays in the wallet, and
+ * the notice only says it is there. Credentials are named by type. The
+ * prototype writes each to the organisation's activity feed, naming who it
+ * goes to, because there is no inbox to put it in; the what's-real page
+ * says so.
  */
 export const NOTICE = {
-  /** FLOW-PRS-02 step 3; FLOW-PRS-01 A3 (kept for later, or 10 minutes undecided). */
-  ready: (verifier: string, types: string, by: string) => `${verifier} is asking for your ${types} — answer by ${formatDate(by)}.`,
-  /** A4 — passed on. */
-  passed: (name: string, verifier: string, by: string) => `${name} passed you ${verifier}'s request — answer by ${formatDate(by)}.`,
-  /** A1 — approvers asked. */
-  approve: (name: string, types: string, verifier: string, by: string) =>
-    `${name} wants to share your ${types} with ${verifier}. Approve by ${formatDate(by)}.`,
-  /** D20 — the Root, whenever anyone else shares. */
-  rootTold: (name: string, verifier: string, types: string, approver: string | null) =>
-    `${name} shared your ${types} with ${verifier}${approver ? `, approved by ${approver}` : ""}.`,
-  /** D20 — the sharer, when their share is approved. */
-  approved: (approver: string, verifier: string) => `${approver} approved. Shared with ${verifier}.`,
-  /** A1 after rejection — the approver's note reaches the sharer (D15). */
-  rejected: (approver: string, note: string) => `${approver} didn't approve sharing this${note ? `: ${note.replace(/\.$/, "")}` : ""}.`,
-  /** E16/E11 — back to OPEN for someone who may answer. */
-  lapsed: (name: string, verifier: string, by: string) =>
-    `${name} can no longer share ${verifier}'s request, so it hasn't been sent. It's open again — answer by ${formatDate(by)}.`,
+  /** A request is OPEN — FLOW-PRS-02 step 3; FLOW-PRS-01 E8 once it passes. */
+  ready: (verifier: string, org: string, purpose: string, by: string) =>
+    `${verifier} is asking ${org} for some details. ${verifier}'s reason: "${purpose}". Answer by ${formatDate(by)}.`,
+  /** Left undecided — FLOW-PRS-01 A3, on *Keep for later* or after 10 minutes OPEN. Not to the sharer. */
+  undecided: (verifier: string, org: string, name: string, by: string) =>
+    `${verifier} is asking ${org} for some details. ${name} started on this but hasn't answered. Answer by ${formatDate(by)}.`,
+  /** Passed on — FLOW-PRS-02 A4; FLOW-PRS-01 E10. */
+  passed: (name: string, verifier: string, by: string) =>
+    `${name} passed you a request from ${verifier}: they can't share it themselves. Answer by ${formatDate(by)}.`,
+  /** Approvers asked — A1 in both flows. */
+  approve: (name: string, types: string, verifier: string) =>
+    `${name} wants to share ${types} with ${verifier}. It won't be sent until someone approves.`,
+  /** Approved — A1; D20. To the sharer. */
+  approved: (approver: string, types: string, verifier: string) => `${approver} approved. ${types} shared with ${verifier}.`,
+  /**
+   * Not approved — A1; D15. To the sharer. The note itself is shown in the
+   * wallet (SCR-PRS-02, SCR-PRS-05), never sent. §3.5 always says "Their
+   * note is in the wallet", but the note is optional on SCR-PRS-04; with
+   * none written the sentence would be untrue, so it is left out.
+   */
+  rejected: (approver: string, verifier: string, withNote: boolean) =>
+    `${approver} didn't approve sharing with ${verifier}.${withNote ? " Their note is in the wallet." : ""} You can ask someone else.`,
+  /** Someone other than the Root shares — D20, under AUTO or on approval. To the Root. */
+  rootTold: (name: string, org: string, types: string, verifier: string, approver: string | null) =>
+    `${name} shared ${org}'s ${types} with ${verifier}.${approver ? ` Approved by ${approver}.` : ""}`,
+  /** Back to open — FLOW-PRS-01 E16; FLOW-PRS-02 E11. */
+  reopened: (verifier: string, name: string, by: string) =>
+    `${verifier}'s request needs an answer again: ${name} can no longer share it, so it wasn't sent. Answer by ${formatDate(by)}.`,
 };
+
+/**
+ * Whether a request belongs on *Waiting* (UX-EW-04 v0.3, SCR-PRS-05). A
+ * RECEIVED request — held while NDI's list is checked — is listed, with no
+ * *Answer*, only when it came through a website session (FLOW-PRS-01 E8),
+ * because that person was told it would be there. One with no session is
+ * not listed until it passes (FLOW-PRS-02 E2).
+ */
+export function onWaiting(r: Pick<PresentationRequest, "status" | "expiresAt" | "sessionId">): boolean {
+  const st = statusOf(r);
+  return st === "RECEIVED" ? Boolean(r.sessionId) : isLive(st);
+}
 
 /** "Business Registration and Tax Clearance Certificate". */
 export const typesOf = (r: Pick<PresentationRequest, "asked">) => {
