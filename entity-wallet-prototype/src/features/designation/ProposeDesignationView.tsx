@@ -17,7 +17,7 @@ import { NDI_ORG, PELDEN, isNamedAdmin, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { kindPlural, kindSingular, kindTitle } from "./shared";
+import { kindPlural, kindSingular, scopePair } from "./shared";
 
 /**
  * SCR-DSG-01 — Propose a designation. FLOW-ORG-02 A1 (Kind E): an
@@ -35,7 +35,11 @@ import { kindPlural, kindSingular, kindTitle } from "./shared";
  *
  * A type another authority already confirms is shown, not hidden, and
  * can't be ticked: proposing it would only fail at activation (E5), and
- * superseding an incumbent is its own act with its own approval.
+ * replacing an incumbent isn't supported yet — a later flow, so nothing
+ * here promises it.
+ *
+ * The scope is listed as UX-EW-02 lists it: each entity type with the
+ * credential that makes it real (EW-FLOW5-SD/D6).
  *
  * SAVE AND RESUME
  *
@@ -227,10 +231,10 @@ export function ProposeDesignationView() {
                     checked={draft.kinds.includes(k)}
                     disabled={Boolean(incumbent)}
                     onChange={(on) => set("kinds", on ? [...draft.kinds, k] : draft.kinds.filter((x) => x !== k))}
-                    label={kindTitle(k)}
+                    label={scopePair(k)}
                     description={
                       incumbent
-                        ? `${incumbent.orgName} already confirms ${kindPlural(k)}. That designation has to be superseded first.`
+                        ? `${incumbent.orgName} is already the foundational issuer for ${kindPlural(k)}. Replacing it isn't supported yet.`
                         : undefined
                     }
                   />
@@ -289,7 +293,7 @@ export function ProposeDesignationView() {
                   : errors.form === "exists"
                     ? `${name} already has a designation on its way or in force.`
                     : errors.form === "covered"
-                      ? "Another authority already confirms one of these kinds of business. That designation has to be superseded first. Nothing was proposed."
+                      ? "Another authority is already the foundational issuer for one of these kinds of business. Replacing it isn't supported yet. Nothing was proposed."
                       : "Nothing was proposed. Check the fields above and try again."}
               </p>
             ) : null}

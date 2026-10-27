@@ -184,6 +184,9 @@ export function InvitationAcceptedView({ id }: { id: string }) {
               {[
                 ["Register the organisation", "Its name and legal identity, as the invitation gave them."],
                 ["Set up its identity on the platform", "Done by you, so the organisation's identity starts with it rather than with NDI."],
+                /* FLOW-ORG-02 step 2: NDI's service account joins only because
+                   the officer grants it — the service never adds itself (S5). */
+                ["Let NDI's service account ask in your name", "You add it to your organisation, and can remove it at any time without asking NDI."],
                 ["NDI activates the designation", "Until then it can register but cannot issue anything."],
               ].map(([title, body], i) => (
                 <li key={title} className="flex items-start gap-3 rounded-[12px] border border-grid px-3.5 py-3">

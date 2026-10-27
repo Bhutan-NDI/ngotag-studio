@@ -250,8 +250,26 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Activation checks — issuing identity, set-up, entitlements",
         reality:
-          "Read from fields on the organisation in the demo data. \"Grant them\" flips a list in your browser; no marketplace is asked and no member is added.",
-        needs: "Reads of org_agents, the ledger namespace and the marketplace entitlements, and adding NDI's service principal as VERIFIER.",
+          "Read from fields on the organisation in the demo data. \"Grant them\" flips a list in your browser; no marketplace is asked. The owner's grant to NDI's service account, and the account accepting it, are fields on the designation — no invitation is sent and no membership row is written.",
+        needs: "Reads of org_agents, the ledger namespace and the marketplace entitlements; the owner's VERIFIER invitation to the service principal (POST /orgs/:orgId/invitations) and the principal accepting it in its own session.",
+      },
+      {
+        shown: "NDI's service account in the members list, removed and turned back on",
+        reality:
+          "A row drawn from the designation, not a member record. Removing it — from Members, the console or Stop something — flips the same field and marks the authorisation rows in your browser withdrawn; turning it back on writes new ones.",
+        needs: "The membership in user_org_roles, removable by the organisation's owner, and the authorisation records moving with it (EW-FLOW5-SD §4.4).",
+      },
+      {
+        shown: "\"Change it to another did:ethr\" on the authority console",
+        reality:
+          "A prototype control. Nothing in the prototype changes an organisation's primary DID, so this stands in for a member doing it; the designation is compared with the DID recorded at activation and suspended.",
+        needs: "E10 detection on next use, against publishingDid (FLOW-ORG-02 AC-08a), and telling both parties.",
+      },
+      {
+        shown: "Days left, lapses and reminders on designations",
+        reality:
+          "Worked out from dates when a page loads. A proposal past 30 days lapses then; \"reminder sent\" means 10 working days have passed — nobody is emailed.",
+        needs: "Scheduled lapses (E6, E13) and reminders to administrators.",
       },
       {
         shown: "Adopting what people will be asked, and stopping it",
@@ -260,10 +278,10 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Write-once schema publication, the versioned proof request and authorisation written in one transaction, and the service account's permission enforced at the agent.",
       },
       {
-        shown: "\"Mark it agreed\" after an objection to the whole draft",
+        shown: "\"NDI revises the draft\" after an objection",
         reality:
-          "A prototype control. An objection with no item holds adoption until it's resolved; nothing on NDI's side revises a draft, so this button stands in for NDI and the authority agreeing.",
-        needs: "NDI's side of the objection: revising the draft and the authority accepting the revision (FLOW-ORG-03 E4).",
+          "A prototype control. Every open objection holds adoption of what it covers until NDI revises the draft or the officer withdraws it; nothing on NDI's side drafts anything, so this button stands in for NDI sending a new draft — without the item the objection named, if it named one.",
+        needs: "NDI's side of the objection: being told, revising the draft, and the objection record keeping how it closed (FLOW-ORG-03 A5).",
       },
       {
         shown: "The second approver is always a named administrator",

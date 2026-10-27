@@ -12,7 +12,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { isNamedAdmin, type Designation } from "@/lib/demoData";
+import { dsgReminderSent, isNamedAdmin, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { daysLeft, dsgPill, kindsInWords } from "./shared";
@@ -29,6 +29,11 @@ import { daysLeft, dsgPill, kindsInWords } from "./shared";
  * — a second administrator, the authority, or NDI's own checks — because
  * "pending" alone doesn't tell an administrator whether the next move is
  * theirs (UN-25).
+ *
+ * Every waiting row shows its days left — to approve (E13) or to accept
+ * (E6) — and whether the 10-working-day reminder has gone. Ended rows say
+ * how they ended in §3.5's words, and a withdrawn one stays listed with its
+ * reason: withdrawal is a record, not a deletion (A3).
  *
  * The root account never sees this page in the menu: it approves nothing
  * (FLOW-ONB-02 v0.6). UX-EW-02 still names Root as a possible second
@@ -47,7 +52,8 @@ export function DesignationsAdminView() {
   const withOrg = list((d) => d.state === "PENDING");
   const checks = list((d) => d.state === "ACCEPTED");
   const live = list((d) => d.state === "ACTIVE" || d.state === "SUSPENDED");
-  const ended = list((d) => ["REFUSED", "DECLINED", "EXPIRED"].includes(d.state));
+  const ended = list((d) => ["DECLINED", "WITHDRAWN", "EXPIRED"].includes(d.state));
+  const reminder = (d: Designation) => (dsgReminderSent(d) ? " · reminder sent to administrators" : "");
   const isRoot = currentPerson.platformRole === "root";
 
   if (!hydrated || forced === "loading") {
@@ -134,7 +140,12 @@ export function DesignationsAdminView() {
             ) : (
               <ul className="relative z-[4] m-0 list-none p-0">
                 {toApprove.map((d, i) =>
-                  row(d, `/admin/designations/${d.id}`, `Proposed by ${d.proposedBy ? personById(d.proposedBy).name : "—"}${d.proposedAt ? `, ${formatDate(d.proposedAt)}` : ""}`, i),
+                  row(
+                    d,
+                    `/admin/designations/${d.id}`,
+                    `Proposed by ${d.proposedBy ? personById(d.proposedBy).name : "—"}${d.proposedAt ? `, ${formatDate(d.proposedAt)}` : ""} · ${daysLeft(d.expiresAt)} days left to approve${reminder(d)}`,
+                    i,
+                  ),
                 )}
               </ul>
             )}
@@ -142,7 +153,7 @@ export function DesignationsAdminView() {
         </section>
 
         {section("dsg-org", "Waiting for the organisation", withOrg, "Nothing is waiting for an organisation to accept.", (d, i) =>
-          row(d, `/admin/designations/${d.id}`, `Approved by ${d.approvedBy ? personById(d.approvedBy).name : "—"} · ${daysLeft(d.expiresAt)} days left to accept`, i),
+          row(d, `/admin/designations/${d.id}`, `Approved by ${d.approvedBy ? personById(d.approvedBy).name : "—"} · ${daysLeft(d.expiresAt)} days left to accept${reminder(d)}`, i),
         )}
 
         {section("dsg-checks", "Accepted — checks not passing yet", checks, "Nothing is waiting on the activation checks.", (d, i) =>
@@ -171,10 +182,14 @@ export function DesignationsAdminView() {
               d,
               `/admin/designations/${d.id}`,
               d.state === "EXPIRED"
-                ? "This designation expired unaccepted."
-                : d.state === "DECLINED"
-                  ? `${d.orgName} declined it.`
-                  : `Refused: ${d.refusedReason ?? "—"}`,
+                ? d.expiredReason === "NOT_APPROVED"
+                  ? "This proposal lapsed without a decision."
+                  : "This designation expired unaccepted."
+                : d.state === "WITHDRAWN"
+                  ? `Withdrawn by ${d.withdrawnBy ? personById(d.withdrawnBy).name : "—"}: ${d.withdrawnReason ?? "—"}`
+                  : d.approvedBy
+                    ? `${d.orgName} declined it.`
+                    : `${d.declinedBy ? personById(d.declinedBy).name : "The second administrator"} declined this: ${d.declinedReason ?? "—"}.`,
               i,
             ),
           )

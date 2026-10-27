@@ -595,20 +595,22 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "The summary says, in outcome words, what the ministry will be able to do — and nothing else. Once switched on, the scope can't be edited.",
     doThis:
-      "Leave **Ministry of Industry, Commerce & Employment** selected, tick **Sole proprietorships** and **Partnerships**, type a legal basis such as **The licensing of businesses under the Ministry's mandate**, press **Propose**, then **Go to pending list**.",
+      "Leave **Ministry of Industry, Commerce & Employment** selected, tick **Sole proprietorships — Trade Licence** and **Partnerships — Trade Licence**, type a legal basis such as **The licensing of businesses under the Ministry's mandate**, press **Propose**, then **Go to pending list**.",
     match: "^/admin/designations/new$",
   },
   {
     chapter: 10,
     title: "Waiting for a second administrator",
-    happening: "Kinzang proposed it, so it waits for someone else. Nothing has been sent to the ministry.",
+    happening:
+      "Kinzang proposed it, so it waits for someone else — with its days left: a proposal nobody approves lapses after 30 days. Nothing has been sent to the ministry.",
     doThis: "Press the ministry's row under **Waiting for approval**.",
     route: "/admin/designations",
   },
   {
     chapter: 10,
     title: "Kinzang can't approve it",
-    happening: "In place of Approve: \"You proposed this designation, so a different administrator has to approve it.\"",
+    happening:
+      "In place of Approve: \"You proposed this designation, so a different administrator has to approve it.\" What Kinzang can still do is withdraw it — with a reason, kept on record.",
     doThis: "Press **Next** — the guide switches to Tshendu.",
     match: "^/admin/designations/dsg-[^/]+$",
   },
@@ -616,7 +618,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 10,
     title: "Tshendu approves",
     happening:
-      "The consequence at the decision: the ministry will create the credential that makes these businesses real, and everyone on the platform will trust what it issues.",
+      "The consequence at the decision: the ministry will create the credential that makes these businesses real, and everyone on the platform will trust what it issues. Refusing needs a reason, which goes to Kinzang; asking for more information changes nothing.",
     doThis: "Press **Approve**, then **Approve** in the dialog.",
     say: "A root of trust takes two named people at NDI — and then the organisation's own consent.",
     match: "^/admin/designations/dsg-[^/]+$",
@@ -635,7 +637,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 10,
     title: "What the ministry is taking on",
     happening:
-      "The role in the ministry's own terms, and NDI's access stated plainly — including that NDI hosts its keys, so removing the access is a permission the ministry controls, not a technical barrier. Accepting switches nothing on.",
+      "The role in the ministry's own terms, and NDI's access stated plainly: accepting is Kesang adding NDI's service account to the ministry — NDI never adds itself — and she can remove it at any time. Including that NDI hosts its keys, so it's a permission the ministry controls, not a technical barrier. Accepting switches nothing on.",
     doThis: "Press **Accept**.",
     say: "This is the paragraph that mustn't be softened. A government body has to know what NDI can do before it agrees.",
     match: "^/designation/dsg-[^/]+$",
@@ -669,7 +671,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 10,
     title: "Designated, nothing live",
     happening:
-      "The ministry's console: its designation, NDI's access with a way to remove it, and nothing live in its name. People can't verify with it until it agrees what they'll be asked.",
+      "The ministry's console: its designation, NDI's access with a way to remove it — the service account is in its members list too, removable there — and nothing live in its name. People can't verify with it until it agrees what they'll be asked.",
     doThis: "Beside **Sole proprietorships**, press **Review and adopt**.",
     route: "/authority",
     persona: "kesang",
@@ -679,16 +681,23 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "What people will be asked",
     happening:
       "Exactly what a person's wallet will show, item by item, with why each is needed. NDI's draft also asks for the date of birth — which the register doesn't need, and the screen says so on the item.",
-    doThis:
-      "Press **Raise an objection**, type **Our register doesn't need the date of birth**, press **Send back to NDI**, then **Continue to adopt**.",
+    doThis: "Press **Raise an objection**, type **Our register doesn't need the date of birth**, then press **Send back to NDI**.",
     say: "NDI may draft it, but the ministry's name is on it — so the ministry can say no to part of it.",
+    match: "^/authority/sole_proprietorship$",
+  },
+  {
+    chapter: 10,
+    title: "On hold until NDI revises it",
+    happening:
+      "Adopting sole proprietorships is now on hold. Only two things release it: NDI revising the draft, or Kesang withdrawing her objection. Neither side can close it alone — the ministry can't strike the item itself, and NDI can't overrule it.",
+    doThis: "In the dashed panel, press **NDI revises the draft**. The new draft leaves out the date of birth — then press **Continue to adopt**.",
     match: "^/authority/sole_proprietorship$",
   },
   {
     chapter: 10,
     title: "Three things, adopted as one",
     happening:
-      "The credential, what people are asked, and NDI's permission to ask it — together, or not at all. Each can be stopped separately afterwards.",
+      "The credential, what people are asked — NDI's revised draft — and NDI's permission to ask it, together, or not at all. Each can be stopped separately afterwards.",
     doThis: "Press **Adopt**, then **Adopt** in the dialog, then **Go to your authority console**.",
     match: "^/authority/sole_proprietorship/adopt$",
   },

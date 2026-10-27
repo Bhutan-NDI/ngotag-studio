@@ -1427,31 +1427,36 @@ export const REMINDER_WORKING_DAYS = 10;
 /* ------------------------------------------------------------------ */
 
 /**
- * A designation's life (FLOW-ORG-02). The spec keeps one `PENDING` from
- * the second approval until activation; the prototype splits it at the
- * authority's acceptance, because the two halves wait on different people
- * — the authority, then NDI's checks — and every screen that shows a
- * pending designation has to say on whom it is waiting (UN-25).
+ * A designation's life — EW-FLOW5-SD §5.1's eight states, and no others.
+ * Each says on whom it is waiting or how it ended, because every screen that
+ * shows a designation has to (UN-25).
  *
  * - `PROPOSED` — a Kind E proposal waiting for a second administrator (A1).
+ *   Lapses after 30 days (E13), with a reminder to administrators at 10
+ *   working days.
  * - `PENDING` — approved, waiting for the authority's OWNER (A2). 30 days (E6).
- * - `ACCEPTED` — accepted; the activation checks are not yet all passing (E1–E5).
+ * - `ACCEPTED` — accepted; the activation checks are not yet all passing
+ *   (E1–E5). It doesn't lapse: the authority has consented, so an abandoned
+ *   one is withdrawn by NDI, with a reason (A3).
  * - `ACTIVE` — switched on (step 5). Nothing is live until something is adopted.
- * - `REFUSED` — the second administrator refused it.
- * - `DECLINED` — the authority declined; NDI is told.
- * - `EXPIRED` — never accepted (E6). Confers nothing; a new one needs a fresh approval.
  * - `SUSPENDED` — the issuing identity changed after activation (E10), or the
  *   organisation was suspended (E9). Organisations already verified stay verified.
+ * - `DECLINED` — refused by the second administrator (E12, the reason carried
+ *   to the proposer) or declined by the authority (A2). One state for both,
+ *   as the spec has it: who said no is on the record, not in the state.
+ * - `WITHDRAWN` — ended by NDI with a reason (A3). Kept, never deleted.
+ * - `EXPIRED` — lapsed: not approved (`NOT_APPROVED`, E13) or not accepted
+ *   (`NOT_ACCEPTED`, E6). Confers nothing; a new one needs a fresh approval.
  */
 export type DesignationState =
   | "PROPOSED"
   | "PENDING"
   | "ACCEPTED"
   | "ACTIVE"
-  | "REFUSED"
+  | "SUSPENDED"
   | "DECLINED"
-  | "EXPIRED"
-  | "SUSPENDED";
+  | "WITHDRAWN"
+  | "EXPIRED";
 
 /** One activation check (FLOW-ORG-02 P2–P6), as SCR-DSG-04 lists it. */
 export interface ActivationCheck {
@@ -1484,24 +1489,94 @@ export interface Designation {
   /** The OWNER who accepted for the authority. */
   acceptedBy: PersonId | null;
   acceptedAt: string | null;
-  /** The second administrator's reason for refusing. */
-  refusedReason: string | null;
-  /** The running 30-day acceptance window (SC 2.2.1 — shown wherever it appears). */
+  /**
+   * Who said no, and why — the second administrator (E12, reason required
+   * and carried to the proposer verbatim) or the authority's OWNER (A2).
+   * Which of the two it was is read from `approvedBy`: a refusal comes
+   * before any approval.
+   */
+  declinedBy: PersonId | null;
+  declinedReason: string | null;
+  /** A3 — NDI ended it before activation, with a reason. The row is kept. */
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
+  withdrawnReason: string | null;
+  /**
+   * The state it was withdrawn from. The authority is told only if the
+   * proposal had reached it (PENDING or ACCEPTED) — before the second
+   * approval nothing was ever sent (A1).
+   */
+  withdrawnFrom: DesignationState | null;
+  /** E13 or E6 — which window ran out. */
+  expiredReason: "NOT_APPROVED" | "NOT_ACCEPTED" | null;
+  /**
+   * The running 30-day window — approval while PROPOSED (E13), acceptance
+   * while PENDING (E6). One field because only one window is ever open, and
+   * SC 2.2.1 wants the days left shown wherever either is.
+   */
   expiresAt: string | null;
+  /**
+   * SCR-DSG-02's "request more information" (A1). Changes nothing — the
+   * state stays PROPOSED and the window keeps running — so it is a note on
+   * the record, not a state.
+   */
+  infoRequests: { by: PersonId; at: string; note: string }[];
   activatedAt: string | null;
+  /**
+   * The primary DID observed at activation (step 5, Q1) — the DID itself,
+   * not only its method, so a switch to a different did:ethr is caught too
+   * (E10, AC-08a). Compared with the organisation's primary DID whenever
+   * that changes.
+   */
+  publishingDid: string | null;
   didMethodAtActivation: string | null;
+  /** Why it is SUSPENDED: the issuing identity changed (E10) or the organisation was (E9). */
+  suspendedReason: "IDENTITY_CHANGED" | "ORGANISATION" | null;
   /** The last run of the activation checks, if any. */
   checks: ActivationCheck[] | null;
   checkedAt: string | null;
   /**
-   * NDI's service account in the authority's organisation (step 4,
-   * EW-FLOW5-SD/D13). The authority removes it itself, without asking —
-   * FLOW-ORG-03 A3 from its side, FLOW-ORG-02 E8 from NDI's: the mechanism
-   * working, never an outage.
+   * The OWNER's grant of `VERIFIER` to NDI's service principal — the
+   * invitation issued in the officer's own session (FLOW-ORG-02 step 2 for
+   * Kind N, A2 for Kind E; A4 again on restore). P2 needs it: without it
+   * activation is E1, and nothing is added (AC-11). The service never
+   * grants itself anything (S5); it only accepts what this records.
    */
-  ndiAccess: "ACTIVE" | "REMOVED";
+  ndiGrant: { by: PersonId; at: string } | null;
+  /**
+   * NDI's service account as a member of the authority's organisation —
+   * `null` until step 4 accepts the grant. The authority removes it itself,
+   * without asking, from its members list or the console (FLOW-ORG-02 E8,
+   * FLOW-ORG-03 A3 — one control, EW-FLOW5-SD §4.4), and turns it back on by
+   * granting again (A4).
+   */
+  ndiAccess: "ACTIVE" | "REMOVED" | null;
   ndiAccessChangedBy: PersonId | null;
   ndiAccessChangedAt: string | null;
+}
+
+/** The named platform account that acts in an authority's name (EW-FLOW5-SD/D13). */
+export const NDI_SERVICE_PRINCIPAL = "NDI service account";
+
+/**
+ * The authorisation — EW-FLOW5-SD §4.4: the record of what NDI's service
+ * account was agreed to do, per entity type. Written with each adoption
+ * (FLOW-ORG-03 step 5), withdrawn with the membership when NDI's access is
+ * paused, and never reactivated: restoring writes a new row (A4), so the
+ * record of when NDI could and couldn't act stays readable.
+ */
+export interface Authorisation {
+  id: string;
+  designationId: string;
+  orgId: string;
+  entityType: OrgKind;
+  principal: string;
+  permittedPurpose: string;
+  grantedBy: PersonId;
+  grantedAt: string;
+  state: "ACTIVE" | "WITHDRAWN";
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
 }
 
 /** What a person is asked, item by item, with why it is needed (SCR-ADO-01). */
@@ -1524,8 +1599,9 @@ export interface ArtefactDraft {
   purpose: string;
   /**
    * An item the draft asks for that the register query doesn't need — the
-   * case SCR-ADO-01's objection route exists for (FLOW-ORG-03 P5, E4). An
-   * objection takes it out of the draft; nothing is overridden.
+   * case SCR-ADO-01's objection route exists for (FLOW-ORG-03 P5, A5). An
+   * objection holds adoption until NDI revises the draft without it, or the
+   * officer withdraws the objection; nothing is overridden.
    */
   overBroad: string | null;
 }
@@ -1546,27 +1622,59 @@ export interface Adoption {
   stoppedAt: string | null;
 }
 
-/** An objection raised on SCR-ADO-01, sent back to NDI with the officer's note. */
+/**
+ * The officer's objection to NDI's draft (FLOW-ORG-03 A5), against one
+ * entity type or — `entityType: null` — the whole draft, every entity type
+ * in it. Kept with how it closed, permanently (§7.1).
+ */
 export interface ArtefactObjection {
+  id: string;
   designationId: string;
-  entityType: OrgKind;
+  entityType: OrgKind | null;
+  /** The item it names, when it names one — the over-broad one SCR-ADO-01 flags. */
   item: string | null;
   note: string;
   by: PersonId;
   at: string;
-  /** When the authority and NDI agreed a change. An objection naming an item is resolved by taking it out. */
-  resolvedAt?: string | null;
+  /**
+   * It closes one of two ways only: NDI revises the draft (a new draft to
+   * review), or the officer withdraws it. NDI can't close it alone and the
+   * officer can't override it, so there is no third value.
+   */
+  closedAt: string | null;
+  closedHow: "REVISED" | "WITHDRAWN" | null;
 }
 
 /**
- * Whether an objection is still holding adoption (FLOW-ORG-03 E4, "resolved
- * by agreement, not by override"). One that names an over-broad item is
- * resolved by taking the item out of what is adopted. One with no item — the
- * officer objects to the draft as a whole — holds adoption until the
- * authority and NDI agree, rather than adopting the full set while the
- * banner says it was sent back.
+ * NDI's revised draft for one entity type, in answer to an objection. A new
+ * draft rather than an edit to the old one, so what the officer objected to
+ * stays on record beside what replaced it.
  */
-export const objectionHolds = (o: ArtefactObjection | undefined) => Boolean(o && !o.item && !o.resolvedAt);
+export interface DraftRevision {
+  designationId: string;
+  entityType: OrgKind;
+  revision: number;
+  at: string;
+  asked: AskedItem[];
+  objectionId: string;
+}
+
+/**
+ * The objection holding adoption of an entity type, if any (A5): an open
+ * one against that type, or against the whole draft. Every open objection
+ * holds — the one the officer names an item in as much as a general one —
+ * until NDI revises the draft or the officer withdraws it.
+ */
+export const openObjectionFor = (objections: ArtefactObjection[], designationId: string | undefined, kind: OrgKind) =>
+  objections.find((o) => o.designationId === designationId && !o.closedAt && (o.entityType === null || o.entityType === kind));
+
+/** What the current draft asks for an entity type — NDI's latest revision, or its first draft. */
+export function draftAsked(revisions: DraftRevision[], designationId: string | undefined, kind: OrgKind): AskedItem[] {
+  const latest = revisions
+    .filter((r) => r.designationId === designationId && r.entityType === kind)
+    .sort((a, b) => b.revision - a.revision)[0];
+  return latest ? latest.asked : draftFor(kind).asked;
+}
 
 /**
  * NDI's drafts for each entity type. The sole proprietorship draft also
@@ -1616,16 +1724,29 @@ export const draftFor = (kind: OrgKind) => ARTEFACT_DRAFTS.find((d) => d.entityT
 /** The marketplace entitlements a foundational issuer needs (FLOW-ORG-02 P5). */
 export const ISSUER_ENTITLEMENTS = ["schemaCreate", "issuance", "verification"];
 
-/** Whether a designation still stands in the way of another for the same organisation. */
 /**
- * Whether a designation waiting on the authority has run out of its 30 days
- * (FLOW-ORG-02 E6). Read from the date, like an accreditation's window, so
- * the admin list, the console and "Propose again" agree without anyone first
- * having to press Accept to discover it.
+ * Whether a designation has run out of its open 30-day window — approval
+ * while PROPOSED (E13), acceptance while PENDING (E6). Read from the date,
+ * like an accreditation's window, so the admin list, the console and
+ * "Propose again" agree without anyone first having to press a button to
+ * discover it. ACCEPTED never lapses (EW-FLOW5-SD §5.1).
  */
 export const dsgExpired = (d: Pick<Designation, "state" | "expiresAt">, today: string) =>
-  d.state === "PENDING" && Boolean(d.expiresAt && d.expiresAt < today);
+  (d.state === "PROPOSED" || d.state === "PENDING") && Boolean(d.expiresAt && d.expiresAt < today);
 
+/**
+ * Whether the 10-working-day reminder to NDI administrators has gone for a
+ * proposal still waiting for approval (E13) or a designation still waiting
+ * for the authority (§5.1 — "after 10 working days of either").
+ */
+export const dsgReminderSent = (d: Pick<Designation, "state" | "proposedAt" | "approvedAt">) =>
+  d.state === "PROPOSED"
+    ? workingDaysSince(d.proposedAt) >= REMINDER_WORKING_DAYS
+    : d.state === "PENDING"
+      ? workingDaysSince(d.approvedAt) >= REMINDER_WORKING_DAYS
+      : false;
+
+/** Whether a designation still stands in the way of another for the same organisation. */
 export const designationInProgress = (d: Pick<Designation, "state" | "expiresAt">) =>
   ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state) && !dsgExpired(d, new Date().toISOString().slice(0, 10));
 
@@ -1715,8 +1836,12 @@ export interface DemoState {
   designations: Designation[];
   /** Flow 5 — what each authority has adopted, per entity type, every version kept. */
   adoptions: Adoption[];
-  /** Flow 5 — what an officer sent back on SCR-ADO-01. */
+  /** Flow 5 — what an officer objected to on SCR-ADO-01, with how each closed (A5). */
   artefactObjections: ArtefactObjection[];
+  /** Flow 5 — NDI's revised drafts, each answering an objection. */
+  draftRevisions: DraftRevision[];
+  /** Flow 5 — what NDI's service account was agreed to do, per entity type (EW-FLOW5-SD §4.4). */
+  authorisations: Authorisation[];
   /**
    * True from the moment onboarding completes until the story jumps past
    * act 1: the console is showing Pelden on its first day (`firstRunState`),
@@ -3336,12 +3461,22 @@ export const SEED: DemoState = {
       approvedAt: null,
       acceptedBy: null,
       acceptedAt: day(-125),
-      refusedReason: null,
+      declinedBy: null,
+      declinedReason: null,
+      withdrawnBy: null,
+      withdrawnAt: null,
+      withdrawnReason: null,
+      withdrawnFrom: null,
+      expiredReason: null,
       expiresAt: null,
+      infoRequests: [],
       activatedAt: day(-124),
+      publishingDid: "did:ethr:bt:0x5a2f7c19e0b4d8a63c11f0e97b2d4a6c8e3f1b07",
       didMethodAtActivation: "did:ethr",
+      suspendedReason: null,
       checks: null,
       checkedAt: null,
+      ndiGrant: { by: "registrar", at: day(-125) },
       ndiAccess: "ACTIVE",
       ndiAccessChangedBy: null,
       ndiAccessChangedAt: null,
@@ -3364,6 +3499,23 @@ export const SEED: DemoState = {
     },
   ],
   artefactObjections: [],
+  draftRevisions: [],
+  /* The authority's own grant, written when it adopted for companies. */
+  authorisations: [
+    {
+      id: "auth-cra-company-1",
+      designationId: "dsg-cra",
+      orgId: "org-cra",
+      entityType: "company",
+      principal: NDI_SERVICE_PRINCIPAL,
+      permittedPurpose: "Confirming a company's representative, for entity onboarding",
+      grantedBy: "registrar",
+      grantedAt: day(-120),
+      state: "ACTIVE",
+      withdrawnBy: null,
+      withdrawnAt: null,
+    },
+  ],
 
   orgInterests: [],
   responsibilities: [],
