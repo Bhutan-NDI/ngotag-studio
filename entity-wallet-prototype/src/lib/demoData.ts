@@ -1363,11 +1363,19 @@ export interface AccRequestPart {
   issue: IssueType[];
   legalBasis: string;
   legalBasisRef: string;
+  /**
+   * Names the ACTIVE approval this part replaces — "Ask for more"
+   * (ACC-02/E3, AC-10). The way past E3 for a business, as `replaces` is
+   * for NDI's proposals: that approval keeps working until this one is.
+   */
+  replaces: string | null;
 }
 
 /** What SCR-ACC-06 sends: one capability or both (D22). */
 export interface AccRequestInput {
   parts: AccRequestPart[];
+  /** The business's agreement with NDI, if it has one (FLOW-ACC-02 step 2). Optional, unlike a proposal's. */
+  agreementRef: string;
 }
 
 /**
@@ -1412,6 +1420,17 @@ export const accEnding = (a: Pick<Accreditation, "state" | "expiresAt" | "door">
 export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) =>
   ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD"].includes(a.state) &&
   accEnding(a, new Date().toISOString().slice(0, 10)) === null;
+
+/**
+ * Whether the organisation itself sees a record. Its own request it always
+ * does. Of what NDI proposes, it sees nothing until a second administrator
+ * has approved it — the owner is told only then (FLOW-ACC-01 step 3) — and
+ * never a proposal NDI declined or let lapse, whose reason was written to
+ * the proposer, not to it (E13, E14). A decline the organisation made
+ * itself (E3) is its own, and stays.
+ */
+export const accSeenByOrg = (a: Pick<Accreditation, "state" | "door" | "declinedByOrg">) =>
+  a.state !== "LAPSED" && (a.door === "REQUEST" || !(a.state === "PROPOSED" || (a.state === "DECLINED" && !a.declinedByOrg)));
 
 /**
  * ACC-01/E11 as a face, not a state: an `ACTIVE` approval whose organisation

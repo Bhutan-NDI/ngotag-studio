@@ -15,12 +15,12 @@ import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/for
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { kindOf } from "@/features/onboarding/orgKinds";
-import { inOrg, isNamedAdmin } from "@/lib/demoData";
+import { REMINDER_WORKING_DAYS, inOrg, isNamedAdmin, workingDaysSince } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
-import { ScopeList, capVerb, legalBasisText } from "./shared";
+import { ScopeList, asSentence, capVerb, legalBasisText } from "./shared";
 
 /**
  * SCR-ACC-05 — Review a request. FLOW-ACC-02 step 6.
@@ -49,15 +49,49 @@ import { ScopeList, capVerb, legalBasisText } from "./shared";
  * what it means, but must not find it after recommending. A request whose
  * asker no longer represents the business has lapsed (ACC-02/E9), and there
  * is nothing to decide.
+ *
+ * OVERDUE IS 10 WORKING DAYS
+ *
+ * The same count NDI is reminded on (ACC-02/E8): a request is overdue once
+ * it has waited 10 working days, not a fortnight of calendar days — which
+ * marked a request sent before a long weekend late for days it never was.
+ *
+ * A DECLINE CAN BE TAKEN BACK BY WHOEVER RECOMMENDED IT
+ *
+ * A recommended decline waits for a second administrator to confirm it,
+ * who can't approve against it (ACC-02/E11, D21). If the two disagree they
+ * settle it between themselves, and then the reviewer — only the reviewer —
+ * withdraws the recommendation here ("Decline waiting"). The part returns
+ * to review and a new recommendation can be made.
  */
-type Face = "live" | "default" | "holder_alert" | "overdue" | "lapsed" | "error" | "offline" | "empty" | "not_found" | "done";
-
-const OVERDUE_DAYS = 14;
+type Face =
+  | "live"
+  | "default"
+  | "holder_alert"
+  | "overdue"
+  | "decline_waiting"
+  | "lapsed"
+  | "error"
+  | "offline"
+  | "empty"
+  | "not_found"
+  | "done";
 
 export function ReviewRequestView({ id }: { id: string }) {
   const router = useRouter();
-  const { accreditations, organizations, relations, currentPerson, personById, reviewRequest, hydrated } = useDemo();
-  const forced = useScreenState("SCR-ACC-05", ["live", "default", "holder_alert", "overdue", "lapsed", "error", "offline", "empty"]) as Face;
+  const { accreditations, organizations, relations, currentPerson, harness, personById, reviewRequest, withdrawRecommendation, hydrated } =
+    useDemo();
+  const forced = useScreenState("SCR-ACC-05", [
+    "live",
+    "default",
+    "holder_alert",
+    "overdue",
+    "decline_waiting",
+    "lapsed",
+    "error",
+    "offline",
+    "empty",
+  ]) as Face;
 
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
@@ -70,20 +104,25 @@ export function ReviewRequestView({ id }: { id: string }) {
   const askerStillRoot = relations.some(
     (r) => inOrg(org?.id ?? "")(r) && r.isRootAuthority && r.state === "ACTIVE" && r.personId === acc?.requestedBy,
   );
-  const waited = acc?.requestedAt ? Math.floor((Date.now() - new Date(acc.requestedAt).getTime()) / 86_400_000) : 0;
+  const overdue = workingDaysSince(acc?.requestedAt ?? null) >= REMINDER_WORKING_DAYS;
   const reviewable = acc?.state === "SUBMITTED" || acc?.state === "IN_REVIEW";
+  /* The viewer's own recommendation to decline, not yet confirmed. */
+  const myDeclineWaiting =
+    acc?.state === "PROPOSED" && acc.recommendation !== null && !acc.recommendation.approve && acc.recommendation.by === harness.persona;
 
   const natural: Face = done
     ? "done"
     : !acc
       ? "not_found"
-      : !reviewable
-        ? "done"
+      : myDeclineWaiting
+        ? "decline_waiting"
+        : !reviewable
+          ? "done"
         : !askerStillRoot
           ? "lapsed"
           : org && !org.capabilities.includes("holder")
             ? "holder_alert"
-            : waited > OVERDUE_DAYS
+            : overdue
               ? "overdue"
               : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -142,6 +181,21 @@ export function ReviewRequestView({ id }: { id: string }) {
   const canAct = isNamedAdmin(currentPerson) && !offline;
   /* The other part of the same request, if it asked for both (D22). */
   const sibling = acc.requestId ? accreditations.find((a) => a.requestId === acc.requestId && a.id !== acc.id) : undefined;
+
+  /* "Decline waiting": a forced face shows a sample recommendation when the
+     record has none of the viewer's. */
+  const declined =
+    acc.recommendation && !acc.recommendation.approve
+      ? acc.recommendation
+      : { by: harness.persona, approve: false, reason: "Ask to check age only, not the date of birth.", at: acc.requestedAt ?? "" };
+  const withdraw = () => {
+    if (forced !== "live") return;
+    const r = withdrawRecommendation(acc.id);
+    /* Back to review: the record is IN_REVIEW again, so this page shows
+       the request to recommend afresh. A refusal means someone confirmed
+       it first, or it isn't the viewer's to withdraw. */
+    if (!r.ok) setFailed(true);
+  };
 
   const send = (approve: boolean) => {
     setBusy(true);
@@ -238,12 +292,32 @@ export function ReviewRequestView({ id }: { id: string }) {
           </p>
         ) : null}
 
+        {face === "decline_waiting" ? (
+          <Panel>
+            <div className="relative z-[4] flex flex-col gap-3" role="status">
+              <h2 className="m-0 font-display text-[15px] font-semibold text-strong">Your recommendation</h2>
+              <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
+                You recommended declining{declined.at ? ` on ${formatDate(declined.at)}` : ""}: {asSentence(declined.reason)}
+              </p>
+              <p className="m-0 max-w-[66ch] text-[13px] leading-[1.6] text-muted">
+                A different administrator hasn&rsquo;t confirmed it yet, and nothing has been sent to the business. If you
+                withdraw it, the request comes back here to review again, and you can recommend afresh.
+              </p>
+              <div>
+                <HairlineButton onClick={withdraw} disabled={!canAct}>
+                  Withdraw the recommendation
+                </HairlineButton>
+              </div>
+            </div>
+          </Panel>
+        ) : null}
+
         {currentPerson.platformRole === "root" ? (
           <p role="status" className="m-0 text-[13.5px] leading-[1.6] text-body">
             The root account doesn&rsquo;t review requests. NDI&rsquo;s platform administrators do.
           </p>
         ) : null}
-        {declining ? (
+        {face === "decline_waiting" ? null : declining ? (
           <Panel>
             <div className="relative z-[4] flex flex-col gap-3">
               <label className={FIELD_BLOCK_CLASS}>

@@ -223,7 +223,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Two administrators, and the organisation accepting by name",
         reality:
-          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\" and \"only the owner accepts\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
+          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\", \"only the owner accepts\" and \"only a business's representative withdraws or stops what it asked for\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
         needs: "Dual control enforced by the platform's services against distinct principals, and the identity-anchored acceptance on the real wallet proof flow.",
       },
       {

@@ -62,6 +62,7 @@ import {
   normaliseLegalName,
   type AccProposalInput,
   type AccRequestInput,
+  type Accreditation,
   type Verification,
   type VerificationDecision,
 } from "./demoData";
@@ -426,6 +427,20 @@ const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2,
  * exists and is not locked or suspended. One definition, used wherever the
  * flow counts admins, as the spec asks.
  */
+/**
+ * Who may end an organisation's accreditation record — resign it, or
+ * withdraw a request still waiting (SCR-ACC-04). For a business's request
+ * the Root, by its ACTIVE relation and never the role (FLOW-ACC-02 S3, A1);
+ * for anything NDI proposed, the organisation's OWNER, who accepted it.
+ */
+const mayEndAcc = (s: DemoState, acc: Pick<Accreditation, "orgId" | "door">, personId: PersonId | undefined) => {
+  if (!personId || !acc.orgId) return false;
+  if (acc.door === "REQUEST")
+    return s.relations.some((r) => inOrg(acc.orgId!)(r) && r.isRootAuthority && r.state === "ACTIVE" && r.personId === personId);
+  const org = s.organizations.find((o) => o.id === acc.orgId);
+  return roleIn(org, s.people.find((p) => p.id === personId)) === "Owner";
+};
+
 const activeAdmins = (s: DemoState) => s.people.filter((p) => p.platformRole === "admin" && p.hasAccount !== false);
 
 /**
@@ -994,14 +1009,16 @@ interface DemoActions {
   /**
    * SCR-ACC-06 — a verified business's Root asks, for one capability or
    * both (D22). E2 for anyone but the Root, E3 when a request or approval
-   * already exists for a capability it asks for. Returns the request's id.
+   * already exists for a capability it asks for — unless the part names
+   * the ACTIVE approval it replaces ("Ask for more", AC-10). Returns the
+   * request's id.
    */
   requestCapability: (
     input: AccRequestInput,
   ) => { ok: true; id: string } | { ok: false; error: "E2" | "E3" | "invalid" };
   /**
    * SCR-ACC-04 — the Root withdraws a request still waiting (ACC-02/A1):
-   * every part of it not yet decided.
+   * every part of it not yet decided. Nobody else can, not even an OWNER.
    */
   withdrawRequest: (id: string) => void;
 
@@ -3049,11 +3066,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const me = s0.people.find((p) => p.id === s0.harness.persona);
         const refused = namedAdminRefusal(me, log);
         if (refused) return refused;
-        /* P4: a scope, a purpose and — for an issuer — one legal basis
-           covering every type (D23). */
+        /* P4: a scope, a purpose, an agreement reference and — for an
+           issuer — one legal basis covering every type (D23). The agreement
+           is required here, not on a business's request: NDI proposes to an
+           organisation it already has an agreement with, so a proposal
+           without one has skipped a step. */
         if (
           !input.orgName.trim() ||
           !input.purpose.trim() ||
+          !input.agreementRef.trim() ||
           (input.capability === "verifier" ? !input.ask.length : !input.issue.length || !input.legalBasis.trim())
         )
           return { ok: false, error: "invalid" };
@@ -3390,11 +3411,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       resignAccreditation: (id) => {
         const s0 = stateRef.current;
         const acc = s0.accreditations.find((a) => a.id === id);
-        const org = s0.organizations.find((o) => o.id === acc?.orgId);
-        const me = s0.people.find((p) => p.id === s0.harness.persona);
-        /* OWNER for an institution, the Root for a business. */
-        const isRoot = s0.relations.some((r) => inOrg(org?.id ?? "")(r) && r.isRootAuthority && r.personId === me?.id);
-        if (!acc || acc.state !== "ACTIVE" || (roleIn(org, me) !== "Owner" && !isRoot)) return;
+        const me = s0.harness.persona;
+        /* OWNER for an institution, the Root for a business (SCR-ACC-04) —
+           decided by the door it came through. A business's approval is
+           its Root's to end, as it was the Root's to ask for: the check
+           reads the relation, never the role (ACC-02/S3), so an OWNER who
+           is not the Root can't resign it. */
+        if (!acc || acc.state !== "ACTIVE" || !mayEndAcc(s0, acc, me)) return;
         setState((s) => ({
           ...s,
           organizations: s.organizations.map((o) =>
@@ -3414,7 +3437,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (!org || !org.capabilities.includes("holder") || root?.personId !== s0.harness.persona)
           return { ok: false, error: "E2" };
         /* One part per capability, at most two (D22), each complete: a
-           scope, a purpose, and for issuing one legal basis (D23). */
+           scope, a purpose, and for issuing one legal basis (D23). The
+           agreement reference is optional — only if the business has one
+           (step 2). */
         const caps = input.parts.map((p) => p.capability);
         if (
           !input.parts.length ||
@@ -3425,9 +3450,31 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         )
           return { ok: false, error: "invalid" };
         /* E3, per capability: SCR-ACC-06 doesn't offer one already asked
-           for or approved; this is the refusal behind that. */
-        if (s0.accreditations.some((a) => a.orgId === org.id && caps.includes(a.capability) && accInProgress(a)))
-          return { ok: false, error: "E3" };
+           for or approved; this is the refusal behind that. In progress
+           includes an NDI approval waiting for the owner to accept (P3,
+           FLOW-ACC-02 v0.4), so the two can never both become ACTIVE.
+           Naming the ACTIVE approval a part replaces — "Ask for more" — is
+           the way through, as it is for NDI's proposals (E10): that one
+           stays ACTIVE until the replacement is listed (AC-10). Anything
+           else in progress still blocks, including a replacement already
+           on its way. */
+        const blocked = input.parts.some((p) =>
+          s0.accreditations.some(
+            (a) =>
+              a.orgId === org.id &&
+              a.capability === p.capability &&
+              accInProgress(a) &&
+              !(a.state === "ACTIVE" && p.replaces === a.id),
+          ),
+        );
+        if (blocked) return { ok: false, error: "E3" };
+        /* A part names what it replaces only if that is this organisation's
+           ACTIVE approval for the same capability; anything else is dropped
+           rather than linked, so completeListing never ends the wrong one. */
+        const replacing = (p: (typeof input.parts)[number]) =>
+          s0.accreditations.some((a) => a.id === p.replaces && a.orgId === org.id && a.capability === p.capability && a.state === "ACTIVE")
+            ? p.replaces
+            : null;
         /* Step 4: the public identity it would be listed under is set up
            with the request, so NDI approves a request that can actually be
            listed — and set up *not primary*: it becomes primary only when
@@ -3456,12 +3503,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               purpose: p.purpose.trim(),
               legalBasis: p.capability === "issuer" ? p.legalBasis.trim() : "",
               legalBasisRef: p.capability === "issuer" ? p.legalBasisRef.trim() : "",
-              agreementRef: "",
+              agreementRef: input.agreementRef.trim(),
               ask: p.capability === "verifier" ? p.ask : [],
               issue: p.capability === "issuer" ? p.issue : [],
               observed: null,
               state: "SUBMITTED" as const,
-              replacesId: null,
+              replacesId: replacing(p),
               requestId,
               proposedBy: null,
               proposedAt: null,
@@ -3494,9 +3541,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           /* The Root withdraws the request, not a part of it: every part not
              yet decided goes with it. A part already approved stays — it is
-             an approval now, ended by resigning it. */
+             an approval now, ended by resigning it. Only the Root, as only
+             the Root could ask (ACC-02/A1, S3): the status page offers it to
+             nobody else, and this is the refusal behind that. */
           const target = s.accreditations.find((a) => a.id === id);
-          if (!target || target.door !== "REQUEST") return s;
+          if (!target || target.door !== "REQUEST" || !mayEndAcc(s, target, s.harness.persona)) return s;
           const open = (a: (typeof s.accreditations)[number]) =>
             a.door === "REQUEST" &&
             (a.id === id || (target.requestId !== null && a.requestId === target.requestId)) &&

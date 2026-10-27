@@ -485,7 +485,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 8,
     title: "The bank is told",
     happening:
-      "Yeshey Choden is Bank of Bhutan's owner. The dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
+      "Yeshey Choden is Bank of Bhutan's owner. Until Tshendu approved it the bank saw nothing — a proposal NDI hasn't approved, or has declined, never reaches it. Now the dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
     doThis: "Press **Review it**.",
     route: "/dashboard",
     persona: "yeshey",
@@ -574,7 +574,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 9,
     title: "Pelden can verify customers",
     happening:
-      "Approved to verify, listed under Pelden's public identity, able to ask one thing: whether a customer is over 18. Anything else it asks for will be refused, and shown here when it is.",
+      "Approved to verify, listed under Pelden's public identity, able to ask one thing: whether a customer is over 18. Anything else it asks for will be refused, and shown here when it is. To widen it, Dorji presses **Ask for more**: the request opens with today's scope filled in, and replaces this approval only once it is approved — this one keeps working until then.",
     doThis: "Press **Next**.",
     route: "/verify-or-issue",
     persona: "dorji",

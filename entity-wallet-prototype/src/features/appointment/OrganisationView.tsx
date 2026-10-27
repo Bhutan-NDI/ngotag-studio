@@ -10,7 +10,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { NextCredentialAction } from "@/features/onboarding/NextCredentialAction";
-import { inOrg, shortOrgName } from "@/lib/demoData";
+import { accSeenByOrg, inOrg, shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
@@ -45,11 +45,12 @@ export function OrganisationView() {
   const mine = relations.find((r) => inOrg(activeOrgId)(r) && r.personId === harness.persona && r.state === "ACTIVE");
   const face: Face =
     forced !== "live" ? forced : mine?.isRootAuthority ? "representative" : mine ? "appointed" : "member";
-  /* Anything it has asked NDI for, or been approved for (Flow 4). Not a
-     proposal that lapsed before NDI decided it, which the organisation
-     never saw; a replaced approval is still counted through its
-     replacement. */
-  const accs = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "LAPSED");
+  /* Anything it has asked NDI for, or been approved for (Flow 4). Not an
+     NDI proposal before a second administrator approved it, nor one NDI
+     declined or let lapse — the organisation is never told of those
+     (FLOW-ACC-01 step 3, E13, E14); a replaced approval is still counted
+     through its replacement. */
+  const accs = accreditations.filter((a) => a.orgId === activeOrgId && accSeenByOrg(a));
   /* A forced face with no appointment shows the guided grant, Receive. */
   const minePresets = presetsOf(mine);
   const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {

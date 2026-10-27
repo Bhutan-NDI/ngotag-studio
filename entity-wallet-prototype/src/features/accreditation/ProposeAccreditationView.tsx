@@ -138,7 +138,7 @@ export function ProposeAccreditationView() {
   });
   const [replaces, setReplaces] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<"E10" | "E12" | "invalid" | "offline" | null>(null);
+  const [error, setError] = useState<"E10" | "E12" | "invalid" | "agreement" | "offline" | null>(null);
   /* E10 for Kind N: the name matches an organisation already on the platform. */
   const [onPlatform, setOnPlatform] = useState<{ orgId: string; orgName: string } | null>(null);
   const [saved, setSaved] = useState<"saved" | "resumed" | null>(null);
@@ -237,6 +237,14 @@ export function ProposeAccreditationView() {
     (draft.capability === "verifier" ? draft.ask.length > 0 : draft.issue.length > 0 && Boolean(draft.legalBasis.trim()));
 
   const propose = () => {
+    /* P4: a proposal carries an agreement reference, and without one it is
+       refused at the field with nothing recorded. Said there rather than by
+       a Propose that stays greyed for no visible reason; the store refuses
+       it too. */
+    if (!draft.agreementRef.trim()) {
+      setError("agreement");
+      return;
+    }
     setBusy(true);
     window.setTimeout(() => {
       setBusy(false);
@@ -535,7 +543,15 @@ export function ProposeAccreditationView() {
                   value={draft.agreementRef}
                   onChange={(e) => set("agreementRef", e.target.value)}
                   placeholder="Reference, for example NDI/AGR/2026/014"
+                  aria-required="true"
+                  aria-invalid={error === "agreement" || undefined}
+                  aria-describedby={error === "agreement" ? "acc-agreement-error" : undefined}
                 />
+                {error === "agreement" ? (
+                  <span id="acc-agreement-error" role="alert" className="text-[12.5px] leading-[1.5] text-body">
+                    A proposal needs the reference of the organisation&rsquo;s agreement with NDI. Nothing was proposed.
+                  </span>
+                ) : null}
               </label>
 
               {error === "offline" ? (
@@ -550,7 +566,7 @@ export function ProposeAccreditationView() {
                 </p>
               ) : error === "invalid" ? (
                 <p role="alert" className="m-0 text-[13.5px] text-body">
-                  Something&rsquo;s missing: the organisation, its purpose, and at least one thing it can{" "}
+                  Something&rsquo;s missing: the organisation, its purpose, the agreement reference, and at least one thing it can{" "}
                   {draft.capability === "verifier" ? "ask for" : "issue, with its legal basis"}.
                 </p>
               ) : null}

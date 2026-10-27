@@ -14,11 +14,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { accInProgress, accStopped, inOrg, roleIn, type AccCapability, type Accreditation } from "@/lib/demoData";
+import { accInProgress, accSeenByOrg, accStopped, inOrg, roleIn, type AccCapability, type Accreditation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, accPill, capApproved, capVerb, inline, sampleAccreditation } from "./shared";
+import { ScopeList, accPill, asSentence, capApproved, capVerb, inline, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-04 — Approval status. FLOW-ACC-01 steps 8–11; FLOW-ACC-02 steps
@@ -38,8 +38,19 @@ import { ScopeList, accPill, capApproved, capVerb, inline, sampleAccreditation }
  *
  * Resigning is always a stop, never a deletion (EW-FLOW4-SD §5.2), so the
  * confirmation says both halves: what stops straight away, and — for an
- * issuer — that what it has already issued stays valid (UXD-17). Each other
- * ending names who did it and what the organisation can do next.
+ * issuer — that what it has already issued stays valid (UXD-17). It does not
+ * say the organisation leaves NDI's public list: a stop leaves the listing
+ * as it was, and the gate is what refuses (FLOW-ACC-01 A3) — an
+ * organisation that issues and verifies and stops one stays listed for the
+ * other (AC-12). Each other ending names who did it and what the
+ * organisation can do next.
+ *
+ * ASKING FOR MORE REPLACES, IT DOESN'T STOP
+ *
+ * A business's Root widens an approval by asking for a replacement
+ * (ACC-02/E3, AC-10): "Ask for more" opens SCR-ACC-06 with the current
+ * scope filled in. The current approval keeps working until the new one is
+ * listed, and is then shown under it as "Replaced".
  *
  * WHAT THE FIRST RELEASE LEFT OUT
  *
@@ -123,12 +134,28 @@ export function ApprovalStatusView() {
   /* Only the Root of a verified holder is offered the way to ask
      (FLOW-ACC-02 P1, P2); anyone else is not shown it at all (E1). */
   const canAsk = isRoot && Boolean(org?.capabilities.includes("holder"));
-  /* Resign and withdraw: OWNER for an institution, the Root for a business.
-     The store checks again; this only decides whether to offer them. */
-  const manages = (isRoot || roleIn(org, currentPerson) === "Owner") && forced !== "member";
-  /* A proposal that lapsed before NDI decided it never reached the
-     organisation, so it isn't shown to it. */
-  const mine = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "LAPSED");
+  /* "Ask for more" (ACC-02/E3, AC-10): the Root of a business, against an
+     ACTIVE approval with nothing else in progress for that capability — a
+     replacement already on its way would be refused with E3. A forced face
+     shows it on the sample. */
+  const canAskMore = (a: Accreditation) =>
+    canAsk &&
+    forced !== "member" &&
+    a.state === "ACTIVE" &&
+    (forced !== "live" ||
+      !accreditations.some((x) => x.id !== a.id && x.orgId === a.orgId && x.capability === a.capability && accInProgress(x)));
+  /* Resign and withdraw: OWNER for what NDI proposed, the Root for a
+     business's own request — an OWNER who is not the Root is not offered
+     it (ACC-02/S3, A1). The store checks again; this only decides whether
+     to offer them. */
+  const manages = (a: Pick<Accreditation, "door">) =>
+    forced !== "member" && (a.door === "REQUEST" ? isRoot : roleIn(org, currentPerson) === "Owner");
+  /* What stands in the way of a new request is everything in progress,
+     which is what the store tests against (E3). What the organisation is
+     shown is less: not an NDI proposal before its second approval, nor one
+     NDI declined or let lapse (FLOW-ACC-01 step 3, E13, E14). */
+  const standing = accreditations.filter((a) => a.orgId === activeOrgId && accInProgress(a));
+  const mine = accreditations.filter((a) => a.orgId === activeOrgId && accSeenByOrg(a));
 
   /* Publishing the listing is simulated: whatever is LISTING when this page
      is open is published after a moment, standing in for the registry
@@ -225,15 +252,22 @@ export function ApprovalStatusView() {
         ? { text: "Put back. Your listed public identity is primary again, and verifying and issuing have restarted." }
         : {
             text: "Your organisation's public identity has changed since it was approved. Verifying and issuing have stopped until it's put back.",
-            action: manages ? <GradientButton onClick={() => setRestored(true)}>Restore</GradientButton> : null,
+            action: manages(a) ? <GradientButton onClick={() => setRestored(true)}>Restore</GradientButton> : null,
           };
     switch (a.state) {
       case "ACTIVE":
         return {
           text: `${capApproved(a.capability)}, listed since ${a.listedAt ? formatDate(a.listedAt) : "—"}.`,
           action:
-            manages && forced !== "offline" ? (
-              <HairlineButton onClick={() => setResigning(a)}>Stop {a.capability === "verifier" ? "verifying" : "issuing"}</HairlineButton>
+            forced !== "offline" && (manages(a) || canAskMore(a)) ? (
+              <>
+                {canAskMore(a) ? (
+                  <HairlineButton onClick={() => router.push(`/verify-or-issue/ask?more=${a.id}`)}>Ask for more</HairlineButton>
+                ) : null}
+                {manages(a) ? (
+                  <HairlineButton onClick={() => setResigning(a)}>Stop {a.capability === "verifier" ? "verifying" : "issuing"}</HairlineButton>
+                ) : null}
+              </>
             ) : null,
         };
       case "SUBMITTED":
@@ -242,13 +276,13 @@ export function ApprovalStatusView() {
         return {
           text: `Waiting for NDI since ${a.requestedAt ? formatDate(a.requestedAt) : "—"}.`,
           action:
-            manages && a.door === "REQUEST" && forced !== "offline" ? (
+            manages(a) && a.door === "REQUEST" && forced !== "offline" ? (
               <HairlineButton onClick={() => withdrawRequest(a.id)}>Withdraw request</HairlineButton>
             ) : null,
         };
       case "PENDING_ACCEPTANCE":
         return {
-          text: `NDI has proposed approving ${short} to ${verb}. It's waiting for ${manages ? "you" : "the owner"} to accept.`,
+          text: `NDI has proposed approving ${short} to ${verb}. It's waiting for ${manages(a) ? "you" : "the owner"} to accept.`,
           action: <GradientButton onClick={() => router.push(`/verify-or-issue/${a.id}`)}>Review and accept</GradientButton>,
         };
       case "LISTING":
@@ -257,7 +291,7 @@ export function ApprovalStatusView() {
         return a.declinedByOrg
           ? { text: "You declined. Nothing is listed and NDI has been told." }
           : {
-              text: `NDI hasn't approved this. Their reason: ${a.declineReason ?? "—"} You can change your request and ask again.`,
+              text: `NDI hasn't approved this. Their reason: ${asSentence(a.declineReason)} You can change your request and ask again.`,
               action: isRoot ? (
                 <HairlineButton onClick={() => router.push(`/verify-or-issue/ask?from=${a.id}`)}>Change and ask again</HairlineButton>
               ) : null,
@@ -279,7 +313,7 @@ export function ApprovalStatusView() {
                   }`,
                   action: contactNdi(),
                 }
-              : { text: `NDI has withdrawn this approval: ${a.withdrawal.note ?? "—"}. Nothing is listed.`, action: contactNdi() };
+              : { text: `NDI has withdrawn this approval: ${asSentence(a.withdrawal.note)} Nothing is listed.`, action: contactNdi() };
           case "REPLACED":
             return { text: "Replaced by a wider approval. Kept on record; nothing stopped in between." };
           default:
@@ -305,7 +339,7 @@ export function ApprovalStatusView() {
 
   /* What the Root could still ask for: a capability with nothing in
      progress or active (ACC-02/E3, per capability). */
-  const askable = (["verifier", "issuer"] as AccCapability[]).filter((c) => !mine.some((a) => a.capability === c && accInProgress(a)));
+  const askable = (["verifier", "issuer"] as AccCapability[]).filter((c) => !standing.some((a) => a.capability === c));
 
   return (
     <AppShell>
@@ -348,6 +382,13 @@ export function ApprovalStatusView() {
                   {sibling ? (
                     <p className="m-0 text-[12.5px] leading-[1.55] text-muted">
                       Asked for together with {sibling.capability === "verifier" ? "verifying" : "issuing"}. NDI decides each on its own.
+                    </p>
+                  ) : null}
+                  {/* A replacement on its way sits beside the approval it
+                      replaces; this says why there are two (AC-10). */}
+                  {a.replacesId && a.state !== "ACTIVE" && shown.some((x) => x.id === a.replacesId && x.state === "ACTIVE") ? (
+                    <p className="m-0 text-[12.5px] leading-[1.55] text-muted">
+                      This asks for more. Your current approval keeps working until the new one replaces it.
                     </p>
                   ) : null}
                   <div className="flex flex-col gap-2">
@@ -407,7 +448,7 @@ export function ApprovalStatusView() {
               ? "You'll stop being able to issue straight away. Credentials you've already issued stay valid."
               : "You'll stop being able to ask people for information straight away."
           }
-          consequences={[`${short} is taken off NDI's public list for this. Being approved again needs NDI.`]}
+          consequences={["Being approved again needs NDI."]}
           confirmLabel={resigning?.capability === "issuer" ? "Stop issuing" : "Stop verifying"}
           onConfirm={() => {
             if (resigning) resignAccreditation(resigning.id);

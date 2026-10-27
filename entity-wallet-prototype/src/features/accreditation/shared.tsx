@@ -42,6 +42,17 @@ export const CHECK_ONLY = "Check only — you'll learn whether it's true, not th
  */
 export const inline = (label: string) => label.charAt(0).toLowerCase() + label.slice(1);
 
+/**
+ * Someone's reason, quoted inside one of §3.5's sentences that puts a full
+ * stop after it ("Their reason: <reason>. You can…"). Reasons are written
+ * as sentences and usually end in one already, which printed "..". The
+ * reason itself is never reworded (UN-32): only a missing stop is added.
+ */
+export const asSentence = (reason: string | null | undefined) => {
+  const r = (reason ?? "—").trim();
+  return /[.!?]$/.test(r) ? r : `${r}.`;
+};
+
 export const sameItem = (a: AskItem, b: AskItem) => a.credential === b.credential && a.item === b.item;
 
 /** Whole days from today to a date, never negative. Only a FLOW-ACC-01 proposal still has one (E14). */
