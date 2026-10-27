@@ -782,11 +782,17 @@ may receive, and that nothing is added until someone accepts it. **Ask the
 Department of Revenue & Customs**. The request page says who has it:
 sending, then waiting for the office, usually within 5 days.
 
+The dashed **Ask, and have it ask for a bank account too** on the same
+screen stands in for an issuer asking for more than was agreed. It is
+offered at asking time because that is the only time it can happen: a
+request reaches *your answer needed* only before anything has been shared
+(EW-FLOW6-SD §5.1). **Answer** opens SCR-CRD-06, with what was agreed and
+what is asked now as two lists, and **Share this too** or **Don't share —
+withdraw the request**. Opening the TPN's ask page after the TPN is held
+says *Your organisation already has this.* (E5) with **Go to credentials**.
+
 **Requests and offers** (SCR-CRD-03) lists it with the next date and
-**Withdraw**. The dashed **Have it ask for a bank account too** stands in
-for an issuer asking for more than was agreed: **Answer** opens SCR-CRD-06,
-with what was agreed and what is asked now as two lists, and **Share this
-too** or **Don't share — withdraw the request**.
+**Withdraw**.
 
 ### Answering — `/issuer/requests`, as Deki
 
@@ -805,10 +811,20 @@ officers' queue.*
 
 **Waiting for you → Review** (SCR-CRD-04): every detail, the office marked as
 on NDI's list, and the prompt to decline and contact the office if anything
-is wrong. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
+is wrong. Two dashed controls under it stand in for the issuer leaving NDI's
+list, or the list being out of reach, while the offer waited: the next
+**Accept** then shows E19 — *can't be added*, or *Try again shortly* with
+**Try again**. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
 beside the registration. **Activity** lists the request and an offer
 *claiming to be from Bhutan Revenue Authority*, refused because the sender
 isn't on NDI's list — nobody was notified.
+
+Offers sent without a request (FLOW-CRD-02) sit under the same **Waiting for
+you** and open on the same SCR-CRD-04, marked *Sent unasked*. Accepting one
+never needs an approver. In the act-3 seed, Bank of Bhutan's reissued
+**Business Current Account** says *This replaces the Business Current
+Account you received on …*, and accepting it marks the old one *Superseded*.
+The old `/wallet/offers` pages redirect here.
 
 ---
 
@@ -837,7 +853,8 @@ not include deciding approvals.
 
 ### 2 · Accept an offer — the holder inbox
 
-Click the **Business Licence** offer.
+Click the **Business Licence** offer. It opens on SCR-CRD-04, the same
+review screen a requested credential uses, marked *Sent unasked*.
 
 > "Here is the thing the studio could never do before. Pelden Trading is
 > the *holder*. Somebody has offered the company a credential."
@@ -848,9 +865,11 @@ Two things to point at:
   > "She is accepting these values. A screen that said 'Business Licence,
   > 4 attributes' would be asking her to accept something she had not seen. And
   > this is read from the offer itself, not from anything anyone typed."
-- **The issuer's trust-registry status.**
+- **That the issuer is on NDI's list of trusted organisations.** An offer
+  from anyone else never reaches this screen — it is refused on arrival and
+  only shows on the **Activity** tab.
 
-Press **Accept**. Then follow **See what we hold** — note the **Root of trust**
+Press **Accept**. Then follow **Go to your credentials** — note the **Root of trust**
 panel, held apart from the table:
 
 > "The Business Registration is not one credential among several. It is the
@@ -860,8 +879,8 @@ panel, held apart from the table:
 
 ### 3 · The refusal — worth showing deliberately
 
-Go to **Offers**, open **Fleet Insurance Certificate**, and pick
-**out_of_scope** in the state switcher.
+Go to **Requests and offers**, open **Fleet Insurance Certificate**, and pick
+**no_permission** in the state switcher.
 
 > "Accepting is never limited by what the credential is — every preset that
 > can accept can accept anything. So the only refusal here is about the
@@ -1089,7 +1108,9 @@ Worth showing:
 | `/delegated-authority/.../revoke` | **suspended**, **revoked** | Reversible vs final |
 | `/delegated-authority` | **empty** | First-run, before anything is delegated |
 | `/dashboard` | **all_clear**, **access_suspended** | An empty queue, and a pulled authority |
-| `/wallet/offers/...` | **out_of_scope**, **requires_approval** | Both refusal shapes on any offer |
+| `/wallet/requests/...` | **no_permission**, **e19_delisted**, **e19_unreachable**, **e13**, **e14** | SCR-CRD-04's one refusal (about the person, never the offer), and the issuer check failing at acceptance |
+| `/issuer/requests` | **e6**, **a2** | Why a request is in the officers' queue: not picked up, or referred by the office's system |
+| `/issuer/requests/...` | **e7**, **e10**, **e11** | Expired, already answered, withdrawn |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
 | `/controllership/audit` | **filtered_empty** | A filter finding nothing, trail still intact |
 | `/onboarding` | **none_supported**, **no_permission** | No authority connected yet; Kind E by someone who isn't the owner |

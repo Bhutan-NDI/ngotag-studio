@@ -654,12 +654,30 @@ export interface HeldCredential {
   expiresAt: string | null;
   status: "active" | "expired" | "revoked";
   /**
-   * The held credential that replaced this one, when a renewal was accepted
-   * (FLOW-CRD-02 step 6). Both are kept — this one is the record — but only
-   * the newer is shared, so this one no longer satisfies a prerequisite.
+   * The held credential that replaced this one: a newer one of the same type
+   * from the same issuer DID, accepted by either route (EW-FLOW6-SD §4.5).
+   * Both are kept — this one is the record — but this one is never presented
+   * as a prerequisite and doesn't count towards one. Which one a relying
+   * party receives is flow 7's: it preselects the newest.
    */
   supersededBy?: string;
 }
+
+/**
+ * The held credential a newly stored one would supersede — same
+ * organisation, same type, same issuer DID, not already superseded — or
+ * undefined. One rule for both routes (EW-FLOW6-SD §4.5), read by the store
+ * when it stores and by SCR-CRD-04 when it says "This replaces …".
+ */
+export const supersedes = (
+  held: HeldCredential[],
+  orgId: string,
+  type: string,
+  issuerDid: string,
+): HeldCredential | undefined =>
+  held
+    .filter((c) => (c.orgId ?? PELDEN) === orgId && c.type === type && c.issuerDid === issuerDid && !c.supersededBy)
+    .sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : -1))[0];
 
 /**
  * What the server said about an operation the Controller wants to run.
@@ -667,6 +685,17 @@ export interface HeldCredential {
  */
 export type ScopeDecision = "allowed" | "out_of_scope" | "requires_approval";
 
+/**
+ * An offer sent without a request — the organisation's inbox item
+ * (FLOW-CRD-02). It is reviewed on SCR-CRD-04, the same screen a requested
+ * offer uses, under the same checks.
+ *
+ * Only offers from issuers on NDI's list get here: anything else is refused
+ * on arrival and kept on the Activity tab alone (`RefusedOffer`, D1/D14).
+ * Accepting needs a person with credential:accept and never an approver —
+ * every preset carries it AUTO (EW-FLOW6-SD §5.3) — so there is no
+ * waiting-for-approval state.
+ */
 export interface CredentialOffer {
   id: string;
   /** Whose wallet it was offered to. Absent means Pelden Trading's. */
@@ -674,15 +703,24 @@ export interface CredentialOffer {
   type: string;
   issuer: string;
   issuerDid: string;
-  issuerTrusted: boolean;
   /** Read from the offer payload, not from anything a user typed. */
   attributes: CredentialAttribute[];
-  decision: ScopeDecision;
-  /** Populated when the decision is anything but `allowed`. */
-  decisionReason: string | null;
-  state: "pending" | "parked" | "accepted" | "declined" | "expired";
+  state: "pending" | "accepted" | "declined" | "expired" | "failed";
   receivedAt: string;
+  /** offerExpiresAt — 30 days from arrival (EW-FLOW6-SD §4.4). */
   expiresAt: string;
+  /** Who accepted or declined it, and when (Q2). */
+  decidedBy?: PersonId | null;
+  decidedAt?: string | null;
+  /** Why it ended without being added, in words, and the reason code (E9). */
+  failReason?: string | null;
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | null;
+  /**
+   * What re-running C2 at acceptance will find — set only by SCR-CRD-04's
+   * prototype control, standing in for the issuer leaving NDI's list or the
+   * list being out of reach while the offer waited (E9 / FLOW-CRD-01 E19).
+   */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
 }
 
 /**
@@ -742,7 +780,8 @@ export interface ParkedOperation {
   relationId: string;
   scopeVersion: number;
   /**
-   * The offer or verification request this is holding back.
+   * The verification request this is holding back. Accepting an offer never
+   * parks: credential:accept is AUTO in every preset (EW-FLOW6-SD §5.3).
    *
    * Without it an approval is a state change and nothing else — the whole
    * point of the queue is that deciding it lets the held operation run, and
@@ -1901,10 +1940,12 @@ export interface CredentialRequest {
   offer: { attributes: CredentialAttribute[]; validUntil: string | null; offeredAt: string; expiresAt: string } | null;
   answeredBy: PersonId | null;
   answeredAt: string | null;
-  /** Why a request failed, in words (E6, E11, E14, E18). */
+  /** Why a request failed, in words (E6, E11, E14, E16, E18, E19). */
   failReason: string | null;
-  /** The held credential this one replaces, when it does. */
-  replaces: string | null;
+  /** The reason code behind a FAILED or platform-WITHDRAWN request (E14, E16, E19). */
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | "REQUESTER_ENDED" | null;
+  /** As `CredentialOffer.simulatedRecheck` — what C2 finds when re-run at acceptance (E19). */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
 }
 
 /** An offer refused automatically — only ever on the Activity tab (UXD-36). */
@@ -3105,8 +3146,9 @@ export const SEED: DemoState = {
 
   offers: [
     {
-      /* Act 3's offer. In scope and automatic — accepting it is the whole
-         interaction, and the type is read from this payload, not typed.
+      /* Act 3's offer, sent without a request (FLOW-CRD-02) and reviewed on
+         SCR-CRD-04 like any other. Accepting it is the whole interaction,
+         and the type is read from this payload, not typed.
 
          A trade licence, because that is what a trading company is offered
          after incorporation (Story A2 in the user stories: MoICE issues the
@@ -3117,18 +3159,15 @@ export const SEED: DemoState = {
       type: "Business Licence",
       issuer: "Ministry of Industry, Commerce & Employment",
       issuerDid: "did:polygon:0xafb50adefe9b359e15a79eada5d0bbb2675f33d3",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "licence_number", value: "BL-THI-2026-10442" },
         { name: "licensed_activity", value: "General trading — import and wholesale" },
         { name: "valid_until", value: day(358) },
       ],
-      decision: "allowed",
-      decisionReason: null,
       state: "pending",
       receivedAt: day(-7),
-      expiresAt: day(7),
+      expiresAt: day(23),
     },
     {
       /* An ordinary offer. It used to be the denied example, refused because
@@ -3136,51 +3175,50 @@ export const SEED: DemoState = {
          §4.2 gives credential:accept no type filter in any preset, so no
          offer can be out of scope by its type. The one refusal SCR-CRD-04
          has is about the person — a role without credential:accept — and
-         that face is in B4's state switcher, on any offer. */
+         that face is in SCR-CRD-04's state switcher, on any offer. */
       id: "offer-insurance",
       type: "Fleet Insurance Certificate",
       issuer: "Royal Insurance Corporation of Bhutan",
       issuerDid: "did:polygon:0x4fc2bf84747e22ab86675163f6b59fc8ab469cb4",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "policy_number", value: "RICB-MV-2026-77412" },
         { name: "sum_insured", value: "BTN 4,200,000" },
       ],
-      decision: "allowed",
-      decisionReason: null,
       state: "pending",
       receivedAt: day(-4),
-      expiresAt: day(10),
+      expiresAt: day(26),
     },
     {
-      id: "offer-warehouse",
-      type: "Bonded Warehouse Authorisation",
-      issuer: "Department of Revenue & Customs",
-      issuerDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
-      issuerTrusted: true,
+      /* A reissue of something Pelden already holds — the same type from the
+         same issuer DID as hc-bank — so SCR-CRD-04 says what it replaces,
+         and accepting it marks the earlier one superseded (EW-FLOW6-SD §4.5,
+         Journey L). It replaces what used to be an unasked Bonded Warehouse
+         Authorisation, which needed an approver to accept and a TPN Pelden
+         doesn't hold — neither of which the spec allows. */
+      id: "offer-bank",
+      type: "Business Current Account",
+      issuer: "Bank of Bhutan",
+      issuerDid: "did:polygon:0xa2a4e362eb3f8494b23536454137d49265f1725c",
       attributes: [
-        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
-        { name: "facility_code", value: "BW-PHU-0043" },
-        { name: "bonded_capacity", value: "1,800 m³" },
+        { name: "account_holder", value: "Pelden Trading Pvt. Ltd." },
+        { name: "account_number", value: "•••• •••• 4417" },
+        { name: "branch", value: "Phuentsholing branch" },
+        { name: "opened_on", value: day(-104) },
       ],
-      decision: "requires_approval",
-      decisionReason: "Accepting an authorisation of this kind needs one approver.",
-      state: "parked",
+      state: "pending",
       receivedAt: day(-3),
-      expiresAt: day(11),
+      expiresAt: day(27),
     },
     {
+      /* Nobody reviewed it within 30 days (FLOW-CRD-02 E4). */
       id: "offer-lapsed",
       type: "Warehouse Safety Certificate",
       issuer: "Department of Labour",
       issuerDid: "did:polygon:0x37c307beb791b306b109010ad5d97de062f28f02",
-      issuerTrusted: true,
       attributes: [{ name: "registered_name", value: "Pelden Trading Pvt. Ltd." }],
-      decision: "allowed",
-      decisionReason: null,
       state: "expired",
-      receivedAt: day(-36),
+      receivedAt: day(-52),
       expiresAt: day(-22),
     },
   ],
@@ -3302,24 +3340,6 @@ export const SEED: DemoState = {
       expiresAt: day(2),
     },
     {
-      id: "park-accept-warehouse",
-      operation: "credential:accept",
-      summary: "Accept Bonded Warehouse Authorisation from Department of Revenue & Customs",
-      requestedBy: "rinzin",
-      relationId: "rel-rinzin",
-      scopeVersion: 3,
-      targetId: "offer-warehouse",
-      targetRelyingParty: null,
-      payloadHash: "sha256:38f5b2ce7a41d09628e5c3ba147f60d92b8074ae5c13f6d8",
-      policy: "SINGLE_APPROVER",
-      requiredSignatures: 1,
-      signatures: [],
-      state: "parked",
-      decisionReason: null,
-      createdAt: day(-3),
-      expiresAt: day(4),
-    },
-    {
       /* Dual control, half collected. The plan folds multi-sig into B7 as a
          variant rather than building D3, and this is that variant. */
       id: "park-issue-highvalue",
@@ -3363,24 +3383,6 @@ export const SEED: DemoState = {
         "Karma Wangmo's controllership was terminated after this was approved, so it was never run.",
       createdAt: day(-9),
       expiresAt: day(-2),
-    },
-    {
-      id: "park-expired",
-      operation: "credential:accept",
-      summary: "Accept Warehouse Safety Certificate from Department of Labour",
-      requestedBy: "rinzin",
-      relationId: "rel-rinzin",
-      scopeVersion: 3,
-      targetId: "offer-lapsed",
-      targetRelyingParty: null,
-      payloadHash: "sha256:4a8e13d705b9c2f6481ade37f0b5924c6d81073be5a2fc94",
-      policy: "SINGLE_APPROVER",
-      requiredSignatures: 1,
-      signatures: [],
-      state: "expired",
-      decisionReason: "Nobody decided this before it expired.",
-      createdAt: day(-35),
-      expiresAt: day(-28),
     },
     {
       id: "park-approved-bnsw",

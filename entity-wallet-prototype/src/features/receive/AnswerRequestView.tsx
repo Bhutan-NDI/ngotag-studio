@@ -47,10 +47,12 @@ import { KIND_WORDS, daysLeft, valueFor } from "./shared";
  */
 type Face = "live" | "default" | "loading" | "e8" | "e10" | "e7" | "e11" | "sent" | "offline";
 
+/* The issuer's own decline codes — the same list Kind A sends to
+   …/decline (EW-FLOW6-IIG §5.2, FLOW-CRD-03 A1). */
 const REASONS = [
-  { value: "REGISTER_MISMATCH", label: "Doesn't match our register" },
+  { value: "NO_MATCHING_RECORD", label: "No record in our register" },
   { value: "NOT_ELIGIBLE", label: "Not eligible for this credential" },
-  { value: "ALREADY_ISSUED", label: "Already issued to this business" },
+  { value: "RECORD_INCOMPLETE", label: "Our record is incomplete" },
   { value: "OTHER", label: "Another reason" },
 ];
 
@@ -78,14 +80,18 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
 
   const org = organizations.find((o) => o.id === r?.orgId);
   const business = org ? shortOrgName(org.name) : "The business";
-  const prereq = r ? heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential) : undefined;
+  /* What was presented — never a superseded one (EW-FLOW6-SD §4.5). */
+  const prereq = r ? heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential && !c.supersededBy) : undefined;
   const missing = (offering?.fields ?? []).filter((f) => !values[f.name]?.trim());
 
+  /* E7 is past answerBy with no answer. A request that expired after it was
+     answered — an offer nobody accepted — was answered, so it's E10 with
+     its outcome. */
   const natural: Face = sent
     ? "sent"
     : busy
       ? "loading"
-      : failed === "E7"
+      : failed === "E7" || (r?.state === "EXPIRED" && !r.offer)
         ? "e7"
         : failed === "offline"
           ? "offline"
@@ -136,15 +142,16 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
   };
 
   if (face === "sent" || face === "e10" || face === "e7" || face === "e11") {
+    /* The outcome is named only when there was one: declined, or an offer
+       sent. The switcher's E10 on an open request shows the issued case. */
+    const outcome = r.state === "DECLINED_BY_ISSUER" ? "declined" : r.offer || forced === "e10" ? "issued" : null;
     const text =
       face === "sent"
         ? sent === "declined"
           ? `Declined. ${business} will see your message exactly as you wrote it.`
           : `Sent. It may take a moment to reach ${business}.`
         : face === "e10"
-          ? `${r.answeredBy ? personById(r.answeredBy).name : "A colleague"} already answered this: ${
-              r.state === "DECLINED_BY_ISSUER" ? "declined" : "issued"
-            }.`
+          ? `${r.answeredBy ? personById(r.answeredBy).name : "A colleague"} already answered this${outcome ? `: ${outcome}` : ""}.`
           : face === "e7"
             ? `This request expired on ${formatDate(r.answerBy ?? r.requestedAt)}. ${business} can ask again.`
             : `${business} withdrew this request.`;

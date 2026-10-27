@@ -315,10 +315,22 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "A credential offer over DIDComm to the organisation's agent, stored on acceptance, with the issuer's standing checked against NDI's list at that moment.",
       },
       {
-        shown: "\"Have it ask for a bank account too\"",
+        shown: "\"Ask, and have it ask for a bank account too\"",
         reality:
-          "A prototype control. No issuer system exists to ask for more; the button writes the wider ask into the request so the consent screen can be shown.",
+          "A prototype control on the ask screen. No issuer system exists to ask for more; the button writes the wider ask into the request before anything is shared, so the consent screen can be shown.",
         needs: "The issuer's proof request, compared with what the business agreed to before anything more is shared.",
+      },
+      {
+        shown: "\"Take it off the list\" and \"Make the list unreachable\"",
+        reality:
+          "Prototype controls on the review screen. Nothing checks NDI's list when Accept is pressed; these mark what the next check would find, so the delisted and can't-check messages can be shown.",
+        needs: "C2 run again against the Trust Registry at the moment of accepting (FLOW-CRD-01 E19, FLOW-CRD-02 E9).",
+      },
+      {
+        shown: "Offers sent without a request, and one replacing a credential already held",
+        reality:
+          "Seeded rows in your browser. No issuer sends anything; superseding is a field the demo store sets on the older credential when the newer one is accepted.",
+        needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
       },
       {
         shown: "Integration settings — webhook, secret, clients, delivery log",

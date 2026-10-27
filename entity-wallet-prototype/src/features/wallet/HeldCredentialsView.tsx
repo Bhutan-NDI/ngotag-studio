@@ -14,8 +14,8 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Tabs } from "@/components/ui/Tabs";
 import { Icon } from "@/components/ui/icons";
-import { requestWords } from "@/features/receive/shared";
-import { inOrg, type HeldCredential } from "@/lib/demoData";
+import { issuerInline, requestWords } from "@/features/receive/shared";
+import { inOrg, type CredentialOffer, type HeldCredential } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { formatDate } from "@/features/controllership/scopeModel";
@@ -38,7 +38,9 @@ import { formatDate } from "@/features/controllership/scopeModel";
  * *Can't be shared right now* (FLOW-CRD-01 E15), which says what still
  * holds rather than implying it's gone.
  *
- * The Activity tab is the only place an offer the wallet refused on its own
+ * The Activity tab keeps requests, offers sent unasked once someone has
+ * accepted or declined them (or they lapsed), and is the only place an
+ * offer the wallet refused on its own
  * appears (FLOW-CRD-02 E1, UXD-36). Nobody is notified of those — a
  * notification for every unlisted sender is how a wallet teaches people to
  * click through warnings — but they're kept, with the reason, so the
@@ -51,16 +53,17 @@ type Face = "live" | "loading" | "error" | "offline" | "empty";
 
 export function HeldCredentialsView() {
   const router = useRouter();
-  const { heldCredentials, activeOrgId, organizations, credentialRequests, refusedOffers, offerings, personById, mayOperate } = useDemo();
+  const { heldCredentials, activeOrgId, organizations, credentialRequests, offers, refusedOffers, offerings, personById, mayOperate } = useDemo();
   const orgName = organizations.find((o) => o.id === activeOrgId)?.name.replace(/ Pvt\. Ltd\.$/, "") ?? "The organisation";
   const [tab, setTab] = useState<"credentials" | "activity">("credentials");
 
   const face = useScreenState("SCR-CRD-05", ["live", "loading", "error", "offline", "empty"]) as Face;
   const variant = face === "empty" ? "empty" : "populated";
   const all = variant === "empty" ? [] : heldCredentials.filter(inOrg(activeOrgId));
-  /* Superseded is what the store recorded when a renewal was accepted, not
-     a date comparison: a renewal and the original are often dated the same
-     day, and a strict "newer than" never marked either. */
+  /* Superseded is what the store recorded when a newer one of the same type
+     from the same issuer was accepted, by either route (EW-FLOW6-SD §4.5) —
+     not a date comparison: a renewal and the original are often dated the
+     same day, and a strict "newer than" never marked either. */
   const superseded = (c: HeldCredential) => Boolean(c.supersededBy);
 
   const foundational = all.find((c) => c.isFoundational);
@@ -116,6 +119,15 @@ export function HeldCredentialsView() {
       text: `${r.credential} from ${r.issuerName} — asked by ${personById(r.requestedBy).name}`,
       words: requestWords(r, offerings.find((o) => o.id === r.offeringId)?.answerWindowDays ?? 5),
     })),
+    ...offers
+      .filter(inOrg(activeOrgId))
+      .filter((o) => o.state !== "pending")
+      .map((o) => ({
+        id: o.id,
+        at: o.decidedAt ?? (o.state === "expired" ? o.expiresAt : o.receivedAt),
+        text: `${o.type} from ${o.issuer} — sent unasked${o.decidedBy ? `, ${o.state === "accepted" ? "accepted" : "declined"} by ${personById(o.decidedBy).name}` : ""}`,
+        words: unaskedWords(o),
+      })),
     ...refusedOffers.filter(inOrg(activeOrgId)).map((o) => ({
       id: o.id,
       at: o.at,
@@ -259,4 +271,22 @@ export function HeldCredentialsView() {
       </div>
     </AppShell>
   );
+}
+
+/** An offer sent unasked, once it has ended, in the words §3.5 gives its endings. */
+function unaskedWords(o: CredentialOffer) {
+  switch (o.state) {
+    case "accepted":
+      return { status: "issued", label: "Added", sentence: "Added to your credentials" };
+    case "declined":
+      return { status: "withdrawn", label: "Declined", sentence: "You've declined this. Nothing has been added." };
+    case "expired":
+      return { status: "lapsed", label: "Expired", sentence: `This offer from ${issuerInline(o.issuer)} expired.` };
+    default:
+      return {
+        status: "failed",
+        label: "Didn't go through",
+        sentence: o.failReason ?? `Something went wrong receiving this from ${issuerInline(o.issuer)}. Nothing has been added.`,
+      };
+  }
 }

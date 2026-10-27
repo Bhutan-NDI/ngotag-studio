@@ -35,18 +35,21 @@ import { daysLeft, valueFor } from "./shared";
  *
  * WHY IT'S HERE
  *
- * A queue offering, something the office's system referred, or something
- * the system hasn't picked up (E6). The last two only matter once the
- * office connects its system (SCR-CRD-10); today every request is the
- * first kind, and the state switcher shows the others.
+ * A queue offering, something the office's system referred with its note
+ * (A2), or something the system hasn't picked up (E6). The last two only
+ * matter once the office connects its system (SCR-CRD-10); today every
+ * request is the first kind, and the state switcher shows the others.
  */
-type Face = "live" | "default" | "empty" | "loading" | "error" | "offline" | "e6";
+type Face = "live" | "default" | "empty" | "loading" | "error" | "offline" | "e6" | "a2";
+
+/* A2's note is the issuer system's own words; this one is an example. */
+const SAMPLE_REFERRAL_NOTE = "two records in the register match this registration number";
 
 export function IssuerRequestsView() {
   const router = useRouter();
   const { credentialRequests, organizations, heldCredentials, personById, hydrated } = useDemo();
   const issuer = useIssuer();
-  const forced = useScreenState("SCR-CRD-08", ["live", "default", "empty", "loading", "error", "offline", "e6"]) as Face;
+  const forced = useScreenState("SCR-CRD-08", ["live", "default", "empty", "loading", "error", "offline", "e6", "a2"]) as Face;
 
   const mine = credentialRequests.filter((r) => r.issuerOrgId === issuer.org?.id);
   const waiting = mine.filter((r) => r.state === "WITH_ISSUER").sort((a, b) => ((a.answerBy ?? "") < (b.answerBy ?? "") ? -1 : 1));
@@ -119,7 +122,7 @@ export function IssuerRequestsView() {
   }
 
   const identifier = (r: CredentialRequest) => {
-    const held = heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential);
+    const held = heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential && !c.supersededBy);
     return held ? valueFor(held.attributes, r.consented.uses.find((u) => /number/i.test(u)) ?? r.consented.uses[0]) : null;
   };
   const business = (r: CredentialRequest) => organizations.find((o) => o.id === r.orgId)?.name ?? "A business";
@@ -166,7 +169,11 @@ export function IssuerRequestsView() {
                       <td>{formatDate(r.requestedAt)}</td>
                       <td>{daysLeft(r.answerBy)} days</td>
                       <td className="max-w-[28ch] text-[12.5px] text-muted">
-                        {face === "e6" ? "Your system hasn't picked this up. You can answer it here." : "Queue offering"}
+                        {face === "e6"
+                          ? "Your system hasn't picked this up. You can answer it here."
+                          : face === "a2"
+                            ? `Your system couldn't decide this: ${SAMPLE_REFERRAL_NOTE}.`
+                            : "Queue offering"}
                       </td>
                       <td>
                         {face === "offline" ? (
