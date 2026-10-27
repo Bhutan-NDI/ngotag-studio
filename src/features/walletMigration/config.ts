@@ -24,6 +24,41 @@ export const PAUSED_STATUSES: MigrationStatus[] = [
   'CUTOVER',
 ]
 
+/**
+ * The move-day statuses before the switch. Only these run against the freeze
+ * deadline: from CUTOVER on, the platform finishes the move however long it
+ * takes, because the switch can't be undone (SAD E.7).
+ */
+export const DEADLINE_STATUSES: MigrationStatus[] = [
+  'FROZEN',
+  'EXPORTING',
+  'IMPORTING',
+  'VERIFYING',
+]
+
+/**
+ * A required step after the switch keeps failing (platform #131): the move
+ * stays in CUTOVER, paused, with COMPLETION_STEP_FAILED:<step> until it
+ * succeeds. Owners and platform admins get the MOVE_STUCK alert.
+ */
+export const isCutoverStuck = (
+  migration: Pick<IMigration, 'status' | 'error'>,
+): boolean =>
+  migration.status === 'CUTOVER' &&
+  (migration.error ?? '').startsWith('COMPLETION_STEP_FAILED')
+
+/**
+ * The platform took the booking back (platform #128): a missed slot, or final
+ * checks that kept failing. The move waits in REHEARSED for a new slot, and the
+ * error clears once the owner books one.
+ */
+export const isPutBack = (
+  migration: Pick<IMigration, 'status' | 'phase' | 'error'>,
+): boolean =>
+  migration.status === 'REHEARSED' &&
+  migration.phase !== 'SCHEDULED' &&
+  Boolean(migration.error)
+
 /** The platform only accepts a cancel before the move starts. */
 export const CANCELLABLE_STATUSES: MigrationStatus[] = ['CREATED', 'REHEARSED']
 

@@ -18,6 +18,7 @@ import {
   isWalletMigrationEnabled,
 } from '../config'
 import React, { useEffect, useRef, useState } from 'react'
+import { describeMigrationError, findMigrationError } from '../errorMessages'
 import { useIsOrgOwner, useMigrationStatus } from '../useMigrationStatus'
 
 import type { AxiosResponse } from 'axios'
@@ -33,7 +34,6 @@ import PageContainer from '@/components/layout/page-container'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StartMoveForm } from './StartMoveForm'
 import { cancelMigration } from '@/app/api/walletMigration'
-import { describeMigrationError } from '../errorMessages'
 import { getOrganizationById } from '@/app/api/organization'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { resetMockMigration } from '../mockMigrationApi'
@@ -225,15 +225,20 @@ export default function MigrationWizard(): React.JSX.Element {
         migration.error === 'CANCELLED_BY_OWNER' ||
         !migration.freezeDeadline
       ) {
+        // Ended before move day. The code's own recovery (re-run the checks,
+        // pick a new time) applies to a live move, not this one, so only its
+        // message is shown.
+        const ended =
+          migration.error === 'CANCELLED_BY_OWNER'
+            ? 'The move was cancelled. Nothing changed.'
+            : (findMigrationError(migration.error)?.message ??
+              "The move couldn't go ahead and was cancelled. Nothing changed.")
         return (
           <Card className="p-6 text-sm">
-            <p className="font-medium">
-              {migration.error === 'CANCELLED_BY_OWNER'
-                ? 'The move was cancelled. Nothing changed.'
-                : describeMigrationError(migration.error)}
-            </p>
+            <p className="font-medium">{ended}</p>
             <p className="text-muted-foreground mt-1">
-              Your organisation stays on the shared agent.
+              Your organisation stays on the shared agent. Start a new move when
+              you&apos;re ready.
             </p>
             {migration.error && migration.error !== 'CANCELLED_BY_OWNER' && (
               <p className="text-muted-foreground mt-1 text-xs">

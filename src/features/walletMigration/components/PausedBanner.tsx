@@ -1,9 +1,16 @@
 'use client'
 
-import { PAUSED_STATUSES, formatBtt, isWalletMigrationEnabled } from '../config'
+import {
+  DEADLINE_STATUSES,
+  PAUSED_STATUSES,
+  formatBtt,
+  isCutoverStuck,
+  isWalletMigrationEnabled,
+} from '../config'
 import React, { useEffect } from 'react'
 import { useMigrationPoller, useMigrationStatus } from '../useMigrationStatus'
 
+import { IMigration } from '../types'
 import Link from 'next/link'
 import { PauseCircle } from 'lucide-react'
 import { generateAccessToken } from '@/utils/session'
@@ -38,6 +45,27 @@ export const useMigrationPaused = (): boolean => {
   )
 }
 
+/**
+ * Banner text. Before the switch the platform gives the latest time the pause
+ * can last (after that it cancels itself). From CUTOVER on there is no such
+ * limit, because the move only finishes, so no end time is promised.
+ */
+export const pausedBannerMessage = (migration: IMigration | null): string => {
+  if (migration && isCutoverStuck(migration)) {
+    return 'Issuing and verifying are still paused: finishing the move to your own agent is taking longer than expected. The platform team has been alerted.'
+  }
+  if (migration?.status === 'CUTOVER') {
+    return 'Issuing and verifying are paused while your organisation finishes switching to its own agent.'
+  }
+  const latestEnd =
+    migration &&
+    DEADLINE_STATUSES.includes(migration.status) &&
+    migration.freezeDeadline
+      ? ` (until ${formatBtt(migration.freezeDeadline, false)} at the latest)`
+      : ''
+  return `Issuing and verifying are paused while your organisation moves to its own agent${latestEnd}.`
+}
+
 // P-03 status banner: can't be dismissed while paused, announced politely.
 function PausedBannerInner(): React.JSX.Element | null {
   const orgId = useAppSelector((state) => state.organization.orgId)
@@ -66,11 +94,7 @@ function PausedBannerInner(): React.JSX.Element | null {
     return <div aria-live="polite" className="sr-only" />
   }
 
-  // The platform gives the latest time the pause can last (after that it
-  // cancels itself), not a start time, so show that.
-  const latestEnd = migration?.freezeDeadline
-    ? formatBtt(migration.freezeDeadline, false)
-    : null
+  const message = pausedBannerMessage(migration)
 
   return (
     <div aria-live="polite">
@@ -80,10 +104,7 @@ function PausedBannerInner(): React.JSX.Element | null {
       >
         <PauseCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <p className="min-w-0 flex-1">
-          Issuing and verifying are paused while your organisation moves to its
-          own agent
-          {latestEnd ? ` (until ${latestEnd} at the latest)` : ''}. Messages
-          from citizens are being held safely.
+          {message} Messages from citizens are being held safely.
         </p>
         <Link href="/wallet-migration" className="font-semibold underline">
           View progress

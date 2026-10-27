@@ -1,4 +1,4 @@
-import { IPreflightCheck } from './types'
+import { IPreflightCheck, PreflightCheckId } from './types'
 
 export interface IMigrationErrorContent {
   message: string
@@ -160,6 +160,26 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
       "The security alert for the key export couldn't be sent, so nothing ran.",
     recovery: 'Try again later. Platform admins have been notified.',
   },
+  // Booking taken back before the move started (the move's `error` on a
+  // REHEARSED move; FAILED on platforms without #128).
+  PREFLIGHT_FAILED: {
+    message:
+      "The final checks failed at your booked time, so the move didn't start. Nothing changed.",
+    recovery:
+      'Failed check: “{check}”. Fix it, re-run the checks in step 1, then pick a new time.',
+  },
+  'PREFLIGHT_FAILED:CHECKS_UNAVAILABLE': {
+    message:
+      "The final checks couldn't run at your booked time, so the move didn't start. Nothing changed.",
+    recovery:
+      'Re-run the checks in step 1, then pick a new time. Contact support if it happens again.',
+  },
+  // After the switch (CUTOVER): the platform retries and never aborts.
+  COMPLETION_STEP_FAILED: {
+    message: 'Finishing the move is taking longer than expected.',
+    recovery:
+      'Your organisation is already on its new agent. The platform keeps retrying ({check}) and the platform team has been alerted. Issuing and verifying resume as soon as it finishes.',
+  },
   // Move outcomes (the move's `error`)
   CANCELLED_BY_OWNER: {
     message: 'The move was cancelled. Nothing changed.',
@@ -225,6 +245,25 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
   },
 }
 
+// Preflight check names, shown on the Checks card and in PREFLIGHT_FAILED:<id>.
+export const CHECK_LABELS: Record<PreflightCheckId, string> = {
+  ORG_IS_SHARED: 'Organisation is on the shared agent',
+  AGENT_REACHABLE: 'Agent admin address reachable',
+  TOKEN_IS_ROOT: 'API key gives full access',
+  ENDPOINT_MATCHES: "Agent's public address matches",
+  RELEASE_MATCHES: 'Agent release',
+  CONFIG_MATCHES: 'Agent settings',
+  TARGET_PRISTINE: 'New agent wallet is empty',
+  DIDCOMM_REACHABLE: 'Public DIDComm address reachable',
+  NO_BULK_JOB: 'No bulk issuance running',
+  WEBHOOK_DELIVERS: 'Webhooks reach the platform',
+  DOWNLOAD_METHOD: 'Wallet file download',
+  NO_OUT_OF_SCOPE_ARTEFACTS: 'Organisation features supported',
+  NO_WEBSOCKET_ENDPOINTS: 'Connection types supported',
+  SHARED_REDIS: 'Platform ready for moves',
+  BACKUPS_CONFIRMED: 'Backups confirmed',
+}
+
 // VERIFICATION_FAILED:<check> names the final check that failed.
 const VERIFY_CHECKS: Record<string, string> = {
   AGENT: 'agent responds',
@@ -236,17 +275,35 @@ const VERIFY_CHECKS: Record<string, string> = {
   COUNTS: 'wallet record counts',
 }
 
+// COMPLETION_STEP_FAILED:<step> names the required step after the switch.
+const COMPLETION_STEPS: Record<string, string> = {
+  RELAY_FORWARD: 'delivering held messages',
+  INVITATION: "preparing your connections' new address",
+  STABILISE: 'resuming issuing and verifying',
+}
+
+// What the part after ":" names, per code.
+const SUFFIX_NAMES: Record<string, Record<string, string>> = {
+  VERIFICATION_FAILED: VERIFY_CHECKS,
+  PREFLIGHT_FAILED: CHECK_LABELS,
+  COMPLETION_STEP_FAILED: COMPLETION_STEPS,
+}
+
 const lookup = (
   code: string,
 ): {
   content: IMigrationErrorContent
   values: Record<string, string>
 } | null => {
+  // A full code can have its own text (PREFLIGHT_FAILED:CHECKS_UNAVAILABLE).
+  if (ERROR_CONTENT[code]) {
+    return { content: ERROR_CONTENT[code], values: {} }
+  }
   const [base, suffix] = code.split(':')
   if (ERROR_CONTENT[base]) {
     return {
       content: ERROR_CONTENT[base],
-      values: { check: VERIFY_CHECKS[suffix] ?? 'a final check' },
+      values: { check: SUFFIX_NAMES[base]?.[suffix] ?? 'a final check' },
     }
   }
   // <STEP>_TIMEOUT from the move-day executor, e.g. EXPORT_TIMEOUT.

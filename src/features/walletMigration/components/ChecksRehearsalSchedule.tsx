@@ -1,11 +1,8 @@
 'use client'
 
-import {
-  CHECK_LABELS,
-  CHECK_STATUS_LABEL,
-  CheckIcon,
-  Failure,
-} from './PreflightParts'
+import { BookedSlot, PutBackNotice } from './ScheduleParts'
+import { CHECK_LABELS, describeMigrationError } from '../errorMessages'
+import { CHECK_STATUS_LABEL, CheckIcon, Failure } from './PreflightParts'
 import { IMigration, MigrationResult } from '../types'
 import { Loader2, RotateCw } from 'lucide-react'
 import React, { useMemo, useState } from 'react'
@@ -17,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { StepCard, StepState } from './StepCard'
+import { formatBtt, isPutBack } from '../config'
 import {
   rerunPreflight,
   runRehearsal,
@@ -28,8 +26,6 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoveConfirmDialog } from './MoveConfirmDialog'
-import { describeMigrationError } from '../errorMessages'
-import { formatBtt } from '../config'
 
 // Off-peak suggestions, Bhutan time (spec SCR-WM-04).
 const SLOT_TIMES = [
@@ -61,6 +57,56 @@ const minutes = (ms: number | null): string => {
 // Failed checks that need something from the owner on the re-run.
 const NEEDS_API_KEY = ['API_KEY_REQUIRED', 'AGENT_TOKEN_REJECTED']
 
+type Busy = 'checks' | 'rehearsal' | 'schedule'
+
+/**
+ * State of each card. The checks can fail again after the rehearsal (the
+ * final checks at the slot), and must pass before a new time is booked.
+ */
+export const stepStates = (
+  migration: IMigration,
+  busy: Busy | null,
+  changingSlot: boolean,
+): {
+  checksState: StepState
+  rehearsalState: StepState
+  scheduleState: StepState
+} => {
+  const { status, phase, preflight, rehearsalStatus } = migration
+  const rehearsed = status === 'REHEARSED'
+  const scheduled = rehearsed && phase === 'SCHEDULED'
+  const checksPassed = Boolean(preflight?.passed)
+
+  let checksState: StepState = 'action'
+  if (busy === 'checks') {
+    checksState = 'running'
+  } else if (preflight) {
+    checksState = checksPassed ? 'done' : 'failed'
+  }
+
+  let rehearsalState: StepState = 'action'
+  if (rehearsalStatus === 'RUNNING' || busy === 'rehearsal') {
+    rehearsalState = 'running'
+  } else if (rehearsed) {
+    rehearsalState = 'done'
+  } else if (!checksPassed) {
+    rehearsalState = 'locked'
+  } else if (rehearsalStatus === 'FAILED') {
+    rehearsalState = 'failed'
+  }
+
+  let scheduleState: StepState = 'action'
+  if (!rehearsed) {
+    scheduleState = 'locked'
+  } else if (scheduled && !changingSlot) {
+    scheduleState = 'done'
+  } else if (!checksPassed) {
+    scheduleState = 'locked'
+  }
+
+  return { checksState, rehearsalState, scheduleState }
+}
+
 interface ChecksRehearsalScheduleProps {
   orgId: string
   orgName: string
@@ -77,7 +123,6 @@ export function ChecksRehearsalSchedule({
   isOwner,
   onResult,
 }: Readonly<ChecksRehearsalScheduleProps>): React.JSX.Element {
-  type Busy = 'checks' | 'rehearsal' | 'schedule'
   const [busy, setBusy] = useState<Busy | null>(null)
   const [date, setDate] = useState(bttDate(1))
   const [time, setTime] = useState(SLOT_TIMES[0])
@@ -90,7 +135,7 @@ export function ChecksRehearsalSchedule({
   const [apiKey, setApiKey] = useState('')
   const [backupsConfirmed, setBackupsConfirmed] = useState(false)
 
-  const { status, phase, preflight, rehearsalStatus } = migration
+  const { status, phase, preflight } = migration
   const failedChecks =
     preflight?.checks.filter((c) => c.status === 'FAIL') ?? []
   const needsApiKey = failedChecks.some((c) =>
@@ -101,30 +146,20 @@ export function ChecksRehearsalSchedule({
   )
   const rehearsed = status === 'REHEARSED'
   const scheduled = rehearsed && phase === 'SCHEDULED'
-  const slotMissed = rehearsed && migration.error === 'SLOT_MISSED'
+  const putBack = isPutBack(migration)
+  const checksPassed = Boolean(preflight?.passed)
+  // Checks can fail again after the rehearsal (the final checks at the slot);
+  // they must pass before a new time is booked.
+  const changing = changingSlot && checksPassed
+  const canRerunChecks =
+    status === 'CREATED' ||
+    (rehearsed && !scheduled && (putBack || !checksPassed))
 
-  const checksState: StepState =
-    busy === 'checks'
-      ? 'running'
-      : !preflight
-        ? 'action'
-        : preflight.passed
-          ? 'done'
-          : 'failed'
-  const rehearsalState: StepState = !preflight?.passed
-    ? 'locked'
-    : rehearsalStatus === 'RUNNING' || busy === 'rehearsal'
-      ? 'running'
-      : rehearsed
-        ? 'done'
-        : rehearsalStatus === 'FAILED'
-          ? 'failed'
-          : 'action'
-  const scheduleState: StepState = !rehearsed
-    ? 'locked'
-    : scheduled && !changingSlot
-      ? 'done'
-      : 'action'
+  const { checksState, rehearsalState, scheduleState } = stepStates(
+    migration,
+    busy,
+    changing,
+  )
 
   // Slot is entered in Bhutan time (UTC+6, no daylight saving).
   const slotTime = useMemo(
@@ -212,6 +247,8 @@ export function ChecksRehearsalSchedule({
 
   return (
     <div className="space-y-5">
+      {putBack && migration.error && <PutBackNotice error={migration.error} />}
+
       <StepCard
         step={1}
         title="Checks"
@@ -248,7 +285,7 @@ export function ChecksRehearsalSchedule({
           </>
         )}
 
-        {isOwner && status === 'CREATED' && (
+        {isOwner && canRerunChecks && (
           <div className="mt-4 space-y-3">
             {needsApiKey && (
               <div className="max-w-sm space-y-1.5">
@@ -363,7 +400,7 @@ export function ChecksRehearsalSchedule({
         {isOwner &&
           (rehearsalState === 'action' ||
             rehearsalState === 'failed' ||
-            (rehearsed && !scheduled)) && (
+            (rehearsed && !scheduled && checksPassed)) && (
             <Button
               size="sm"
               variant={rehearsed ? 'outline' : 'default'}
@@ -390,38 +427,20 @@ export function ChecksRehearsalSchedule({
       >
         {scheduleState === 'locked' && (
           <p className="text-muted-foreground text-sm">
-            Complete first: the rehearsal must finish.
+            {rehearsed
+              ? 'Complete first: all checks must pass again.'
+              : 'Complete first: the rehearsal must finish.'}
           </p>
         )}
-        {scheduleState === 'done' && migration.scheduledFor && (
-          <>
-            <p className="text-sm">
-              Move booked for{' '}
-              <span className="font-semibold">
-                {formatBtt(migration.scheduledFor)}
-              </span>
-              . Final checks run before the switch, and if any fails, the move
-              cancels itself and nothing changes.
-            </p>
-            {isOwner && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="mt-4"
-                onClick={() => setChangingSlot(true)}
-              >
-                Change time
-              </Button>
-            )}
-          </>
+        {scheduleState === 'done' && (
+          <BookedSlot
+            migration={migration}
+            isOwner={isOwner}
+            onChangeTime={() => setChangingSlot(true)}
+          />
         )}
         {scheduleState === 'action' && (
           <>
-            {slotMissed && (
-              <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                {describeMigrationError('SLOT_MISSED')}
-              </div>
-            )}
             <p className="mb-3 text-sm">
               Expected pause: about{' '}
               <span className="font-semibold">
@@ -464,7 +483,7 @@ export function ChecksRehearsalSchedule({
                 >
                   {scheduled ? 'Move to this time' : 'Schedule move'}
                 </Button>
-                {changingSlot && (
+                {changing && (
                   <Button
                     variant="ghost"
                     onClick={() => setChangingSlot(false)}

@@ -12,6 +12,8 @@ import {
   completedTime,
   formatBtt,
   hoursUntil,
+  isCutoverStuck,
+  isPutBack,
 } from '../config'
 
 import { Badge } from '@/components/ui/badge'
@@ -49,14 +51,22 @@ const chipFor = (
         : preparing
     case 'REHEARSED':
       if (migration.phase === 'SCHEDULED' && migration.scheduledFor) {
+        // At the slot the final checks are retried for a while before the
+        // booking is taken back; failing ones need the owner's attention.
+        if (migration.preflight && !migration.preflight.passed) {
+          return needsAttention
+        }
         return {
           label: `Move scheduled: ${formatBtt(migration.scheduledFor)}`,
           icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
           className: info,
         }
       }
-      return migration.error === 'SLOT_MISSED' ||
-        migration.rehearsalStatus === 'FAILED'
+      // Any error here means the booking was taken back (missed slot, final
+      // checks failed); the platform clears it when a new slot is booked.
+      return isPutBack(migration) ||
+        migration.rehearsalStatus === 'FAILED' ||
+        (migration.preflight !== null && !migration.preflight.passed)
         ? needsAttention
         : preparing
     case 'FROZEN':
@@ -64,6 +74,13 @@ const chipFor = (
     case 'IMPORTING':
     case 'VERIFYING':
     case 'CUTOVER':
+      if (isCutoverStuck(migration)) {
+        return {
+          label: 'Moving now: taking longer than expected',
+          icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+          className: warn,
+        }
+      }
       return {
         label: 'Moving now: issuing and verifying paused',
         icon: <PauseCircle className="h-3.5 w-3.5" aria-hidden />,

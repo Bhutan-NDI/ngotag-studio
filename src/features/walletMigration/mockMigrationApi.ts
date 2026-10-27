@@ -12,6 +12,13 @@
 //   unreachable    first checks fail with AGENT_UNREACHABLE
 //   rehearsal-fail first rehearsal fails (JOB_FAILED during export)
 //   slot-missed    first booked slot is missed (back to REHEARSED, SLOT_MISSED)
+//   final-checks-fail  final checks fail at the first slot, are retried, then
+//                  the booking is taken back (PREFLIGHT_FAILED:AGENT_REACHABLE)
+//   checks-unavailable  as above, but the final checks can't run
+//                  (PREFLIGHT_FAILED:CHECKS_UNAVAILABLE)
+//   cutover-stuck  a step after the switch keeps failing for a while
+//                  (CUTOVER + COMPLETION_STEP_FAILED:RELAY_FORWARD), past the
+//                  freeze deadline, then the move finishes
 //   verify-fail    move day fails at VERIFYING (VERIFICATION_FAILED:RELAY_PROBE)
 //   slow           move day fails with FREEZE_BUDGET_EXCEEDED during import
 //   disaster       ends in DISASTER_RESTORED during the first 48 hours
@@ -20,14 +27,13 @@
 import {
   IMigration,
   IMigrationWithPreflight,
-  IPreflightCheck,
   IPreflightReport,
   IStartMovePayload,
   MigrationPhase,
   MigrationResult,
   MigrationStatus,
-  PreflightCheckId,
 } from './types'
+import { finalChecksReport, runPreflight } from './mockPreflight'
 
 const REHEARSAL_MS = 6_000
 const START_DELAY_MS = 8_000
@@ -36,49 +42,11 @@ const STABILISE_MS = 30_000
 const WEBHOOK_CONFIRM_MS = 6_000
 const ROTATE_MS = 30_000
 const LATENCY_MS = 400
+// How long the final checks are retried before the booking is taken back.
+const FINAL_RETRY_MS = 8_000
+// How long a step after the switch keeps failing in the cutover-stuck demo.
+const STUCK_MS = 16_000
 const TOTAL_CONNECTIONS = 1240
-
-const CHECK_IDS: PreflightCheckId[] = [
-  'ORG_IS_SHARED',
-  'AGENT_REACHABLE',
-  'TOKEN_IS_ROOT',
-  'ENDPOINT_MATCHES',
-  'RELEASE_MATCHES',
-  'CONFIG_MATCHES',
-  'TARGET_PRISTINE',
-  'DIDCOMM_REACHABLE',
-  'NO_BULK_JOB',
-  'WEBHOOK_DELIVERS',
-  'DOWNLOAD_METHOD',
-  'NO_OUT_OF_SCOPE_ARTEFACTS',
-  'NO_WEBSOCKET_ENDPOINTS',
-  'SHARED_REDIS',
-  'BACKUPS_CONFIRMED',
-]
-
-const FAILING_CHECK: Record<
-  string,
-  { id: PreflightCheckId; code: string; detail?: IPreflightCheck['detail'] }
-> = {
-  'not-pristine': { id: 'TARGET_PRISTINE', code: 'TARGET_NOT_PRISTINE' },
-  'old-release': {
-    id: 'RELEASE_MATCHES',
-    code: 'RELEASE_MISMATCH',
-    detail: { found: '0.5.6', required: '0.6.1' },
-  },
-  unreachable: { id: 'AGENT_REACHABLE', code: 'AGENT_UNREACHABLE' },
-}
-
-// Checks that can't run once the agent is unreachable.
-const NEEDS_AGENT: PreflightCheckId[] = [
-  'TOKEN_IS_ROOT',
-  'ENDPOINT_MATCHES',
-  'RELEASE_MATCHES',
-  'CONFIG_MATCHES',
-  'TARGET_PRISTINE',
-  'WEBHOOK_DELIVERS',
-  'DOWNLOAD_METHOD',
-]
 
 interface IMockRecord {
   id: string
@@ -125,35 +93,6 @@ const trigger = (record: IMockRecord, word: string): boolean =>
 
 const iso = (ms: number): string => new Date(ms).toISOString()
 
-const runPreflight = (record: IMockRecord): IPreflightReport => {
-  const failing =
-    record.preflightRuns === 1
-      ? Object.entries(FAILING_CHECK).find(([word]) =>
-          trigger(record, word),
-        )?.[1]
-      : undefined
-  const checks: IPreflightCheck[] = CHECK_IDS.map((id) => {
-    if (failing && id === failing.id) {
-      return { id, status: 'FAIL', code: failing.code, detail: failing.detail }
-    }
-    if (id === 'BACKUPS_CONFIRMED' && !record.backupsConfirmed) {
-      return { id, status: 'FAIL', code: 'BACKUPS_NOT_CONFIRMED' }
-    }
-    if (failing?.id === 'AGENT_REACHABLE' && NEEDS_AGENT.includes(id)) {
-      return { id, status: 'SKIPPED' }
-    }
-    if (id === 'DOWNLOAD_METHOD') {
-      return { id, status: 'PASS', detail: { method: 'PULL' } }
-    }
-    return { id, status: 'PASS' }
-  })
-  return {
-    ranAt: iso(Date.now()),
-    passed: checks.every((c) => c.status !== 'FAIL'),
-    checks,
-  }
-}
-
 const blank = (record: IMockRecord): IMigration => ({
   id: record.id,
   createDateTime: record.createDateTime,
@@ -197,6 +136,11 @@ const at = (
   status: MigrationStatus,
   phase: MigrationPhase,
 ): IMigration => ({ ...m, status, phase })
+
+const newest = (
+  a: IPreflightReport | null,
+  b: IPreflightReport,
+): IPreflightReport => (a && a.ranAt > b.ranAt ? a : b)
 
 const derive = (record: IMockRecord, now: number): IMigration => {
   let m = blank(record)
@@ -246,12 +190,39 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   if (sinceBooking < START_DELAY_MS) {
     return m
   }
-  if (record.bookings === 1 && trigger(record, 'slot-missed')) {
-    return { ...m, phase: 'PREPARE', scheduledFor: null, error: 'SLOT_MISSED' }
+  const firstMove = record.bookings === 1
+  const putBack = (error: string): IMigration => ({
+    ...m,
+    phase: 'PREPARE',
+    scheduledFor: null,
+    error,
+  })
+  if (firstMove && trigger(record, 'slot-missed')) {
+    return putBack('SLOT_MISSED')
+  }
+  // Final checks at the slot (platform #128): retried for a while, then the
+  // booking is taken back. A later re-run by the owner replaces the report.
+  if (firstMove && trigger(record, 'final-checks-fail')) {
+    const finalChecks = finalChecksReport(
+      iso(record.bookedAt + START_DELAY_MS),
+      record.backupsConfirmed,
+    )
+    m.preflight = newest(record.preflight, finalChecks)
+    return sinceBooking < START_DELAY_MS + FINAL_RETRY_MS
+      ? m
+      : putBack('PREFLIGHT_FAILED:AGENT_REACHABLE')
+  }
+  if (firstMove && trigger(record, 'checks-unavailable')) {
+    return sinceBooking < START_DELAY_MS + FINAL_RETRY_MS
+      ? m
+      : putBack('PREFLIGHT_FAILED:CHECKS_UNAVAILABLE')
   }
 
   const frozenAt = record.bookedAt + START_DELAY_MS
-  const freezeBudgetMs = 30 * 60_000
+  const stuck = firstMove && trigger(record, 'cutover-stuck')
+  // The stuck demo runs past its deadline, which no longer applies after the
+  // switch (platform #131).
+  const freezeBudgetMs = stuck ? 5 * STEP_MS : 30 * 60_000
   m.freezeDeadline = iso(frozenAt + freezeBudgetMs)
   const moveT = now - frozenAt
   const step = Math.floor(moveT / STEP_MS)
@@ -262,7 +233,6 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     'VERIFYING',
     'CUTOVER',
   ]
-  const firstMove = record.bookings === 1
   if (firstMove && trigger(record, 'slow') && step >= 2) {
     return failed(m, 'FREEZE_BUDGET_EXCEEDED')
   }
@@ -272,9 +242,18 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   if (step < steps.length) {
     return at(m, steps[step], 'MOVE')
   }
+  const cutoverIndex = steps.length - 1
+  const stepsMs = steps.length * STEP_MS
+  const cutoverEnds = stepsMs + STUCK_MS
+  if (stuck && moveT < cutoverEnds) {
+    return {
+      ...at(m, steps[cutoverIndex], 'MOVE'),
+      error: 'COMPLETION_STEP_FAILED:RELAY_FORWARD',
+    }
+  }
 
-  // After the switch
-  const moveDayMs = steps.length * STEP_MS
+  // After the switch (the platform clears the error on the way out)
+  const moveDayMs = stepsMs + (stuck ? STUCK_MS : 0)
   const switchedAt = frozenAt + moveDayMs
   const afterSwitch = now - switchedAt
   m.stabilisationEndsAt = iso(switchedAt + STABILISE_MS)
@@ -382,7 +361,13 @@ export const mockRerunPreflight = async (
 ): Promise<MigrationResult<IMigrationWithPreflight>> => {
   await wait()
   const record = load(orgId)
-  if (!record || derive(record, Date.now()).status !== 'CREATED') {
+  // Like the platform: the checks can run again until the move starts.
+  const current = record ? derive(record, Date.now()) : null
+  if (
+    !record ||
+    !current ||
+    !['CREATED', 'REHEARSED'].includes(current.status)
+  ) {
     return notFound()
   }
   const next: IMockRecord = {
