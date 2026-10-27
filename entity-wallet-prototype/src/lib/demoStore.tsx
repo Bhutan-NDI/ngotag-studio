@@ -169,8 +169,11 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       acceptance is EXPIRED with a reason (declined, withdrawn, basis
  *       lost). A version-18 save records a decline as TERMINATED, which the
  *       screens no longer read as declined.
+ *  20 — The high-value grant waiting for dual control no longer carries
+ *       Dorji's own signature on his own request. A version-19 save would
+ *       let one more approver complete it alone.
  */
-const SEED_VERSION = 19;
+const SEED_VERSION = 20;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -900,7 +903,10 @@ interface DemoActions {
     counterparties: ScopeFilter;
     validFrom: string;
     validUntil: string;
-  }) => DelegatedAuthority;
+  }) =>
+    | { status: "issued"; authority: DelegatedAuthority }
+    | { status: "parked"; authority: DelegatedAuthority }
+    | { status: "refused" };
   acceptAuthority: (id: string) => void;
   /** Reversible. */
   suspendAuthority: (id: string, reason: string) => void;
@@ -2095,11 +2101,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
              FLOW-DEL-01 A2) — not even someone holding Approve with Share. */
           if (operation.requestedBy === s.harness.persona) return s;
 
+          /* One signature per approver, and the requester's never counts —
+             so dual control always means two people other than the one who
+             asked, whatever a saved record already holds. */
+          if (operation.signatures.some((g) => g.personId === s.harness.persona)) return s;
           const signatures = [
             ...operation.signatures,
             { personId: s.harness.persona, at: today(), method },
           ];
-          const satisfied = signatures.length >= operation.requiredSignatures;
+          const satisfied =
+            signatures.filter((g) => g.personId !== operation.requestedBy).length >= operation.requiredSignatures;
 
           let next: DemoState = {
             ...s,
@@ -2149,6 +2160,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               request?.disclosing ?? request?.requiredAttributes ?? [],
               approver,
             );
+          } else if (operation.operation === "authority:issue" && operation.heldAuthority) {
+            const authority = { ...operation.heldAuthority, issuedAt: today() };
+            next = {
+              ...next,
+              delegatedAuthorities: [authority, ...next.delegatedAuthorities],
+              auditEntries: appendAudit(next, {
+                operation: "authority:issue",
+                summary: `Issued ${authority.title} to ${
+                  next.people.find((p) => p.id === authority.recipientId)?.name ?? "a recipient"
+                }`,
+                actorId: operation.requestedBy,
+                relationId: operation.relationId,
+                scopeVersion: operation.scopeVersion,
+              }),
+            };
           }
 
           return next;
@@ -2182,16 +2208,29 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         }),
 
       issueAuthority: (input) => {
+        /* Only someone whose own appointment carries authority:issue may
+           issue — the Root (FLOW-DEL-02) or someone given *Give authority
+           to act*. The credential traces back to that person's relation,
+           and their grant's approval rule decides whether it goes out now
+           or waits for the approver they were told about (FLOW-DEL-01 A1). */
+        const s0 = stateRef.current;
+        const issuer = s0.relations.find(
+          (r) =>
+            inOrg(PELDEN)(r) &&
+            r.personId === s0.harness.persona &&
+            r.state === "ACTIVE" &&
+            r.scope.grants.some((g) => g.operation === "authority:issue"),
+        );
+        if (!issuer) return { status: "refused" };
+        const grant = issuer.scope.grants.find((g) => g.operation === "authority:issue");
+        const held = grant?.approval !== "AUTO";
         const authority: DelegatedAuthority = {
           id: rid("da"),
           kind: input.kind,
           title: input.title,
           recipientId: input.recipientId,
           parentId: input.parentId,
-          /* Every Pattern B credential traces back to a controllership
-             relation. The owner's root authority is what these are issued
-             out of, so that is the relation recorded on them. */
-          relationId: SEED.relations.filter(inOrg(PELDEN)).find((r) => r.isRootAuthority)?.id ?? "rel-root",
+          relationId: issuer.id,
           taskScopes: input.taskScopes,
           valueCap: input.valueCap,
           counterparties: input.counterparties,
@@ -2202,20 +2241,51 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           issuedAt: today(),
           acceptedAt: null,
         };
+        const recipientName = s0.people.find((p) => p.id === input.recipientId)?.name ?? "a recipient";
+        if (held) {
+          /* Nothing reaches the recipient's wallet until it is approved. */
+          setState((s) => ({
+            ...s,
+            parkedOperations: [
+              {
+                id: rid("park"),
+                orgId: PELDEN,
+                operation: "authority:issue" as const,
+                summary: `Give ${input.title} to ${recipientName}`,
+                requestedBy: s.harness.persona,
+                relationId: issuer.id,
+                scopeVersion: issuer.scope.version,
+                targetId: authority.id,
+                targetRelyingParty: null,
+                payloadHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random()
+                  .toString(16)
+                  .slice(2, 10)}`,
+                policy: "SINGLE_APPROVER" as const,
+                requiredSignatures: 1,
+                signatures: [],
+                state: "parked" as const,
+                decisionReason: null,
+                createdAt: today(),
+                expiresAt: inDays(14),
+                heldAuthority: authority,
+              },
+              ...s.parkedOperations,
+            ],
+          }));
+          return { status: "parked", authority };
+        }
         setState((s) => ({
           ...s,
           delegatedAuthorities: [authority, ...s.delegatedAuthorities],
           auditEntries: appendAudit(s, {
             operation: "authority:issue",
-            summary: `Issued ${input.title} to ${
-              s.people.find((p) => p.id === input.recipientId)?.name ?? "a recipient"
-            }`,
+            summary: `Issued ${input.title} to ${recipientName}`,
             actorId: s.harness.persona,
             relationId: authority.relationId,
-            scopeVersion: 1,
+            scopeVersion: issuer.scope.version,
           }),
         }));
-        return authority;
+        return { status: "issued", authority };
       },
 
       acceptAuthority: (id) =>
