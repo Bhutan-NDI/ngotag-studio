@@ -1,13 +1,16 @@
 'use client'
 
 import { PAUSED_STATUSES, isWalletMigrationEnabled } from '../config'
+import React, { useEffect } from 'react'
+import { useMigrationPoller, useMigrationStatus } from '../useMigrationStatus'
 
 import Link from 'next/link'
 import { PauseCircle } from 'lucide-react'
-import React from 'react'
+import { generateAccessToken } from '@/utils/session'
 import { useAppSelector } from '@/lib/hooks'
-import { useMigrationStatus } from '../useMigrationStatus'
 import { usePathname } from 'next/navigation'
+
+const SESSION_KEEPALIVE_MS = 4 * 60_000
 
 // Pages where issuing/verifying actions live (SCR-WM-08).
 const BANNER_PATHS = [
@@ -39,9 +42,24 @@ export const useMigrationPaused = (): boolean => {
 function PausedBannerInner(): React.JSX.Element | null {
   const orgId = useAppSelector((state) => state.organization.orgId)
   const pathname = usePathname()
-  // Keeps the slice current on every page, at the idle (60 s) rate.
+  // The only status poller: the layout mounts this banner once on every
+  // page, and the migration screens read what it stores.
+  useMigrationPoller(orgId)
   const { migration } = useMigrationStatus(orgId)
   const paused = useMigrationPaused()
+
+  // No sign-out mid-move (spec §2.3): renew the token while paused so an idle
+  // owner isn't logged out. The sign-in server's absolute session limit still
+  // applies; if it ends, the user returns to the move page after signing in.
+  useEffect(() => {
+    if (!paused) {
+      return undefined
+    }
+    const timer = setInterval(() => {
+      void generateAccessToken()
+    }, SESSION_KEEPALIVE_MS)
+    return () => clearInterval(timer)
+  }, [paused])
 
   const onBannerPage = BANNER_PATHS.some((p) => pathname?.startsWith(p))
   if (!paused || !onBannerPage) {

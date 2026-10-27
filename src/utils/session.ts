@@ -12,7 +12,13 @@ export async function logoutUser(): Promise<void> {
   }
 
   const searchParam = new URLSearchParams(window.location.search)
-  const redirectTo = searchParam.get('redirectTo')
+  // If the session ends while following a wallet move, come back to it after
+  // signing in (UX-NGOTAG-WM-01 §2.3).
+  const redirectTo =
+    searchParam.get('redirectTo') ??
+    (window.location.pathname.startsWith('/wallet-migration')
+      ? '/wallet-migration'
+      : null)
   const signInUrl = redirectTo
     ? `/sign-in?redirectTo=${encodeURIComponent(redirectTo)}`
     : '/sign-in'

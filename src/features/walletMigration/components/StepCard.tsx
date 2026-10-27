@@ -86,26 +86,33 @@ export function StepCard({
   const style = STATE_STYLE[state]
   return (
     <Card
-      className={`border-border bg-card w-full rounded-xl border border-l-4 py-4 ${style.border}`}
+      className={`border-border bg-card w-full gap-0 rounded-xl border border-l-4 p-0 ${style.border}`}
     >
-      <CardHeader className="px-6 pb-2">
+      <CardHeader className="space-y-0 px-5 pt-5 pb-4 sm:px-6">
         <div className="flex items-start gap-3">
-          <span className="bg-muted text-foreground mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold">
+          <span className="bg-muted text-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold">
             {step}
           </span>
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex flex-wrap items-center gap-2">
-              <CardTitle className="text-lg">{title}</CardTitle>
+            <div className="flex min-h-7 flex-wrap items-center gap-2">
+              <CardTitle className="text-base sm:text-lg">{title}</CardTitle>
               <Badge className={`gap-1 text-xs ${style.badge}`}>
                 {style.icon}
                 {style.label}
               </Badge>
             </div>
-            {description && <CardDescription>{description}</CardDescription>}
+            {description && (
+              <CardDescription className="mt-1">{description}</CardDescription>
+            )}
           </div>
         </div>
       </CardHeader>
-      {children && <CardContent className="px-6 pt-0">{children}</CardContent>}
+      {/* Indented to line up with the title (number badge + gap). */}
+      {children && (
+        <CardContent className="px-5 pt-0 pb-5 sm:pr-6 sm:pl-[3.75rem]">
+          {children}
+        </CardContent>
+      )}
     </Card>
   )
 }

@@ -19,6 +19,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react'
 import { useIsOrgOwner, useMigrationStatus } from '../useMigrationStatus'
 
+import type { AxiosResponse } from 'axios'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ import PageContainer from '@/components/layout/page-container'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StartMoveForm } from './StartMoveForm'
 import { cancelMigration } from '@/app/api/walletMigration'
+import { getOrganizationById } from '@/app/api/organization'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { resetMockMigration } from '../mockMigrationApi'
 import { useAppSelector } from '@/lib/hooks'
@@ -54,7 +56,43 @@ export default function MigrationWizard(): React.JSX.Element {
   const [showMoveDayResult, setShowMoveDayResult] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  // 'shared' | 'dedicated' | 'none' once loaded; a move only makes sense from
+  // the shared agent, so the page must not offer it otherwise.
+  const [agentType, setAgentType] = useState<string | null>(null)
+  const [agentTypeError, setAgentTypeError] = useState(false)
+
+  useEffect(() => {
+    if (!orgId || !isWalletMigrationEnabled) {
+      return
+    }
+    setAgentType(null)
+    setAgentTypeError(false)
+    getOrganizationById(orgId).then((response) => {
+      if (typeof response === 'string') {
+        setAgentTypeError(true)
+        return
+      }
+      const agents = (response as AxiosResponse)?.data?.data?.org_agents ?? []
+      const agent = agents[0]?.org_agent_type?.agent as string | undefined
+      setAgentType(agent ? agent.toLowerCase() : 'none')
+    })
+  }, [orgId])
   const sawMoveDay = useRef(false)
+  const initialOrgId = useRef(orgId)
+
+  // A move belongs to one organisation. If the user switches organisation
+  // from the dropdown while here, take them to the Dashboard instead of
+  // showing the other org's move page.
+  useEffect(() => {
+    if (!initialOrgId.current) {
+      initialOrgId.current = orgId
+      return
+    }
+    if (orgId && orgId !== initialOrgId.current) {
+      router.replace('/dashboard')
+    }
+  }, [orgId, router])
 
   const status = migration?.status
 
@@ -78,12 +116,20 @@ export default function MigrationWizard(): React.JSX.Element {
       return
     }
     setCancelling(true)
+    setCancelError(null)
     const result = await cancelMigration(orgId)
     setCancelling(false)
-    setCancelOpen(false)
-    if (result.ok) {
-      applyResult({ ok: true, data: null })
+    if (!result.ok) {
+      // Keep the dialog open: the move is still planned on the server.
+      setCancelError(
+        `The move wasn't cancelled and is still planned. ${
+          result.message || 'Please try again.'
+        }`,
+      )
+      return
     }
+    setCancelOpen(false)
+    applyResult({ ok: true, data: null })
   }
 
   const renderBody = (): React.ReactNode => {
@@ -126,6 +172,28 @@ export default function MigrationWizard(): React.JSX.Element {
       )
     }
     if (!migration) {
+      if (agentTypeError) {
+        return (
+          <Alert variant="destructive">
+            <AlertDescription>
+              Couldn&apos;t load your organisation&apos;s agent details. Refresh
+              to try again.
+            </AlertDescription>
+          </Alert>
+        )
+      }
+      if (agentType === null) {
+        return <Skeleton className="h-32 w-full" />
+      }
+      if (agentType !== 'shared') {
+        return (
+          <Card className="text-muted-foreground p-6 text-sm">
+            {agentType === 'dedicated'
+              ? "This organisation already runs on its own dedicated agent. There's nothing to move."
+              : "This organisation doesn't have a wallet yet. Moving applies only to organisations on the shared agent."}
+          </Card>
+        )
+      }
       return isOwner ? (
         <StartMoveForm
           orgId={orgId}
@@ -183,7 +251,7 @@ export default function MigrationWizard(): React.JSX.Element {
 
   return (
     <PageContainer>
-      <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-10">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-12">
         {isBhutanndiTheme() && (
           <div className="mb-4">
             <Breadcrumb
@@ -195,7 +263,7 @@ export default function MigrationWizard(): React.JSX.Element {
           </div>
         )}
 
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold sm:text-2xl">
               Move to dedicated agent
@@ -225,19 +293,21 @@ export default function MigrationWizard(): React.JSX.Element {
 
         {renderBody()}
 
-        <div className="mt-6 flex flex-wrap justify-end gap-3">
-          {canCancel && (
-            <Button variant="outline" onClick={() => setCancelOpen(true)}>
-              Cancel move
-            </Button>
-          )}
-          {MOCK_MIGRATION_API &&
+        {(canCancel ||
+          (MOCK_MIGRATION_API &&
             isWalletMigrationEnabled &&
+            isOwner &&
+            migration)) && (
+          <div className="border-border mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-6">
+            {MOCK_MIGRATION_API &&
+            isWalletMigrationEnabled &&
+            isOwner &&
             orgId &&
-            migration && (
+            migration ? (
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-muted-foreground"
                 onClick={() => {
                   resetMockMigration(orgId)
                   applyResult({ ok: true, data: null })
@@ -245,12 +315,26 @@ export default function MigrationWizard(): React.JSX.Element {
               >
                 Reset demo data
               </Button>
+            ) : (
+              <span />
             )}
-        </div>
+            {canCancel && (
+              <Button variant="outline" onClick={() => setCancelOpen(true)}>
+                Cancel move
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* P-02 low severity: plain confirm. */}
-      <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+      <AlertDialog
+        open={cancelOpen}
+        onOpenChange={(open) => {
+          setCancelOpen(open)
+          setCancelError(null)
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel the move?</AlertDialogTitle>
@@ -258,6 +342,11 @@ export default function MigrationWizard(): React.JSX.Element {
               Nothing has changed yet. Your organisation stays on the shared
               agent, and you can start a new move later.
             </AlertDialogDescription>
+            {cancelError && (
+              <p role="alert" className="text-destructive text-sm">
+                {cancelError}
+              </p>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Keep the move</AlertDialogCancel>

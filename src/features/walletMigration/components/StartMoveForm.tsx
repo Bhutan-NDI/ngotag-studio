@@ -3,13 +3,10 @@
 import * as yup from 'yup'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  DOMAIN_REGEX,
-  HOST_PORT_REGEX,
-} from '@/features/wallet/DedicatedAgentForm'
 import { Download, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Field, FieldProps, Form, Formik, FormikHelpers } from 'formik'
 import { IMigration, IStartMovePayload } from '../types'
+import { PUBLIC_HOST_MESSAGE, isHttpsUrl, isPublicHost } from '../agentUrl'
 import React, { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
@@ -34,14 +31,6 @@ const initialValues: IStartMoveValues = {
   backupsConfirmed: false,
 }
 
-// Same host rules as the dedicated-agent form, but HTTPS only and no
-// localhost: the platform reaches this agent over the internet.
-const isHttpsAgentUrl = (value?: string): boolean =>
-  Boolean(value) &&
-  /^https:\/\//i.test(value as string) &&
-  !/^https:\/\/localhost/i.test(value as string) &&
-  (HOST_PORT_REGEX.test(value as string) || DOMAIN_REGEX.test(value as string))
-
 const validationSchema = yup.object({
   adminUrl: yup
     .string()
@@ -50,8 +39,9 @@ const validationSchema = yup.object({
     .test(
       'https',
       'Enter an HTTPS address, e.g. https://agent.example.bt',
-      isHttpsAgentUrl,
-    ),
+      isHttpsUrl,
+    )
+    .test('public', PUBLIC_HOST_MESSAGE, isPublicHost),
   publicUrl: yup
     .string()
     .trim()
@@ -59,8 +49,9 @@ const validationSchema = yup.object({
     .test(
       'https',
       'Enter an HTTPS address, e.g. https://didcomm.example.bt',
-      isHttpsAgentUrl,
+      isHttpsUrl,
     )
+    .test('public', PUBLIC_HOST_MESSAGE, isPublicHost)
     .notOneOf(
       [yup.ref('adminUrl')],
       'Must be different from the admin address',

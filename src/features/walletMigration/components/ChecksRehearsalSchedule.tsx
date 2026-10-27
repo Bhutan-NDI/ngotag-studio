@@ -93,6 +93,10 @@ export function ChecksRehearsalSchedule({
   const [date, setDate] = useState(bttDate(1))
   const [time, setTime] = useState(SLOT_TIMES[0])
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [actionError, setActionError] = useState<{
+    kind: 'checks' | 'rehearsal'
+    message: string
+  } | null>(null)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
 
   const { status } = migration
@@ -123,19 +127,42 @@ export function ChecksRehearsalSchedule({
       : 'action'
 
   // Slot is entered in Bhutan time (UTC+6, no daylight saving).
-  const scheduledFor = useMemo(
-    () => new Date(`${date}T${time}:00+06:00`).toISOString(),
+  const slotTime = useMemo(
+    () => new Date(`${date}T${time}:00+06:00`).getTime(),
     [date, time],
   )
-  const slotInPast = new Date(scheduledFor).getTime() <= Date.now()
+  const slotValid = Boolean(date) && !Number.isNaN(slotTime)
+  const scheduledFor = slotValid ? new Date(slotTime).toISOString() : ''
+  const slotInPast = slotValid && slotTime <= Date.now()
+  // YYYY-MM-DD strings compare correctly as text.
+  const slotTooFar = slotValid && date > bttDate(14)
+  const slotError = !slotValid
+    ? 'Pick a date.'
+    : slotInPast
+      ? 'Pick a time in the future.'
+      : slotTooFar
+        ? 'Pick a date within the next 14 days.'
+        : null
 
   const run = async (
     kind: 'checks' | 'rehearsal',
     action: (id: string) => Promise<MigrationResult<IMigration>>,
   ): Promise<void> => {
     setBusy(kind)
-    onResult(await action(orgId))
+    setActionError(null)
+    const result = await action(orgId)
     setBusy(null)
+    if (!result.ok) {
+      const content = getMigrationError(result.code)
+      setActionError({
+        kind,
+        message: result.code
+          ? `${content.message} ${content.recovery}`
+          : result.message || content.message,
+      })
+      return
+    }
+    onResult(result)
   }
 
   const confirmSchedule = async (): Promise<void> => {
@@ -159,16 +186,19 @@ export function ChecksRehearsalSchedule({
       : null
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <StepCard
         step={1}
         title="Checks"
         description="We check that your new agent is ready to receive the wallet."
         state={checksState}
       >
-        <ul className="space-y-2">
+        <ul className="divide-border/60 divide-y rounded-lg border">
           {migration.preflight.map((check) => (
-            <li key={check.key} className="flex items-center gap-2 text-sm">
+            <li
+              key={check.key}
+              className="flex items-center gap-3 px-3 py-2.5 text-sm"
+            >
               <CheckIcon state={check.state} />
               <span className="flex-1">{check.label}</span>
               <span className="text-muted-foreground text-xs">
@@ -194,7 +224,7 @@ export function ChecksRehearsalSchedule({
           <Button
             variant="outline"
             size="sm"
-            className="mt-4"
+            className="mt-5"
             disabled={busy !== null}
             onClick={() => run('checks', rerunPreflight)}
           >
@@ -205,6 +235,11 @@ export function ChecksRehearsalSchedule({
             )}
             Re-run checks
           </Button>
+        )}
+        {actionError?.kind === 'checks' && (
+          <p role="alert" className="text-destructive mt-3 text-sm">
+            {actionError.message}
+          </p>
         )}
       </StepCard>
 
@@ -285,7 +320,7 @@ export function ChecksRehearsalSchedule({
           (rehearsalState === 'action' || rehearsalState === 'failed') && (
             <Button
               size="sm"
-              className="mt-4"
+              className="mt-5"
               disabled={busy !== null}
               onClick={() => run('rehearsal', runRehearsal)}
             >
@@ -297,6 +332,11 @@ export function ChecksRehearsalSchedule({
                 : 'Run rehearsal'}
             </Button>
           )}
+        {actionError?.kind === 'rehearsal' && (
+          <p role="alert" className="text-destructive mt-3 text-sm">
+            {actionError.message}
+          </p>
+        )}
       </StepCard>
 
       <StepCard
@@ -361,7 +401,7 @@ export function ChecksRehearsalSchedule({
                   </Select>
                 </div>
                 <Button
-                  disabled={busy !== null || slotInPast}
+                  disabled={busy !== null || slotError !== null}
                   onClick={() => setConfirmOpen(true)}
                 >
                   {status === 'FAILED' ? 'Reschedule' : 'Schedule move'}
@@ -372,10 +412,8 @@ export function ChecksRehearsalSchedule({
                 The organisation owner schedules the move.
               </p>
             )}
-            {slotInPast && (
-              <p className="text-destructive mt-2 text-sm">
-                Pick a time in the future.
-              </p>
+            {isOwner && slotError && (
+              <p className="text-destructive mt-2 text-sm">{slotError}</p>
             )}
             {scheduleError && (
               <p className="text-destructive mt-2 text-sm">{scheduleError}</p>

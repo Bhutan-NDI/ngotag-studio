@@ -1,3 +1,7 @@
+import {
+  MIGRATION_PAUSED_MESSAGE,
+  isMigrationWriteBlocked,
+} from '@/features/walletMigration/pauseGuard'
 import axios, { type AxiosError, type AxiosResponse } from 'axios'
 import {
   instance as axiosUser,
@@ -74,6 +78,20 @@ const HandleResponse = (
   return Promise.reject(
     new Error('Please check your internet connectivity and try again'),
   )
+}
+
+const migrationPauseError = (url: string): Error | null => {
+  const { walletMigration, organization } = store.getState()
+  if (!isMigrationWriteBlocked(url, walletMigration, organization.orgId)) {
+    return null
+  }
+  const error = new Error(MIGRATION_PAUSED_MESSAGE) as Error & {
+    statusCode?: number
+    code?: string
+  }
+  error.statusCode = 423
+  error.code = 'ORG_AGENT_MIGRATING'
+  return error
 }
 
 const publicAxiosUser = axios.create({
@@ -175,6 +193,10 @@ export const axiosPost = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.post(url, payload, config)
 
@@ -190,6 +212,10 @@ export const axiosPatch = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.patch(url, payload, config)
 
@@ -205,6 +231,10 @@ export const axiosPut = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.put(url, payload, config)
 
@@ -220,6 +250,10 @@ export const axiosDelete = async ({
   config,
   payload = {},
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const requestConfig =
       Object.keys(payload).length > 0 ? { ...config, data: payload } : config

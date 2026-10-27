@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +39,13 @@ export function MoveConfirmDialog({
   onConfirm,
 }: Readonly<MoveConfirmDialogProps>): React.JSX.Element {
   const [typed, setTyped] = useState('')
+  // Start empty every time the dialog opens, however it was last closed, so
+  // the typed confirmation can never become a single click (P-02).
+  useEffect(() => {
+    if (open) {
+      setTyped('')
+    }
+  }, [open])
   const matches = typed === orgName
 
   return (
