@@ -53,7 +53,7 @@ import {
   type AppointmentDocument,
   type PresetId,
   type ShareReach,
-  standsNow,
+  appointmentHeld,
   REGISTER_RECORDS,
   type Verification,
   type VerificationDecision,
@@ -129,8 +129,12 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  14 — Flow 2 follows FLOW-ORG-01: one identifier, the authority decides,
  *       no manual review and no wallet requests to NDI. A version-13 save
  *       carries an onboarding with no stage and review cases nothing reads.
+ *  15 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
+ *       acceptance is EXPIRED with a reason (declined, withdrawn, basis
+ *       lost). A version-14 save records a decline as TERMINATED, which the
+ *       screens no longer read as declined.
  */
-const SEED_VERSION = 14;
+const SEED_VERSION = 15;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -545,7 +549,7 @@ interface DemoActions {
   acceptResponsibility: (orgId: string) => { ok: true } | { ok: false; error: "E3" | "E4" };
   /** SCR-DEL-01's decline (DEL-02/E2). Nothing moves; it can be reopened. */
   declineResponsibility: (orgId: string) => void;
-  /** SCR-DEL-02 — give a member authority. Returns the appointment's id. */
+  /** SCR-DEL-02 — appoint a member. Returns the appointment's id. */
   appoint: (input: {
     personId: PersonId;
     /** One or more, in any combination (EW-FLOW3-SD §4.2, D18). */
@@ -556,16 +560,28 @@ interface DemoActions {
     issueNeedsApproval: boolean;
     validUntil: string | null;
     document: AppointmentDocument | null;
-  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E12" | "E13" };
+  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E12" | "E13" | "E14" | "E16" };
   /**
    * SCR-DEL-04 — the appointee's one wallet approval, which both confirms
    * who they are and records their acceptance (EW-FLOW3-SD/D7). `answeredAs`
    * is who the wallet proved; anyone but the appointee is E7, and the
-   * reason is not given.
+   * reason is not given. E15 is an appointment no longer waiting — withdrawn,
+   * declined or already accepted; E8 and E9 are the basis lost at the last
+   * moment (step 8's re-check).
    */
-  acceptAppointment: (id: string, answeredAs: PersonId) => { ok: true } | { ok: false; error: "E4" | "E7" | "E8" };
+  acceptAppointment: (
+    id: string,
+    answeredAs: PersonId,
+  ) => { ok: true } | { ok: false; error: "E4" | "E7" | "E8" | "E9" | "E15" };
   /** SCR-DEL-03's decline (DEL-01/E5). */
   declineAppointment: (id: string) => void;
+  /**
+   * SCR-DEL-05 — the representative withdraws an appointment still waiting
+   * to be accepted (DEL-01/E15, EW-FLOW3-SD/D19). `not_pending` when the
+   * appointee's answer got there first: an accepted appointment is ended
+   * only by catalogue flow 12.
+   */
+  withdrawAppointment: (id: string) => { ok: true } | { ok: false; error: "E1" | "not_pending" };
   declineRelation: (id: string, reason: string) => void;
 
   /* ---- The holder's daily loop (Pattern A) ----
@@ -1335,9 +1351,13 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const root = s0.relations.find((r) => inOrg(orgId)(r) && r.isRootAuthority && r.state === "ACTIVE");
         /* DEL-01/P1: the representative, and nobody else, appoints. */
         if (!root || root.personId !== s0.harness.persona) return { ok: false, error: "E1" };
-        /* DEL-01/E3: one appointment per person per organisation at a time. */
-        if (s0.relations.some((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today())))
-          return { ok: false, error: "E3" };
+        /* DEL-01/P3: one appointment per person per organisation at a time —
+           E3 if they can already act, E14 if one is waiting for them. */
+        const held = appointmentHeld(s0.relations, orgId, personId, today());
+        if (held) return { ok: false, error: held };
+        /* DEL-01/E16: an end date has to be after today. The date picker
+           offers nothing earlier; this is the boundary for a direct call. */
+        if (validUntil !== null && validUntil <= today()) return { ok: false, error: "E16" };
         /* DEL-01/E13: at least one preset. The screen disables the button;
            this is the boundary. */
         const ticked = presets.filter((p, i) => presets.indexOf(p) === i);
@@ -1385,7 +1405,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ...s.relations,
           ],
           activity: [
-            { id: rid("a"), text: `Authority offered to ${person?.name ?? "a member"}, waiting for them to accept`, at: now, orgId },
+            { id: rid("a"), text: `${person?.name ?? "A member"} appointed, waiting for them to accept`, at: now, orgId },
             ...s.activity,
           ].slice(0, 20),
         }));
@@ -1395,11 +1415,31 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       acceptAppointment: (id, answeredAs) => {
         const s0 = stateRef.current;
         const r = s0.relations.find((x) => x.id === id);
-        if (!r || r.state !== "PENDING_ACCEPTANCE") return { ok: false, error: "E8" };
+        /* Withdrawal and acceptance are serialised on the relation: whichever
+           commits first stands (EW-FLOW3-SD §5.1). Withdrawn, declined or
+           already accepted, it is no longer there to accept. */
+        if (!r || r.state !== "PENDING_ACCEPTANCE") return { ok: false, error: "E15" };
         if (r.expiresAt && r.expiresAt < today()) return { ok: false, error: "E4" };
         /* The wallet answered as somebody else. Deliberately not explained —
            to the person presenting, or to the representative (E7). */
         if (answeredAs !== r.personId) return { ok: false, error: "E7" };
+        /* Step 8 re-checks P1–P4 at the moment of activation (AC-09). The
+           representative who made it must still be the representative (E9),
+           and the organisation must still be able to hold credentials (E8).
+           Either way the appointment never authorised anything, so it ends
+           as EXPIRED, reason BASIS_LOST — not activated and then undone. */
+        const orgId = r.orgId ?? PELDEN;
+        const rootActive = s0.relations.some((x) => inOrg(orgId)(x) && x.isRootAuthority && x.state === "ACTIVE");
+        const holder = s0.organizations.find((o) => o.id === orgId)?.capabilities.includes("holder");
+        if (!rootActive || !holder) {
+          setState((s) => ({
+            ...s,
+            relations: s.relations.map((x) =>
+              x.id === id && x.state === "PENDING_ACCEPTANCE" ? { ...x, state: "EXPIRED", expiryReason: "BASIS_LOST" } : x,
+            ),
+          }));
+          return { ok: false, error: !rootActive ? "E9" : "E8" };
+        }
         const person = s0.people.find((p) => p.id === r.personId);
         setState((s) => ({
           ...s,
@@ -1412,7 +1452,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               : x,
           ),
           activity: [
-            { id: rid("a"), text: `${person?.name ?? "The appointee"} accepted authority to act`, at: today(), orgId: r.orgId ?? PELDEN },
+            { id: rid("a"), text: `${person?.name ?? "The appointee"} accepted their appointment`, at: today(), orgId },
             ...s.activity,
           ].slice(0, 20),
         }));
@@ -1422,12 +1462,48 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       declineAppointment: (id) =>
         setState((s) => ({
           ...s,
-          /* As declineRelation: there is no DECLINED state, so it ends, and
-             the reason says why. */
+          /* EXPIRED with reason DECLINED (EW-FLOW3-SD §5.1), not TERMINATED:
+             termination ends authority someone held, which is flow 12's, and
+             a declined appointment never authorised anything. */
           relations: s.relations.map((r) =>
-            r.id === id && r.state === "PENDING_ACCEPTANCE" ? { ...r, state: "TERMINATED", endedReason: "declined" } : r,
+            r.id === id && r.state === "PENDING_ACCEPTANCE" ? { ...r, state: "EXPIRED", expiryReason: "DECLINED" } : r,
           ),
         })),
+
+      withdrawAppointment: (id) => {
+        const s0 = stateRef.current;
+        const r = s0.relations.find((x) => x.id === id);
+        const orgId = r?.orgId ?? PELDEN;
+        const root = s0.relations.find((x) => inOrg(orgId)(x) && x.isRootAuthority && x.state === "ACTIVE");
+        /* Only the representative, who made it (EW-FLOW3-SD/D19). */
+        if (!root || root.personId !== s0.harness.persona) return { ok: false, error: "E1" };
+        /* Serialised with acceptance: if the appointee's answer committed
+           first it stands, and an ACTIVE relation is ended only by flow 12.
+           A lapsed one has nothing left to withdraw. */
+        if (!r || r.state !== "PENDING_ACCEPTANCE" || (r.expiresAt && r.expiresAt < today()))
+          return { ok: false, error: "not_pending" };
+        const person = s0.people.find((p) => p.id === r.personId);
+        const rep = s0.people.find((p) => p.id === root.personId);
+        setState((s) => ({
+          ...s,
+          /* EXPIRED frees the member at once (AC-13): standsNow no longer
+             counts it, so they can be appointed again straight away. The
+             appointee is told by what their appointment now says. */
+          relations: s.relations.map((x) =>
+            x.id === id && x.state === "PENDING_ACCEPTANCE" ? { ...x, state: "EXPIRED", expiryReason: "WITHDRAWN" } : x,
+          ),
+          activity: [
+            {
+              id: rid("a"),
+              text: `${rep?.name ?? "The representative"} withdrew ${person?.name ?? "a member"}'s appointment`,
+              at: today(),
+              orgId,
+            },
+            ...s.activity,
+          ].slice(0, 20),
+        }));
+        return { ok: true };
+      },
 
       declineRelation: (id, reason) =>
         setState((s) => ({

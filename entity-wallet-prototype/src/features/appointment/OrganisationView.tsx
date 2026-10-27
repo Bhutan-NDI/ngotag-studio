@@ -23,7 +23,7 @@ import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
  * accept (FLOW-DEL-01 step 9). What it shows depends on who is looking:
  *
  * - The representative sees everything: the next credential as the primary
- *   action, and giving someone authority and seeing who can act beside it.
+ *   action, and appointing someone and seeing who can act beside it.
  * - An appointed person sees only what their authority covers, in the
  *   words of the presets they were given, with what it doesn't cover
  *   beside it — computed from the boxes left unticked (UXD-58).
@@ -89,17 +89,19 @@ export function OrganisationView() {
                   <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
                   It can&rsquo;t issue credentials to others or verify anyone else&rsquo;s.
                 </p>
-                {/* UXD-24: not for a sole proprietorship. */}
-                {org?.kind === "sole_proprietorship" ? null : (
+                {/* UXD-24 is a rule about the prompt only: a sole proprietorship
+                    isn't offered appointing here, but may still appoint — an
+                    accountant, say — from who can act. */}
                 <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                  <Link href="/people-who-can-act/give">
-                    <HairlineButton>Give someone authority to act</HairlineButton>
-                  </Link>
+                  {org?.kind === "sole_proprietorship" ? null : (
+                    <Link href="/people-who-can-act/appoint">
+                      <HairlineButton>Appoint someone</HairlineButton>
+                    </Link>
+                  )}
                   <Link href="/people-who-can-act" className="ndi-plainlink text-[12.5px] font-medium text-muted">
                     See who can act
                   </Link>
                 </div>
-                )}
               </div>
             </Panel>
           </>
