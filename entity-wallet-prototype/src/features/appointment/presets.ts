@@ -88,12 +88,23 @@ export function shareTargets(organizations: Pick<Organization, "id" | "name" | "
  * granted. The story's older relations, authored operation by operation,
  * have none.
  */
-export function presetsOf(r: Pick<ControllershipRelation, "presets" | "preset"> | undefined): PresetId[] {
+export function presetsOf(r: Pick<ControllershipRelation, "presets" | "scope"> | undefined): PresetId[] {
   if (!r) return [];
   if (r.presets?.length) return [...r.presets].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
-  if (r.preset === "everything") return ["receive", "share", "approve"];
-  if (r.preset === "receive" || r.preset === "share" || r.preset === "approve") return [r.preset];
-  return [];
+  /* No ticked boxes recorded — a relation set up before the boxes, or with
+     its scope set individually. Read the boxes off what the scope actually
+     grants, so a read-back never describes a scope the relation doesn't
+     have (and accepting never gives the opposite of what was agreed). */
+  const has = (...ops: string[]) => r.scope.grants.some((g) => ops.includes(g.operation));
+  return ORDER.filter((id) =>
+    id === "receive"
+      ? has("credential:receive", "credential:accept")
+      : id === "share"
+        ? has("proof:present")
+        : id === "approve"
+          ? has("approval:decide")
+          : has("authority:issue"),
+  );
 }
 
 /** Who a relation may share with: the names, or null for any organisation (or no Share). */
@@ -210,8 +221,9 @@ export function describeGrant(
   }
   wont.push("Appoint anyone else — only the representative can", `Take ${opts.orgName}'s credentials off the platform`);
 
+  /* Nothing ticked but the read-only list every appointment carries. */
   const sentence =
-    `${opts.name} can ${join(can)}.` + (cannot.length ? ` ${opts.name} can't ${join(cannot).replace(/ and (?=[^,]*$)/, " or ")}.` : "");
+    (can.length ? `${opts.name} can ${join(can)}.` : `${opts.name} can see what ${opts.orgName} holds.`) + (cannot.length ? ` ${opts.name} can't ${join(cannot).replace(/ and (?=[^,]*$)/, " or ")}.` : "");
   const label = presets.map((id) => presetOf(id)?.label ?? id).join(" · ");
   return { label, allows, wont, sentence };
 }

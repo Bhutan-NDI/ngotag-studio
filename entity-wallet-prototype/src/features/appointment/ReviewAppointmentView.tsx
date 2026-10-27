@@ -44,6 +44,8 @@ import { FullTerms, Responsibilities } from "./Responsibilities";
 type Face =
   | "default"
   | "already_accepted"
+  | "accepted_by_them"
+  | "ended"
   | "not_found"
   | "expired"
   | "declined"
@@ -64,6 +66,8 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
     "withdrawn",
     "registration_lost",
     "no_longer_valid",
+    "accepted_by_them",
+    "ended",
     "offline",
   ]);
   const [declined, setDeclined] = useState(false);
@@ -78,7 +82,7 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   /* What was ticked, read back as one grant: allows from the boxes ticked,
      "won't" from the ones left unticked (UX-EW-01 SCR-DEL-03, UXD-58). */
   const ticked = presetsOf(r);
-  const grant = describeGrant(ticked.length ? ticked : ["receive"], {
+  const grant = describeGrant(ticked, {
     name: "You",
     orgName: shortOrgName(orgName),
     shareWith: r ? shareTargetsOf(r) : null,
@@ -93,7 +97,7 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
      (EW-FLOW3-SD §5.1): declined, withdrawn by the representative (E15),
      lapsed (E4), or its basis lost — and for that, which of the two in
      plain words: the organisation's registration (E8) or the
-     representative (E9).
+     representative (E9). Only that last reason gets those two faces.
      An appointment already accepted is not offered again — reached by Back
      after accepting, it would otherwise reopen as pending. An address that
      matches nothing says so, without claiming anything about anyone. */
@@ -108,13 +112,17 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
           : (r.state === "EXPIRED" && r.expiryReason !== "BASIS_LOST") ||
               (r.state === "PENDING_ACCEPTANCE" && r.expiresAt && r.expiresAt < now)
             ? "expired"
-            : r.state !== "PENDING_ACCEPTANCE"
+            : r.state === "EXPIRED"
               ? org && !org.capabilities.includes("holder")
                 ? "registration_lost"
                 : "no_longer_valid"
-              : r.personId !== harness.persona
-                ? "not_yours"
-                : "default";
+              : r.state === "ACTIVE"
+                ? "accepted_by_them"
+                : r.state !== "PENDING_ACCEPTANCE"
+                  ? "ended"
+                  : r.personId !== harness.persona
+                    ? "not_yours"
+                    : "default";
   const face: Face = forced === "live" ? natural : (forced as Face);
 
   if (!hydrated) {
@@ -150,6 +158,19 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
       <div>
         <GradientButton onClick={() => router.push("/organisation")}>See what you can do</GradientButton>
       </div>,
+    );
+  /* Accepted, but opened by someone else — say so, and nothing more about
+     anyone. Ended or paused after acceptance is not a lost basis: E8 and E9
+     are for an appointment that never started (EXPIRED, BASIS_LOST). */
+  if (face === "accepted_by_them")
+    return outcome(<>{appointee?.name ?? "The person appointed"} has accepted this appointment.</>);
+  if (face === "ended")
+    return outcome(
+      r?.state === "SUSPENDED" ? (
+        <>This appointment is paused. {repName} can tell you more.</>
+      ) : (
+        <>This appointment has ended. {repName} can tell you more.</>
+      ),
     );
   if (face === "not_found") return outcome(<>We can&rsquo;t find this appointment. Ask the person who appointed you.</>);
   if (face === "expired") return outcome(<>This appointment has expired. Ask {repName} to make it again.</>);

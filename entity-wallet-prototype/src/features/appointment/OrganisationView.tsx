@@ -10,7 +10,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { NextCredentialAction } from "@/features/onboarding/NextCredentialAction";
-import { inOrg, shortOrgName } from "@/lib/demoData";
+import { inOrg, shortOrgName, type PresetId } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
@@ -46,8 +46,8 @@ export function OrganisationView() {
   const face: Face =
     forced !== "live" ? forced : mine?.isRootAuthority ? "representative" : mine ? "appointed" : "member";
   /* A forced face with no appointment shows the guided grant, Receive. */
-  const minePresets = presetsOf(mine);
-  const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {
+  const minePresets: PresetId[] = mine ? presetsOf(mine) : ["receive"];
+  const grant = describeGrant(minePresets, {
     name: "You",
     orgName: short,
     shareWith: mine ? shareTargetsOf(mine) : null,
