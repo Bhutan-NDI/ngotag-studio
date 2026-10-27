@@ -203,7 +203,7 @@ function Sessions(): JSX.Element {
                 className="mt-2 h-auto rounded-md border p-4 md:flex-row"
               >
                 <div className="flex h-full cursor-default flex-wrap items-center justify-between">
-                  <div className="flex min-w-[300px] items-center gap-4">
+                  <div className="flex min-w-0 items-center gap-4 sm:min-w-[300px]">
                     <div className="px-2">
                       {clientInfo ? (
                         getSessionIcon(record, clientInfo)
