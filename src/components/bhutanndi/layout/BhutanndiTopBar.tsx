@@ -120,7 +120,7 @@ export function BhutanndiTopBar({
       <div className="border-bhutanndi-subtle pointer-events-none absolute inset-x-0 bottom-0 h-px border-t min-[901px]:left-[248px]" />
       <div className="border-bhutanndi-subtle pointer-events-none absolute inset-y-0 left-[247px] hidden w-px border-l min-[901px]:block" />
 
-      <div className="flex h-full items-center gap-3 px-4 min-[641px]:px-6">
+      <div className="flex h-full items-center gap-2 px-3 min-[641px]:gap-3 min-[641px]:px-6">
         <button
           type="button"
           onClick={onToggleNav}
@@ -148,9 +148,10 @@ export function BhutanndiTopBar({
           </svg>
         </button>
 
-        <Lockup className="flex-none" />
+        {/* Hidden on very narrow phones; the menu button is enough there. */}
+        <Lockup className="flex-none max-[479px]:hidden" />
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-1 min-[641px]:gap-2">
           <SidebarContext.Provider value={STATIC_SIDEBAR_CONTEXT}>
             <OrgSwitcher
               tenants={orgList.map((org) => ({
@@ -162,12 +163,16 @@ export function BhutanndiTopBar({
             />
           </SidebarContext.Provider>
 
-          {enableAppLauncher && <AppLauncher />}
+          {enableAppLauncher && (
+            <div className="hidden min-[641px]:block">
+              <AppLauncher />
+            </div>
+          )}
 
           <button
             type="button"
             aria-label="Notifications"
-            className="ndi-navrow inline-flex h-10 w-10 items-center justify-center rounded-[10px]"
+            className="ndi-navrow hidden h-10 w-10 items-center justify-center rounded-[10px] min-[641px]:inline-flex"
             data-active="0"
           >
             <Icon name="bell" size={17} strokeWidth={1.7} />

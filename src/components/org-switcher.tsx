@@ -72,16 +72,16 @@ const OrgSwitcherInner = ({
   }
 
   return (
-    <SidebarMenu className="w-fit">
-      <SidebarMenuItem className="w-fit">
+    <SidebarMenu className="w-fit min-w-0">
+      <SidebarMenuItem className="w-fit min-w-0">
         <DropdownMenu>
           <DropdownMenuTrigger
             asChild
-            className="focus:ring-ring bg-card hover:bg-card mx-2 my-2 h-9 rounded-xl border p-2 shadow outline-none hover:text-inherit focus:ring-1!"
+            className="focus:ring-ring bg-card hover:bg-card mx-0 my-2 h-9 rounded-xl border p-2 shadow outline-none hover:text-inherit focus:ring-1! sm:mx-2"
           >
             <SidebarMenuButton
               size="lg"
-              className="border-ring w-[200px] justify-start gap-2 border"
+              className="border-ring w-[150px] justify-start gap-2 border sm:w-[200px]"
             >
               {tenants.length > 0 && (
                 <div className="bg-popover border-muted flex size-6 min-w-6 items-center justify-center overflow-hidden rounded-full">

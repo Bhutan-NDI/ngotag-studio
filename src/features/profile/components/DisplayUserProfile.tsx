@@ -97,23 +97,25 @@ const DisplayUserProfile = ({
     return (
       <Card
         key={role.id}
-        className="inline-flex items-center border px-3 py-1 text-xs font-medium"
+        className="inline-flex min-w-0 items-center gap-1 border px-3 py-2 text-xs font-medium"
       >
         {role.organisation.logoUrl ? (
           <img
             src={role.organisation.logoUrl}
             alt={role.organisation.name}
-            className="h-12 w-12 rounded-full object-cover"
+            className="h-12 w-12 shrink-0 rounded-full object-cover"
           />
         ) : (
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-12 w-12 shrink-0">
             <AvatarFallback className={`${bg} ${text} text-xs font-bold`}>
               {role.organisation.name.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         )}
-        <div>
-          <span className="pl-2 text-base">{role.organisation.name}</span>
+        <div className="min-w-0">
+          <span className="block pl-2 text-base break-words">
+            {role.organisation.name}
+          </span>
           <div className="pl-2">
             <b>Role</b> : {roles[role.orgId]?.join(', ') ?? ''}
           </div>
@@ -125,7 +127,7 @@ const DisplayUserProfile = ({
   if (bhutanndi) {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <Panel className="relative col-span-1 flex flex-col items-center gap-4 text-center">
             <button
               type="button"
@@ -150,7 +152,7 @@ const DisplayUserProfile = ({
               <p className="text-bhutanndi-muted text-sm">
                 {userProfileInfo?.username}
               </p>
-              <p className="text-bhutanndi-muted flex items-center justify-center gap-1 text-sm">
+              <p className="text-bhutanndi-muted flex min-w-0 flex-wrap items-center justify-center gap-1 text-sm break-all">
                 <Icon name="mail" size={14} strokeWidth={1.8} />
                 {userProfileInfo?.email}
               </p>
@@ -173,7 +175,7 @@ const DisplayUserProfile = ({
             </div>
           </Panel>
 
-          <div className="col-span-1 md:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             <RecentActivity />
           </div>
         </div>
@@ -202,7 +204,7 @@ const DisplayUserProfile = ({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="relative col-span-1 flex flex-col items-center space-y-4 p-6 text-center shadow">
           <Button
             variant="ghost"
@@ -236,7 +238,7 @@ const DisplayUserProfile = ({
             <p className="text-muted-foreground text-sm">
               {userProfileInfo?.username}
             </p>
-            <p className="text-muted-foreground flex items-center justify-center gap-1 text-sm">
+            <p className="text-muted-foreground flex min-w-0 flex-wrap items-center justify-center gap-1 text-sm break-all">
               <Mail className="h-4 w-4" />
               {userProfileInfo?.email}
             </p>
@@ -255,7 +257,7 @@ const DisplayUserProfile = ({
           </div>
         </Card>
 
-        <div className="col-span-1 md:col-span-2">
+        <div className="min-w-0 lg:col-span-2">
           <RecentActivity />
         </div>
       </div>
