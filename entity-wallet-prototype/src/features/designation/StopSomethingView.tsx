@@ -187,6 +187,9 @@ export function StopSomethingView() {
             <legend className="sr-only">What do you want to stop?</legend>
             {options.map((o) => {
               const on = choice === o.id;
+              /* Already paused — by this screen, the console or the members
+                 list, which are one control — so there is nothing to pause. */
+              const alreadyPaused = o.id === "pause" && Boolean(d) && d?.ndiAccess !== "ACTIVE";
               return (
                 <label
                   key={o.id}
@@ -198,12 +201,17 @@ export function StopSomethingView() {
                     name="stop"
                     className="mt-[5px]"
                     checked={on}
-                    disabled={readOnly}
+                    disabled={readOnly || alreadyPaused}
                     onChange={() => setChoice(o.id)}
                   />
                   <span className="flex flex-col gap-1">
                     <span className="text-[14px] font-semibold text-strong">{o.heading}</span>
                     <span className="text-[13.5px] leading-[1.6] text-body">{o.body}</span>
+                    {alreadyPaused ? (
+                      <span className="text-[12.5px] leading-[1.5] text-muted">
+                        NDI&rsquo;s access is already paused. You can turn it back on from your authority console.
+                      </span>
+                    ) : null}
                   </span>
                 </label>
               );

@@ -56,7 +56,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const router = useRouter();
   const {
     parkedOperations,
-    offers,
     relations,
     personById,
     harness,
@@ -114,11 +113,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const state = screenState === "reviewable" ? operation.state : screenState;
   const decided =
     state === "approved" || state === "rejected" || state === "expired" || state === "stale";
-
-  /* Whatever this is holding back, so its substance can be shown. */
-  const offer = operation.targetId
-    ? offers.find((o) => o.id === operation.targetId)
-    : undefined;
 
   /* An approver never decides their own request (SAD-EW-01 §8.4;
      FLOW-DEL-01 A2). The store refuses it too; this says why first. */
@@ -267,35 +261,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
             changed, the fingerprint would change with it.
           </p>
         </Panel>
-
-        {/* ---- The substance ---- */}
-        {offer ? (
-          <Panel>
-            <div className="relative z-[4] flex flex-col gap-1">
-              <h2 className="font-display text-[15px] font-semibold text-strong">
-                What would be accepted
-              </h2>
-              <p className="text-[12.5px] leading-[1.5] text-faint">
-                Offered by {offer.issuer}, read from the offer payload.
-              </p>
-            </div>
-            <ul className="relative z-[4] mt-3 flex flex-col">
-              {offer.attributes.map((attribute, i) => (
-                <li
-                  key={attribute.name}
-                  className={`grid gap-0.5 py-2 min-[521px]:grid-cols-[200px_1fr] min-[521px]:gap-6 ${
-                    i > 0 ? "border-t border-subtle" : ""
-                  }`}
-                >
-                  <span className="text-[12.5px] text-faint">
-                    {attribute.name.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-[13px] text-body">{attribute.value}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ) : null}
 
         {/* ---- Was it in scope ---- */}
         {relation ? (

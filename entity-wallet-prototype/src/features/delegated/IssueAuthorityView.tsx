@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/Switch";
 import { Icon } from "@/components/ui/icons";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { useDemo } from "@/lib/demoStore";
-import { PELDEN, isPlatformAdmin, type AuthorityKind } from "@/lib/demoData";
+import { PELDEN, inOrg, isPlatformAdmin, type AuthorityKind } from "@/lib/demoData";
 
 import { TASK_SCOPES, formatNu, taskScopeLabel } from "./constraints";
 
@@ -62,7 +62,8 @@ const plusDays = (days: number) => {
 };
 
 export function IssueAuthorityView() {
-  const { people, delegatedAuthorities, issueAuthority, acceptAuthority, personById, organizations, harness } = useDemo();
+  const { people, relations, parkedOperations, delegatedAuthorities, issueAuthority, acceptAuthority, personById, organizations, harness } =
+    useDemo();
 
   const screenState = useScreenState("D2", [
     "building",
@@ -130,6 +131,19 @@ export function IssueAuthorityView() {
   const parentId = parentTouched ? parentChoice : (parentOptions[0]?.id ?? null);
 
   const issued = issuedId ? delegatedAuthorities.find((a) => a.id === issuedId) : null;
+  /* Held for approval: the appointment that lets this person give authority
+     says each grant needs approving (FLOW-DEL-01 A1), so nothing is in the
+     recipient's wallet until the approver says yes. */
+  const held = issuedId && !issued ? parkedOperations.find((p) => p.targetId === issuedId) : null;
+  /* Only someone whose appointment carries *Give authority to act* — or the
+     Root, whose preset includes it — may issue (UX-EW-05 SCR-AUT-01 E1). */
+  const mayIssue = relations.some(
+    (r) =>
+      inOrg(PELDEN)(r) &&
+      r.personId === harness.persona &&
+      r.state === "ACTIVE" &&
+      r.scope.grants.some((g) => g.operation === "authority:issue"),
+  );
 
   /* The screen state drives the after-issuance faces so each is reachable
      without walking the flow. */
@@ -140,7 +154,9 @@ export function IssueAuthorityView() {
         ? issued.acceptance === "accepted"
           ? "accepted"
           : "offer_sent"
-        : "building";
+        : held
+          ? "parked_for_approval"
+          : "building";
 
   const capAmount = Number(cap) || 0;
   const canIssue =
@@ -149,10 +165,11 @@ export function IssueAuthorityView() {
     tasks.length > 0 &&
     (anyCounterparty || counterparties.length > 0) &&
     validUntil > validFrom &&
-    (!capped || capAmount > 0);
+    (!capped || capAmount > 0) &&
+    mayIssue;
 
   const issue = () => {
-    const authority = issueAuthority({
+    const result = issueAuthority({
       kind,
       title: title.trim(),
       recipientId,
@@ -165,7 +182,7 @@ export function IssueAuthorityView() {
       validFrom,
       validUntil,
     });
-    setIssuedId(authority.id);
+    if (result.status !== "refused") setIssuedId(result.authority.id);
   };
 
   const toggleTask = (value: string) =>
@@ -216,12 +233,11 @@ export function IssueAuthorityView() {
               {stage === "parked_for_approval" ? (
                 <>
                   <p className="font-display text-[14.5px] font-semibold text-strong">
-                    This needs a second signature before it goes out
+                    This needs approval before it goes out
                   </p>
                   <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
-                    Issuing authority above {formatNu(1000000)} is held back
-                    until two people have signed for it. Nothing has been sent
-                    to {sentTo.name} yet.
+                    Your appointment says each grant of authority is approved
+                    first. Nothing has been sent to {sentTo.name} yet.
                   </p>
                 </>
               ) : stage === "accepted" ? (
@@ -576,7 +592,7 @@ export function IssueAuthorityView() {
                   {/* Checkboxes, not pills. The pills read as labels: in review
                       nobody could tell they were choices, or which were chosen.
                       A checkbox says both before anyone touches it, and it is
-                      the same control "Give someone authority" uses for the
+                      the same control "Appoint someone" uses for the
                       organisations someone may share with. */}
                   {!anyCounterparty ? (
                     <div className="flex flex-col gap-2">
@@ -640,6 +656,12 @@ export function IssueAuthorityView() {
             />
 
             <div className="flex flex-col gap-2.5">
+              {!mayIssue ? (
+                <p className="text-[12.5px] leading-[1.55] text-muted">
+                  You can&rsquo;t give anyone authority to act. Your appointment
+                  doesn&rsquo;t include it — ask Pelden&rsquo;s representative.
+                </p>
+              ) : null}
               <GradientButton onClick={issue} disabled={!canIssue}>
                 <Icon name="send" size={15} strokeWidth={2} />
                 {recipientId ? `Issue to ${recipient.name.split(" ")[0]}` : "Issue authority"}

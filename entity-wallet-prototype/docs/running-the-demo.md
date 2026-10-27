@@ -17,7 +17,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential
-and sharing one — thirteen chapters, 86 steps, starting on the platform's day
+and sharing one — thirteen chapters, 87 steps, starting on the platform's day
 zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
@@ -51,7 +51,7 @@ zero:
    same way the platform admins did — and lands in Pelden's console as a
    member with no authority. Back as Dorji, the Members page lists Ugyen:
    identity not yet confirmed, authority none.
-6. **Give someone authority to act** (FLOW-DEL-01) — Dorji chooses Ugyen and
+6. **Appoint someone** (FLOW-DEL-01) — Dorji chooses Ugyen and
    ticks what they can do (**Receive credentials**) from four boxes that
    combine, sees what Ugyen won't be able to do worked out from the rest,
    and confirms they're authorised to make the
@@ -87,11 +87,14 @@ zero:
     confirms sole proprietorships yet. Kinzang proposes the Ministry of
     Industry, Commerce & Employment, already on the platform; Tshendu
     approves. Kesang Wangmo, the ministry's director, reads what it is taking
-    on — including that NDI hosts its keys — and accepts. One activation
-    check fails (an entitlement NDI grants); Kinzang grants it and the checks run again.
-    Kesang reads what people will be asked, sends back the date of birth the
-    register doesn't need, and adopts for sole proprietorships. Then **Stop
-    something** shows three different stops, none pre-selected.
+    on — including that NDI hosts its keys — and accepts, which is her adding
+    NDI's service account to the ministry. One activation check fails (an
+    entitlement NDI grants); Kinzang grants it and the checks run again.
+    Kesang reads what people will be asked and objects to the date of birth
+    the register doesn't need; adoption is on hold until NDI revises the
+    draft (a dashed stand-in), and she adopts the revised draft for sole
+    proprietorships. Then **Stop something** shows three different stops,
+    none pre-selected.
 11. **Pelden gets its TPN** (FLOW-CRD-01, FLOW-CRD-03) — Dorji opens **Get a
     credential**, asks the Department of Revenue & Customs for the taxpayer
     number, and reads exactly what is shared: all of Pelden's registration,
@@ -116,7 +119,7 @@ identity is confirmed **at the appointment, not at the invitation**
 (FLOW-ONB-02 §7.3). Giving authority follows FLOW-DEL-01; the role in a
 wallet is Flow 8, which has no specification yet, so it follows Story B5 and
 is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
-v0.2, FLOW-ACC-02 v0.3 and UX-EW-02 v0.3 SCR-ACC-01 to 06 — the first-release
+v0.2, FLOW-ACC-02 v0.4 and UX-EW-02 v0.5 SCR-ACC-01 to 06 — the first-release
 simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
 and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01, FLOW-PRS-02 and
 EW-FLOW7-SD v0.2, with UX-EW-04 v0.2 SCR-PRS-01 to 06; the approval path —
@@ -131,7 +134,7 @@ but the guide and the demo controls no longer walk them.
 Registering Pelden lands on a first day, not on the story's three-months-in
 seed. Only Dorji is a member; nobody else from Pelden's side of the story has
 an account yet, so the persona switcher and the sign-in panel do not offer
-them, the Members page lists Dorji alone, and **Give someone authority**
+them, the Members page lists Dorji alone, and **Appoint someone**
 says there is nobody to choose yet and offers to invite someone.
 Everyone else arrives the way the member chapter shows: an invitation Dorji
 sends and they accept. The activity feed is Pelden's own — it shows who joined
@@ -313,7 +316,7 @@ the onboarding flows are kept.
 For the Gate 2 review. Demo controls → **Walk a flow** offers the
 onboardings in focus — **Root signs in**, **Root invites a platform admin**,
 **Create an account**, **Register the company**, **Invite a member**,
-**Give someone authority** and **A role in a wallet (Flow 8, ahead of spec)** — each on its first
+**Appoint someone** and **A role in a wallet (Flow 8, ahead of spec)** — each on its first
 screen as the right person, from a known starting state: the root and admin
 flows on day zero, the company flows on the platform with its two admins
 (Kinzang and Tshendu) and no business, the member flow on Pelden's first day, and the
@@ -370,7 +373,7 @@ its only member.
    behalf yet.
 5. Back as Dorji, **Members** lists them — identity *not yet confirmed*
    (joining never asks the register), authority *none — membership only* —
-   and the dashboard's activity shows who joined. **Give someone authority**
+   and the dashboard's activity shows who joined. **Appoint someone**
    now offers them; confirming who they are happens when they accept.
 
 Invite a second colleague at an address the story does not know and they get
@@ -388,34 +391,66 @@ authority since sending — worded as a lapse, never a rejection),
 Starts on the platform with its two admins and no business. **Designations**
 lists who confirms what: the Corporate Regulatory Authority for companies,
 designated before the Entity Wallet opened. **Propose a designation**
-(SCR-DSG-01): the ministry, sole proprietorships and partnerships, a legal
-basis — the summary says what it will be able to do and nothing else, that
-the scope can't be edited once switched on, and that a different
-administrator has to approve it. **Propose**.
+(SCR-DSG-01): the ministry, and the scope as entity type and credential
+pairs — sole proprietorships and partnerships, each with the Trade Licence —
+and a legal basis. The summary says what it will be able to do and nothing
+else, that the scope can't be edited once switched on, and that a different
+administrator has to approve it. A type another authority already confirms
+can't be ticked: "Replacing it isn't supported yet" (E5). **Propose**.
 
-Kinzang opening it sees **Approve** disabled with the reason (E7) and can
-only withdraw it. As **Tshendu**, **Approve** (SCR-DSG-02) — the consequence
-is stated in the dialog. The root account can't: Designations isn't in its
-menu, and the store refuses it.
+**Waiting for approval** shows the days left before the proposal lapses
+(E13, 30 days) and, after 10 working days, that a reminder went to
+administrators. Kinzang opening it sees **Approve** disabled with the reason
+(E7), and can only withdraw it — with a reason; the row is kept as
+**Withdrawn**, never deleted (A3). As **Tshendu** (SCR-DSG-02), the lapse
+line reads "This proposal lapses in <n> days if no one approves it."
+**Ask for more information** records a question for Kinzang and changes
+nothing. **Refuse** needs a reason and ends it **Declined**, with "<Tshendu>
+declined this: <reason>." for the proposer (E12). **Approve** — the
+consequence is stated in the dialog. The root account can't: Designations
+isn't in its menu, and the store refuses it. The state switcher on SCR-DSG-02
+shows the **lapsed**, **declined** and **withdrawn** faces.
 
 As **Kesang**, the dashboard says NDI has proposed it, with the days left.
 **Review it** opens SCR-DSG-03: what the ministry would confirm, the legal
 basis, who proposed and approved, and NDI's access in the spec's words —
-including that NDI hosts the ministry's keys. **Accept**. Activation runs at
-once (SCR-DSG-04): one check fails — schema creation is missing — and says
-NDI grants it. As Kinzang, **Designations → Accepted — checks not passing
-yet**, **Grant them**: the checks run again, and it's designated, with nothing live yet.
+"When you accept, you add it", and that NDI hosts the ministry's keys.
+**Accept**: this is Kesang granting NDI's service account its place in the
+ministry, in her own session (A2). Activation runs at once (SCR-DSG-04): P2
+needs both the acceptance and that grant (without the grant it is E1 and
+nothing is added — the switcher's **e1** face). One check fails — schema
+creation is missing — and says NDI grants it. As Kinzang, **Designations →
+Accepted — checks not passing yet**, **Grant them**: the checks run again,
+the service account accepts the grant and joins the ministry, and it's
+designated — recording the primary DID it was designated under — with
+nothing live yet. A pending or accepted designation can be withdrawn here or
+on SCR-DSG-02, with a reason the ministry is told; E5 offers **View the
+incumbent** and the withdrawal, and promises no replacement.
 
 As Kesang, **Authority** (SCR-DSG-05 and SCR-ADO-03, one page): the
 designation, NDI's access with **Remove NDI's access**, members including
-NDI's service account, and nothing live. **Review and adopt** beside sole
-proprietorships (SCR-ADO-01): the date of birth is flagged as not needed —
-**Raise an objection** sends it back and takes it out. **Continue to adopt**
-(SCR-ADO-02): three things as one act. Sole proprietorships are now live —
-and in Flow 2's first screen, sole proprietorship is no longer disabled.
-**Stop something** (SCR-ADO-04): pause NDI's access, stop an entity type, or
-change what people are asked — none pre-selected, and none un-verifies
-anyone.
+NDI's service account ("Can send your request"), and nothing live. **Members**
+lists the service account too, with **Remove** — the same control: either
+route removes the membership and withdraws every authorisation under the
+designation, and the console then reads "…unchanged, and you can turn it back
+on." **Turn NDI's access back on** is Kesang granting it again; a new
+authorisation is written for each live entity type and the withdrawn ones
+stay on record (A4). **Review and adopt** beside sole proprietorships
+(SCR-ADO-01): the date of birth is flagged as not needed. **Raise an
+objection** — against sole proprietorships, or the whole draft — and
+adoption of what it covers is on hold: "Your objection has gone to NDI.
+Adopting sole proprietorships is on hold until they revise the draft or you
+withdraw your objection." Only **Withdraw the objection** or the dashed
+**NDI revises the draft** releases it; NDI's revision is a new draft without
+the date of birth. **Continue to adopt** (SCR-ADO-02): three things as one
+act. Sole proprietorships are now live — and in Flow 2's first screen, sole
+proprietorship is no longer disabled. **Stop something** (SCR-ADO-04): pause
+NDI's access, stop an entity type, or change what people are asked — none
+pre-selected, and none un-verifies anyone.
+
+The console's dashed panel changes the ministry's primary DID to another
+did:ethr: the designation is suspended (E10), compared with the DID it was
+designated under, and **Restore the previous issuing identity** puts it back.
 
 ### Also built · Inviting an agency — as Kinzang, `/admin/invitations/new`
 
@@ -536,13 +571,16 @@ passes.** The chain is whole because the link was restored.
 
 ---
 
-## The Act 2 walkthrough — giving someone authority to act (Flow 3)
+## The Act 2 walkthrough — appointing someone (Flow 3)
 
-**Walk a flow → Give someone authority**, as Dorji, on Pelden's first day
-with Ugyen and Pema joined. About five minutes. It follows FLOW-DEL-01 and
-UX-EW-01 SCR-DEL-02 to 05.
+**Walk a flow → Appoint someone**, as Dorji, on Pelden's first day
+with Ugyen and Pema joined. About five minutes. It follows FLOW-DEL-01 v0.8
+and UX-EW-01 v0.23, SCR-DEL-02 to 05. The screen was called *Give someone
+authority to act* until v0.23; it is *Appoint someone* now, so it isn't
+confused with the *Give authority to act* box on it. The old address,
+`/people-who-can-act/give`, still leads here.
 
-### 1 · Choose what they can do — `/people-who-can-act/give`
+### 1 · Choose what they can do — `/people-who-can-act/appoint`
 
 Choose **Ugyen Phuntsho**. Then tick one or more of **four boxes** —
 Receive credentials, Share credentials, Approve others' actions, Give
@@ -563,24 +601,31 @@ Worth showing:
 - **Share** asks for a reach: only organisations Dorji names, or any that
   asks. The ones Dorji can name are the organisations NDI has approved to
   verify — on the story's first day, only Bank of Bhutan; the list grows as
-  Flow 4 approves more. Named with none chosen, **Give authority** stays unavailable (E12).
+  Flow 4 approves more. Named with none chosen, **Appoint** stays unavailable (E12).
+  The reach limits whom Ugyen presents to; connecting to an organisation
+  is not limited by it (EW-FLOW3-SD §4.2).
   With approval on and nobody else able to approve, it says before you
   submit that Dorji will be asked each time (A1). *Give authority to act*
   works the same way with its own approval setting.
-- Untick everything: **Give authority** is unavailable — choose at least one
+- Untick everything: **Appoint** is unavailable — choose at least one
   thing (E13).
 - Tick **Approve** with **Share**: the screen says Ugyen can approve what
-  others share, never what they share themselves (A2). The approvals queue
-  enforces it too.
+  others share, never what they share themselves (A2). With *Give authority
+  to act* instead it speaks of authority others give, and with both, of
+  both. The approvals queue enforces it too.
+- **Until** offers nothing before tomorrow, and the store refuses an end
+  date of today or earlier anyway (E16).
 - Tick all four: the two fixed lines still say Ugyen can't appoint anyone
   else or take the credentials off the platform. All four is not a deputy.
 - The **statement** is required: Dorji confirms they're authorised to make
   this appointment. **Cite the document behind this** is optional and folded
   away — the file stays on the device, and only a fingerprint would be kept.
-- Someone who can already act is shown but can't be chosen (E3). Driven as
-  Ugyen, the page says only Dorji can give authority (E1).
+- Someone who can already act is shown but can't be chosen (E3). Someone
+  whose appointment is still waiting is shown the same way, but says so —
+  they can't act yet — with **Withdraw it** (E14). Driven as Ugyen, the page
+  says only Dorji can appoint people to act for Pelden (E1).
 
-Leave **Receive credentials**, tick the statement, **Give authority**.
+Leave **Receive credentials**, tick the statement, **Appoint**.
 
 ### 2 · Waiting — `/people-who-can-act`
 
@@ -588,13 +633,22 @@ Dorji first, as the representative; Ugyen *waiting to accept*, with the date
 it lapses. **Open it as Ugyen Phuntsho** (dashed) stands in for Ugyen's
 notification.
 
+**Withdraw** takes the appointment back while it is still waiting (E15,
+EW-FLOW3-SD/D19): the row says *You've withdrawn Ugyen's appointment*, with
+**Appoint again**, and Ugyen can be appointed straight away. Opened as Ugyen,
+it now says Dorji has withdrawn it and nothing has changed. Once Ugyen has
+accepted it can't be withdrawn — ending authority someone holds is
+catalogue flow 12. To carry on the walkthrough after trying it, appoint
+Ugyen again.
+
 ### 3 · Ugyen reviews — `/appointments/…`
 
 Who is appointing them — Dorji, by name — that Dorji confirmed they may,
 what Ugyen will and **won't** be able to do, and Ugyen's responsibilities as
 things to do. It says before they press anything that accepting needs their
-NDI wallet. **Decline** ends it, and Dorji's list then says *Ugyen declined*
-with **Appoint again**.
+NDI wallet. **Decline** ends it (expired, reason declined — never in force,
+so nothing is terminated), and Dorji's list then says *Ugyen declined* with
+**Appoint again**.
 
 ### 4 · One approval is the acceptance — `/appointments/…/confirm`
 
@@ -603,7 +657,11 @@ real one is set when that organisation is created), and the screen names it
 as the wallet would. Approving confirms it's Ugyen *and* records the
 acceptance — nothing to press afterwards, whoever the appointee is. Declined
 (E6), someone else's wallet (E7 — deliberately says nothing about why) and
-no wallet (E11) are walkable.
+no wallet (E11) are walkable. **Cancel** goes back to the review; a request
+declined in the wallet is tried again in place. At the moment of acceptance
+the store checks again that Dorji is still the representative and Pelden can
+still hold credentials (E9, E8); if not, the appointment ends instead of
+starting, and the review says which.
 
 > "Dorji couldn't accept on Ugyen's behalf. An acceptance someone else makes
 > isn't worth recording."
@@ -633,15 +691,22 @@ invited to register, then accepts).
 bank was seen asking for, each item marked *observed*. Untick **Date of
 birth** and **Permanent address**; the summary on the right says what it
 will be able to ask for, that anything else will be refused, what was
-removed, and that it will be publicly listed. **Propose**.
+removed, and that it will be publicly listed. Type the agreement reference —
+a proposal without one is refused at the field (P4). **Propose**.
 
 > "The bank has been asking for more than it needs. Recognition is where
 > that gets narrower, before anything is refused."
 
 Open it from **Waiting for approval**: Kinzang sees it all, with "You
 proposed this, so a different administrator has to approve it" in place of
-Approve, and who can. Switch to **Tshendu** and **Approve** —
-"Every citizen's NDI wallet will trust it for this."
+Approve, and who can. Its row shows the days left before it lapses, and
+*reminded* once it has waited 10 working days (E14). Switch to **Tshendu**
+and **Approve** — "Every citizen's NDI wallet will trust it for this."
+
+Until it is approved the bank sees nothing of it: an NDI proposal reaches
+the organisation only once a second administrator has approved it, and one
+NDI declines or lets lapse never does — the reason goes to the proposer
+(FLOW-ACC-01 step 3, E13, E14).
 
 ### Acceptance — `/verify-or-issue/…`, as Yeshey
 
@@ -658,6 +723,8 @@ trusted organisations. Anyone can see that it is on the list. Your name is
 recorded as the person who accepted.* — the public identity it will be
 listed under, and that NDI hosts the keys. **Accept with your NDI wallet**,
 **Simulate the scan**, **See approval status**: publishing, then approved.
+**Decline** asks first — *Nothing is listed and NDI is told*, and NDI would
+have to propose again — because a decline is final (SC 3.3.4).
 
 An organisation proposed through the ordinary door (not recognition)
 without a did:ethr public identity is first asked to **Set it up**, before
@@ -676,6 +743,7 @@ or decline it as written and won't change it. A business can choose
 of the request, reviewed and decided on its own, so one can be approved and
 the other declined. Issuing names the credential types, then one purpose and
 one legal basis (with a reference) for all of them — not a basis per type.
+The agreement with NDI is asked for only if the business has one.
 
 As Kinzang, **Requests to review** → the request → **Recommend approval**
 (or **Recommend decline** with a reason written to the business). As Tshendu,
@@ -683,16 +751,28 @@ As Kinzang, **Requests to review** → the request → **Recommend approval**
 Approve at all, and nothing to send it back to: Tshendu reads *Kinzang
 recommends declining: <reason>. Confirm the decline, or talk to Kinzang if
 you disagree* and can only **Confirm the decline**; the business then reads
-Kinzang's reason. If they do disagree, Kinzang — and only Kinzang — can
-**Withdraw your recommendation** from the same page and review it again.
-Nothing here expires: a request, and a recommendation waiting for its second
-administrator, are reminded after 10 working days. Back as Dorji, **Verify or
-issue** shows Pelden approved and listed; a declined request shows the
-reason word for word and **Change and ask again**.
+Kinzang's reason. If they do disagree, Kinzang — and only Kinzang — opens
+the request from **Waiting for approval** (it opens on the review page,
+*Decline waiting*) and presses **Withdraw the recommendation**: it comes back
+to review, to recommend afresh (ACC-02/E11).
+Nothing here expires: a request is *overdue* after 10 working days, and a
+recommendation to approve that has waited as long reads *A recommendation
+to approve has waited since <date>* (ACC-02/E8, E12). Back as Dorji,
+**Verify or issue** shows Pelden approved and listed; a declined request
+shows the reason word for word and **Change and ask again**. Withdrawing a
+waiting request, or stopping a business's approval, is the representative's
+alone — an owner who isn't the representative isn't offered either, and the
+store refuses them (ACC-02/S3, A1).
 
-A wider scope is a **replacement**: propose (or ask) again naming the active
-approval. The current one stays in force until the replacement is listed,
-then shows under it as *Replaced* — nothing stops in between. There is no
+A wider scope is a **replacement**. NDI proposes again naming the active
+approval; a business's representative presses **Ask for more** on the
+approved card (or on SCR-ACC-06, where the capability shows as already
+approved), which opens the request with today's scope filled in, names the
+approval it replaces, and says *Your current approval keeps working until
+the new one replaces it* (ACC-02/E3, AC-10). The current one stays in force
+until the replacement is listed, then shows under it as *Replaced* —
+nothing stops in between. **Stop verifying** / **Stop issuing** stops at once
+but leaves the public listing as it was (FLOW-ACC-01 A3). There is no
 suspension: if an organisation's primary identity stops matching its
 listed one, its requests are refused and the approval shows *Stopped* with
 **Restore**, but the approval itself still stands.
@@ -715,11 +795,17 @@ may receive, and that nothing is added until someone accepts it. **Ask the
 Department of Revenue & Customs**. The request page says who has it:
 sending, then waiting for the office, usually within 5 days.
 
+The dashed **Ask, and have it ask for a bank account too** on the same
+screen stands in for an issuer asking for more than was agreed. It is
+offered at asking time because that is the only time it can happen: a
+request reaches *your answer needed* only before anything has been shared
+(EW-FLOW6-SD §5.1). **Answer** opens SCR-CRD-06, with what was agreed and
+what is asked now as two lists, and **Share this too** or **Don't share —
+withdraw the request**. Opening the TPN's ask page after the TPN is held
+says *Your organisation already has this.* (E5) with **Go to credentials**.
+
 **Requests and offers** (SCR-CRD-03) lists it with the next date and
-**Withdraw**. The dashed **Have it ask for a bank account too** stands in
-for an issuer asking for more than was agreed: **Answer** opens SCR-CRD-06,
-with what was agreed and what is asked now as two lists, and **Share this
-too** or **Don't share — withdraw the request**.
+**Withdraw**.
 
 ### Answering — `/issuer/requests`, as Deki
 
@@ -738,10 +824,20 @@ officers' queue.*
 
 **Waiting for you → Review** (SCR-CRD-04): every detail, the office marked as
 on NDI's list, and the prompt to decline and contact the office if anything
-is wrong. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
+is wrong. Two dashed controls under it stand in for the issuer leaving NDI's
+list, or the list being out of reach, while the offer waited: the next
+**Accept** then shows E19 — *can't be added*, or *Try again shortly* with
+**Try again**. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
 beside the registration. **Activity** lists the request and an offer
 *claiming to be from Bhutan Revenue Authority*, refused because the sender
 isn't on NDI's list — nobody was notified.
+
+Offers sent without a request (FLOW-CRD-02) sit under the same **Waiting for
+you** and open on the same SCR-CRD-04, marked *Sent unasked*. Accepting one
+never needs an approver. In the act-3 seed, Bank of Bhutan's reissued
+**Business Current Account** says *This replaces the Business Current
+Account you received on …*, and accepting it marks the old one *Superseded*.
+The old `/wallet/offers` pages redirect here.
 
 ---
 
@@ -852,7 +948,8 @@ not include deciding approvals.
 
 ### 2 · Accept an offer — the holder inbox
 
-Click the **Business Licence** offer.
+Click the **Business Licence** offer. It opens on SCR-CRD-04, the same
+review screen a requested credential uses, marked *Sent unasked*.
 
 > "Here is the thing the studio could never do before. Pelden Trading is
 > the *holder*. Somebody has offered the company a credential."
@@ -863,9 +960,11 @@ Two things to point at:
   > "She is accepting these values. A screen that said 'Business Licence,
   > 4 attributes' would be asking her to accept something she had not seen. And
   > this is read from the offer itself, not from anything anyone typed."
-- **The issuer's trust-registry status.**
+- **That the issuer is on NDI's list of trusted organisations.** An offer
+  from anyone else never reaches this screen — it is refused on arrival and
+  only shows on the **Activity** tab.
 
-Press **Accept**. Then follow **See what we hold** — note the **Root of trust**
+Press **Accept**. Then follow **Go to your credentials** — note the **Root of trust**
 panel, held apart from the table:
 
 > "The Business Registration is not one credential among several. It is the
@@ -875,8 +974,8 @@ panel, held apart from the table:
 
 ### 3 · The refusal — worth showing deliberately
 
-Go to **Offers**, open **Fleet Insurance Certificate**, and pick
-**out_of_scope** in the state switcher.
+Go to **Requests and offers**, open **Fleet Insurance Certificate**, and pick
+**no_permission** in the state switcher.
 
 > "Accepting is never limited by what the credential is — every preset that
 > can accept can accept anything. So the only refusal here is about the
@@ -1060,18 +1159,19 @@ Worth showing:
 |---|---|---|
 | `/wallet/authority` | **suspended**, **expired** | A dead end with a reason, not a broken screen |
 | `/wallet/authority` | **no_authority** | What Pema, who holds no controllership, sees |
-| `/controllership/relations/.../scope` | **over_broad** | The advisory warnings, without having to build a bad scope |
-| `/onboarding/responsibility` | **returning**, **not_representative**, **could_not_finish**, **not_confirmed**, **offline** | SCR-DEL-01: the wallet step-up in a later session, and every refusal |
-| `/people-who-can-act/give` | **no_one_to_choose**, **already_has_authority**, **approval_falls_to_you**, **nothing_to_share_with**, **not_representative**, **offline** | SCR-DEL-02's E1, E2, E3, E12 and A1 |
-| `/appointments/...` | **expired**, **declined**, **no_longer_valid**, **offline** | SCR-DEL-03's E4, E5, E8/E9 |
+| `/onboarding/responsibility` | **returning**, **not_representative**, **could_not_finish**, **not_confirmed**, **no_longer_representative**, **offline** | SCR-DEL-01: the wallet step-up in a later session, and every refusal (DEL-02/E3, E4, E7, E8) |
+| `/people-who-can-act/appoint` | **no_one_to_choose**, **already_has_authority**, **appointment_waiting**, **approval_falls_to_you**, **approves_and_shares**, **nothing_to_share_with**, **not_representative**, **offline** | SCR-DEL-02's E1, E2, E3, E14, E12, A1 and A2 |
+| `/appointments/...` | **expired**, **declined**, **withdrawn**, **registration_lost**, **no_longer_valid**, **offline** | SCR-DEL-03's E4, E5, E15, E8 and E9 |
 | `/appointments/.../confirm` | **same_device**, **declined**, **could_not_confirm**, **no_wallet** | SCR-DEL-04's E6, E7, E11 |
-| `/people-who-can-act` | **only_you**, **pending**, **accepted**, **declined**, **expired** | SCR-DEL-05, including a verified name that differs from the account |
-| `/onboarding/foundational` | **not_yet_accepted**, **declined**, **sole_proprietorship** | Verified but not usable yet; no delegation for a proprietor |
+| `/people-who-can-act` | **only_you**, **pending**, **accepted**, **declined**, **expired**, **withdrawn** | SCR-DEL-05, including a verified name that differs from the account |
+| `/onboarding/foundational` | **not_yet_accepted**, **declined**, **declined_accredited**, **sole_proprietorship** | Verified but not usable yet (DEL-02/E2, with its accredited wording); no appointing prompt for a proprietor, who can still appoint from who can act (UXD-24) |
 | `/verifier/bnsw` | **pass**, **fail**, **service_unreachable** | All three outcomes, no setup needed |
 | `/delegated-authority/.../revoke` | **suspended**, **revoked** | Reversible vs final |
 | `/delegated-authority` | **empty** | First-run, before anything is delegated |
 | `/dashboard` | **all_clear**, **access_suspended** | An empty queue, and a pulled authority |
-| `/wallet/offers/...` | **out_of_scope**, **requires_approval** | Both refusal shapes on any offer |
+| `/wallet/requests/...` | **no_permission**, **e19_delisted**, **e19_unreachable**, **e13**, **e14** | SCR-CRD-04's one refusal (about the person, never the offer), and the issuer check failing at acceptance |
+| `/issuer/requests` | **e6**, **a2** | Why a request is in the officers' queue: not picked up, or referred by the office's system |
+| `/issuer/requests/...` | **e7**, **e10**, **e11** | Expired, already answered, withdrawn |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
 | `/present?session=…` | **signed_out**, **choose**, **checking**, **error_unknown**, **error_expired**, **error_used**, **no_organisation**, **refused**, **no_request**, **offline** | SCR-PRS-01: FLOW-PRS-01 E1–E4, E7, E8, E11 |
 | `/wallet/sharing/…` | **with_approval**, **cant_satisfy**, **no_approver**, **recheck_error**, **send_error**, **already_answered**, **cancelled**, **no_permission**, **outside_reach**, **offline** | SCR-PRS-02, including E6/E13 (no approver while the Root is inactive) |
@@ -1096,10 +1196,10 @@ Worth showing:
 | `/admin/accreditations` | **empty**, **offline** | Nothing pending, nothing to review, nobody observed |
 | `/admin/accreditations/new` | **recognition**, **error**, **existing_org**, **overlap**, **success**, **offline**, **no_permission** | Observed scope; E10, including a Kind N name already on the platform; an issuer type someone else issues, shown not refused |
 | `/admin/accreditations/…` | **self_proposed**, **recommended_decline**, **lapsed**, **not_accepted**, **success**, **offline** | Dual control; a recommended decline can only be confirmed; E14, the one lapse; withdrawing an approval nobody accepted (E2) |
-| `/admin/accreditations/…/review` | **holder_alert**, **overdue**, **lapsed**, **error**, **empty** | ACC-02/E8, E9, E10 |
+| `/admin/accreditations/…/review` | **holder_alert**, **overdue**, **decline_waiting**, **lapsed**, **error**, **empty** | ACC-02/E8, E9, E10; withdrawing a recommended decline (E11) |
 | `/verify-or-issue/…` | **recognition**, **setting_up**, **set_up_failed**, **not_set_up**, **waiting_wallet**, **not_confirmed**, **withdrawn**, **offline**, **no_permission** | Every way acceptance can go, E2 (withdrawn by NDI) to E7 |
 | `/verify-or-issue` | **waiting**, **withdrawn**, **request_lapsed**, **listing_abandoned**, **withdrawn_by_ndi**, **replaced**, **declined**, **publishing**, **held**, **stopped**, **resigned**, **empty**, **member** | Every state an approval can be in |
-| `/verify-or-issue/ask` | **choosing_verify**, **choosing_issue**, **choosing_both**, **step_up**, **already_asked**, **error**, **offline**, **no_permission** | E2, E3 per capability, E6; one capability or both, one legal basis for issuing |
+| `/verify-or-issue/ask` | **choosing_verify**, **choosing_issue**, **choosing_both**, **asking_more**, **step_up**, **already_asked**, **already_approved**, **error**, **offline**, **no_permission** | E2, E3 per capability (with *Ask for more* when approved), E6; one capability or both, one legal basis for issuing |
 | `/kitchen-sink` | — | Every component, both themes. Not part of the story |
 
 > "Denied, expired and suspended states get the same care as the happy path.

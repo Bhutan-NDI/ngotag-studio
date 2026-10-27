@@ -55,12 +55,14 @@ import { kindOf } from "./orgKinds";
  * way back offered and, for the other case, the authority named as the
  * place to change who the representative is (DEL-02/E2).
  *
- * GIVING OTHERS AUTHORITY, ONLY WHERE IT MEANS SOMETHING
+ * APPOINTING, PROMPTED ONLY WHERE IT MEANS SOMETHING
  *
- * Giving someone authority to act and seeing who can act are secondary,
- * and only for an organisation that is not a sole proprietorship (UXD-24):
- * a proprietor delegating to themselves is not a task. "Ask NDI" to verify
- * or issue (FLOW-ACC-02) waits for Flow 4.
+ * Appointing someone is secondary, and offered only for an organisation
+ * that is not a sole proprietorship (UXD-24): a proprietor delegating to
+ * themselves is not a task. That is a rule about the prompt, not about
+ * appointing — a proprietor may still appoint their accountant — so "See
+ * who can act" stays for everyone, and appointing is there. "Ask NDI" to
+ * verify or issue (FLOW-ACC-02) waits for Flow 4.
  *
  * NAME DIFFERS
  *
@@ -79,6 +81,7 @@ export function FoundationalCredentialView() {
     "name_differs",
     "not_yet_accepted",
     "declined",
+    "declined_accredited",
     "sole_proprietorship",
   ]);
 
@@ -125,8 +128,17 @@ export function FoundationalCredentialView() {
      to give, and a screen reached by address must not appear to hand it out. */
   const responsibility = responsibilities.find((r) => r.orgId === orgId)?.state ?? "ACCEPTED";
   const notAccepted =
-    forced === "not_yet_accepted" || forced === "declined" || (forced === "live" && responsibility !== "ACCEPTED");
-  const declined = forced === "declined" || (forced === "live" && responsibility === "DECLINED");
+    forced === "not_yet_accepted" ||
+    forced === "declined" ||
+    forced === "declined_accredited" ||
+    (forced === "live" && responsibility !== "ACCEPTED");
+  const declined = forced === "declined" || forced === "declined_accredited" || (forced === "live" && responsibility === "DECLINED");
+  /* DEL-02/E2's accredited variant: an organisation that already verifies
+     or issues keeps doing so whoever holds its wallet, so the decline
+     must not read as if everything stopped. */
+  const accredited =
+    forced === "declined_accredited" ||
+    (forced === "live" && Boolean(existing?.capabilities.some((c) => c === "issuer" || c === "verifier")));
   const delegation = forced === "sole_proprietorship" ? false : kind.value !== "sole_proprietorship";
 
   if (forced === "live" && orgOnboarding?.stage !== "verified") {
@@ -159,7 +171,9 @@ export function FoundationalCredentialView() {
           <div className="relative z-[4] flex flex-col gap-3" role="status">
             <p className="m-0 max-w-[62ch] text-[14px] leading-[1.65] text-body">
               {declined
-                ? `You've declined. Nobody can act for ${shortName} until someone accepts. If you're not the right person, the ${kind.authority} needs to update its records.`
+                ? accredited
+                  ? `You've declined. Nobody can use ${shortName}'s wallet until someone accepts. Its verifying and issuing carry on.`
+                  : `You've declined. Nobody can act for ${shortName} until someone accepts. If you're not the right person, the ${kind.authority} needs to update its records.`
                 : `${shortName} is verified. Before you can use it, accept responsibility for acting on its behalf.`}
             </p>
             <div className="flex flex-wrap items-center gap-2.5">
@@ -296,14 +310,10 @@ export function FoundationalCredentialView() {
           {`Go to ${existing?.name ?? shortName}`}
           <Icon name="arrowRight" size={14} strokeWidth={2} />
         </HairlineButton>
-        {delegation ? (
-          <>
-            <HairlineButton onClick={() => open("/people-who-can-act/give")}>Give someone authority to act</HairlineButton>
-            <button type="button" onClick={() => open("/people-who-can-act")} className="ndi-plainlink text-[12.5px] font-medium text-muted">
-              See who can act
-            </button>
-          </>
-        ) : null}
+        {delegation ? <HairlineButton onClick={() => open("/people-who-can-act/appoint")}>Appoint someone</HairlineButton> : null}
+        <button type="button" onClick={() => open("/people-who-can-act")} className="ndi-plainlink text-[12.5px] font-medium text-muted">
+          See who can act
+        </button>
         {existing ? null : (
           <button type="button" onClick={() => router.push("/onboarding")} className="ndi-plainlink text-[12.5px] font-medium text-muted">
             Add another organisation

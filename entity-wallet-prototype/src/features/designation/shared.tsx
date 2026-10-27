@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@/components/ui/icons";
-import { roleIn, type ActivationCheck, type AskedItem, type Designation, type OrgKind } from "@/lib/demoData";
+import { draftFor, roleIn, type ActivationCheck, type AskedItem, type Designation, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 /**
@@ -33,6 +33,16 @@ export const kindsInWords = (kinds: OrgKind[]) => {
 };
 
 /**
+ * The scope as UX-EW-02 lists it on SCR-DSG-01 to -03: each entity type
+ * with the credential that makes it real — "Sole proprietorships — Trade
+ * Licence" (EW-FLOW5-SD/D6, scope as pairs). The credential is the one in
+ * NDI's draft for that type; the record keeps entity types only, because in
+ * the prototype each has exactly one.
+ */
+export const scopePair = (k: OrgKind) => `${kindTitle(k)} — ${draftFor(k).credential}`;
+export const scopePairs = (kinds: OrgKind[]) => kinds.map(scopePair).join("; ");
+
+/**
  * Whole days from today to a date, never negative — 0 on the date itself.
  * Counted between calendar dates, not from this instant: `new Date("YYYY-MM-DD")`
  * is UTC midnight, already past by the morning of the last day, which made
@@ -57,14 +67,14 @@ export function dsgPill(d: Pick<Designation, "state">, audience: "admin" | "auth
       return { status: "held", label: admin ? "Checks not passing" : "NDI is finishing set-up" };
     case "ACTIVE":
       return { status: "active", label: "Designated" };
-    case "REFUSED":
-      return { status: "refused", label: "Refused" };
-    case "DECLINED":
-      return { status: "declined", label: "Declined" };
-    case "EXPIRED":
-      return { status: "lapsed", label: "Expired" };
     case "SUSPENDED":
       return { status: "suspended", label: "Suspended" };
+    case "DECLINED":
+      return { status: "declined", label: "Declined" };
+    case "WITHDRAWN":
+      return { status: "withdrawn", label: "Withdrawn" };
+    case "EXPIRED":
+      return { status: "lapsed", label: admin ? "Lapsed" : "Expired" };
   }
 }
 
@@ -158,13 +168,16 @@ export function useAuthority() {
     organizations.find((o) => o.memberIds.includes(currentPerson.id) && designations.some((d) => d.orgId === o.id));
   /* Only a designation the authority has been shown, and that still stands,
      is theirs to see. A PROPOSED one hasn't reached them (FLOW-ORG-02 A1:
-     nothing before the second approval); a REFUSED or an unapproved EXPIRED
-     one never did (E12, E13: "nothing reaches the authority"); a DECLINED
-     one is their own ended answer. Falling back to whatever row came first
-     showed a proposal as theirs, with NDI's process in it. These count as no
-     designation, so every authority screen shows its empty state. */
+     nothing before the second approval); one the second administrator
+     DECLINED, or an unapproved EXPIRED one, never did (E12, E13: "nothing
+     reaches the authority"); one they DECLINED is their own ended answer;
+     a WITHDRAWN one confers nothing, and they are told of it where they
+     were asked (A3), not shown it as their designation. Falling back to
+     whatever row came first showed a proposal as theirs, with NDI's process
+     in it. These count as no designation, so every authority screen shows
+     its empty state. */
   const mine = designations.filter(
-    (d) => d.orgId === org?.id && !["PROPOSED", "REFUSED", "DECLINED", "EXPIRED"].includes(d.state),
+    (d) => d.orgId === org?.id && !["PROPOSED", "DECLINED", "WITHDRAWN", "EXPIRED"].includes(d.state),
   );
   const designation: Designation | undefined =
     mine.find((x) => ["ACTIVE", "SUSPENDED"].includes(x.state)) ?? mine.find((x) => ["PENDING", "ACCEPTED"].includes(x.state));
@@ -200,13 +213,23 @@ export const SAMPLE_DESIGNATION: Designation = {
   approvedAt: null,
   acceptedBy: null,
   acceptedAt: null,
-  refusedReason: null,
+  declinedBy: null,
+  declinedReason: null,
+  withdrawnBy: null,
+  withdrawnAt: null,
+  withdrawnReason: null,
+  withdrawnFrom: null,
+  expiredReason: null,
   expiresAt: null,
+  infoRequests: [],
   activatedAt: null,
+  publishingDid: null,
   didMethodAtActivation: null,
+  suspendedReason: null,
   checks: null,
   checkedAt: null,
-  ndiAccess: "ACTIVE",
+  ndiGrant: null,
+  ndiAccess: null,
   ndiAccessChangedBy: null,
   ndiAccessChangedAt: null,
 };
