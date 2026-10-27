@@ -289,7 +289,11 @@ export function AskNdiView() {
     </AppShell>
   );
 
-  if (face === "no_permission") return message(`Only ${rootName}, who represents ${short}, can ask for this.`);
+  /* E2 names the person (UX-EW-02 §3.5). An organisation with no recorded
+     representative has nobody to name, so the sentence says so plainly
+     instead of "Only its representative, who represents …". */
+  if (face === "no_permission")
+    return message(root ? `Only ${rootName}, who represents ${short}, can ask for this.` : `Only ${short}'s representative can ask for this.`);
   if (face === "already_asked")
     return message("You've already asked for this. Here's where it stands.", <GradientButton onClick={() => router.push("/verify-or-issue")}>Go to status</GradientButton>);
   if (face === "already_approved") {

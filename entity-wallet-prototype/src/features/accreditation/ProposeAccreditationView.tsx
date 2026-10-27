@@ -614,7 +614,8 @@ export function ProposeAccreditationView() {
                 </p>
               ) : null}
               <p className="m-0 text-[13.5px] leading-[1.6] text-body">
-                Once accepted, {orgName} is added to NDI&rsquo;s public list of trusted organisations.
+                {/* Mid-sentence, so the placeholder goes lower case until a name is chosen. */}
+                Once accepted, {orgName === "The organisation" ? "the organisation" : orgName} is added to NDI&rsquo;s public list of trusted organisations.
               </p>
               <p className="m-0 text-[13px] leading-[1.6] text-muted">
                 A different administrator has to approve this before anything happens.
