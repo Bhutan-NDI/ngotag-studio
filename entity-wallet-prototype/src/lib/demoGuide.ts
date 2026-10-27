@@ -87,7 +87,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "A new company signs up", shows: "A person signs up — nothing about any company yet" },
   { title: "Verify the organisation", shows: "The authority that registered it, not NDI, confirms the company" },
   { title: "Pelden brings on its people", shows: "The owner invites a colleague; they join from the link" },
-  { title: "Give someone authority to act", shows: "Dorji chooses what Ugyen can do; Ugyen accepts with one wallet approval" },
+  { title: "Appoint someone", shows: "Dorji chooses what Ugyen can do; Ugyen accepts with one wallet approval" },
   { title: "A role in a wallet — Flow 8, ahead of spec", shows: "A clearing agent is invited, then given a role in their own wallet" },
   { title: "Recognise Bank of Bhutan", shows: "NDI approves a bank already verifying — asking for less — and the bank accepts by name" },
   { title: "Pelden asks to verify customers", shows: "A verified business asks; one administrator reviews, a second decides" },
@@ -101,7 +101,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 0,
     title: "Onboarding onto the Entity Wallet",
     happening:
-      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden's owner invites a colleague and gives them authority to act, then — ahead of the specification — invites a clearing agent and gives them a role in their own wallet. Then NDI approves Bank of Bhutan and Pelden to verify customers, and designates the ministry that confirms sole proprietorships. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
+      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden's owner invites a colleague and appoints them to act for it, then — ahead of the specification — invites a clearing agent and gives them a role in their own wallet. Then NDI approves Bank of Bhutan and Pelden to verify customers, and designates the ministry that confirms sole proprietorships. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
     doThis:
       "Press **Next**. The guide takes you to each screen and tells you what to press; you do the clicking. **Minimise** tucks this card away when it's in the way.",
   },
@@ -324,7 +324,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 5,
     title: "Pelden, as a member sees it",
     happening:
-      "Ugyen can see Pelden but holds no authority for it, and the console says so in the same words the invitation used. No members page, and no giving others authority: those are the owner's.",
+      "Ugyen can see Pelden but holds no authority for it, and the console says so in the same words the invitation used. No members page, and no appointing anyone: those are the owner's.",
     doThis: "Press **Next** to go back to Dorji.",
     route: "/dashboard",
     /* No persona: accepting already drives the console as whoever joined. */
@@ -333,29 +333,31 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 5,
     title: "Dorji sees who joined",
     happening:
-      "Ugyen is a member now: identity not yet confirmed — joining never asks anyone — and no authority to act. That comes next: Dorji gives Ugyen authority to act, and Ugyen accepts with one approval in their own NDI wallet.",
+      "Ugyen is a member now: identity not yet confirmed — joining never asks anyone — and no authority to act. That comes next: Dorji appoints Ugyen to act for Pelden, and Ugyen accepts with one approval in their own NDI wallet.",
     doThis: "Press **Next**.",
     route: "/members",
     persona: "dorji",
   },
 
-  /* ---- 6 · Give someone authority to act (FLOW-DEL-01) ---- */
+  /* ---- 6 · Appoint someone (FLOW-DEL-01) ----
+     Renamed from "Give someone authority to act" with UX-EW-01 v0.23, so
+     the chapter isn't confused with the Give authority to act box. */
   {
     chapter: 6,
     title: "Choose what Ugyen can do",
     happening:
       "Four boxes, ticked in any combination, each saying what it allows — not a list of permissions. What Ugyen won't be able to do is worked out from the boxes left unticked, and the whole grant reads back as one sentence. Dorji confirms they're authorised to make the appointment; citing a document like a board resolution is optional and folded away.",
     doThis:
-      "Choose **Ugyen Phuntsho**, leave just **Receive credentials** ticked, tick the statement that you're authorised, then press **Give authority**.",
+      "Choose **Ugyen Phuntsho**, leave just **Receive credentials** ticked, tick the statement that you're authorised, then press **Appoint**.",
     say: "Membership let Ugyen in. This is the separate thing that lets Ugyen act — and Dorji can say exactly what it covers.",
-    route: "/people-who-can-act/give",
+    route: "/people-who-can-act/appoint",
     persona: "dorji",
   },
   {
     chapter: 6,
     title: "Waiting for Ugyen",
     happening:
-      "Dorji is listed first, as the representative. Ugyen's appointment waits for Ugyen, with the date it lapses if they don't accept. Nothing is in force yet.",
+      "Dorji is listed first, as the representative. Ugyen's appointment waits for Ugyen, with the date it lapses if they don't accept. Nothing is in force yet, so Dorji could still withdraw it — say, after ticking the wrong box — and appoint Ugyen again straight away.",
     doThis: "Press **Open it as Ugyen Phuntsho** (dashed — it stands in for Ugyen's notification).",
     route: "/people-who-can-act",
   },
@@ -484,7 +486,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 8,
     title: "The bank is told",
     happening:
-      "Yeshey Choden is Bank of Bhutan's owner. The dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
+      "Yeshey Choden is Bank of Bhutan's owner. Until Tshendu approved it the bank saw nothing — a proposal NDI hasn't approved, or has declined, never reaches it. Now the dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
     doThis: "Press **Review it**.",
     route: "/dashboard",
     persona: "yeshey",
@@ -573,7 +575,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 9,
     title: "Pelden can verify customers",
     happening:
-      "Approved to verify, listed under Pelden's public identity, able to ask one thing: whether a customer is over 18. Anything else it asks for will be refused, and shown here when it is.",
+      "Approved to verify, listed under Pelden's public identity, able to ask one thing: whether a customer is over 18. Anything else it asks for will be refused, and shown here when it is. To widen it, Dorji presses **Ask for more**: the request opens with today's scope filled in, and replaces this approval only once it is approved — this one keeps working until then.",
     doThis: "Press **Next**.",
     route: "/verify-or-issue",
     persona: "dorji",

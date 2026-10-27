@@ -98,7 +98,7 @@ export interface Organization {
   id: string;
   /**
    * The entity type its authority verified it as (FLOW-ORG-01). Decides,
-   * among other things, whether giving others authority is offered at all
+   * among other things, whether appointing someone is offered at all
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
@@ -514,6 +514,12 @@ export interface ControllershipRelation {
   activatedAt: string | null;
   suspendedAt?: string | null;
   endedReason?: string | null;
+  /**
+   * Why a pending appointment became EXPIRED (EW-FLOW3-SD §5.1). One state,
+   * because none of them ever authorised anything; four reasons, because
+   * each tells the person something different.
+   */
+  expiryReason?: ExpiryReason | null;
   /*
    * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
    * older relations, which were authored operation by operation before the
@@ -562,6 +568,32 @@ export type ShareReach = "named" | "any";
  */
 export function standsNow(r: Pick<ControllershipRelation, "state" | "expiresAt">, today: string): boolean {
   return r.state === "ACTIVE" || (r.state === "PENDING_ACCEPTANCE" && !(r.expiresAt && r.expiresAt < today));
+}
+
+/**
+ * The four reasons an appointment that was never accepted ends: the
+ * appointee said no, the representative withdrew it (D19), 14 days passed,
+ * or the organisation or its representative stopped standing behind it.
+ */
+export type ExpiryReason = "DECLINED" | "WITHDRAWN" | "TIMED_OUT" | "BASIS_LOST";
+
+/**
+ * Whether a member can be appointed now, and if not, which refusal applies
+ * (FLOW-DEL-01 P3). Split since FLOW-DEL-01 v0.8: someone who can already
+ * act is E3, and someone with an appointment still waiting for them is E14 —
+ * they can't act yet, so the screen mustn't say they can. The store refuses
+ * with this, and SCR-DEL-02 shows the same answer, so the two never differ.
+ */
+export function appointmentHeld(
+  relations: Pick<ControllershipRelation, "orgId" | "personId" | "isRootAuthority" | "state" | "expiresAt">[],
+  orgId: string,
+  personId: string,
+  today: string,
+): "E3" | "E14" | null {
+  const theirs = relations.filter((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today));
+  if (theirs.some((r) => r.state === "ACTIVE")) return "E3";
+  if (theirs.length) return "E14";
+  return null;
 }
 
 /**
@@ -1342,11 +1374,19 @@ export interface AccRequestPart {
   issue: IssueType[];
   legalBasis: string;
   legalBasisRef: string;
+  /**
+   * Names the ACTIVE approval this part replaces — "Ask for more"
+   * (ACC-02/E3, AC-10). The way past E3 for a business, as `replaces` is
+   * for NDI's proposals: that approval keeps working until this one is.
+   */
+  replaces: string | null;
 }
 
 /** What SCR-ACC-06 sends: one capability or both (D22). */
 export interface AccRequestInput {
   parts: AccRequestPart[];
+  /** The business's agreement with NDI, if it has one (FLOW-ACC-02 step 2). Optional, unlike a proposal's. */
+  agreementRef: string;
 }
 
 /**
@@ -1391,6 +1431,17 @@ export const accEnding = (a: Pick<Accreditation, "state" | "expiresAt" | "door">
 export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) =>
   ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD"].includes(a.state) &&
   accEnding(a, new Date().toISOString().slice(0, 10)) === null;
+
+/**
+ * Whether the organisation itself sees a record. Its own request it always
+ * does. Of what NDI proposes, it sees nothing until a second administrator
+ * has approved it — the owner is told only then (FLOW-ACC-01 step 3) — and
+ * never a proposal NDI declined or let lapse, whose reason was written to
+ * the proposer, not to it (E13, E14). A decline the organisation made
+ * itself (E3) is its own, and stays.
+ */
+export const accSeenByOrg = (a: Pick<Accreditation, "state" | "door" | "declinedByOrg">) =>
+  a.state !== "LAPSED" && (a.door === "REQUEST" || !(a.state === "PROPOSED" || (a.state === "DECLINED" && !a.declinedByOrg)));
 
 /**
  * ACC-01/E11 as a face, not a state: an `ACTIVE` approval whose organisation

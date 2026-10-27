@@ -27,7 +27,7 @@ import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
-import { ScopeList, accPill, capVerb, daysUntil, inline, legalBasisText, sampleAccreditation } from "./shared";
+import { ScopeList, accPill, asSentence, capVerb, daysUntil, inline, legalBasisText, sampleAccreditation } from "./shared";
 
 /**
  * SCR-ACC-02 — Approve an accreditation. FLOW-ACC-01 step 2; FLOW-ACC-02
@@ -53,7 +53,9 @@ import { ScopeList, accPill, capVerb, daysUntil, inline, legalBasisText, sampleA
  * reviewer's reason. There used to be a "send for a different review" as
  * well; it had no defined end and, with two administrators, could go round
  * for ever (D21). A second administrator who disagrees talks to the
- * reviewer, who can withdraw the recommendation and review it again.
+ * reviewer, who can withdraw the recommendation and review it again — on
+ * SCR-ACC-05, where the recommendation was made ("Decline waiting"); this
+ * page only points the reviewer there.
  *
  * AN APPROVAL NOBODY ACCEPTS IS WITHDRAWN, NOT EXPIRED
  *
@@ -86,18 +88,8 @@ const DECIDE_REFUSALS: Record<"E1" | "E5" | "E11" | "not_admin" | "invalid", str
 
 export function ApproveAccreditationView({ id }: { id: string }) {
   const router = useRouter();
-  const {
-    accreditations,
-    organizations,
-    people,
-    harness,
-    currentPerson,
-    personById,
-    decideAccreditation,
-    withdrawRecommendation,
-    withdrawApproval,
-    hydrated,
-  } = useDemo();
+  const { accreditations, organizations, people, harness, currentPerson, personById, decideAccreditation, withdrawApproval, hydrated } =
+    useDemo();
   const forced = useScreenState("SCR-ACC-02", [
     "live",
     "default",
@@ -207,9 +199,11 @@ export function ApproveAccreditationView({ id }: { id: string }) {
   const replaces = acc.replacesId ? accreditations.find((a) => a.id === acc.replacesId) : undefined;
   const replacedBy = accreditations.find((a) => a.replacesId === acc.id && a.state === "ACTIVE");
   /* A request is never late (ACC-02/E12): it shows how long it has waited,
-     and that NDI has been reminded once it is 10 working days. */
+     and once a recommendation to approve has waited 10 working days, the
+     reminder NDI was sent, in §3.5's words. */
   const waitingSince = isRequest ? acc.proposedAt ?? acc.requestedAt : acc.decidedAt;
   const reminded = workingDaysSince(waitingSince) >= REMINDER_WORKING_DAYS;
+  const approveReminder = proposedHere && isRequest && acc.recommendation?.approve === true && reminded;
 
   const decide = (approve: boolean, why?: string) => {
     setBusy(true);
@@ -258,7 +252,7 @@ export function ApproveAccreditationView({ id }: { id: string }) {
       case "DECLINED":
         return acc.declinedByOrg
           ? `${acc.orgName} declined the accreditation.`
-          : `${acc.decidedBy ? personById(acc.decidedBy).name : "An administrator"} declined this: ${acc.declineReason ?? "—"}`;
+          : `${acc.decidedBy ? personById(acc.decidedBy).name : "An administrator"} declined this: ${asSentence(acc.declineReason)}`;
       case "LAPSED":
         return "This proposal lapsed without a decision. It confers nothing.";
       case "WITHDRAWN":
@@ -266,7 +260,7 @@ export function ApproveAccreditationView({ id }: { id: string }) {
           case "REPLACED":
             return `Replaced by a wider approval${replacedBy?.listedAt ? `, active since ${formatDate(replacedBy.listedAt)}` : ""}. This one stays on record; nothing stopped in between.`;
           case "BY_NDI":
-            return `${acc.withdrawal.by ? personById(acc.withdrawal.by).name : "An administrator"} withdrew this approval: ${acc.withdrawal.note ?? "—"}`;
+            return `${acc.withdrawal.by ? personById(acc.withdrawal.by).name : "An administrator"} withdrew this approval: ${asSentence(acc.withdrawal.note)}`;
           case "NOT_LISTED":
             return "Withdrawn because the listing couldn't be published.";
           default:
@@ -456,15 +450,17 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 ...(proposedHere && face !== "lapsed"
                   ? [
                       isRequest
-                        ? {
-                            label: "Waiting since",
-                            value: `${waitingSince ? formatDate(waitingSince) : "—"}${reminded ? " · NDI reminded" : ""}`,
-                          }
+                        ? { label: "Waiting since", value: waitingSince ? formatDate(waitingSince) : "—" }
                         : { label: "Lapses", value: `In ${daysUntil(acc.expiresAt)} days, if nobody decides` },
                     ]
                   : []),
               ]}
             />
+            {approveReminder ? (
+              <p role="status" className="m-0 text-[13.5px] leading-[1.6] text-body">
+                A recommendation to approve has waited since {waitingSince ? formatDate(waitingSince) : "—"}.
+              </p>
+            ) : null}
             <p className="m-0 text-[13.5px] leading-[1.6] text-body">
               {isRequest
                 ? `Approving adds ${acc.orgName} to NDI's public list of trusted organisations.`
@@ -501,20 +497,12 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 </p>
                 <p className="m-0 text-[13px] text-muted">{whoCan.length ? `${whoCan.join(" or ")} can.` : "No other administrator has an account yet."}</p>
                 {/* ACC-02/E11: the reviewer, and only the reviewer, can take
-                    a recommended decline back and review it again — how a
-                    disagreement between the two is settled now that there is
-                    no send-back. */}
+                    a recommended decline back — on SCR-ACC-05, its "Decline
+                    waiting" state, where it was made. */}
                 {isRequest && acc.recommendation && !acc.recommendation.approve && acc.recommendation.by === harness.persona ? (
                   <div>
-                    <HairlineButton
-                      onClick={() => {
-                        const r = withdrawRecommendation(acc.id);
-                        if (!r.ok) return setRefusal("This has changed since you opened it. Nothing was recorded.");
-                        router.push(`/admin/accreditations/${acc.id}/review`);
-                      }}
-                      disabled={!canAct}
-                    >
-                      Withdraw your recommendation
+                    <HairlineButton onClick={() => router.push(`/admin/accreditations/${acc.id}/review`)}>
+                      Go to your recommendation
                     </HairlineButton>
                   </div>
                 ) : null}
@@ -522,8 +510,8 @@ export function ApproveAccreditationView({ id }: { id: string }) {
             ) : face === "recommended_decline" ? (
               <>
                 <p className="m-0 max-w-[66ch] text-[13.5px] leading-[1.6] text-body">
-                  {reviewer} recommends declining: {acc.recommendation?.reason}. Confirm the decline, or talk to {reviewer} if you
-                  disagree.
+                  {reviewer} recommends declining: {asSentence(acc.recommendation?.reason)} Confirm the decline, or talk to {reviewer}{" "}
+                  if you disagree.
                 </p>
                 <div className="flex flex-wrap gap-2.5">
                   <GradientButton onClick={() => decide(false)} disabled={!canAct || busy}>
