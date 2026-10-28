@@ -1,9 +1,7 @@
-import type { Metadata } from "next";
+/* The pre-spec "Verification requests" list is Sharing now (UX-EW-04
+   SCR-PRS-05). The old address is kept so a bookmark still lands. */
+import { redirect } from "next/navigation";
 
-import { VerificationRequestsView } from "@/features/wallet/VerificationRequestsView";
-
-export const metadata: Metadata = { title: "Verification requests — NDI Studio" };
-
-export default function VerificationRequestsPage() {
-  return <VerificationRequestsView />;
+export default function VerificationRequestsRedirect(): never {
+  redirect("/wallet/sharing");
 }

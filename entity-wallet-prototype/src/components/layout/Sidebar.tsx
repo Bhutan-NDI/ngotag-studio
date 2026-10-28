@@ -80,7 +80,13 @@ const ORG_OWNERS: PersonaId[] = ["dorji", "yeshey"];
 const PELDEN: PersonaId[] = ["dorji", "rinzin", "pema", "ugyen", "invitee"];
 /* Everyone who works in some organisation's console — Pelden's people and
    Bank of Bhutan's owner. */
-const ANY_ORG: PersonaId[] = [...PELDEN, "yeshey"];
+const ANY_ORG: PersonaId[] = [...PELDEN, "yeshey", "kesang", "deki"];
+/* An authority's officer — Kesang for the Ministry of Industry, Commerce &
+   Employment. */
+const AUTHORITY: PersonaId[] = ["kesang"];
+/* An issuing office's officer — Deki for the Department of Revenue &
+   Customs, who answers requests for taxpayer numbers (Flow 6). */
+const ISSUING_OFFICE: PersonaId[] = ["deki"];
 
 const PRIMARY: NavItem[] = [
   { label: "Dashboard", icon: "dashboard", href: "/dashboard", personas: ANY_ORG, members: "any", ndi: "also" },
@@ -100,6 +106,10 @@ const PRIMARY: NavItem[] = [
       /* Deciding approvals to verify or issue is routine work, which the
          root account doesn't do (FLOW-ONB-02 S9). */
       { label: "Accreditations", href: "/admin/accreditations", icon: "certificate", notForRoot: true },
+      /* Flow 5 — which authority confirms which kind of business. Root
+         proposes and approves nothing (FLOW-ONB-02 v0.6), so it isn't
+         offered the page. */
+      { label: "Designations", href: "/admin/designations", icon: "shieldCheck", notForRoot: true },
       { label: "Invitations", href: "/admin/invitations", icon: "mail" },
       /* Never offered to the root account, which approves nothing
          (FLOW-ONB-02 S2, E13; UX-EW-01 SCR-INV-02). */
@@ -137,8 +147,16 @@ const PRIMARY: NavItem[] = [
          what they are allowed to do, not what the entity happens to hold. */
       { label: "My authority", href: "/wallet/authority", icon: "lockRounded" },
       { label: "Held credentials", href: "/wallet/credentials", icon: "credentials" },
-      { label: "Offers", href: "/wallet/offers", icon: "download" },
-      { label: "Verification requests", href: "/wallet/verification-requests", icon: "verify" },
+      /* Flow 6. Offers that arrive unasked are on the same page as the
+         requests that produce them — to the person they're the same thing:
+         something waiting to be accepted (SCR-CRD-03). */
+      { label: "Get a credential", href: "/wallet/get", icon: "issue" },
+      { label: "Requests and offers", href: "/wallet/requests", icon: "download" },
+      /* Flow 7 — what banks and agencies ask for, what was shared and who
+         agreed, and what was refused (SCR-PRS-05). Its own page, not part
+         of Requests and offers: receiving and giving are opposite
+         decisions, and one list invites the same reflex for both (UXD-45). */
+      { label: "Sharing", href: "/wallet/sharing", icon: "send" },
     ],
   },
   /* Approvals is the one item whose visibility comes from the scope rather
@@ -173,6 +191,23 @@ const PRIMARY: NavItem[] = [
      need not hold anything to accept (FLOW-ACC-01), and the business's own
      way to ask is what is withheld until it is verified (FLOW-ACC-02/E1). */
   { label: "Verify or issue", icon: "certificate", href: "/verify-or-issue", personas: ORG_OWNERS, members: "any" },
+  /* Flow 5 — an authority's own console (SCR-DSG-05, SCR-ADO-03): what is
+     live in its name and who can act in it. Only for the ministry's people;
+     a business never sees it. */
+  { label: "Authority", icon: "shieldCheck", href: "/authority", personas: AUTHORITY },
+  /* Flow 6 — the issuing office's side of a request (FLOW-CRD-03): what it
+     offers, the officers' queue, and the integration its IT lead sets up.
+     Named for the work, not the role: the office answers requests. */
+  {
+    label: "Requests from businesses",
+    icon: "issue",
+    personas: ISSUING_OFFICE,
+    children: [
+      { label: "Requests to answer", href: "/issuer/requests", icon: "userCheck" },
+      { label: "What you offer", href: "/issuer/offerings", icon: "certificate" },
+      { label: "Integration", href: "/issuer/integration", icon: "settings" },
+    ],
+  },
   /* Pema's only reason to open the console at all. */
   { label: "Appeals", icon: "shieldAlert", href: "/appeals", personas: PELDEN },
 
@@ -191,7 +226,18 @@ const PRIMARY: NavItem[] = [
       { label: "Schemas", href: "/schemas", icon: "layers" },
     ],
   },
-  { label: "Verification", icon: "verify", href: "/verification", personas: ORG_OWNERS, needs: "verifier" },
+  /* Verifying, and — since Flow 7 — where NDI may send a verifier's
+     customers back to (SCR-PRS-06), beside it as UX-EW-04 places it. */
+  {
+    label: "Verification",
+    icon: "verify",
+    personas: ORG_OWNERS,
+    needs: "verifier",
+    children: [
+      { label: "Verify credentials", href: "/verification", icon: "verify" },
+      { label: "Return addresses", href: "/verification/return-addresses", icon: "link" },
+    ],
+  },
 
   /* ---- NDI Studio — NDI's own organisation only ----------------------
      These were taken out of the nav when this console became one entity's
@@ -274,7 +320,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
          workspace is theirs to see — only what NDI's own organisation has. */
       if (platformAdmin) return Boolean(item.ndi) && inNdi;
       if (item.ndi === "only") return false;
-      if (item.needs === "no-holder" && can("holder")) return false;
+      if (item.needs === "no-holder" && (can("holder") || org?.statutory)) return false;
       if (item.needs && item.needs !== "no-holder" && !can(item.needs)) return false;
       if (item.label === "Approvals") return canDecideApprovals;
       /* Appeals exist for someone who has held an authority that could be
