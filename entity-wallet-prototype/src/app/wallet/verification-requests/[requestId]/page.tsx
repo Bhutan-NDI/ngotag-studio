@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
+/* The pre-spec request screen chose attributes to disclose, which
+   EW-FLOW7-SD/D4 rules out; its requests were replaced along with it, so
+   an old link goes to Sharing rather than to a request that no longer
+   exists. */
+import { redirect } from "next/navigation";
 
-import { PresentProofView } from "@/features/wallet/PresentProofView";
-
-export const metadata: Metadata = { title: "Present a proof — NDI Studio" };
-
-export default async function PresentProofPage({
-  params,
-}: {
-  params: Promise<{ requestId: string }>;
-}) {
-  const { requestId } = await params;
-  return <PresentProofView requestId={decodeURIComponent(requestId)} />;
+export default function VerificationRequestRedirect(): never {
+  redirect("/wallet/sharing");
 }

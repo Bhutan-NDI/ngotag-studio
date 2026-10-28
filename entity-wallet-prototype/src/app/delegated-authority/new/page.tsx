@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { IssueAuthorityView } from "@/features/delegated/IssueAuthorityView";
-
-export const metadata: Metadata = {
-  title: "Issue authority — NDI Studio",
-};
-
-export default function IssueAuthorityPage() {
-  return <IssueAuthorityView />;
+/* The pre-spec issuance form, replaced by Flow 8's SCR-AUT-02. */
+export default function Page() {
+  redirect("/authority-to-act/give");
 }

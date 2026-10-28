@@ -9,7 +9,8 @@ import { Icon, type IconName } from "@/components/ui/icons";
 import { inOrg, shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { describeRelation } from "@/features/controllership/scopeModel";
+import { describeRelation, formatDate } from "@/features/controllership/scopeModel";
+import { today as todayIso } from "@/lib/sharing";
 
 /**
  * B1 — "what needs me", and a reminder of what the person is allowed to do.
@@ -44,7 +45,7 @@ export function NeedsAttention({ allClear = false }: { allClear?: boolean } = {}
     harness,
     relations,
     offers,
-    verificationRequests,
+    presentationRequests,
     parkedOperations,
     currentPerson,
     personById,
@@ -68,32 +69,33 @@ export function NeedsAttention({ allClear = false }: { allClear?: boolean } = {}
 
   /* Somebody else is blocked. First, always. */
   if (canDecide && !allClear) {
-    for (const operation of parkedOperations.filter(here).filter((p) => p.state === "parked")) {
+    /* Never one's own: a share someone chose is theirs to wait on, not
+       theirs to approve (SCR-PRS-04 "Own initiation"). */
+    for (const operation of parkedOperations.filter(here).filter((p) => p.state === "parked" && p.requestedBy !== persona)) {
+      const share = operation.operation === "proof:present" && operation.targetId;
       tasks.push({
         key: operation.id,
         icon: "userCheck",
-        label: operation.summary,
-        detail: `${personById(operation.requestedBy).name} is waiting on a decision`,
-        href: `/approvals/${operation.id}`,
+        label: share ? `${personById(operation.requestedBy).name} wants to share this with ${operation.targetRelyingParty}` : operation.summary,
+        detail: share ? operation.summary : `${personById(operation.requestedBy).name} is waiting on a decision`,
+        href: share ? `/wallet/sharing/${operation.targetId}/approve` : `/approvals/${operation.id}`,
         expiresAt: operation.expiresAt,
         emphasis: true,
       });
     }
   }
 
-  /* A relying party is waiting. */
+  /* An organisation is asking (Flow 7). The state in words SCR-PRS-05
+     uses, and the page where anyone here may answer or pass it on. */
   for (const request of allClear
     ? []
-    : verificationRequests.filter(here).filter((v) => v.state === "ready")) {
+    : presentationRequests.filter(here).filter((v) => v.status === "OPEN" && v.expiresAt >= todayIso())) {
     tasks.push({
       key: request.id,
       icon: "verify",
-      label: `${request.relyingParty} is asking for a proof`,
-      detail:
-        request.decision === "out_of_scope"
-          ? "Not something your authority covers"
-          : `${request.credentialType} · ${request.requiredAttributes.length} attributes needed`,
-      href: `/wallet/verification-requests/${request.id}`,
+      label: `${request.verifierName} is asking — answer by ${formatDate(request.expiresAt)}`,
+      detail: request.asked.map((d) => d.credentialType).join(" and "),
+      href: `/wallet/sharing/${request.id}`,
       expiresAt: request.expiresAt,
     });
   }
@@ -104,13 +106,11 @@ export function NeedsAttention({ allClear = false }: { allClear?: boolean } = {}
       key: offer.id,
       icon: "download",
       label: `${offer.issuer} has offered ${offer.type}`,
-      detail:
-        offer.decision === "out_of_scope"
-          ? "Not something your authority covers"
-          : offer.decision === "requires_approval"
-            ? "Accepting it needs an approver"
-            : "Within your authority",
-      href: `/wallet/offers/${offer.id}`,
+      /* Sent unasked (FLOW-CRD-02), and reviewed on SCR-CRD-04 like a
+         requested one. Accepting never needs an approver: credential:accept
+         is AUTO in every preset (EW-FLOW6-SD §5.3). */
+      detail: "Sent without a request — review it",
+      href: `/wallet/requests/${offer.id}`,
       expiresAt: offer.expiresAt,
     });
   }
