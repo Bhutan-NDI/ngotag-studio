@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
@@ -35,12 +35,14 @@ import { useDemo } from "@/lib/demoStore";
  * visible next to the operation it describes — otherwise they are trusting
  * the screen, which is the thing the signature was supposed to remove.
  *
- * WHY THE DISCLOSURE IS SHOWN, NOT SUMMARISED
+ * SHARES ARE DECIDED ON THEIR OWN SCREEN
  *
- * An approver deciding "present Business Registration to Bank of Bhutan" has
- * not been told what will be disclosed. The attribute list is the substance
- * of what they are approving, so it is listed in full — a count would let
- * somebody approve five attributes believing they had approved two.
+ * A colleague's share waits in the same queue, but it is decided on
+ * SCR-PRS-04 (Flow 7), which shows everything the sharer saw — every
+ * attribute of every credential, because all of it goes (EW-FLOW7-SD/D4) —
+ * and runs the re-checks an approval of a share needs. A link here for one
+ * goes there. The old disclosure panel, with attributes struck through as
+ * "withheld", described a choice JSON-LD credentials don't allow.
  *
  * DUAL CONTROL NEEDS A DIFFERENT PERSON
  *
@@ -54,8 +56,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const router = useRouter();
   const {
     parkedOperations,
-    verificationRequests,
-    offers,
     relations,
     personById,
     harness,
@@ -77,6 +77,16 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const [signing, setSigning] = useState(false);
 
   const operation = parkedOperations.find((p) => p.id === operationId);
+  const isShare = operation?.operation === "proof:present" && Boolean(operation.targetId);
+  /* A grant of authority likewise goes to SCR-AUT-06 (Flow 8). */
+  const isGrant = operation?.operation === "authority:issue" && Boolean(operation.targetId);
+
+  useEffect(() => {
+    if (isShare && operation?.targetId) router.replace(`/wallet/sharing/${operation.targetId}/approve`);
+    if (isGrant && operation?.targetId) router.replace(`/authority-to-act/${operation.targetId}/approve`);
+  }, [isShare, isGrant, operation?.targetId, router]);
+
+  if (isShare || isGrant) return null;
 
   if (!operation) {
     return (
@@ -106,16 +116,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const state = screenState === "reviewable" ? operation.state : screenState;
   const decided =
     state === "approved" || state === "rejected" || state === "expired" || state === "stale";
-
-  /* Whatever this is holding back, so its substance can be shown. */
-  const request = operation.targetId
-    ? verificationRequests.find((v) => v.id === operation.targetId)
-    : undefined;
-  const offer = operation.targetId
-    ? offers.find((o) => o.id === operation.targetId)
-    : undefined;
-
-  const disclosing = request?.disclosing ?? request?.requiredAttributes ?? [];
 
   /* An approver never decides their own request (SAD-EW-01 §8.4;
      FLOW-DEL-01 A2). The store refuses it too; this says why first. */
@@ -239,7 +239,7 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
                     : "—",
                 },
                 ...(operation.targetRelyingParty
-                  ? [{ label: "Relying party", value: operation.targetRelyingParty }]
+                  ? [{ label: "Organisation", value: operation.targetRelyingParty }]
                   : []),
                 {
                   label: "Policy",
@@ -264,72 +264,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
             changed, the fingerprint would change with it.
           </p>
         </Panel>
-
-        {/* ---- The substance ---- */}
-        {request ? (
-          <Panel>
-            <div className="relative z-[4] flex flex-col gap-1">
-              <h2 className="font-display text-[15px] font-semibold text-strong">
-                What would be disclosed
-              </h2>
-              <p className="text-[12.5px] leading-[1.5] text-faint">
-                {disclosing.length} of {request.requestedAttributes.length} attributes
-                the relying party asked for.
-              </p>
-            </div>
-            <ul className="relative z-[4] mt-3 flex flex-wrap gap-1.5">
-              {request.requestedAttributes.map((name) => {
-                const on = disclosing.includes(name);
-                return (
-                  <li
-                    key={name}
-                    className="rounded-full border px-2.5 py-1 text-[12.5px]"
-                    style={{
-                      borderColor: on ? "var(--ndi-mint-40)" : "var(--border-grid)",
-                      background: on ? "var(--ndi-mint-08)" : "transparent",
-                      color: on ? "var(--accent)" : "var(--text-faint)",
-                      textDecoration: on ? undefined : "line-through",
-                    }}
-                  >
-                    {name.replace(/_/g, " ")}
-                  </li>
-                );
-              })}
-            </ul>
-            <p className="relative z-[4] mt-3 text-[12.5px] leading-[1.5] text-muted">
-              Struck through means it was asked for and withheld. You are
-              approving the disclosure on the left, not the request.
-            </p>
-          </Panel>
-        ) : null}
-
-        {offer ? (
-          <Panel>
-            <div className="relative z-[4] flex flex-col gap-1">
-              <h2 className="font-display text-[15px] font-semibold text-strong">
-                What would be accepted
-              </h2>
-              <p className="text-[12.5px] leading-[1.5] text-faint">
-                Offered by {offer.issuer}, read from the offer payload.
-              </p>
-            </div>
-            <ul className="relative z-[4] mt-3 flex flex-col">
-              {offer.attributes.map((attribute, i) => (
-                <li
-                  key={attribute.name}
-                  className={`grid gap-0.5 py-2 min-[521px]:grid-cols-[200px_1fr] min-[521px]:gap-6 ${
-                    i > 0 ? "border-t border-subtle" : ""
-                  }`}
-                >
-                  <span className="text-[12.5px] text-faint">
-                    {attribute.name.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-[13px] text-body">{attribute.value}</span>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ) : null}
 
         {/* ---- Was it in scope ---- */}
         {relation ? (
@@ -450,7 +384,7 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
-              placeholder="The bank does not need the registered address for this. Present without it."
+              placeholder="We haven't agreed this with the supplier yet."
               className={`${FIELD_CLASS} resize-y py-3`}
             />
             <span className="text-[12px] leading-[1.5] text-faint">

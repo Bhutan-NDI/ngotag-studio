@@ -62,7 +62,7 @@ export function MyAuthorityView() {
             <EmptyState
               icon="lockRounded"
               title="Nothing has been granted to you"
-              message="You do not act for this entity through the console. If you hold a role or capability credential, it lives in your own wallet and is checked wherever you use it."
+              message="You do not act for this organisation through the console. If someone has given you authority to act for it, it lives in your own Bhutan NDI app and is checked wherever you use it."
             />
           </Panel>
         </div>

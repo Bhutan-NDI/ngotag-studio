@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
 import { DataTable } from "@/components/ui/DataTable";
+import { Dialog } from "@/components/ui/Dialog";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
-import { roleIn, type OrgInvitation } from "@/lib/demoData";
+import { NDI_SERVICE_PRINCIPAL, roleIn, type OrgInvitation } from "@/lib/demoData";
+import { formatDate } from "@/features/controllership/scopeModel";
 import { presetOf, presetsOf } from "@/features/appointment/presets";
 import { useDemo } from "@/lib/demoStore";
 
@@ -33,9 +37,20 @@ import { PendingInvitations } from "./PendingInvitations";
  * not been checked against the register — anchoring happens when someone
  * takes on accountability, not when they join (Flow 1 design D3) — and act 2
  * will refuse to grant them authority until it has.
+ *
+ * NDI'S SERVICE ACCOUNT IS LISTED HERE
+ *
+ * A designated authority's owner granted it membership (FLOW-ORG-02 step
+ * 2 / A2), and SCR-DSG-03 promised it would appear here and could be
+ * removed from here without asking NDI (Q6). Remove calls the same store
+ * action as "Remove NDI's access" on the authority console and SCR-ADO-04
+ * — one control, one end state (EW-FLOW5-SD §4.4, E8).
  */
 export function MembersView() {
-  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson, delegatedAuthorities } = useDemo();
+  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson, designations, personById, setNdiAccess } =
+    useDemo();
+  const [removing, setRemoving] = useState(false);
+  const [removed, setRemoved] = useState(false);
 
   const forced = useScreenState("SCR-INV-03", ["default", "loading", "empty", "delivery_failed", "offline", "read_only"]);
 
@@ -48,6 +63,9 @@ export function MembersView() {
     .map((p) => ({ ...p, role: roleIn(org, p) }));
   const myRole = roleIn(org, currentPerson);
   const canInvite = forced !== "read_only" && (myRole === "Owner" || myRole === "Admin");
+  /* The designation whose grant put NDI's service account here, if any. */
+  const dsg = designations.find((x) => x.orgId === activeOrgId && (x.state === "ACTIVE" || x.state === "SUSPENDED") && x.ndiAccess !== null);
+  const canRemove = myRole === "Owner" && forced !== "read_only" && forced !== "offline";
 
   const live = orgInvitations.filter(
     (i) => i.kind === "M" && i.orgId === activeOrgId && (i.state === "PENDING" || i.state === "PENDING_APPROVAL"),
@@ -79,20 +97,15 @@ export function MembersView() {
     forced === "empty" ? [] : forced === "delivery_failed" && !live.some((i) => i.delivery === "failed") ? [bounced, ...live] : live;
 
   /* Membership and authority side by side: what each person may do for the
-     organisation, by whichever route it was granted — a controllership they
-     accepted, or a role or capability in their own wallet — and an
-     appointment still waiting on them, so the owner can see it is not yet in
-     force. */
+     organisation — an appointment they accepted — and an appointment still
+     waiting on them, so the owner can see it is not yet in force. Authority
+     given to act from someone's own Bhutan NDI app isn't listed here: that
+     person needs no account and isn't a member (EW-FLOW8-SD D10); it is on
+     the Authority page. */
   const authorityOf = (personId: string) => {
     const r = relations.find((rel) => rel.personId === personId && rel.state === "ACTIVE");
     if (r) return r.isRootAuthority ? "Representative" : `Can act · ${presetsOf(r).map((id) => presetOf(id)?.label).join(", ") || "set individually"}`;
-    const held = delegatedAuthorities.filter(
-      (a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "accepted",
-    );
-    if (held.length) return `Role in their wallet · ${held.map((a) => a.title).join(", ")}`;
-    const waiting =
-      relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE") ||
-      delegatedAuthorities.some((a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "sent");
+    const waiting = relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE");
     return waiting ? "Appointed — waiting for them to accept" : null;
   };
 
@@ -144,7 +157,7 @@ export function MembersView() {
                     <td>
                       {authority ? (
                         <Link
-                          href={authority.startsWith("Role in") ? "/delegated-authority" : "/people-who-can-act"}
+                          href="/people-who-can-act"
                           className="ndi-plainlink text-body"
                         >
                           {authority}
@@ -156,9 +169,58 @@ export function MembersView() {
                   </tr>
                 );
               })}
+              {dsg?.ndiAccess === "ACTIVE" ? (
+                <tr>
+                  <td>
+                    <span className="flex flex-col">
+                      <span className="text-body">{NDI_SERVICE_PRINCIPAL}</span>
+                      <span className="text-[12px] text-faint">
+                        Added by {dsg.ndiGrant ? `${personById(dsg.ndiGrant.by).name}, ${formatDate(dsg.ndiGrant.at)}` : "your organisation's owner"}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="text-body">Service account</td>
+                  <td>
+                    <StatusPill status="not_set_up" label="Not a person" />
+                  </td>
+                  <td>
+                    <span className="flex flex-wrap items-center gap-3">
+                      <span className="text-body">Sends only the request you approved, in your name</span>
+                      {canRemove ? <HairlineButton onClick={() => setRemoving(true)}>Remove</HairlineButton> : null}
+                    </span>
+                  </td>
+                </tr>
+              ) : null}
             </DataTable>
           )}
         </Panel>
+        {dsg?.ndiAccess === "REMOVED" ? (
+          <p role="status" className="m-0 max-w-[70ch] text-[13px] leading-[1.6] text-body">
+            {removed
+              ? "NDI's service account can no longer send requests in your name. What you've agreed stays agreed."
+              : `NDI's service account was removed${dsg.ndiAccessChangedAt ? ` on ${formatDate(dsg.ndiAccessChangedAt)}` : ""}${dsg.ndiAccessChangedBy ? ` by ${personById(dsg.ndiAccessChangedBy).name}` : ""}. It can no longer send in your name.`}{" "}
+            <Link href="/authority" className="ndi-plainlink font-medium text-accent">
+              Turn it back on from your authority console
+            </Link>
+          </p>
+        ) : null}
+
+        {dsg ? (
+          <Dialog
+            open={removing}
+            onClose={() => setRemoving(false)}
+            tone="danger"
+            title="Remove NDI's service account?"
+            lead="It will no longer be able to send requests in your name — from this moment. What you've agreed stays agreed, and you can turn it back on."
+            consequences={["Businesses can't verify with you while it's removed", "Businesses already verified are not affected"]}
+            confirmLabel="Remove"
+            onConfirm={() => {
+              const r = setNdiAccess(dsg.id, false);
+              setRemoving(false);
+              if (r.ok) setRemoved(true);
+            }}
+          />
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <h2 className="font-display text-[16px] font-semibold text-strong">Invitations waiting</h2>

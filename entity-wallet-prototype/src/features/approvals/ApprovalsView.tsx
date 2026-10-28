@@ -28,6 +28,14 @@ import { useDemo } from "@/lib/demoStore";
  * opening this is "what will lapse if I go to lunch", and sorting by date
  * answers a different question.
  */
+/* What each kind of held-back action is, in the words the screens use —
+   never the operation names, which say "present" for what the business
+   calls sharing (UX-EW-04 §2.4). */
+const KIND: Record<string, string> = {
+  "proof:present": "Sharing",
+  "authority:issue": "Giving authority",
+};
+
 export function ApprovalsView() {
   const { parkedOperations, personById } = useDemo();
 
@@ -41,6 +49,16 @@ export function ApprovalsView() {
   );
 
   const showing = variant === "empty" ? [] : variant === "history" ? decided : live;
+
+  /* A colleague's share is decided on SCR-PRS-04, which shows everything
+     they saw (Flow 7); the queue only lists it beside everything else. */
+  const href = (operation: (typeof parkedOperations)[number]) =>
+    operation.operation === "proof:present" && operation.targetId
+      ? `/wallet/sharing/${operation.targetId}/approve`
+      : /* A colleague's grant of authority is decided on SCR-AUT-06 (Flow 8). */
+        operation.operation === "authority:issue" && operation.targetId
+        ? `/authority-to-act/${operation.targetId}/approve`
+        : `/approvals/${operation.id}`;
 
   return (
     <AppShell>
@@ -87,7 +105,7 @@ export function ApprovalsView() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex min-w-0 flex-col gap-1">
                         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">
-                          {operation.operation.replace(/:/g, " · ")}
+                          {KIND[operation.operation] ?? operation.operation}
                         </p>
                         <p className="font-display text-[15px] font-semibold leading-[1.3] text-strong">
                           {operation.summary}
@@ -166,7 +184,7 @@ export function ApprovalsView() {
 
                       {operation.state === "parked" ? (
                         <Link
-                          href={`/approvals/${operation.id}`}
+                          href={href(operation)}
                           className="ndi-hairline-btn inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-grid px-3.5 font-display text-[13px] font-medium"
                         >
                           Review and decide
@@ -174,7 +192,7 @@ export function ApprovalsView() {
                         </Link>
                       ) : (
                         <Link
-                          href={`/approvals/${operation.id}`}
+                          href={href(operation)}
                           className="ndi-plainlink text-[12.5px] font-medium text-muted"
                         >
                           Open

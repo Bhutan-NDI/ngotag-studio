@@ -174,39 +174,108 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
-    area: "Delegated authority",
+    area: "Giving authority to act",
     icon: "send",
     rows: [
       {
-        shown: "A credential arriving in someone's personal wallet",
+        shown: "A clearing agent collecting authority from a link, proving who she is with Bhutan NDI",
         reality:
-          "A row in browser storage, and a button labelled “simulate accepting”. Nobody's phone receives anything.",
-        needs: "Role and Capability issuance carrying the public constraint schema.",
-      },
-      {
-        shown: "A signed PASS / FAIL decision at a counterparty",
-        reality:
-          "Derived live, in the browser, by a stand-in that walks the real chain and fails closed. The logic is genuine; the service is not, and the signature is a random string of the right shape.",
+          "The claim page is real in its rules — nothing is shown before the identity matches, a dead link names nobody, three mismatches end it — but the Bhutan NDI app is a dashed panel: \"Share <name>'s ID\" picks one of four invented citizens, and \"Accept in the app\" stands in for the app's offer screen. No identity request is sent, no presentation verified, no credential offered or signed.",
         needs:
-          "The Authority Verification API itself, independently scaled, plus a live status query on the revocation agent.",
+          "The claim page outside Studio sign-in, the identity request through NDI's verification organisation with the grant's challenge, the G8 match, and an authority-only issuance route that the capability gate admits for one grant in ISSUING (EW-FLOW8-SD §7.1, §11.2).",
       },
       {
-        /* The one row here about a counterparty rather than about NDI. It is
-           needed because the verifier page is drawn as the Single Window
-           convincingly enough — its own chrome, "not part of NDI Studio" — that
-           the natural conclusion is that BNSW exists and is ready to integrate.
-           It is neither yet, and delegation is fast-follow scope precisely
-           because it waits on a counterparty like this one. */
-        shown: "The Bhutan National Single Window checking an authority",
+        shown: "The ID number matched without being kept",
         reality:
-          "The Single Window is not live yet — its main system was still being procured when this was built (August 2026). The page is a stand-in drawn as BNSW because that is the eventual counterparty. Customs today runs on the Department of Revenue & Customs' eCMS, which licenses clearing agents and is the likely interim integration.",
-        needs:
-          "BNSW itself, or an eCMS integration in the meantime — and an agreed service level with whichever it is for the Authority Verification API.",
+          "The number becomes a string hash mixed with the organisation's id the moment Give authority is pressed, and that is all that is stored — and it is cleared when the grant ends. The hash is not a keyed HMAC and would not protect a real 11-digit number; until then the number sits in the form's draft in your browser.",
+        needs: "An HMAC with a per-organisation key in the key management service, never logged (FLOW-AUT-01 S4).",
       },
       {
-        shown: "Revocation reaching a verifier within a minute",
-        reality: "Instant, because both sides are the same browser tab. Nothing propagates anywhere.",
-        needs: "Status lists, and cache invalidation on the revocation agent.",
+        shown: "Pelden being added to NDI's list of trusted organisations on its first grant",
+        reality:
+          "A dashed step — \"NDI's list confirms\" or \"can't be confirmed for 24 hours\" — and a field on the organisation. No did:ethr is created, nothing is written to the Trust Registry, and no primary DID is switched.",
+        needs: "Authenticated Trust Registry writes, the Capability-type listing and the primary-DID switch after listing (FLOW-AUT-01 P5, P8; §7.1).",
+      },
+      {
+        shown: "The business licence the agent acts under, and whether it can be named",
+        reality:
+          "Pelden's licence comes from a dashed step, because the ministry doesn't offer one on request in the prototype. Whether a licence may be relied on by someone acting for the holder is a constant in lib/authority.ts standing in for the Trust Registry's delegable flag, which doesn't exist yet. Revoking it is a dashed step on the waiting authority.",
+        needs: "MoICE issuing revocable business licences marked delegable (FLOW-AUT-01 P7), the delegable flag (D9), and the held-credential index carrying licence numbers (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "Revocation ids, registered when the agent accepts",
+        reality: "A generated id on the grant, discarded if the offer isn't accepted. \"Accept — the registration is slow\" shows E17. Nothing is registered anywhere.",
+        needs: "Revocation for platform-issued credentials (FLOW-AUT-01 P6, D23).",
+      },
+      {
+        shown: "Seven days passing, thirty minutes passing",
+        reality: "Dashed buttons that move the date back. Real dates are also read: a link or approval left seven days lapses on load.",
+        needs: "The service's own timers.",
+      },
+      {
+        shown: "Who is told — approvers asked, the link ready, the Root told a link is out and how it ended",
+        reality:
+          "Where UX-EW-05 §3.5 gives the words they are used verbatim; the approvers' notice, \"the link is ready\" and the Root's notices are the prototype's. Each is a line in the organisation's activity feed naming who it goes to. The Root's notice that someone else cancelled a grant is E14's, word for word; the grantor's, when it wasn't the grantor who cancelled, is the prototype's.",
+        needs: "In-app and email delivery, and those lines in UX-EW-05 §3.5.",
+      },
+      {
+        shown: "A link opened again while the authority is being collected",
+        reality:
+          "A dashed \"Open the link again, on another phone\" step. The page asks for identity again; on a match the first offer is withdrawn, its id discarded, and a new one made with a new 30 minutes — or, once accepted, nothing new (E18). The prototype keeps one did:key per person, so the new offer goes to the same one, not to the phone that opened the link.",
+        needs: "The offer made to the did:key that signed the new presentation, with withdrawal and acceptance serialised (FLOW-AUT-01 E18).",
+      },
+      {
+        shown: "The limit, always per declaration",
+        reality: "The form offers nothing else and every authority is written per declaration (EW-FLOW8-SD D25). Nothing adds up what has been declared in total.",
+        needs: "A running total, which the specification marks as later (EW-FLOW9-SD §8.2).",
+      },
+    ],
+  },
+  {
+    area: "Acting for a company at the Single Window",
+    icon: "shieldCheck",
+    rows: [
+      {
+        shown: "The Bhutan National Single Window's website",
+        reality:
+          "A dashed stand-in at /simulated/bnsw — the whole site inside one dashed frame, because SCR-AUT-07 is BNSW's screen, not NDI's. Signing in to it picks one of four invented citizens. Its records panel shows what BNSW's back end would keep; all of it is in your browser.",
+        needs: "BNSW building SCR-AUT-07, B0–B4, the authority session, the per-declaration check and the limit against EW-FLOW9-CIG (FLOW-AUT-02 P6).",
+      },
+      {
+        shown: "Pema sharing her citizen ID and her authority from her app",
+        reality:
+          "A dashed panel standing in for the app's own screen (SCR-AUT-08). Which authorities her app holds is read from the grants the story made. No proof request is sent, nothing is presented over DIDComm, and nothing is signed. \"A copied authority, signed with another key\" is how V2's failure is reached.",
+        needs: "client-service's proof request with two descriptors, and the app rendering a Capability credential and offering a choice between companies (§13 item 7).",
+      },
+      {
+        shown: "The checks at sign-in — NDI's V1–V6, then BNSW's B0–B4",
+        reality:
+          "lib/bnsw.ts reads the demo state in the order the solution design gives, stopping at the first failure, and reads Flow 8's own grant: its publishing DID, revocation id, licences and limit. Nothing cryptographic happens: V1 and V6 always pass for a grant the story made. B4 looks up the TPN and every registered licence the authority names. The result lists each check's outcome, which client-service doesn't forward yet — a failed check is still reported as validated today (R11).",
+        needs: "client-service forwarding the true outcome, V2–V6, the per-credential result fields and POST /status (FLOW-AUT-02 P3).",
+      },
+      {
+        shown: "A withdrawal reaching BNSW",
+        reality:
+          "Withdrawing, pausing and resuming are dashed steps standing in for catalogue flow 11, which has no specification. The status changes at once, and BNSW sees it on its next check — the next declaration. DA-CORE's target is within 60 seconds of the action; the prototype shows it as immediate.",
+        needs: "Flow 11, revocation for platform-issued credentials, and the 60-second propagation DA-CORE sets.",
+      },
+      {
+        shown: "The tax office revoking a TPN, and the ministry suspending a licence",
+        reality:
+          "Dashed steps under the Single Window's page. Each flips the held credential's status in your browser; nothing in the Entity Wallet does this. BNSW looks the TPN and the licences up at B4 when a session opens (E11), and again at each declaration (E12, which ends the session and keeps the draft). A licence the ministry suspends can't be reinstated here; the tax office's TPN can.",
+        needs: "DRC and MoICE issuing revocable credentials (FLOW-AUT-02 P5), and client-service's POST /status answering for their revocation ids (P3).",
+      },
+      {
+        shown: "Pelden registering with the Single Window",
+        reality:
+          "Flow 7's share from a website, with BNSW asking for the registration, the TPN and the business licence. The store writes BNSW's record when the share goes through, with Pelden's publishing DID when it is listed as able to give authority. The holder DID and revocation ids in it are strings made up from the credential ids.",
+        needs: "The registration result's holderPublishingDid (FLOW-AUT-02 P4), and revocation ids on MoICE's and DRC's credentials (P5).",
+      },
+      {
+        shown: "Choices the specification leaves open, made here",
+        reality:
+          "BNSW's sign-in lasts eight hours (§13 item 8 is open). When the revocation service doesn't know an authority at all, E12's reason is \"it can't be found at NDI\" — the list in E12 has none for that. The label Amend is the prototype's too. \"Checking…\" has a line under it saying what is being looked at. A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
+        needs: "The specification to settle each.",
       },
     ],
   },
@@ -245,6 +314,178 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
+    area: "Designating an authority",
+    icon: "shieldCheck",
+    rows: [
+      {
+        shown: "Which authority confirms which kind of business",
+        reality:
+          "Designations and adoptions in your browser decide which types can be verified. The Corporate Regulatory Authority's is seeded as done; nothing reads a register or a schema.",
+        needs: "The designation register and the adoption records in the Entity-Wallet Service, read by FLOW-ORG-01 P3 on every verification.",
+      },
+      {
+        shown: "Activation checks — issuing identity, set-up, entitlements",
+        reality:
+          "Read from fields on the organisation in the demo data. \"Grant them\" flips a list in your browser; no marketplace is asked. The owner's grant to NDI's service account, and the account accepting it, are fields on the designation — no invitation is sent and no membership row is written.",
+        needs: "Reads of org_agents, the ledger namespace and the marketplace entitlements; the owner's VERIFIER invitation to the service principal (POST /orgs/:orgId/invitations) and the principal accepting it in its own session.",
+      },
+      {
+        shown: "NDI's service account in the members list, removed and turned back on",
+        reality:
+          "A row drawn from the designation, not a member record. Removing it — from Members, the console or Stop something — flips the same field and marks the authorisation rows in your browser withdrawn; turning it back on writes new ones.",
+        needs: "The membership in user_org_roles, removable by the organisation's owner, and the authorisation records moving with it (EW-FLOW5-SD §4.4).",
+      },
+      {
+        shown: "\"Change it to another did:ethr\" on the authority console",
+        reality:
+          "A prototype control. Nothing in the prototype changes an organisation's primary DID, so this stands in for a member doing it; the designation is compared with the DID recorded at activation and suspended.",
+        needs: "E10 detection on next use, against publishingDid (FLOW-ORG-02 AC-08a), and telling both parties.",
+      },
+      {
+        shown: "Days left, lapses and reminders on designations",
+        reality:
+          "Worked out from dates when a page loads. A proposal past 30 days lapses then; \"reminder sent\" means 10 working days have passed — nobody is emailed.",
+        needs: "Scheduled lapses (E6, E13) and reminders to administrators.",
+      },
+      {
+        shown: "Adopting what people will be asked, and stopping it",
+        reality:
+          "Version numbers and states in your browser. No schema is published, no proof request is stored, and stopping something changes only which types the demo treats as connected.",
+        needs: "Write-once schema publication, the versioned proof request and authorisation written in one transaction, and the service account's permission enforced at the agent.",
+      },
+      {
+        shown: "\"NDI revises the draft\" after an objection",
+        reality:
+          "A prototype control. Every open objection holds adoption of what it covers until NDI revises the draft or the officer withdraws it; nothing on NDI's side drafts anything, so this button stands in for NDI sending a new draft — without the item the objection named, if it named one.",
+        needs: "NDI's side of the objection: being told, revising the draft, and the objection record keeping how it closed (FLOW-ORG-03 A5).",
+      },
+      {
+        shown: "The second approver is always a named administrator",
+        reality:
+          "UX-EW-02 lets the root account approve a designation; FLOW-ONB-02 v0.6 is later and says the root account approves nothing. The prototype follows the later document.",
+        needs: "The two documents agreeing.",
+      },
+    ],
+  },
+  {
+    area: "Receiving a credential",
+    icon: "credentials",
+    rows: [
+      {
+        shown: "Pelden shares its registration with the tax office, and the office checks it",
+        reality:
+          "A timer moves the request from sending to waiting. No proof is requested or presented, no signature is checked, and the office's \"Verified\" panel reads Pelden's registration straight from the demo data.",
+        needs: "The organisation's agent presenting the whole credential to the issuer's proof request, verified at the issuer before the request reaches anyone (FLOW-CRD-01 steps 4–8).",
+      },
+      {
+        shown: "The tax office issues, and Pelden accepts",
+        reality:
+          "Issuing writes an offer into your browser; accepting copies it into Pelden's held credentials. Nothing is signed, nothing is stored in a wallet, and the 30-day offer window is a date nothing enforces except the accept button.",
+        needs: "A credential offer over DIDComm to the organisation's agent, stored on acceptance, with the issuer's standing checked against NDI's list at that moment.",
+      },
+      {
+        shown: "\"Ask, and have it ask for a bank account too\"",
+        reality:
+          "A prototype control on the ask screen. No issuer system exists to ask for more; the button writes the wider ask into the request before anything is shared, so the consent screen can be shown.",
+        needs: "The issuer's proof request, compared with what the business agreed to before anything more is shared.",
+      },
+      {
+        shown: "\"Take it off the list\" and \"Make the list unreachable\"",
+        reality:
+          "Prototype controls on the review screen. Nothing checks NDI's list when Accept is pressed; these mark what the next check would find, so the delisted and can't-check messages can be shown.",
+        needs: "C2 run again against the Trust Registry at the moment of accepting (FLOW-CRD-01 E19, FLOW-CRD-02 E9).",
+      },
+      {
+        shown: "Offers sent without a request, and one replacing a credential already held",
+        reality:
+          "Seeded rows in your browser. No issuer sends anything; superseding is a field the demo store sets on the older credential when the newer one is accepted.",
+        needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "The tax office's system answers a request by itself",
+        reality:
+          "A timer in your browser. A few seconds after a request for the bonded-warehouse authorisation reaches the office, the demo writes the answer a system would send — the example values from the offering — recorded against the first client you created, and adds credential-request.received and credential-request.issued to the delivery log. No URL is called, no register is looked up and nothing is signed. \"Have it refer the next request\", \"Have it not pick up the next request\" and \"Have your system answer it now\" are prototype controls standing in for the system referring a request with a note, a webhook nobody answers, and the system and an officer answering at once, where the first answer wins. Whether the Department of Revenue & Customs answers this way at all is still open with GovTech (REQ-EW-01 item 23), so the taxpayer number stays with the officers' queue and the prototype shows the path without deciding it.",
+        needs: "The request service's outbox and signed delivery, the issuer request API with client credentials (offer, decline, refer), compare-and-set on the answer, and the one-hour check that puts a request nobody picked up in the queue (FLOW-CRD-03 steps 5–7, E6, E10, A2; EW-FLOW6-IIG).",
+      },
+      {
+        shown: "Integration settings — webhook, secret, clients, delivery log",
+        reality:
+          "Fields in your browser. No URL is called, no secret exists behind the mask, and the test event and its latency are made up on the spot.",
+        needs: "Signed webhook delivery from an outbox with retries, client credentials for the issuer's system, and the fallback to the officers' queue.",
+      },
+      {
+        shown: "Creating a new offering",
+        reality:
+          "Not built. Existing offerings can be paused, retired or given a new version; a new one needs a prerequisite chooser limited to the office's approval to verify, which the prototype doesn't model.",
+        needs: "SCR-CRD-07's composer, reading the issuer's verifier scope.",
+      },
+    ],
+  },
+  {
+    area: "Presenting a credential",
+    icon: "send",
+    rows: [
+      {
+        shown: "Bank of Bhutan's website, its application number and its return page",
+        reality:
+          "A dashed stand-in at /simulated/bank, drawn to the verifier integration guide's §5. Pressing its button creates a session in your browser; its return page reads the session back from the demo store and shows what the fetched status means. No bank system exists, and nothing leaves the browser.",
+        needs: "A first bank's eKYB journey changed to start a session, redirect, park a pending application and fetch the result from its back end (EW-FLOW7-SD §13 item 4).",
+      },
+      {
+        shown: "Signing in with Bhutan NDI when the link opens",
+        reality:
+          "The dashed step signs in as whoever the demo is driven as. The 15- and 30-minute windows are real timestamps in your browser; nothing about the session survives on a server.",
+        needs: "Studio keeping the session reference through the existing Bhutan NDI sign-in, and the presentation-session routes (§7.1).",
+      },
+      {
+        shown: "The proof request arriving, the checks, and the share being sent",
+        reality:
+          "No invitation is received, no DIDComm request arrives and nothing is presented or signed. V1/V2 read whether the organisation has the verifier capability; V7 reads the held credentials. The bank's verified result is the demo's own data.",
+        needs: "Organisation-level presentation in the agent (shared with Flow 6), the holder-side request record and checks V1–V7, and the issuer check in verification (D5).",
+      },
+      {
+        shown: "Requests arriving with nobody at a website, a refused sender, and NDI's list being unreachable",
+        reality: "Dashed buttons on Sharing that add requests to the demo store, and one that makes NDI's list answer.",
+        needs: "A verifier sending a proof request on an existing connection, the connection counterparty record (§6), and Trust Registry re-checks with back-off.",
+      },
+      {
+        shown: "A bank cancelling a request",
+        reality: "A dashed button that marks the request cancelled and removes any approval waiting on it.",
+        needs: "The verifier's DELETE on its session, or a problem report on the exchange.",
+      },
+      {
+        shown: "Who is told — a request waiting, one left undecided, passed on, approvers asked, a share approved or not, the representative told of a share, a request open again",
+        reality:
+          "The wording is UX-EW-04 §3.5's notification table, word for word, and each is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. Ten minutes passing with a website request undecided is a dashed button on Sharing; keeping it for later sends the same notice at once. An approver's note is never in the notice, only in the wallet.",
+        needs: "In-app and email delivery, with the link opening the right screen after sign-in.",
+      },
+      {
+        shown: "A request held while NDI's list is checked",
+        reality:
+          "A dashed sign-in on the wallet's page, and a dashed button on Sharing, stand in for NDI's list being out of reach. As UX-EW-04 v0.3 says, a request held this way from a website is listed on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer; one that arrived on a connection isn't listed at all until it passes. Nobody is told until it does.",
+        needs: "Trust Registry re-checks with back-off, and the RECEIVED state on the holder-side request record.",
+      },
+      {
+        shown: "Where NDI sends people back to",
+        reality:
+          "Return addresses are kept in your browser; the fresh Bhutan NDI sign-in for each change is a dashed step, and \"sent to every owner and to NDI\" is a line in the activity feed.",
+        needs: "SCR-PRS-06's registration with exact matching, step-up sign-in, audit and notification.",
+      },
+      {
+        shown: "Refused shares and approvals on the record",
+        reality:
+          "A share refused for want of Share or outside its reach, an approval of one's own share, and a sharer whose standing lapsed before approval each add a row to the audit trail in your browser, with the relation, the request and the reason (FLOW-PRS-01/02 §10). The screens never offer the first two, so they are reached only by calling the store.",
+        needs: "The same rows written by the presentation-request routes when they refuse, in the append-only store.",
+      },
+      {
+        shown: "A sharer whose appointment ends while their share waits for approval",
+        reality:
+          "The store checks for it when the share is approved (FLOW-PRS-02 E11), but nothing in the prototype ends an appointment, so it is shown through the state switcher on the approval screen.",
+        needs: "Ending or suspending an appointment (catalogue flow 11).",
+      },
+    ],
+  },
+  {
     area: "The record",
     icon: "fileText",
     rows: [
@@ -265,7 +506,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
 ];
 
 const REAL = [
-  "The authority model — controllership, scope, approval policy, the Role and Capability chain, and how they relate.",
+  "The authority model — controllership, scope, approval policy, authority given to a person in their own wallet, and how they relate.",
   "The plain-language scope grammar, and the claim that a person can read an authority in five seconds.",
   "Every screen, state and refusal, including the ones nobody clicks their way to.",
   "The order of the flows, and which surface each step belongs to.",
@@ -374,7 +615,7 @@ export function WhatsRealView() {
             </h2>
             <p className="max-w-[64ch] text-[13.5px] leading-[1.65] text-body">
               There is no server, no database, no register integration, no
-              Authority Verification API and no wallet. There is no network layer at
+              verification service and no wallet. There is no network layer at
               all — the application makes no requests. Every organisation,
               person, credential, approval and decision you see lives in your
               browser&rsquo;s local storage and can be wiped with one button.

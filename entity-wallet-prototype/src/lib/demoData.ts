@@ -102,6 +102,14 @@ export interface Organization {
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
+  /**
+   * Constituted by statute or executive order, with no register to verify it
+   * against — a ministry, an authority. It is an issuer and a verifier and
+   * never a holder, so it has no business-verification route; it reaches the
+   * platform through a designation or an approval (EW-FLOW2-SD v0.13 §2.2,
+   * D4; FLOW-ORG-01 §1.2).
+   */
+  statutory?: boolean;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -142,6 +150,30 @@ export interface Organization {
   pendingDid?: string;
   /** Its name on the register, when that differs from how it is known. */
   legalName?: string;
+  /**
+   * Its primary issuing identity — what FLOW-ORG-02 P4 reads. Named by
+   * method only on SCR-DSG-04 and SCR-ACC-03, where someone acts on it.
+   */
+  issuingDid?: string;
+  /** Whether its agent and wallet are provisioned (FLOW-ORG-02 P3). */
+  agentReady?: boolean;
+  /** Marketplace entitlements, read directly — never inferred (P5). */
+  entitlements?: string[];
+  /**
+   * Flow 8 — its listing on NDI's list of trusted organisations as an issuer
+   * of authority, written when it makes its first grant (EW-FLOW8-SD D5,
+   * §7.1). `did` is the publishing did:ethr made in the grantor's session;
+   * it becomes the primary DID once listed, which the prototype records
+   * here rather than on `publicDid`, so Flow 4's accreditation screens don't
+   * read it as an approval to verify. `firstNotice` is SCR-AUT-01's
+   * first-grant notice, naming the counterparty, until dismissed.
+   */
+  authorityListing?: {
+    status: "PENDING" | "CURRENT" | "TERMINATED";
+    did: string;
+    listedAt: string | null;
+    firstNotice?: string | null;
+  };
 }
 
 /** An invitation to join an ecosystem, as opposed to an organization. */
@@ -270,6 +302,8 @@ export type PersonaId =
   | "ugyen"
   | "invitee"
   | "yeshey"
+  | "kesang"
+  | "deki"
   | "root"
   | "tshering"
   | "tshendu";
@@ -295,6 +329,8 @@ export const PERSONAS: PersonaId[] = [
   "ugyen",
   "invitee",
   "yeshey",
+  "kesang",
+  "deki",
   "root",
   "tshering",
   "tshendu",
@@ -640,7 +676,31 @@ export interface HeldCredential {
   receivedAt: string;
   expiresAt: string | null;
   status: "active" | "expired" | "revoked";
+  /**
+   * The held credential that replaced this one: a newer one of the same type
+   * from the same issuer DID, accepted by either route (EW-FLOW6-SD §4.5).
+   * Both are kept — this one is the record — but this one is never presented
+   * as a prerequisite and doesn't count towards one. Which one a relying
+   * party receives is flow 7's: it preselects the newest.
+   */
+  supersededBy?: string;
 }
+
+/**
+ * The held credential a newly stored one would supersede — same
+ * organisation, same type, same issuer DID, not already superseded — or
+ * undefined. One rule for both routes (EW-FLOW6-SD §4.5), read by the store
+ * when it stores and by SCR-CRD-04 when it says "This replaces …".
+ */
+export const supersedes = (
+  held: HeldCredential[],
+  orgId: string,
+  type: string,
+  issuerDid: string,
+): HeldCredential | undefined =>
+  held
+    .filter((c) => (c.orgId ?? PELDEN) === orgId && c.type === type && c.issuerDid === issuerDid && !c.supersededBy)
+    .sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : -1))[0];
 
 /**
  * What the server said about an operation the Controller wants to run.
@@ -648,6 +708,17 @@ export interface HeldCredential {
  */
 export type ScopeDecision = "allowed" | "out_of_scope" | "requires_approval";
 
+/**
+ * An offer sent without a request — the organisation's inbox item
+ * (FLOW-CRD-02). It is reviewed on SCR-CRD-04, the same screen a requested
+ * offer uses, under the same checks.
+ *
+ * Only offers from issuers on NDI's list get here: anything else is refused
+ * on arrival and kept on the Activity tab alone (`RefusedOffer`, D1/D14).
+ * Accepting needs a person with credential:accept and never an approver —
+ * every preset carries it AUTO (EW-FLOW6-SD §5.3) — so there is no
+ * waiting-for-approval state.
+ */
 export interface CredentialOffer {
   id: string;
   /** Whose wallet it was offered to. Absent means Pelden Trading's. */
@@ -655,46 +726,165 @@ export interface CredentialOffer {
   type: string;
   issuer: string;
   issuerDid: string;
-  issuerTrusted: boolean;
   /** Read from the offer payload, not from anything a user typed. */
   attributes: CredentialAttribute[];
-  decision: ScopeDecision;
-  /** Populated when the decision is anything but `allowed`. */
-  decisionReason: string | null;
-  state: "pending" | "parked" | "accepted" | "declined" | "expired";
+  state: "pending" | "accepted" | "declined" | "expired" | "failed";
+  receivedAt: string;
+  /** offerExpiresAt — 30 days from arrival (EW-FLOW6-SD §4.4). */
+  expiresAt: string;
+  /** Who accepted or declined it, and when (Q2). */
+  decidedBy?: PersonId | null;
+  decidedAt?: string | null;
+  /** Why it ended without being added, in words, and the reason code (E9). */
+  failReason?: string | null;
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | null;
+  /**
+   * What re-running C2 at acceptance will find — set only by SCR-CRD-04's
+   * prototype control, standing in for the issuer leaving NDI's list or the
+   * list being out of reach while the offer waited (E9 / FLOW-CRD-01 E19).
+   */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
+}
+
+/**
+ * Flow 7 — a proof request a verifier sent the organisation, on the
+ * holder's side (EW-FLOW7-SD §4.1). One record for both ways a request
+ * arrives: by redirect from the verifier's website (FLOW-PRS-01, with a
+ * session) and on a connection the organisation already has (FLOW-PRS-02).
+ *
+ * WHY THE WHOLE CREDENTIAL, AND NO "DISCLOSING" FIELD
+ *
+ * The pre-spec screen kept a list of the attributes a Controller chose to
+ * disclose, ticked down from what the bank asked for. Entity credentials
+ * are JSON-LD, and a JSON-LD credential signed the way the platform signs
+ * cannot be presented in part (D4). So there is nothing to choose below the
+ * credential: `asked` is what the verifier's request names, kept so the
+ * consent can mark it, and `chosen` is which held credential answers each
+ * descriptor — every attribute of it goes.
+ *
+ * WHERE THE VERIFIER'S NAME COMES FROM
+ *
+ * `verifierName` is the name NDI lists for the verifier organisation, never
+ * one the link or the request supplied (UXD-41). The one exception is a
+ * BLOCKED request whose sender isn't on the platform at all: there is no
+ * listing to read, so the name is what it *claimed*, and the Refused tab
+ * says "claiming to be" for that reason (FLOW-PRS-02 E1).
+ */
+export type PresentationStatus =
+  | "RECEIVED"
+  | "BLOCKED"
+  | "OPEN"
+  | "AWAITING_APPROVAL"
+  | "SHARED"
+  | "DECLINED"
+  | "EXPIRED"
+  | "WITHDRAWN"
+  | "FAILED";
+
+/** Why a check refused a request (EW-FLOW7-SD §6). Shown only on *Refused*. */
+export type BlockedReason = "VERIFIER_NOT_TRUSTED" | "OUT_OF_SCOPE" | "UNSUPPORTED_FORMAT" | "NO_CHALLENGE" | "NO_PURPOSE";
+
+/** One input descriptor: a credential type, and the fields the request names in it. */
+export interface AskedDescriptor {
+  id: string;
+  credentialType: string;
+  fields: string[];
+}
+
+export interface PresentationRequest {
+  id: string;
+  /** Whose wallet was asked. Absent means Pelden Trading's. */
+  orgId?: string;
+  /** The verifier organisation on the platform — null when the sender isn't one. */
+  verifierOrgId: string | null;
+  verifierName: string;
+  verifierDid: string;
+  /** The verifier's reason, in its own words (V6). */
+  purpose: string;
+  asked: AskedDescriptor[];
+  /** FLOW-PRS-01's session, or null for a request on an existing connection. */
+  sessionId: string | null;
+  /** The verifier's own reference, shown with the only-continue-if sentence (D21). */
+  displayReference: string | null;
+  status: PresentationStatus;
+  blockedReason?: BlockedReason | null;
+  /** Which held credential answers each descriptor, recorded at *Share*. */
+  chosen?: Record<string, string> | null;
+  /** The relation of whoever chose *Share* — `initiatedBy` in §4.1. */
+  initiatedBy?: PersonId | null;
+  initiatedAt?: string | null;
+  approvedBy?: PersonId | null;
+  /** The approval waiting on this share (a `proof:present` parked operation). */
+  approvalId?: string | null;
+  /** Who declined, or who shared under AUTO — the person on the History row. */
+  decidedBy?: PersonId | null;
+  decidedAt?: string | null;
+  /** Members who passed it to people who can answer (D13, A4). */
+  passedBy?: PersonId[];
+  /** The last approver's rejection, which sent it back to OPEN (D15). */
+  rejection?: { by: PersonId; note: string; at: string } | null;
+  /** E16/E11 — the sharer whose permission lapsed before approval. */
+  lapsedSharer?: PersonId | null;
+  /** E12 — an identical request already OPEN. */
+  repeatOf?: string | null;
+  /** Why it FAILED, in §3.5's words. */
+  failure?: string | null;
+  /** FLOW-PRS-01 — who redeemed the session: the sharer A3's notice leaves out. */
+  openedBy?: PersonId | null;
+  /** FLOW-PRS-01 A3 — when the people who may answer were told it was left undecided. Once only. */
+  undecidedToldAt?: string | null;
   receivedAt: string;
   expiresAt: string;
 }
 
 /**
- * A relying party asking the entity for a presentation. It arrives as a task
- * in the console — not a deep link — because the entity has no device.
+ * The verifier's side of FLOW-PRS-01 (EW-FLOW7-SD §4.2): what its back end
+ * creates when the person presses *Share from NDI Entity Wallet*. The
+ * browser only ever carries `id`. Its status follows the request once there
+ * is one (§5.1's mapping, `sessionStatusOf`); before that it is stored.
  */
-export interface VerificationRequestTask {
+export type SessionStatus = "CREATED" | "OPENED" | "SHARED" | "PENDING" | "DECLINED" | "EXPIRED" | "FAILED";
+
+export interface PresentationSession {
   id: string;
-  /** Whose wallet was asked. Absent means Pelden Trading's. */
-  orgId?: string;
-  relyingParty: string;
-  relyingPartyDid: string;
-  relyingPartyTrusted: boolean;
-  credentialType: string;
-  /** Everything asked for. */
-  requestedAttributes: string[];
-  /** The subset that is actually required — the least-disclosure default. */
-  requiredAttributes: string[];
-  requestsControllershipProof: boolean;
-  decision: ScopeDecision;
-  decisionReason: string | null;
+  verifierOrgId: string;
+  asked: AskedDescriptor[];
+  purpose: string;
+  /** Which registered return address — never a URL (D9). */
+  returnUrlId: string;
+  /** The verifier website's own value, returned unchanged. */
+  state: string;
+  displayReference: string;
+  status: SessionStatus;
+  /** Milliseconds, because the windows are minutes (D16). */
+  createdAt: number;
+  /** Set by the page once it has loaded in a browser, never by the request
+   *  that serves it — so a link preview neither starts the 30 minutes nor
+   *  uses the link (EW-FLOW7-SD v0.3 §4.2, D16). */
+  firstLoadedAt: number | null;
   /**
-   * What the Controller chose to disclose. Recorded so an approver decides on
-   * the actual disclosure rather than on the request — approving "a
-   * presentation to Bank of Bhutan" without knowing which attributes it
-   * carries is not an approval of anything.
+   * When it was redeemed and the organisation it is bound to from then on
+   * (EW-FLOW7-SD v0.3 §4.2, S7). Never returned to the verifier: before
+   * anything is shared it would tell whoever started the session which
+   * organisation opened the link (§8).
    */
-  disclosing?: string[];
-  state: "ready" | "parked" | "signing" | "presented" | "declined" | "expired";
-  receivedAt: string;
-  expiresAt: string;
+  redeemedAt: number | null;
+  boundOrgId: string | null;
+  requestId: string | null;
+  /** The person went back to the verifier without a final answer. */
+  returnedPending?: boolean;
+}
+
+/** SCR-PRS-06 — an address NDI may send people back to, and its history. */
+export interface ReturnAddress {
+  id: string;
+  orgId: string;
+  returnUrlId: string;
+  url: string;
+  addedBy: PersonId;
+  addedAt: string;
+  removedBy?: PersonId | null;
+  removedAt?: string | null;
 }
 
 export interface ApprovalSignature {
@@ -723,7 +913,8 @@ export interface ParkedOperation {
   relationId: string;
   scopeVersion: number;
   /**
-   * The offer or verification request this is holding back.
+   * The verification request this is holding back. Accepting an offer never
+   * parks: credential:accept is AUTO in every preset (EW-FLOW6-SD §5.3).
    *
    * Without it an approval is a state change and nothing else — the whole
    * point of the queue is that deciding it lets the held operation run, and
@@ -744,81 +935,312 @@ export interface ParkedOperation {
   expiresAt: string;
   /** Set when `stale` — why an approved operation stopped being valid. */
   invalidatedReason?: string | null;
-  /** For `authority:issue`: the credential held back, issued only once the
-   *  approval is given (FLOW-DEL-01 A1). */
-  heldAuthority?: DelegatedAuthority;
 }
 
-export type AuthorityKind = "role" | "capability";
-
 /**
- * A Role or Capability credential the entity issued into a person's own
- * wallet. The constraints are public: any verifier can read them, which is
- * the whole point of Pattern B.
+ * Flow 8 — an authority grant (EW-FLOW8-SD §4.1), the record behind one
+ * person's authority to act for an organisation from their own Bhutan NDI
+ * app.
+ *
+ * WHAT CHANGED FROM THE PRE-SPEC "DELEGATED AUTHORITY"
+ *
+ * The prototype used to hold Role and Capability credentials hanging off
+ * each other, issued to a member of the organisation, traced to the
+ * relation of whoever issued them. The specification settles all three the
+ * other way: Capability only, no chain (D1, D3); the delegate needs no
+ * account and may be outside the organisation (D10), identified when they
+ * collect it by the citizen ID number the grantor entered (D11); and the
+ * authority is the organisation's, not the grantor's — it survives them
+ * leaving (D15). So the record names the organisation and its decision,
+ * and who granted and approved it are attribution, not a link anything
+ * depends on.
+ *
+ * THE ID NUMBER IS NEVER KEPT
+ *
+ * Only `delegateIdKeyed` — what `keyedIdHash` makes of it — and that is
+ * cleared when the grant ends (§4.1, S4). Nothing on any screen can show
+ * the number again once it is submitted.
  */
-export interface DelegatedAuthority {
+export type GrantStatus =
+  | "AWAITING_APPROVAL"
+  | "AWAITING_LISTING"
+  | "CLAIMABLE"
+  | "ISSUING"
+  | "ACTIVE"
+  | "EXPIRED"
+  | "SUSPENDED"
+  | "REVOKED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "DECLINED"
+  | "LAPSED"
+  | "FAILED";
+
+export interface AuthorityGrant {
+  /** `grantId` — carried in the credential as `relationId`. */
   id: string;
-  kind: AuthorityKind;
-  title: string;
-  recipientId: PersonId;
-  /** The Role this Capability hangs off, if any. Act 5 revokes the parent. */
-  parentId: string | null;
-  /** Every Pattern B credential traces back to a controllership relation. */
-  relationId: string;
-  taskScopes: string[];
-  valueCap: { amount: number; currency: "BTN"; perTransaction: boolean } | null;
-  counterparties: ScopeFilter;
+  orgId: string;
+  /** `CAPABILITY` at first release (D1). `ROLE` is reserved. */
+  kind: "CAPABILITY";
+  /** The name the grantor typed. Shown until the delegate collects it. */
+  name: string;
+  /** The name the delegate's citizen credential states — written at claim (G8). */
+  delegateName: string | null;
+  /** The keyed hash of the ID number. Cleared when the grant ends (S4). */
+  delegateIdKeyed: string | null;
+  /** The did:key that signed the claim presentation (G8). */
+  delegateDid: string | null;
+  /**
+   * Prototype only: the story's record of whoever collected it, when they
+   * are one of its characters, so Flow 9's stand-in page can say who is
+   * signed in. Not part of the grant record — the platform keeps no
+   * account for a delegate (D10).
+   */
+  delegatePersonId: PersonId | null;
+  /** Task scopes from the published vocabulary (§5.2) — never shown as strings. */
+  tasks: string[];
+  /** Counterparty organisations, each CURRENT as a verifier (D19). */
+  counterparties: string[];
+  licenceNumbers: string[];
+  valueCapNu: number;
+  /** Always true at first release — the form offers only "per declaration" (EW-FLOW8-SD D25). */
+  perTransaction: true;
   validFrom: string;
   validUntil: string;
-  status: "ACTIVE" | "SUSPENDED" | "REVOKED" | "EXPIRED";
-  acceptance: "sent" | "accepted" | "rejected" | "expired";
-  issuedAt: string;
-  acceptedAt: string | null;
-  endedAt?: string | null;
-  endedReason?: string | null;
-  appealReference?: string | null;
-}
-
-/** One link in the chain a verification walks. */
-export interface AuthorityChainLink {
-  id: string;
-  label: string;
-  kind: "foundational" | "relation" | "role" | "capability";
-  /** Who holds this link — the entity, or a person. */
-  heldBy: string;
-  status: "valid" | "revoked" | "suspended" | "expired";
-}
-
-export interface ConstraintCheck {
-  label: string;
-  detail: string;
-  outcome: "pass" | "fail";
+  /** The publishing DID it is issued from, once the organisation is listed (§7.1). */
+  issuerDid: string | null;
+  /** Generated when the identity matches; discarded if the offer isn't accepted (D23). */
+  revocationId: string | null;
+  grantedBy: PersonId;
+  grantedRelationId: string;
+  approvedBy: PersonId | null;
+  approvedRelationId: string | null;
+  /** The parked approval, under SINGLE_APPROVER (§8.2). */
+  approvalId: string | null;
+  credentialRef: string | null;
+  /** The bearer reference in the claim link's path (FLOW-AUT-01 §7.2). */
+  claimRef: string | null;
+  claimExpiresAt: string | null;
+  /** SHA-256 of the grant as submitted — an approval is bound to it (D20). */
+  approvalHash: string;
+  status: GrantStatus;
+  submittedAt: string;
+  /** When it reached the state it is in. */
+  statusAt: string;
+  /** For an ended grant, the reason in words — SCR-AUT-01's Ended tab. */
+  endReason: string | null;
+  cancelledBy?: PersonId | null;
+  rejection?: { by: PersonId; note: string; at: string } | null;
+  /** Identity mismatches at claim; the third ends the grant (E9). */
+  mismatches: number;
+  /** ISSUING: when the offer is withdrawn (E13), as epoch ms. */
+  offerExpiresAt: number | null;
+  /** ISSUING: the delegate accepted, and the revocation id isn't registered yet (E17). */
+  accepted: boolean;
 }
 
 /**
- * The signed decision an external verifier renders (D5).
- *
- * `SERVICE_UNREACHABLE` is a FAIL, not a third outcome — it is separate here
- * only so the UI can say honestly *why* it failed. Fail closed: an
- * unreachable service never resolves to a hopeful spinner or a silent pass.
+ * What SCR-AUT-02 holds between the form and SCR-AUT-03. In the store so
+ * the two screens can have their own addresses — *Change* goes back to a
+ * form still filled in. The ID number lives here only until *Give
+ * authority*, which keeps nothing but its keyed hash.
  */
-export interface VerificationDecision {
+export interface AuthorityDraft {
+  orgId: string;
+  name: string;
+  cid: string;
+  counterparty: string;
+  tasks: string[];
+  licences: string[];
+  limit: string;
+  until: string;
+  /** A3 answered "give another anyway". */
+  duplicateOk: boolean;
+}
+
+/**
+ * A stand-in for the HMAC FLOW-AUT-01 S4 asks for — a per-organisation key
+ * in the key management service over the citizen ID number. This is a
+ * string hash with the organisation's id mixed in: enough for the match
+ * and the duplicate warning to behave as the real one does, and nothing
+ * like enough to protect a real number (the what's-real page says so).
+ */
+export function keyedIdHash(orgId: string, cid: string): string {
+  const input = `${orgId}|${cid.replace(/\D/g, "")}`;
+  let a = 0x811c9dc5;
+  let b = 0x01000193;
+  for (let i = 0; i < input.length; i += 1) {
+    a = Math.imul(a ^ input.charCodeAt(i), 0x01000193) >>> 0;
+    b = Math.imul(b ^ input.charCodeAt(input.length - 1 - i), 0x811c9dc5) >>> 0;
+  }
+  return `hmac:${a.toString(16).padStart(8, "0")}${b.toString(16).padStart(8, "0")}`;
+}
+
+/**
+ * The citizens the simulated Bhutan NDI app can share as, at a claim link.
+ * The first is the clearing agent the guided demo gives authority to; the
+ * others are who a forwarded link might reach (Journey U). Their numbers
+ * are invented, and are the only ID numbers anywhere in the prototype.
+ */
+export const SIM_CITIZENS: { cid: string; name: string; personId: PersonId | null }[] = [
+  { cid: "11512002960", name: "Pema Choden", personId: "pema" },
+  { cid: "10811004417", name: "Kinley Wangdi", personId: null },
+  { cid: "11206003325", name: "Sangay Wangmo", personId: null },
+  { cid: "10305007781", name: "Tashi Dorji", personId: null },
+];
+
+/* ------------------------------------------------------------------ */
+/* Flow 9 — the Bhutan National Single Window's own records            */
+/*                                                                     */
+/* None of these is the platform's. They are what BNSW's back end      */
+/* keeps (EW-FLOW9-SD §4), held in the demo store only because the      */
+/* prototype has no BNSW: the dashed BNSW pages read them, and nothing  */
+/* in the Entity Wallet does except the first-grant notice asking       */
+/* "is this organisation registered there?" (§7).                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * BNSW's record of a company's registration — kept from FLOW-PRS-01's
+ * result when the company shares its registration, TPN and business
+ * licence with BNSW (§4.1, EW-FLOW9-CIG §3). Registering again replaces it.
+ */
+export interface CounterpartyRegistration {
   id: string;
-  outcome: "PASS" | "FAIL" | "SERVICE_UNREACHABLE";
-  verifier: string;
-  /** Dual attribution, and nothing else about the person. */
-  entity: string;
-  actorId: PersonId;
-  authorityId: string;
-  declarationRef: string;
-  declarationHash: string;
-  declaredValue: { amount: number; currency: "BTN" };
-  chain: AuthorityChainLink[];
-  checks: ConstraintCheck[];
-  /** Present on a FAIL. Never leaks unrelated personal data. */
-  reasons: string[];
-  decidedAt: string;
-  signature: string;
+  counterpartyId: string;
+  orgId: string;
+  /** `verification.holder` — the company's did:key. Audit only. */
+  holderDid: string;
+  /**
+   * `verification.holderPublishingDid` — the platform's attestation of the
+   * company's listed did:ethr (D8), or null when it wasn't CURRENT as an
+   * issuer of authority when it registered. B1 matches an authority's issuer to it.
+   */
+  publishingDid: string | null;
+  legalName: string;
+  registrationNumber: string;
+  tpn: string | null;
+  /** DRC's `revocation_id` for it — looked up at B4 and at each declaration (§6.2, §8.1). */
+  tpnRevocationId: string | null;
+  /** The prototype's link to the held credential the TPN's status stands for, as `licences[].credentialId` is for each licence. */
+  tpnCredentialId: string | null;
+  /** Each business licence number and its revocation_id (B3, B4). `credentialId` is the prototype's link to the held credential its status stands for. */
+  licences: { number: string; revocationId: string; credentialId: string }[];
+  registeredAt: string;
+  /** The presentation request it came from — null for the seed's. */
+  requestId: string | null;
+}
+
+/**
+ * BNSW's authority session — written at sign-in once V1–V6 and B0–B4 pass
+ * (§4.2, FLOW-AUT-02 Q1). It holds the delegate's name and citizen ID
+ * number: BNSW does see them, from the citizen credential.
+ */
+export interface AuthoritySession {
+  id: string;
+  counterpartyId: string;
+  /** BNSW's signed-in user, from its own Bhutan NDI sign-in (B0). */
+  signedInCid: string;
+  delegateDid: string;
+  /** The citizen credential's name and ID number. */
+  delegateName: string;
+  delegateCid: string;
+  /** The name the authority carries — shown beside the citizen credential's, not compared (D12). */
+  authorityName: string;
+  /** The registered company matched in B1. */
+  orgId: string;
+  registrationId: string;
+  principalDid: string;
+  /** The grant's id — `credentialSubject.relationId`. */
+  relationId: string;
+  /** BNSW task scopes the authority names (B2). */
+  tasks: string[];
+  /** Named by the authority, registered (B3) and ACTIVE at B4 — what A2 offers. */
+  licenceNumbers: string[];
+  valueCapNu: number;
+  perTransaction: boolean;
+  authorityRevocationId: string;
+  citizenRevocationId: string;
+  /** The authority's expirationDate (D19). */
+  validUntil: string;
+  /** The earlier of BNSW's sign-in timeout and validUntil (D13), as epoch ms. */
+  endsAt: number;
+  checkedAt: number;
+  status: "OPEN" | "ENDED";
+  endedAt: number | null;
+  endReason: "stopped" | "changed" | "timeout" | "expired" | "signed_out" | null;
+}
+
+/** What BNSW keeps with each declaration (§4.3, D14). */
+export interface CounterpartyDeclaration {
+  id: string;
+  reference: string;
+  counterpartyId: string;
+  orgId: string;
+  sessionId: string;
+  kind: "submit" | "amend";
+  /** The declaration this one amends (A3), and the one that amended this. */
+  amends: string | null;
+  amendedBy: string | null;
+  goods: string;
+  valueNu: number;
+  licenceNumber: string;
+  relationId: string;
+  authorityRevocationId: string;
+  delegateName: string;
+  delegateCid: string;
+  /** The status lookup's answer, as kept. */
+  statusResult: string;
+  at: string;
+}
+
+/** BNSW's form, kept as a draft through any refusal at submit (UXD-54). */
+export interface DeclarationDraft {
+  goods: string;
+  value: string;
+  licence: string;
+  /** The declaration being amended, or null for a new one. */
+  amends: string | null;
+}
+
+/** One of V1–V6 or B0–B4, as the result reports it. */
+export interface BnswCheck {
+  id: string;
+  label: string;
+  outcome: "pass" | "fail" | "not_run";
+}
+
+/**
+ * What BNSW records of a sign-in it refused (FLOW-AUT-02 E8, E15): DIDs,
+ * never the attribute values behind them.
+ */
+export interface BnswAttempt {
+  id: string;
+  at: number;
+  code: "E8" | "E15";
+  /** E8 — the DID the authority was issued from, which matched no registered company. */
+  issuerDid: string | null;
+  /** E15 — the app that answered, and the person BNSW had signed in. */
+  answeredByDid: string | null;
+  signedInDid: string | null;
+}
+
+/**
+ * The simulated BNSW portal's own state: who is signed in to it, the
+ * request out to the app, what it last told the person, the draft, and the
+ * two things the prototype can't otherwise produce — an outage at NDI and
+ * a citizen credential that isn't valid.
+ */
+export interface BnswState {
+  signedInCid: string | null;
+  servicesDown: boolean;
+  suspendedCitizens: string[];
+  /** Refused sign-ins BNSW records — E8 the issuer DID, E15 both identities' DIDs (FLOW-AUT-02 §6). */
+  attempts: BnswAttempt[];
+  /** Steps 2–3 — the proof request out to the app; five minutes (E2). */
+  request: { id: string; startedAt: number } | null;
+  /** The last outcome to show, set by the store: a refusal, A4, an acceptance. */
+  notice: { code: string; text: string; checks: BnswCheck[]; at: number } | null;
+  draft: DeclarationDraft | null;
 }
 
 /**
@@ -1465,6 +1887,637 @@ export function workingDaysSince(date: string | null): number {
 
 export const REMINDER_WORKING_DAYS = 10;
 
+/* ------------------------------------------------------------------ */
+/* Flow 5 — foundational-issuer designation and adoption               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A designation's life — EW-FLOW5-SD §5.1's eight states, and no others.
+ * Each says on whom it is waiting or how it ended, because every screen that
+ * shows a designation has to (UN-25).
+ *
+ * - `PROPOSED` — a Kind E proposal waiting for a second administrator (A1).
+ *   Lapses after 30 days (E13), with a reminder to administrators at 10
+ *   working days.
+ * - `PENDING` — approved, waiting for the authority's OWNER (A2). 30 days (E6).
+ * - `ACCEPTED` — accepted; the activation checks are not yet all passing
+ *   (E1–E5). It doesn't lapse: the authority has consented, so an abandoned
+ *   one is withdrawn by NDI, with a reason (A3).
+ * - `ACTIVE` — switched on (step 5). Nothing is live until something is adopted.
+ * - `SUSPENDED` — the issuing identity changed after activation (E10), or the
+ *   organisation was suspended (E9). Organisations already verified stay verified.
+ * - `DECLINED` — refused by the second administrator (E12, the reason carried
+ *   to the proposer) or declined by the authority (A2). One state for both,
+ *   as the spec has it: who said no is on the record, not in the state.
+ * - `WITHDRAWN` — ended by NDI with a reason (A3). Kept, never deleted.
+ * - `EXPIRED` — lapsed: not approved (`NOT_APPROVED`, E13) or not accepted
+ *   (`NOT_ACCEPTED`, E6). Confers nothing; a new one needs a fresh approval.
+ */
+export type DesignationState =
+  | "PROPOSED"
+  | "PENDING"
+  | "ACCEPTED"
+  | "ACTIVE"
+  | "SUSPENDED"
+  | "DECLINED"
+  | "WITHDRAWN"
+  | "EXPIRED";
+
+/** One activation check (FLOW-ORG-02 P2–P6), as SCR-DSG-04 lists it. */
+export interface ActivationCheck {
+  id: "P2" | "P3" | "P4" | "P5" | "P6";
+  label: string;
+  pass: boolean;
+  /** On failure: what was observed, in the words SCR-DSG-04 uses. */
+  observed: string | null;
+  /** On failure: who resolves it — the whole point of the screen (UN-19). */
+  resolver: "NDI" | "authority" | null;
+  /** The spec's error for this check, when it fails. */
+  error: "E1" | "E2" | "E3" | "E4" | "E5" | null;
+}
+
+export interface Designation {
+  id: string;
+  orgId: string;
+  orgName: string;
+  /** `N` arrived through a Kind O invitation; `E` was proposed against an existing organisation. */
+  kind: "N" | "E";
+  /** The entity types it will confirm. Fixed once active (EW-FLOW5-SD/D6). */
+  entityTypes: OrgKind[];
+  legalBasis: string;
+  legalRef: string;
+  state: DesignationState;
+  proposedBy: PersonId | null;
+  proposedAt: string | null;
+  approvedBy: PersonId | null;
+  approvedAt: string | null;
+  /** The OWNER who accepted for the authority. */
+  acceptedBy: PersonId | null;
+  acceptedAt: string | null;
+  /**
+   * Who said no, and why — the second administrator (E12, reason required
+   * and carried to the proposer verbatim) or the authority's OWNER (A2).
+   * Which of the two it was is read from `approvedBy`: a refusal comes
+   * before any approval.
+   */
+  declinedBy: PersonId | null;
+  declinedReason: string | null;
+  /** A3 — NDI ended it before activation, with a reason. The row is kept. */
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
+  withdrawnReason: string | null;
+  /**
+   * The state it was withdrawn from. The authority is told only if the
+   * proposal had reached it (PENDING or ACCEPTED) — before the second
+   * approval nothing was ever sent (A1).
+   */
+  withdrawnFrom: DesignationState | null;
+  /** E13 or E6 — which window ran out. */
+  expiredReason: "NOT_APPROVED" | "NOT_ACCEPTED" | null;
+  /**
+   * The running 30-day window — approval while PROPOSED (E13), acceptance
+   * while PENDING (E6). One field because only one window is ever open, and
+   * SC 2.2.1 wants the days left shown wherever either is.
+   */
+  expiresAt: string | null;
+  /**
+   * SCR-DSG-02's "request more information" (A1). Changes nothing — the
+   * state stays PROPOSED and the window keeps running — so it is a note on
+   * the record, not a state.
+   */
+  infoRequests: { by: PersonId; at: string; note: string }[];
+  activatedAt: string | null;
+  /**
+   * The primary DID observed at activation (step 5, Q1) — the DID itself,
+   * not only its method, so a switch to a different did:ethr is caught too
+   * (E10, AC-08a). Compared with the organisation's primary DID whenever
+   * that changes.
+   */
+  publishingDid: string | null;
+  didMethodAtActivation: string | null;
+  /** Why it is SUSPENDED: the issuing identity changed (E10) or the organisation was (E9). */
+  suspendedReason: "IDENTITY_CHANGED" | "ORGANISATION" | null;
+  /** The last run of the activation checks, if any. */
+  checks: ActivationCheck[] | null;
+  checkedAt: string | null;
+  /**
+   * The OWNER's grant of `VERIFIER` to NDI's service principal — the
+   * invitation issued in the officer's own session (FLOW-ORG-02 step 2 for
+   * Kind N, A2 for Kind E; A4 again on restore). P2 needs it: without it
+   * activation is E1, and nothing is added (AC-11). The service never
+   * grants itself anything (S5); it only accepts what this records.
+   */
+  ndiGrant: { by: PersonId; at: string } | null;
+  /**
+   * NDI's service account as a member of the authority's organisation —
+   * `null` until step 4 accepts the grant. The authority removes it itself,
+   * without asking, from its members list or the console (FLOW-ORG-02 E8,
+   * FLOW-ORG-03 A3 — one control, EW-FLOW5-SD §4.4), and turns it back on by
+   * granting again (A4).
+   */
+  ndiAccess: "ACTIVE" | "REMOVED" | null;
+  ndiAccessChangedBy: PersonId | null;
+  ndiAccessChangedAt: string | null;
+}
+
+/** The named platform account that acts in an authority's name (EW-FLOW5-SD/D13). */
+export const NDI_SERVICE_PRINCIPAL = "NDI service account";
+
+/**
+ * The authorisation — EW-FLOW5-SD §4.4: the record of what NDI's service
+ * account was agreed to do, per entity type. Written with each adoption
+ * (FLOW-ORG-03 step 5), withdrawn with the membership when NDI's access is
+ * paused, and never reactivated: restoring writes a new row (A4), so the
+ * record of when NDI could and couldn't act stays readable.
+ */
+export interface Authorisation {
+  id: string;
+  designationId: string;
+  orgId: string;
+  entityType: OrgKind;
+  principal: string;
+  permittedPurpose: string;
+  grantedBy: PersonId;
+  grantedAt: string;
+  state: "ACTIVE" | "WITHDRAWN";
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
+}
+
+/** What a person is asked, item by item, with why it is needed (SCR-ADO-01). */
+export interface AskedItem {
+  item: string;
+  from: string;
+  why: string;
+}
+
+/**
+ * The artefact set for one entity type (FLOW-ORG-03): the credential's
+ * contents, exactly what a person is asked, and the purpose their wallet
+ * shows. NDI may draft it; only the authority adopts it (EW-FLOW5-SD/D7).
+ */
+export interface ArtefactDraft {
+  entityType: OrgKind;
+  credential: string;
+  contents: string[];
+  asked: AskedItem[];
+  purpose: string;
+  /**
+   * An item the draft asks for that the register query doesn't need — the
+   * case SCR-ADO-01's objection route exists for (FLOW-ORG-03 P5, A5). An
+   * objection holds adoption until NDI revises the draft without it, or the
+   * officer withdraws the objection; nothing is overridden.
+   */
+  overBroad: string | null;
+}
+
+export interface Adoption {
+  id: string;
+  designationId: string;
+  orgId: string;
+  entityType: OrgKind;
+  version: number;
+  /** `SUPERSEDED` is kept, never deleted (UC-18). `WITHDRAWN` is a stop (A2). */
+  state: "ACTIVE" | "SUPERSEDED" | "WITHDRAWN";
+  adoptedBy: PersonId;
+  adoptedAt: string;
+  asked: AskedItem[];
+  purpose: string;
+  stoppedBy: PersonId | null;
+  stoppedAt: string | null;
+}
+
+/**
+ * The officer's objection to NDI's draft (FLOW-ORG-03 A5), against one
+ * entity type or — `entityType: null` — the whole draft, every entity type
+ * in it. Kept with how it closed, permanently (§7.1).
+ */
+export interface ArtefactObjection {
+  id: string;
+  designationId: string;
+  entityType: OrgKind | null;
+  /** The item it names, when it names one — the over-broad one SCR-ADO-01 flags. */
+  item: string | null;
+  note: string;
+  by: PersonId;
+  at: string;
+  /**
+   * It closes one of two ways only: NDI revises the draft (a new draft to
+   * review), or the officer withdraws it. NDI can't close it alone and the
+   * officer can't override it, so there is no third value.
+   */
+  closedAt: string | null;
+  closedHow: "REVISED" | "WITHDRAWN" | null;
+}
+
+/**
+ * NDI's revised draft for one entity type, in answer to an objection. A new
+ * draft rather than an edit to the old one, so what the officer objected to
+ * stays on record beside what replaced it.
+ */
+export interface DraftRevision {
+  designationId: string;
+  entityType: OrgKind;
+  revision: number;
+  at: string;
+  asked: AskedItem[];
+  objectionId: string;
+}
+
+/**
+ * The objection holding adoption of an entity type, if any (A5): an open
+ * one against that type, or against the whole draft. Every open objection
+ * holds — the one the officer names an item in as much as a general one —
+ * until NDI revises the draft or the officer withdraws it.
+ */
+export const openObjectionFor = (objections: ArtefactObjection[], designationId: string | undefined, kind: OrgKind) =>
+  objections.find((o) => o.designationId === designationId && !o.closedAt && (o.entityType === null || o.entityType === kind));
+
+/** What the current draft asks for an entity type — NDI's latest revision, or its first draft. */
+export function draftAsked(revisions: DraftRevision[], designationId: string | undefined, kind: OrgKind): AskedItem[] {
+  const latest = revisions
+    .filter((r) => r.designationId === designationId && r.entityType === kind)
+    .sort((a, b) => b.revision - a.revision)[0];
+  return latest ? latest.asked : draftFor(kind).asked;
+}
+
+/**
+ * NDI's drafts for each entity type. The sole proprietorship draft also
+ * asks for the date of birth — which confirming a licence holder doesn't
+ * need, and which SCR-ADO-01 flags on the item so the officer can send it
+ * back (E4) rather than adopt it in the authority's name.
+ */
+export const ARTEFACT_DRAFTS: ArtefactDraft[] = [
+  {
+    entityType: "sole_proprietorship",
+    credential: "Trade Licence",
+    contents: ["Business name", "Trade licence number", "Licence holder", "Dzongkhag", "Licence status", "Valid until"],
+    asked: [
+      { item: "Full name", from: "Citizen ID", why: "To find the licence holder in the trade licence register" },
+      { item: "Citizenship ID number", from: "Citizen ID", why: "To tell two people with the same name apart" },
+      { item: "Date of birth", from: "Citizen ID", why: "Added in NDI's draft — the register doesn't use it to answer" },
+    ],
+    purpose: "To check with the Ministry of Industry, Commerce & Employment that you hold this trade licence.",
+    overBroad: "Date of birth",
+  },
+  {
+    entityType: "partnership",
+    credential: "Trade Licence",
+    contents: ["Business name", "Trade licence number", "Partners", "Dzongkhag", "Licence status", "Valid until"],
+    asked: [
+      { item: "Full name", from: "Citizen ID", why: "To find the partner in the trade licence register" },
+      { item: "Citizenship ID number", from: "Citizen ID", why: "To tell two people with the same name apart" },
+    ],
+    purpose: "To check with the Ministry of Industry, Commerce & Employment that you are a partner in this business.",
+    overBroad: null,
+  },
+  {
+    entityType: "company",
+    credential: "Business Registration",
+    contents: ["Registered name", "Registration number", "Company type", "Registered address", "Status"],
+    asked: [
+      { item: "Full name", from: "Citizen ID", why: "To find the director or authorised representative" },
+      { item: "Citizenship ID number", from: "Citizen ID", why: "To tell two people with the same name apart" },
+    ],
+    purpose: "To check with the Corporate Regulatory Authority that you can represent this company.",
+    overBroad: null,
+  },
+];
+
+export const draftFor = (kind: OrgKind) => ARTEFACT_DRAFTS.find((d) => d.entityType === kind)!;
+
+/** The marketplace entitlements a foundational issuer needs (FLOW-ORG-02 P5). */
+export const ISSUER_ENTITLEMENTS = ["schemaCreate", "issuance", "verification"];
+
+/**
+ * Whether a designation has run out of its open 30-day window — approval
+ * while PROPOSED (E13), acceptance while PENDING (E6). Read from the date,
+ * like an accreditation's window, so the admin list, the console and
+ * "Propose again" agree without anyone first having to press a button to
+ * discover it. ACCEPTED never lapses (EW-FLOW5-SD §5.1).
+ */
+export const dsgExpired = (d: Pick<Designation, "state" | "expiresAt">, today: string) =>
+  (d.state === "PROPOSED" || d.state === "PENDING") && Boolean(d.expiresAt && d.expiresAt < today);
+
+/**
+ * Whether the 10-working-day reminder to NDI administrators has gone for a
+ * proposal still waiting for approval (E13) or a designation still waiting
+ * for the authority (§5.1 — "after 10 working days of either").
+ */
+export const dsgReminderSent = (d: Pick<Designation, "state" | "proposedAt" | "approvedAt">) =>
+  d.state === "PROPOSED"
+    ? workingDaysSince(d.proposedAt) >= REMINDER_WORKING_DAYS
+    : d.state === "PENDING"
+      ? workingDaysSince(d.approvedAt) >= REMINDER_WORKING_DAYS
+      : false;
+
+/** Whether a designation still stands in the way of another for the same organisation. */
+export const designationInProgress = (d: Pick<Designation, "state" | "expiresAt">) =>
+  ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state) && !dsgExpired(d, new Date().toISOString().slice(0, 10));
+
+/* ------------------------------------------------------------------ */
+/* Flow 6 — receiving a credential                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What an issuer needs to see before it decides: a credential the
+ * organisation holds, shared whole (EW-FLOW6-SD/D20), and the items the
+ * issuer says it will use. SCR-CRD-02 lists every attribute, because a
+ * JSON-LD credential can't be shared in part — and must never claim it is.
+ */
+export interface Prerequisite {
+  credential: string;
+  issuer: string;
+  /** Every attribute in it, in the words SCR-CRD-02 lists them. */
+  attributes: string[];
+  /** What the issuer says it uses — a subset of `attributes`. */
+  uses: string[];
+}
+
+/** A field the officer fills or confirms on SCR-CRD-09. */
+export interface OfferField {
+  name: string;
+  label: string;
+  example: string;
+}
+
+/**
+ * An issuer's offering — something a business can ask it for (SCR-CRD-07).
+ * `version` pins what a request agreed to: publishing a change makes a new
+ * version, and requests already made keep theirs.
+ */
+export interface CredentialOffering {
+  id: string;
+  issuerOrgId: string;
+  issuerName: string;
+  credential: string;
+  summary: string;
+  eligibleKinds: OrgKind[];
+  prerequisite: Prerequisite;
+  /** `queue` — officers answer on SCR-CRD-08 (Kind Q). `api` — the issuer's system answers (Kind A). */
+  answering: "queue" | "api";
+  answerWindowDays: number;
+  renewable: boolean;
+  status: "ACTIVE" | "PAUSED" | "RETIRED";
+  version: number;
+  fields: OfferField[];
+  /** Whether the issuer's approval to issue still covers it (FLOW-CRD-03 E2). */
+  covered: boolean;
+}
+
+/**
+ * A request's life, as the holder's side sees it (FLOW-CRD-01). Each is
+ * stated in words by who has it now (SCR-CRD-03, UN-38) — never as a code.
+ */
+export type CrdRequestState =
+  | "AWAITING_PROOF"
+  | "NEEDS_CONSENT"
+  | "WITH_ISSUER"
+  | "OFFER_READY"
+  | "ISSUED"
+  | "DECLINED_BY_ISSUER"
+  | "DECLINED_BY_HOLDER"
+  | "WITHDRAWN"
+  | "EXPIRED"
+  | "FAILED";
+
+export interface CredentialRequest {
+  id: string;
+  orgId: string;
+  offeringId: string;
+  offeringVersion: number;
+  credential: string;
+  issuerName: string;
+  issuerOrgId: string;
+  requestedBy: PersonId;
+  requestedAt: string;
+  state: CrdRequestState;
+  /** What the consent on SCR-CRD-02 covered. */
+  consented: Prerequisite;
+  /** A1 — what the issuer asked for beyond the consent, listed separately (UXD-35). */
+  askedMore: { credential: string; items: string[] } | null;
+  /** A1 answered "share this too": what was shared beyond the first consent, which the officer sees too. */
+  alsoShared?: { credential: string; items: string[] } | null;
+  /** The issuer stops waiting for the answer on this date (7 days, FLOW-CRD-03 E4). */
+  consentBy: string | null;
+  /** The issuer's answer window (FLOW-CRD-03 step 4). */
+  answerBy: string | null;
+  /** The issuer's reason, carried verbatim (UXD-38). */
+  declined: { code: string; message: string } | null;
+  offer: { attributes: CredentialAttribute[]; validUntil: string | null; offeredAt: string; expiresAt: string } | null;
+  answeredBy: PersonId | null;
+  answeredAt: string | null;
+  /**
+   * Kind A: answered by the issuer's own system, through the API — recorded
+   * as its client, not as a person (FLOW-CRD-03 Q1, Q4; EW-FLOW6-SD §4.3,
+   * `answeredBy` is `SYSTEM` or the officer). `answeredBy` stays the
+   * officer's id, the one attribution every other screen reads, and is null
+   * when the system answered.
+   */
+  answeredBySystem?: { clientId: string; name: string } | null;
+  /** Kind A: where the request stands with the issuer's system. Absent on a request that was the officers' from the start. */
+  system?: SystemRoute | null;
+  /** Why a request failed, in words (E6, E11, E14, E16, E18, E19). */
+  failReason: string | null;
+  /** The reason code behind a FAILED or platform-WITHDRAWN request (E14, E16, E19). */
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | "REQUESTER_ENDED" | null;
+  /** As `CredentialOffer.simulatedRecheck` — what C2 finds when re-run at acceptance (E19). */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
+}
+
+/** An offer refused automatically — only ever on the Activity tab (UXD-36). */
+export interface RefusedOffer {
+  id: string;
+  orgId: string;
+  claimedIssuer: string;
+  credential: string;
+  reason: string;
+  /** Whether the sender is listed — "claiming" when it isn't, because the name is unproven. */
+  listed: boolean;
+  at: string;
+}
+
+/**
+ * Kind A — where a request stands with the issuer's own system, once it has
+ * reached the issuer (FLOW-CRD-03 step 5).
+ *
+ * - `WAITING` — delivered; the system answers after a short delay.
+ * - `REFERRED` — A2: the system couldn't decide, and says why. Referring is
+ *   not an answer: the system may still offer afterwards, and the first
+ *   answer wins.
+ * - `MISSED` — E6: delivery to the system failed, so nothing picked it up.
+ *   It joins the officers' queue only while fallback is on; with it off, it
+ *   waits for the system until `answerBy`.
+ * - `UNCONNECTED` — the offering is answered by the system but the issuer
+ *   hadn't set it up when the request arrived (no URL, or no client to
+ *   answer with — P3), so it went straight to the queue, as SCR-CRD-10's
+ *   empty state says it does.
+ */
+export interface SystemRoute {
+  state: "WAITING" | "REFERRED" | "MISSED" | "UNCONNECTED";
+  /** What the simulated system does when its delay ends. */
+  plan: "answer" | "refer" | "miss";
+  /** A2's note — the system's own words, shown to the officers and never to the business. */
+  note: string | null;
+}
+
+/** A2's note is the issuer system's own words; this one is an example. */
+export const SAMPLE_REFERRAL_NOTE = "two records in the register match this registration number";
+
+/**
+ * Whether a request is on the officers' queue (SCR-CRD-08). A queue
+ * offering's always is; a request for an offering the system answers is only
+ * when the system referred it (A2), the issuer hadn't set the system up, or
+ * the system missed it and fallback is on (E6). Read from the request and the
+ * fallback setting, so turning fallback on moves a request already missed.
+ */
+export const inOfficerQueue = (r: Pick<CredentialRequest, "state" | "system">, queueFallback: boolean) =>
+  r.state === "WITH_ISSUER" &&
+  (!r.system || r.system.state === "REFERRED" || r.system.state === "UNCONNECTED" || (r.system.state === "MISSED" && queueFallback));
+
+/** The issuer's integration (SCR-CRD-10) — read by its IT lead, the one technical screen. */
+export interface IssuerIntegration {
+  orgId: string;
+  webhookUrl: string | null;
+  secretRotatedAt: string | null;
+  clients: { id: string; name: string; createdAt: string }[];
+  queueFallback: boolean;
+  /**
+   * Prototype — what the simulated system does with the next request that
+   * reaches it, set by the dashed stand-in on SCR-CRD-10 and put back to
+   * `answer` once used. No system exists to decide this for itself.
+   */
+  nextAnswer: "answer" | "refer" | "miss";
+  failingSince: string | null;
+  lastError: string | null;
+  log: { id: string; event: string; attempt: number; status: number; latencyMs: number; at: string }[];
+}
+
+/**
+ * Whether the issuer's system can answer: a URL to deliver to and a client
+ * to answer with (FLOW-CRD-03 P3). Either missing, and requests go to the
+ * officers' queue, as SCR-CRD-10 says before anything is set up.
+ */
+export const systemConnected = (i: Pick<IssuerIntegration, "webhookUrl" | "clients">) => Boolean(i.webhookUrl) && i.clients.length > 0;
+
+/**
+ * What a request becomes when a date it was waiting on passes, or null. The
+ * issuer stops waiting for an answer to its wider ask on `consentBy`
+ * (FLOW-CRD-03 E4), which withdraws the request; an issuer that hasn't answered by `answerBy` has
+ * missed its window (FLOW-CRD-01 E10); an offer nobody accepted lapses on its
+ * `expiresAt` (E13). Read from the date, like the other windows in the
+ * prototype, so every screen and the store agree without anyone having to
+ * press a button that would discover it.
+ */
+export const crdEnding = (
+  r: Pick<CredentialRequest, "state" | "consentBy" | "answerBy" | "offer" | "issuerName">,
+  today: string,
+): { state: "EXPIRED" | "WITHDRAWN"; failReason: string | null } | null => {
+  /* EW-FLOW6-SD §5.1: NEEDS_CONSENT ends in WITHDRAWN "on refusal or when
+     the issuer stops waiting" — the request is withdrawn, not expired. */
+  if (r.state === "NEEDS_CONSENT" && r.consentBy && r.consentBy < today)
+    return { state: "WITHDRAWN", failReason: `${r.issuerName} stopped waiting for your answer. You can ask again.` };
+  if (r.state === "WITH_ISSUER" && r.answerBy && r.answerBy < today)
+    return { state: "EXPIRED", failReason: `${r.issuerName} didn't answer in time. Nothing was issued. You can ask again.` };
+  if (r.state === "OFFER_READY" && r.offer && r.offer.expiresAt < today)
+    return { state: "EXPIRED", failReason: `This offer from ${r.issuerName} expired. You can ask again.` };
+  return null;
+};
+
+/** Whether a request is still in flight — it blocks asking again (FLOW-CRD-01 P5, E5). */
+export const requestInFlight = (r: Pick<CredentialRequest, "state">) =>
+  ["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER", "OFFER_READY"].includes(r.state);
+
+/** The Business Registration's attributes, as SCR-CRD-02 lists them. */
+const REGISTRATION_ATTRIBUTES = [
+  "Registered name",
+  "Registration number",
+  "Company type",
+  "Registered address",
+  "Date of incorporation",
+  "Status",
+];
+
+/**
+ * What the Department of Revenue & Customs offers on request. The TPN is
+ * the next credential in a company's chain (UX-EW-01 UXD-14) and what the
+ * first day's dashboard leads with; the bonded-warehouse authorisation
+ * needs the TPN first, which is E4's case in the catalogue.
+ *
+ * HOW EACH IS ANSWERED
+ *
+ * The TPN stays with the officers' queue. Whether the Department answers
+ * its taxpayer numbers through the API is still open with GovTech (REQ-EW-01
+ * item 23), and the prototype shows both paths without deciding it. The
+ * bonded-warehouse authorisation is the one the system answers — which
+ * only happens once the office has set its integration up on SCR-CRD-10;
+ * until then it lands on the queue like the other. It also comes second in
+ * the story, so the system's path can be walked after the queue's.
+ */
+export const SEED_OFFERINGS: CredentialOffering[] = [
+  {
+    id: "off-tpn",
+    issuerOrgId: "org-drc",
+    issuerName: "Department of Revenue & Customs",
+    credential: "Taxpayer Number (TPN)",
+    summary: "Your business's tax identity — what a bank, a customs broker or a supplier asks for.",
+    eligibleKinds: ["company", "sole_proprietorship", "partnership"],
+    prerequisite: {
+      credential: "Business Registration",
+      issuer: "Corporate Regulatory Authority",
+      attributes: REGISTRATION_ATTRIBUTES,
+      uses: ["Registered name", "Registration number", "Company type"],
+    },
+    answering: "queue",
+    answerWindowDays: 5,
+    renewable: false,
+    status: "ACTIVE",
+    version: 1,
+    fields: [
+      { name: "tpn", label: "Taxpayer number", example: "TPN-114-8830" },
+      { name: "tax_office", label: "Tax office", example: "Thimphu Regional Revenue & Customs Office" },
+      { name: "registered_for", label: "Registered for", example: "Business income tax, GST" },
+    ],
+    covered: true,
+  },
+  {
+    id: "off-bonded",
+    issuerOrgId: "org-drc",
+    issuerName: "Department of Revenue & Customs",
+    credential: "Bonded Warehouse Authorisation",
+    summary: "Permission to store goods in a bonded warehouse before duty is paid.",
+    eligibleKinds: ["company"],
+    prerequisite: {
+      credential: "Taxpayer Number (TPN)",
+      issuer: "Department of Revenue & Customs",
+      attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
+      uses: ["Registered name", "Taxpayer number"],
+    },
+    answering: "api",
+    answerWindowDays: 15,
+    renewable: true,
+    status: "ACTIVE",
+    version: 1,
+    fields: [
+      { name: "facility_code", label: "Facility code", example: "BW-PHU-0043" },
+      { name: "bonded_capacity", label: "Bonded capacity", example: "1,800 m³" },
+    ],
+    covered: true,
+  },
+];
+
+export const SEED_INTEGRATION: IssuerIntegration = {
+  orgId: "org-drc",
+  webhookUrl: null,
+  secretRotatedAt: null,
+  clients: [],
+  queueFallback: true,
+  nextAnswer: "answer",
+  failingSince: null,
+  lastError: null,
+  log: [],
+};
+
 export interface HarnessState {
   /**
    * Who the console is being driven as. Decides what is *absent*.
@@ -1529,11 +2582,23 @@ export interface DemoState {
   relations: ControllershipRelation[];
   heldCredentials: HeldCredential[];
   offers: CredentialOffer[];
-  verificationRequests: VerificationRequestTask[];
+  /** Flow 7 — proof requests verifiers sent, in every state (SCR-PRS-05). */
+  presentationRequests: PresentationRequest[];
+  /** Flow 7 — the verifiers' sessions behind FLOW-PRS-01's redirects. */
+  presentationSessions: PresentationSession[];
+  /** Flow 7 — where NDI may send people back to, per verifier (SCR-PRS-06). */
+  returnAddresses: ReturnAddress[];
   parkedOperations: ParkedOperation[];
-  delegatedAuthorities: DelegatedAuthority[];
-  /** Act 5 keeps both decisions so PASS and FAIL can sit side by side. */
-  decisions: VerificationDecision[];
+  /** Flow 8 — every grant of authority to act, in every state (SCR-AUT-01). */
+  authorityGrants: AuthorityGrant[];
+  /** Flow 8 — SCR-AUT-02's form, read by SCR-AUT-03. */
+  authorityDraft: AuthorityDraft | null;
+  /** Flow 9 — BNSW's registration records, authority sessions and declarations (BNSW's data, see above). */
+  counterpartyRegistrations: CounterpartyRegistration[];
+  authoritySessions: AuthoritySession[];
+  counterpartyDeclarations: CounterpartyDeclaration[];
+  /** Flow 9 — the simulated BNSW portal. */
+  bnsw: BnswState;
   auditEntries: AuditEntry[];
   appeals: Appeal[];
 
@@ -1547,6 +2612,24 @@ export interface DemoState {
   responsibilities: Responsibility[];
   /** Flow 4 — approvals to verify or issue, through either door. */
   accreditations: Accreditation[];
+  /** Flow 5 — which organisation is the foundational issuer for which entity types. */
+  designations: Designation[];
+  /** Flow 5 — what each authority has adopted, per entity type, every version kept. */
+  adoptions: Adoption[];
+  /** Flow 5 — what an officer objected to on SCR-ADO-01, with how each closed (A5). */
+  artefactObjections: ArtefactObjection[];
+  /** Flow 6 — what issuers offer on request. */
+  offerings: CredentialOffering[];
+  /** Flow 6 — every organisation's requests to issuers, from both sides. */
+  credentialRequests: CredentialRequest[];
+  /** Flow 6 — offers refused automatically, shown only on the Activity tab. */
+  refusedOffers: RefusedOffer[];
+  /** Flow 6 — the issuer's delivery set-up (Kind A). */
+  integration: IssuerIntegration;
+  /** Flow 5 — NDI's revised drafts, each answering an objection. */
+  draftRevisions: DraftRevision[];
+  /** Flow 5 — what NDI's service account was agreed to do, per entity type (EW-FLOW5-SD §4.4). */
+  authorisations: Authorisation[];
   /**
    * True from the moment onboarding completes until the story jumps past
    * act 1: the console is showing Pelden on its first day (`firstRunState`),
@@ -1863,7 +2946,16 @@ export const SEED: DemoState = {
       /* Holder only: it signed up for itself, so it has an Entity Wallet and
          no issuing or verifying on the network. */
       capabilities: ["holder"],
-      memberIds: ["dorji", "rinzin", "ugyen", "pema", "invitee", "sonam", "karma", "tenzin"],
+      /* Not Pema: a clearing agent acts for Pelden from her own Bhutan NDI
+         app and needs no account here (EW-FLOW8-SD D10). */
+      memberIds: ["dorji", "rinzin", "ugyen", "invitee", "sonam", "karma", "tenzin"],
+      /* Listed as an issuer of authority since its first grant (Flow 8, D5). */
+      authorityListing: {
+        status: "CURRENT",
+        did: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+        listedAt: "2026-07-14",
+        firstNotice: null,
+      },
     },
     {
       /* Already on NDI as an issuer and verifier long before the Entity
@@ -1903,6 +2995,94 @@ export const SEED: DemoState = {
       visibility: "public",
       capabilities: ["issuer"],
       memberIds: [],
+    },
+    {
+      /* The authority every company chains back to. Designated through a
+         Kind O invitation before the Entity Wallet opened (see
+         designations), with the issuing identity a foundational issuer
+         needs. Not driven in the demo: its office is only ever seen through
+         what it confirms. */
+      id: "org-cra",
+      statutory: true,
+      name: "Corporate Regulatory Authority",
+      legalName: "Corporate Regulatory Authority",
+      description: "Statutory authority · Registrar of Companies.",
+      role: "Owner",
+      members: 1,
+      createdAt: "2025-11-02",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["issuer", "verifier"],
+      memberIds: ["registrar"],
+      roles: { registrar: "Owner" },
+      issuingDid: "did:ethr:bt:0x5a2f7c19e0b4d8a63c11f0e97b2d4a6c8e3f1b07",
+      agentReady: true,
+      entitlements: ["schemaCreate", "issuance", "verification"],
+    },
+    {
+      /* Flow 5's authority. The Ministry of Industry, Commerce & Employment
+         licenses sole proprietorships and partnerships, and is already on
+         the platform — it verifies trade licences at its own counters — so
+         it is designated in place (FLOW-ORG-02 Kind E) rather than invited.
+         It has the issuing identity a foundational issuer needs, and lacks
+         one entitlement: schema creation, which it has never needed. That
+         is the E4 the activation checks catch, and NDI resolves. */
+      id: "org-moice",
+      statutory: true,
+      name: "Ministry of Industry, Commerce & Employment",
+      legalName: "Ministry of Industry, Commerce & Employment",
+      description: "Licenses sole proprietorships and partnerships. Verifies trade licences on NDI.",
+      role: "Owner",
+      members: 1,
+      createdAt: "2025-06-18",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["issuer", "verifier"],
+      memberIds: ["kesang"],
+      /* Kesang is the ministry's OWNER — the only role that accepts a
+         designation or adopts in its name (SCR-DSG-03, SCR-ADO-02). */
+      roles: { kesang: "Owner" },
+      issuingDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      agentReady: true,
+      entitlements: ["issuance", "verification"],
+    },
+    {
+      /* Flow 6's issuer. The Department of Revenue & Customs issues the
+         taxpayer number a company needs next, approved to issue on NDI. Its
+         officers answer requests from a queue today (Kind Q); its own system
+         isn't connected yet, which SCR-CRD-10 shows as its empty state. */
+      id: "org-drc",
+      name: "Department of Revenue & Customs",
+      legalName: "Department of Revenue & Customs, Ministry of Finance",
+      description: "Issues taxpayer numbers and customs authorisations on NDI.",
+      role: "Owner",
+      members: 1,
+      createdAt: "2024-09-03",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["issuer", "verifier"],
+      memberIds: ["deki"],
+      roles: { deki: "Owner" },
+      publicDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+    },
+    {
+      /* Flow 8's counterparty. The Bhutan National Single Window is where a
+         clearing agent declares for a company (EW-FLOW8-SD §9), and the one
+         organisation the task vocabulary names (§5.2). It verifies on the
+         platform, which is what makes it CURRENT as a verifier (G5). Nobody
+         in the story works there: its own page is Flow 9's stand-in. */
+      id: "org-bnsw",
+      name: "Bhutan National Single Window",
+      legalName: "Bhutan National Single Window, Department of Revenue & Customs",
+      description: "The single window for customs declarations. Verifies authority to act on NDI.",
+      role: "Owner",
+      members: 0,
+      createdAt: "2026-04-14",
+      location: "Thimphu, Bhutan",
+      visibility: "public",
+      capabilities: ["verifier"],
+      memberIds: [],
+      publicDid: "did:ethr:bt:0x6e1d47a0c9b38f25d7e40a1c6b93f08e2d57a4c1",
     },
   ],
   /* The original Studio's staff list — four NDI people the story never
@@ -2152,6 +3332,39 @@ export const SEED: DemoState = {
       title: "Head of digital banking · Bank of Bhutan",
       cidVerified: true,
     },
+    {
+      /* The Ministry of Industry, Commerce & Employment's officer — a senior
+         civil servant, not an SSI specialist (UX-EW-02 §1.1). Has had an
+         account since the ministry started verifying on NDI. */
+      id: "kesang",
+      name: "Kesang Wangmo",
+      cid: "•••• •••• 5108",
+      email: "kesang.wangmo@moice.gov.bt",
+      title: "Director, Department of Trade · Ministry of Industry, Commerce & Employment",
+      cidVerified: true,
+    },
+    {
+      /* The Department of Revenue & Customs' officer: processes taxpayer
+         registrations in DRC's own system today (UX-EW-03 §1.1), and is
+         also the office's owner on the platform, so one person can show
+         both the queue and the offerings. */
+      id: "deki",
+      name: "Deki Yangzom",
+      cid: "•••• •••• 2264",
+      email: "deki.yangzom@drc.gov.bt",
+      title: "Taxpayer services officer · Department of Revenue & Customs",
+      cidVerified: true,
+    },
+    {
+      /* The Corporate Regulatory Authority's office, as its records name
+         who adopted in its name. Never driven — not in PERSONAS. */
+      id: "registrar",
+      name: "Office of the Registrar",
+      cid: "—",
+      email: "registrar@cra.gov.bt",
+      title: "Registrar of Companies · Corporate Regulatory Authority",
+      cidVerified: true,
+    },
   ],
 
   relations: [
@@ -2221,9 +3434,10 @@ export const SEED: DemoState = {
     },
     {
       /* Rinzin's grant, the one Act 3 runs on. Deliberately narrow, and
-         narrow in a way you can see: she may accept two kinds of credential
-         and present exactly one, to two
-         named counterparties, and only presenting needs an approver. */
+         narrow in a way you can see: she may present exactly one kind of
+         credential, to two named counterparties, and only presenting needs
+         an approver. Accepting has no type filter — EW-FLOW3-SD §4.2 gives
+         credential:accept none, AUTO, in every preset. */
       id: "rel-rinzin",
       personId: "rinzin",
       legalBasis: "entity_consent",
@@ -2238,12 +3452,7 @@ export const SEED: DemoState = {
         validUntil: day(113),
         grants: [
           { operation: "credential:receive", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
-          {
-            operation: "credential:accept",
-            credentialTypes: { mode: "list", values: ["Business Registration", "Business Licence"] },
-            relyingParties: { mode: "any" },
-            approval: "AUTO",
-          },
+          { operation: "credential:accept", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "credential:list", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           {
             operation: "proof:present",
@@ -2252,6 +3461,10 @@ export const SEED: DemoState = {
             approval: "SINGLE_APPROVER",
           },
           { operation: "connection:create", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
+          /* *Give authority to act*, at its default: each grant needs one
+             other person to approve it (EW-FLOW3-SD §4.2, EW-FLOW8-SD D2).
+             Rinzin looks after the clearing agents — Journey T. */
+          { operation: "authority:issue", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "SINGLE_APPROVER" },
         ],
       },
       state: "ACTIVE",
@@ -2414,12 +3627,73 @@ export const SEED: DemoState = {
       expiresAt: day(154),
       status: "revoked",
     },
+    {
+      /* Pelden's taxpayer number, from the Department of Revenue & Customs
+         (Flow 6's offering). Flow 9's registration with the Single Window
+         shares it with the registration and the licence (EW-FLOW9-SD §4.1). */
+      id: "hc-tpn",
+      type: "Taxpayer Number (TPN)",
+      issuer: "Department of Revenue & Customs",
+      issuerDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "tpn", value: "TPN-114-8830" },
+        { name: "tax_office", value: "Thimphu Regional Revenue & Customs Office" },
+        { name: "registered_for", value: "Business income tax, GST" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-60),
+      expiresAt: null,
+      status: "active",
+    },
+    {
+      /* Flow 8 — the business licence Pelden's clearing agents act under.
+         The Phuentsholing branch's, because that is where its imports cross.
+         MoICE marks its business licence as one someone acting for the
+         holder may use (EW-FLOW8-SD D9), so it can be named in a grant (G4). */
+      id: "hc-licence-plg",
+      type: "Business Licence",
+      issuer: "Ministry of Industry, Commerce & Employment",
+      issuerDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "licence_number", value: "BL-PLG-2025-00871" },
+        { name: "licensed_activity", value: "General trading — import and wholesale" },
+        { name: "branch", value: "Phuentsholing" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-150),
+      expiresAt: day(215),
+      status: "active",
+    },
+    {
+      /* An earlier licence, now expired — SCR-AUT-02 shows it unavailable,
+         with the reason, rather than hiding it (E4, UXD-47). */
+      id: "hc-licence-thi-old",
+      type: "Business Licence",
+      issuer: "Ministry of Industry, Commerce & Employment",
+      issuerDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      issuerTrusted: true,
+      attributes: [
+        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
+        { name: "licence_number", value: "BL-THI-2022-04410" },
+        { name: "licensed_activity", value: "General trading — retail" },
+        { name: "branch", value: "Thimphu" },
+      ],
+      isFoundational: false,
+      receivedAt: day(-1100),
+      expiresAt: day(-30),
+      status: "expired",
+    },
   ],
 
   offers: [
     {
-      /* Act 3's offer. In scope and automatic — accepting it is the whole
-         interaction, and the type is read from this payload, not typed.
+      /* Act 3's offer, sent without a request (FLOW-CRD-02) and reviewed on
+         SCR-CRD-04 like any other. Accepting it is the whole interaction,
+         and the type is read from this payload, not typed.
 
          A trade licence, because that is what a trading company is offered
          after incorporation (Story A2 in the user stories: MoICE issues the
@@ -2430,163 +3704,238 @@ export const SEED: DemoState = {
       type: "Business Licence",
       issuer: "Ministry of Industry, Commerce & Employment",
       issuerDid: "did:polygon:0xafb50adefe9b359e15a79eada5d0bbb2675f33d3",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "licence_number", value: "BL-THI-2026-10442" },
         { name: "licensed_activity", value: "General trading — import and wholesale" },
         { name: "valid_until", value: day(358) },
       ],
-      decision: "allowed",
-      decisionReason: null,
       state: "pending",
       receivedAt: day(-7),
-      expiresAt: day(7),
+      expiresAt: day(23),
     },
     {
-      /* The denied state. The reason is specific and the next step routes to
-         the Owner — never to a self-edit. */
+      /* An ordinary offer. It used to be the denied example, refused because
+         Rinzin's accept grant named only two credential types. EW-FLOW3-SD
+         §4.2 gives credential:accept no type filter in any preset, so no
+         offer can be out of scope by its type. The one refusal SCR-CRD-04
+         has is about the person — a role without credential:accept — and
+         that face is in SCR-CRD-04's state switcher, on any offer. */
       id: "offer-insurance",
       type: "Fleet Insurance Certificate",
       issuer: "Royal Insurance Corporation of Bhutan",
       issuerDid: "did:polygon:0x4fc2bf84747e22ab86675163f6b59fc8ab469cb4",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "policy_number", value: "RICB-MV-2026-77412" },
         { name: "sum_insured", value: "BTN 4,200,000" },
       ],
-      decision: "out_of_scope",
-      decisionReason:
-        "Your authority covers Business Registration and Business Licence credentials. Accepting insurance credentials was not granted.",
       state: "pending",
       receivedAt: day(-4),
-      expiresAt: day(10),
+      expiresAt: day(26),
     },
     {
-      id: "offer-warehouse",
-      type: "Bonded Warehouse Authorisation",
-      issuer: "Department of Revenue & Customs",
-      issuerDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
-      issuerTrusted: true,
+      /* A reissue of something Pelden already holds — the same type from the
+         same issuer DID as hc-bank — so SCR-CRD-04 says what it replaces,
+         and accepting it marks the earlier one superseded (EW-FLOW6-SD §4.5,
+         Journey L). It replaces what used to be an unasked Bonded Warehouse
+         Authorisation, which needed an approver to accept and a TPN Pelden
+         doesn't hold — neither of which the spec allows. */
+      id: "offer-bank",
+      type: "Business Current Account",
+      issuer: "Bank of Bhutan",
+      issuerDid: "did:polygon:0xa2a4e362eb3f8494b23536454137d49265f1725c",
       attributes: [
-        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
-        { name: "facility_code", value: "BW-PHU-0043" },
-        { name: "bonded_capacity", value: "1,800 m³" },
+        { name: "account_holder", value: "Pelden Trading Pvt. Ltd." },
+        { name: "account_number", value: "•••• •••• 4417" },
+        { name: "branch", value: "Phuentsholing branch" },
+        { name: "opened_on", value: day(-104) },
       ],
-      decision: "requires_approval",
-      decisionReason: "Accepting an authorisation of this kind needs one approver.",
-      state: "parked",
+      state: "pending",
       receivedAt: day(-3),
-      expiresAt: day(11),
+      expiresAt: day(27),
     },
     {
+      /* Nobody reviewed it within 30 days (FLOW-CRD-02 E4). */
       id: "offer-lapsed",
       type: "Warehouse Safety Certificate",
       issuer: "Department of Labour",
       issuerDid: "did:polygon:0x37c307beb791b306b109010ad5d97de062f28f02",
-      issuerTrusted: true,
       attributes: [{ name: "registered_name", value: "Pelden Trading Pvt. Ltd." }],
-      decision: "allowed",
-      decisionReason: null,
       state: "expired",
-      receivedAt: day(-36),
+      receivedAt: day(-52),
       expiresAt: day(-22),
     },
   ],
 
-  verificationRequests: [
+  /*
+   * Flow 7 — what verifiers have asked Pelden for, three months in. Each is
+   * here for a case the screens must show from the seed, before anyone has
+   * walked anything (UX-EW-04 SCR-PRS-05):
+   *
+   * - pr-bob-earlier: Rinzin chose to share with the bank and Dorji hasn't
+   *   approved yet — Journey P's middle, AWAITING_APPROVAL.
+   * - pr-moice-tender: the ministry checking bidders asks for a tax
+   *   clearance Pelden holds only expired — D17, shown but not answerable.
+   * - pr-drc-check: a verifier outside Rinzin's reach — FLOW-PRS-02 E5 for
+   *   her, an ordinary share for Dorji.
+   * - History: the account the bank opened (Dorji, AUTO), a loan Rinzin
+   *   shared and Dorji approved, and a request that expired after Karma's
+   *   appointment ended under it.
+   * - Refused: a sender not on NDI's list, and the bank asking for
+   *   something outside what it is approved to ask for — neither notified.
+   */
+  presentationRequests: [
     {
-      /* Act 3's portal task. Five attributes asked for, two actually
-         required — least disclosure has something to defend here. */
-      id: "vr-bob",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: [
-        "registered_name",
-        "registration_number",
-        "entity_type",
-        "registered_address",
-        "incorporation_date",
-      ],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: true,
-      decision: "requires_approval",
-      decisionReason: "Presenting to Bank of Bhutan is in scope and needs one approver.",
-      state: "ready",
-      receivedAt: day(-5),
-      expiresAt: day(2),
-    },
-    {
-      /* Already sent for approval, so the queue has something in it before
-         the story is walked. Deliberately a *different* request from vr-bob:
-         a parked operation and a request that still says "ready" would
-         contradict each other, and the screen would show one of them as
-         wrong. */
-      id: "vr-bob-earlier",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number", "entity_type"],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: false,
-      decision: "requires_approval",
-      decisionReason: "Presenting to Bank of Bhutan is in scope and needs one approver.",
-      disclosing: ["registered_name", "registration_number"],
-      state: "parked",
+      id: "pr-bob-earlier",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Annual review of a business customer's registration, as banking rules require.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "AWAITING_APPROVAL",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "rinzin",
+      initiatedAt: day(-1),
+      approvalId: "park-present-bob",
       receivedAt: day(-3),
       expiresAt: day(4),
     },
     {
-      /* The relying-party filter doing its job — in scope by credential
-         type, denied by counterparty. */
-      id: "vr-druk",
-      relyingParty: "Druk Trading House",
-      relyingPartyDid: "did:polygon:0x067c37a944b618effbd0dfe9f463e5f60e458b07",
-      relyingPartyTrusted: false,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number", "registered_address"],
-      requiredAttributes: ["registered_name"],
-      requestsControllershipProof: false,
-      decision: "out_of_scope",
-      decisionReason:
-        "Your authority allows presentations to Bhutan National Single Window and Bank of Bhutan. Druk Trading House is not among them.",
-      state: "ready",
+      id: "pr-moice-tender",
+      verifierOrgId: "org-moice",
+      verifierName: "Ministry of Industry, Commerce & Employment",
+      verifierDid: "did:ethr:bt:0x9c4e21a7b8f03d56e1a2c7b94f0d18e6a3b5c2d9",
+      purpose: "Checking that every bidder on tender MoICE/T/2026/031 is registered and has cleared its taxes.",
+      asked: [
+        { id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "status"] },
+        { id: "tax", credentialType: "Tax Clearance Certificate", fields: ["tpn", "assessment_year"] },
+      ],
+      sessionId: null,
+      displayReference: null,
+      status: "OPEN",
+      receivedAt: day(-1),
+      expiresAt: day(6),
+    },
+    {
+      id: "pr-drc-check",
+      verifierOrgId: "org-drc",
+      verifierName: "Department of Revenue & Customs",
+      verifierDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
+      purpose: "Confirming your registered name and number before we update your taxpayer record.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "OPEN",
       receivedAt: day(-2),
       expiresAt: day(5),
     },
     {
-      id: "vr-bnsw-done",
-      relyingParty: "Bhutan National Single Window",
-      relyingPartyDid: "did:polygon:0xc70c2d3625bec5a34d5b3746b830d36f2525f163",
-      relyingPartyTrusted: true,
-      credentialType: "Business Registration",
-      requestedAttributes: ["registered_name", "registration_number"],
-      requiredAttributes: ["registered_name", "registration_number"],
-      requestsControllershipProof: true,
-      decision: "requires_approval",
-      decisionReason: null,
-      state: "presented",
-      receivedAt: day(-14),
-      expiresAt: day(-7),
+      id: "pr-bob-loan",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Assessing a working-capital loan application.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
+      sessionId: null,
+      displayReference: "LN-2026-0381",
+      status: "SHARED",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "rinzin",
+      initiatedAt: day(-15),
+      approvedBy: "dorji",
+      approvalId: "park-approved-bob-loan",
+      decidedBy: "rinzin",
+      decidedAt: day(-14),
+      receivedAt: day(-15),
+      expiresAt: day(-8),
     },
     {
-      id: "vr-lapsed",
-      relyingParty: "Bank of Bhutan",
-      relyingPartyDid: "did:polygon:0x42c7fe47af259e3e911a36578833f3beb2e50493",
-      relyingPartyTrusted: true,
-      credentialType: "Tax Clearance Certificate",
-      requestedAttributes: ["registered_name", "tpn", "assessment_year"],
-      requiredAttributes: ["registered_name", "tpn"],
-      requestsControllershipProof: false,
-      decision: "requires_approval",
-      decisionReason: null,
-      state: "expired",
+      id: "pr-bob-account",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Opening a business current account.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "registered_address"] }],
+      sessionId: null,
+      displayReference: "EKYB-20177",
+      status: "SHARED",
+      chosen: { registration: "hc-foundational" },
+      initiatedBy: "dorji",
+      initiatedAt: day(-106),
+      decidedBy: "dorji",
+      decidedAt: day(-106),
+      receivedAt: day(-106),
+      expiresAt: day(-99),
+    },
+    {
+      id: "pr-lapsed",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Confirming tax clearance before renewing an overdraft.",
+      asked: [{ id: "tax", credentialType: "Tax Clearance Certificate", fields: ["tpn", "assessment_year"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "EXPIRED",
+      lapsedSharer: "karma",
       receivedAt: day(-30),
       expiresAt: day(-23),
+    },
+    {
+      id: "pr-druk",
+      verifierOrgId: null,
+      verifierName: "Druk Trading House",
+      verifierDid: "did:polygon:0x067c37a944b618effbd0dfe9f463e5f60e458b07",
+      purpose: "Supplier onboarding.",
+      asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "registered_address"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "BLOCKED",
+      blockedReason: "VERIFIER_NOT_TRUSTED",
+      receivedAt: day(-2),
+      expiresAt: day(5),
+    },
+    {
+      id: "pr-bob-scope",
+      verifierOrgId: "org-bob",
+      verifierName: "Bank of Bhutan",
+      verifierDid: ISSUER_DID,
+      purpose: "Checking a trade-finance customer's transport permits.",
+      asked: [{ id: "permit", credentialType: "Freight Forwarder Permit", fields: ["permit_number", "vehicle_classes"] }],
+      sessionId: null,
+      displayReference: null,
+      status: "BLOCKED",
+      blockedReason: "OUT_OF_SCOPE",
+      receivedAt: day(-9),
+      expiresAt: day(-2),
+    },
+  ],
+  presentationSessions: [],
+  /* Bank of Bhutan's one registered return address — its eKYB journey's
+     return page. Removing it is how FLOW-PRS-01 E15 is reached live. */
+  returnAddresses: [
+    {
+      id: "ra-bob-ekyb",
+      orgId: "org-bob",
+      returnUrlId: "ekyb-return",
+      url: "https://www.bob.bt/ekyb/return",
+      addedBy: "yeshey",
+      addedAt: day(-40),
+    },
+    {
+      /* The Single Window's registration page — Flow 9's way back from
+         FLOW-PRS-01 once a company has shared its registration, licence
+         and TPN. Nobody in the story works at BNSW; the address was
+         registered when it joined (SCR-PRS-06). */
+      id: "ra-bnsw-register",
+      orgId: "org-bnsw",
+      returnUrlId: "bnsw-register-return",
+      url: "https://www.bnsw.gov.bt/register/return",
+      addedBy: "bnsw-admin",
+      addedAt: day(-200),
     },
   ],
 
@@ -2596,11 +3945,11 @@ export const SEED: DemoState = {
          would actually commit to — B7 shows it for that reason. */
       id: "park-present-bob",
       operation: "proof:present",
-      summary: "Present Business Registration to Bank of Bhutan",
+      summary: "Share Business Registration with Bank of Bhutan",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
-      targetId: "vr-bob-earlier",
+      targetId: "pr-bob-earlier",
       targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:c0a71e94b83f2d6508a1c47fe9b230da75146c8be03f9a27",
       policy: "SINGLE_APPROVER",
@@ -2612,97 +3961,61 @@ export const SEED: DemoState = {
       expiresAt: day(2),
     },
     {
-      id: "park-accept-warehouse",
-      operation: "credential:accept",
-      summary: "Accept Bonded Warehouse Authorisation from Department of Revenue & Customs",
+      /* Flow 8, Journey T: Rinzin gave an employee authority to act, and
+         her *Give authority to act* is SINGLE_APPROVER, so it waits for one
+         other person (EW-FLOW8-SD §8.2). One approver, never Rinzin — the
+         value threshold and two-signature control this used to show are
+         catalogue flow 10, out of scope (§1.2). */
+      id: "park-grant-sangay",
+      operation: "authority:issue",
+      summary: "Give Sangay Wangmo authority to submit customs declarations at Bhutan National Single Window",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
-      targetId: "offer-warehouse",
-      targetRelyingParty: null,
-      payloadHash: "sha256:38f5b2ce7a41d09628e5c3ba147f60d92b8074ae5c13f6d8",
+      targetId: "g-sangay",
+      targetRelyingParty: "Bhutan National Single Window",
+      payloadHash: "sha256:9c03e7b15fa2d4806e1b3c97a54d0f82e6b19a7c3d05f418",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
       signatures: [],
       state: "parked",
       decisionReason: null,
-      createdAt: day(-3),
-      expiresAt: day(4),
-    },
-    {
-      /* Dual control, nothing collected yet: two approvers, neither of them
-         Dorji, who asked — a requester never signs their own (A2). The plan
-         folds multi-sig into B7 as a variant rather than building D3, and
-         this is that variant. */
-      id: "park-issue-highvalue",
-      operation: "authority:issue",
-      summary: "Issue Declaration authority to Pema Choden — cap Nu. 1,200,000",
-      requestedBy: "dorji",
-      relationId: "rel-root",
-      scopeVersion: 1,
-      targetId: null,
-      targetRelyingParty: "Bhutan National Single Window",
-      payloadHash: "sha256:7d19a4fe0c38b5217e9c460da3f8b12a4e07c1685bd93fa2",
-      policy: "DUAL_CONTROL",
-      requiredSignatures: 2,
-      signatures: [],
-      state: "parked",
-      decisionReason: null,
       createdAt: day(-1),
-      expiresAt: day(3),
+      expiresAt: day(6),
     },
     {
       /* Approved, then invalidated before it ran. The edge the brief calls
          out in 8.4 and the one a system would be broken to execute. */
       id: "park-stale",
       operation: "proof:present",
-      summary: "Present Tax Clearance Certificate to Bank of Bhutan",
+      summary: "Share Tax Clearance Certificate with Bank of Bhutan",
       requestedBy: "karma",
       relationId: "rel-karma",
       scopeVersion: 2,
-      targetId: "vr-lapsed",
+      targetId: "pr-lapsed",
       targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:b61f7c05e298a4d3706b1cfe45a9d823017e5b9c4af26d10",
-      policy: "DUAL_CONTROL",
-      requiredSignatures: 2,
-      signatures: [
-        { personId: "dorji", at: day(-8), method: "wallet" },
-        { personId: "sonam", at: day(-8), method: "web" },
-      ],
+      policy: "SINGLE_APPROVER",
+      requiredSignatures: 1,
+      signatures: [{ personId: "dorji", at: day(-8), method: "web" }],
       state: "stale",
       decisionReason: null,
-      invalidatedReason:
-        "Karma Wangmo's controllership was terminated after this was approved, so it was never run.",
+      /* FLOW-PRS-02 E11: approving re-checks the sharer, and Karma's
+         appointment had ended — so nothing went, and the request went back
+         to OPEN, where it later expired. */
+      invalidatedReason: "Karma Wangmo can no longer share this, so it hasn't been sent.",
       createdAt: day(-9),
       expiresAt: day(-2),
     },
     {
-      id: "park-expired",
-      operation: "credential:accept",
-      summary: "Accept Warehouse Safety Certificate from Department of Labour",
-      requestedBy: "rinzin",
-      relationId: "rel-rinzin",
-      scopeVersion: 3,
-      targetId: "offer-lapsed",
-      targetRelyingParty: null,
-      payloadHash: "sha256:4a8e13d705b9c2f6481ade37f0b5924c6d81073be5a2fc94",
-      policy: "SINGLE_APPROVER",
-      requiredSignatures: 1,
-      signatures: [],
-      state: "expired",
-      decisionReason: "Nobody decided this before it expired.",
-      createdAt: day(-35),
-      expiresAt: day(-28),
-    },
-    {
-      id: "park-approved-bnsw",
+      id: "park-approved-bob-loan",
       operation: "proof:present",
-      summary: "Present Business Registration to Bhutan National Single Window",
+      summary: "Share Business Registration with Bank of Bhutan",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
-      targetId: "vr-bnsw-done",
-      targetRelyingParty: "Bhutan National Single Window",
+      targetId: "pr-bob-loan",
+      targetRelyingParty: "Bank of Bhutan",
       payloadHash: "sha256:e572b0491ac8d36f7be24051c9da8317064fb2e85d1a7c63",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
@@ -2714,185 +4027,293 @@ export const SEED: DemoState = {
     },
   ],
 
-  delegatedAuthorities: [
+  /*
+   * Flow 8 — Pelden's grants of authority to act, three months in. Each is
+   * here for a case SCR-AUT-01 must show before anyone has walked anything:
+   *
+   * - g-pema: Pema Choden, Druk Sharpa Freight's clearing agent, collected
+   *   her authority a month ago — Journey S's end, ACTIVE.
+   * - g-sangay: Rinzin, appointed with *Give authority to act*, gave an
+   *   employee authority to submit declarations, and Dorji hasn't approved
+   *   it yet — Journey T's middle, AWAITING_APPROVAL.
+   * - g-kinley: claimable — a link out, not yet collected.
+   * - g-tashi: a link nobody collected in seven days (E15, LAPSED).
+   * - g-pema-q2: Pema's earlier authority, which reached its end date.
+   *
+   * Their ID-number hashes are made the way the store makes them, from the
+   * simulated citizens' numbers, so a claim against g-kinley matches.
+   */
+  authorityGrants: [
     {
-      /* The Role Act 5 revokes. Everything below it fails when it goes. */
-      id: "da-role-broker",
-      kind: "role",
-      title: "Customs broker",
-      recipientId: "pema",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration", "customs:amendment"],
-      valueCap: null,
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
-      validFrom: day(-86),
-      validUntil: day(278),
+      id: "g-pema",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Pema Choden",
+      delegateName: "Pema Choden",
+      delegateIdKeyed: keyedIdHash(PELDEN, "11512002960"),
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegatePersonId: "pema",
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 1000000,
+      perTransaction: true,
+      validFrom: day(-31),
+      validUntil: day(59),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: "urn:uuid:4c1e8a72-9d03-4b6f-a5e2-81f7c03d9b46",
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:2a9f41c7e0b3d85640c1f7ae92b4d03e65a817cf0d24b9e3",
       status: "ACTIVE",
-      acceptance: "accepted",
-      issuedAt: day(-86),
-      acceptedAt: day(-86),
+      submittedAt: day(-31),
+      statusAt: day(-30),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: true,
     },
     {
-      /* Act 4's capability. Short-lived by design — expiry is the first line
-         of defence, so 90 days, not a year. */
-      id: "da-cap-declaration",
-      kind: "capability",
-      title: "Declaration authority",
-      recipientId: "pema",
-      parentId: "da-role-broker",
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration"],
-      valueCap: { amount: 500000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
+      id: "g-sangay",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Sangay Wangmo",
+      delegateName: null,
+      delegateIdKeyed: keyedIdHash(PELDEN, "11206003325"),
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 300000,
+      perTransaction: true,
+      validFrom: day(-1),
+      validUntil: day(89),
+      issuerDid: null,
+      revocationId: null,
+      grantedBy: "rinzin",
+      grantedRelationId: "rel-rinzin",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: "park-grant-sangay",
+      credentialRef: null,
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:9c03e7b15fa2d4806e1b3c97a54d0f82e6b19a7c3d05f418",
+      status: "AWAITING_APPROVAL",
+      submittedAt: day(-1),
+      statusAt: day(-1),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
+    },
+    {
+      id: "g-kinley",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Kinley Wangdi",
+      delegateName: null,
+      delegateIdKeyed: keyedIdHash(PELDEN, "10811004417"),
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 500000,
+      perTransaction: true,
       validFrom: day(-2),
       validUntil: day(88),
-      status: "ACTIVE",
-      acceptance: "accepted",
-      issuedAt: day(-2),
-      acceptedAt: day(-1),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: null,
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: null,
+      claimRef: "c7Qm2xVb9TkPa4Lw",
+      claimExpiresAt: day(5),
+      approvalHash: "sha256:51d8e0a3c7f294b6e1a05d38c9f27b4e0a6d13f58c2b97e4",
+      status: "CLAIMABLE",
+      submittedAt: day(-2),
+      statusAt: day(-2),
+      endReason: null,
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
     },
     {
-      /* The console's "sent, awaiting acceptance" state — acceptance is the
-         holder's consent and cannot be assumed. */
-      id: "da-cap-payments",
-      kind: "capability",
-      title: "Payment release authority",
-      recipientId: "sonam",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["payments:release"],
-      valueCap: { amount: 250000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bank of Bhutan"] },
-      validFrom: day(-1),
-      validUntil: day(59),
-      status: "ACTIVE",
-      acceptance: "sent",
-      issuedAt: day(-1),
-      acceptedAt: null,
+      id: "g-tashi",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Tashi Dorji",
+      delegateName: null,
+      delegateIdKeyed: null,
+      delegateDid: null,
+      delegatePersonId: null,
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 250000,
+      perTransaction: true,
+      validFrom: day(-20),
+      validUntil: day(70),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: null,
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: null,
+      claimRef: "t3Wd8nKq5RzHe1Yc",
+      claimExpiresAt: day(-13),
+      approvalHash: "sha256:e74a0c19b5d23f86a0c7e41b9d53f2a86c0e17b4d95a3f20",
+      status: "LAPSED",
+      submittedAt: day(-20),
+      statusAt: day(-13),
+      endReason: "Tashi Dorji didn't collect their authority by the date the link expired. Nothing was given.",
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: false,
     },
     {
-      id: "da-cap-lapsed",
-      kind: "capability",
-      title: "Declaration authority (Q2)",
-      recipientId: "pema",
-      parentId: "da-role-broker",
-      relationId: "rel-root",
-      taskScopes: ["customs:declaration"],
-      valueCap: { amount: 500000, currency: "BTN", perTransaction: true },
-      counterparties: { mode: "list", values: ["Bhutan National Single Window"] },
-      validFrom: day(-161),
-      validUntil: day(-71),
+      id: "g-pema-q2",
+      orgId: PELDEN,
+      kind: "CAPABILITY",
+      name: "Pema Choden",
+      delegateName: "Pema Choden",
+      delegateIdKeyed: null,
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegatePersonId: "pema",
+      tasks: ["nsw:submit-declaration"],
+      counterparties: ["org-bnsw"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 500000,
+      perTransaction: true,
+      validFrom: day(-122),
+      validUntil: day(-32),
+      issuerDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      revocationId: "0d6b3f28-c1e4-47a9-8b25-e93f0a7c164d",
+      grantedBy: "dorji",
+      grantedRelationId: "rel-root",
+      approvedBy: null,
+      approvedRelationId: null,
+      approvalId: null,
+      credentialRef: "urn:uuid:a93d17e0-5b2c-48f6-9e41-c08b7f2d65a3",
+      claimRef: null,
+      claimExpiresAt: null,
+      approvalHash: "sha256:0f6c2e91a7d438b5c1e09f4a72d3b86e5c10a9f7e2d4b631",
       status: "EXPIRED",
-      acceptance: "accepted",
-      issuedAt: day(-161),
-      acceptedAt: day(-161),
-    },
-    {
-      id: "da-role-warehouse",
-      kind: "role",
-      title: "Warehouse supervisor",
-      recipientId: "karma",
-      parentId: null,
-      relationId: "rel-root",
-      taskScopes: ["warehouse:receipt"],
-      valueCap: null,
-      counterparties: { mode: "any" },
-      validFrom: day(-187),
-      validUntil: day(113),
-      status: "REVOKED",
-      acceptance: "accepted",
-      issuedAt: day(-187),
-      acceptedAt: day(-186),
-      endedAt: day(-40),
-      endedReason: "Left the company.",
-      appealReference: "AP-2026-0288",
+      submittedAt: day(-122),
+      statusAt: day(-32),
+      endReason: "Reached its end date.",
+      mismatches: 0,
+      offerExpiresAt: null,
+      accepted: true,
     },
   ],
+  authorityDraft: null,
 
-  decisions: [
+  /*
+   * Flow 9 — BNSW's own records, three months in (EW-FLOW9-SD §4). Pelden
+   * registered with the Single Window after its first grant, so the record
+   * carries its publishing DID and Pema's authority is recognised (B1). One
+   * earlier session of Pema's, ended at BNSW's sign-in timeout, with the two
+   * declarations she made in it — what BNSW keeps with each (§4.3).
+   */
+  counterpartyRegistrations: [
     {
-      /* Act 5, first run. Every check passes and the chain is whole. */
-      id: "dec-84120",
-      outcome: "PASS",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "da-cap-declaration",
-      declarationRef: "BNSW-DEC-2026-84120",
-      declarationHash: "sha256:1f6b90c4a7e2d3850b94cf17e6a02d5b83741ce90b2d6f45",
-      declaredValue: { amount: 420000, currency: "BTN" },
-      chain: [
-        { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "rel-root", label: "Root authority", kind: "relation", heldBy: "Dorji Wangchuk", status: "valid" },
-        { id: "da-role-broker", label: "Customs broker", kind: "role", heldBy: "Pema Choden", status: "valid" },
-        { id: "da-cap-declaration", label: "Declaration authority", kind: "capability", heldBy: "Pema Choden", status: "valid" },
-      ],
-      checks: [
-        { label: "Task in scope", detail: "customs:declaration is one of the granted tasks", outcome: "pass" },
-        { label: "Value within cap", detail: "Nu. 420,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
-        { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
-        { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
-        { label: "Authority chain intact", detail: "All four links live at the time of decision", outcome: "pass" },
-      ],
-      reasons: [],
-      decidedAt: day(-1),
-      signature: "z3Kf8Qa2NmVpT7wLxB4dRc9sYhE6uJn1PkG5tZoW",
-    },
-    {
-      /* The same capability, the same person, the same counterparty — and a
-         FAIL, because a link above it was withdrawn. This pair is the demo. */
-      id: "dec-84137",
-      outcome: "FAIL",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "da-cap-declaration",
-      declarationRef: "BNSW-DEC-2026-84137",
-      declarationHash: "sha256:8c04e71ab5d2f39607be4a1c8d5079f2361ba0e75c8d4f19",
-      declaredValue: { amount: 380000, currency: "BTN" },
-      chain: [
-        { id: "hc-foundational", label: "Business Registration", kind: "foundational", heldBy: "Pelden Trading Pvt. Ltd.", status: "valid" },
-        { id: "rel-root", label: "Root authority", kind: "relation", heldBy: "Dorji Wangchuk", status: "valid" },
-        { id: "da-role-broker", label: "Customs broker", kind: "role", heldBy: "Pema Choden", status: "revoked" },
-        { id: "da-cap-declaration", label: "Declaration authority", kind: "capability", heldBy: "Pema Choden", status: "valid" },
-      ],
-      checks: [
-        { label: "Task in scope", detail: "customs:declaration is one of the granted tasks", outcome: "pass" },
-        { label: "Value within cap", detail: "Nu. 380,000 declared against a Nu. 500,000 per-transaction cap", outcome: "pass" },
-        { label: "Counterparty bound", detail: "Bhutan National Single Window matches the bound counterparty", outcome: "pass" },
-        { label: "Within validity window", detail: "Valid 7 Sep 2026 – 6 Dec 2026", outcome: "pass" },
-        { label: "Authority chain intact", detail: "Customs broker was revoked on 9 Sep 2026", outcome: "fail" },
-      ],
-      reasons: [
-        "The Customs broker role this authority depends on was withdrawn on 9 September 2026.",
-        "An authority cannot be relied on while any authority above it has been withdrawn.",
-      ],
-      decidedAt: day(0),
-      signature: "z7Ln2Vx9BqTm4pKdW8sRc3aYhU5eJf1GoZ6tNwPi",
-    },
-    {
-      /* Fail closed, and say so. Seeded rather than only reachable through a
-         thrown error, because a state you cannot reach cannot be reviewed. */
-      id: "dec-unreachable",
-      outcome: "SERVICE_UNREACHABLE",
-      verifier: "Bhutan National Single Window",
-      entity: "Pelden Trading Pvt. Ltd.",
-      actorId: "pema",
-      authorityId: "da-cap-declaration",
-      declarationRef: "BNSW-DEC-2026-84141",
-      declarationHash: "sha256:5b93d0e6c1a47f28903e5bd7a4c61f80257ed3b9418c6a02",
-      declaredValue: { amount: 96000, currency: "BTN" },
-      chain: [],
-      checks: [],
-      reasons: [
-        "The Authority Verification API could not be reached, so nothing could be checked.",
-        "An unverifiable authority is treated as no authority.",
-      ],
-      decidedAt: day(0),
-      signature: "",
+      id: "reg-pelden-bnsw",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      holderDid: "did:key:z6MkhPq3vT8wYb2LcR5nJd9sXe4mKa7GuF1oZi6NyWrQ2tBc",
+      publishingDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      legalName: "Pelden Trading Pvt. Ltd.",
+      registrationNumber: "CRA-2019-04477",
+      tpn: "TPN-114-8830",
+      tpnRevocationId: "b81f04c2-6d3e-4a97-8e15-c2d07a9f3b64",
+      tpnCredentialId: "hc-tpn",
+      licences: [{ number: "BL-PLG-2025-00871", revocationId: "e4a92c17-0b5d-4f38-a6c1-9d27f30e85b2", credentialId: "hc-licence-plg" }],
+      registeredAt: day(-29),
+      requestId: null,
     },
   ],
+  authoritySessions: [
+    {
+      id: "as-pema-earlier",
+      counterpartyId: "org-bnsw",
+      signedInCid: "11512002960",
+      delegateDid: "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      authorityName: "Pema Choden",
+      orgId: PELDEN,
+      registrationId: "reg-pelden-bnsw",
+      principalDid: "did:ethr:bt:0x3b7e90c4d12a58f6e0b9a41c7d2e85f3a6c01d94",
+      relationId: "g-pema",
+      tasks: ["nsw:submit-declaration", "nsw:amend-declaration"],
+      licenceNumbers: ["BL-PLG-2025-00871"],
+      valueCapNu: 1000000,
+      perTransaction: true,
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      citizenRevocationId: "11512002-c17e-4a0d-9b52-115120029600",
+      validUntil: day(59),
+      endsAt: Date.parse(`${day(-2)}T11:30:00Z`),
+      checkedAt: Date.parse(`${day(-2)}T03:30:00Z`),
+      status: "ENDED",
+      endedAt: Date.parse(`${day(-2)}T11:30:00Z`),
+      endReason: "timeout",
+    },
+  ],
+  counterpartyDeclarations: [
+    {
+      id: "dcl-84120",
+      reference: "BNSW-DEC-2026-84120",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      sessionId: "as-pema-earlier",
+      kind: "submit",
+      amends: null,
+      amendedBy: null,
+      goods: "Steel roofing sheets, 12 pallets",
+      valueNu: 420000,
+      licenceNumber: "BL-PLG-2025-00871",
+      relationId: "g-pema",
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · TPN ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      at: day(-2),
+    },
+    {
+      id: "dcl-84137",
+      reference: "BNSW-DEC-2026-84137",
+      counterpartyId: "org-bnsw",
+      orgId: PELDEN,
+      sessionId: "as-pema-earlier",
+      kind: "submit",
+      amends: null,
+      amendedBy: null,
+      goods: "Cement, 40 tonnes",
+      valueNu: 380000,
+      licenceNumber: "BL-PLG-2025-00871",
+      relationId: "g-pema",
+      authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
+      delegateName: "Pema Choden",
+      delegateCid: "11512002960",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · TPN ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      at: day(-2),
+    },
+  ],
+  bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
 
   auditEntries: [
     {
@@ -2931,7 +4352,7 @@ export const SEED: DemoState = {
       id: "au-6",
       seq: 6,
       operation: "authority:issue",
-      summary: "Issued Declaration authority to Pema Choden — cap Nu. 500,000 per declaration",
+      summary: "Gave Pema Choden authority to submit and amend customs declarations at Bhutan National Single Window — up to Nu 1,000,000 per declaration",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "dorji",
       relationId: "rel-root",
@@ -2950,7 +4371,7 @@ export const SEED: DemoState = {
       id: "au-5",
       seq: 5,
       operation: "proof:present",
-      summary: "Presented Business Registration to Bhutan National Single Window",
+      summary: "Shared Business Registration with Bhutan National Single Window",
       entity: "Pelden Trading Pvt. Ltd.",
       actorId: "rinzin",
       relationId: "rel-rinzin",
@@ -3036,8 +4457,8 @@ export const SEED: DemoState = {
       reference: "AP-2026-0417",
       subjectId: "pema",
       againstKind: "authority",
-      againstId: "da-role-broker",
-      againstTitle: "Customs broker",
+      againstId: "g-pema-q2",
+      againstTitle: "Authority to submit customs declarations at Bhutan National Single Window",
       noticeReason:
         "Withdrawn pending an internal review of declaration values submitted in August.",
       noticeIssuedAt: day(0),
@@ -3053,14 +4474,14 @@ export const SEED: DemoState = {
       id: "ap-karma",
       reference: "AP-2026-0288",
       subjectId: "karma",
-      againstKind: "authority",
-      againstId: "da-role-warehouse",
-      againstTitle: "Warehouse supervisor",
+      againstKind: "relation",
+      againstId: "rel-karma",
+      againstTitle: "Karma Wangmo's appointment",
       noticeReason: "Withdrawn on departure from the company.",
       noticeIssuedAt: day(-40),
       submittedAt: day(-36),
       submission:
-        "My last working day was 8 August, not 31 July. I had four warehouse receipts outstanding on the date the role was withdrawn.",
+        "My last working day was 8 August, not 31 July. I had four declarations outstanding on the date my appointment was ended.",
       state: "rejected",
       windowWorkingDays: 10,
       decisionWorkingDays: 5,
@@ -3074,6 +4495,104 @@ export const SEED: DemoState = {
   orgOnboarding: null,
 
   accreditations: [],
+
+  /* The Corporate Regulatory Authority has confirmed companies on the
+     platform since before the Entity Wallet opened: it came on through a
+     Kind O invitation (FLOW-ONB-02, the inv-cra record), and its
+     designation and adoption are the deployment's, not anything a
+     presenter walks. The prototype walks the other kind — a ministry
+     already on the platform, designated in place (Kind E) — so MoICE has
+     no designation at all here, and sole proprietorships and partnerships
+     have nobody to confirm them until Flow 5 gives them one. */
+  designations: [
+    {
+      id: "dsg-cra",
+      orgId: "org-cra",
+      orgName: "Corporate Regulatory Authority",
+      kind: "N",
+      entityTypes: ["company"],
+      legalBasis: "Companies Act of Bhutan — the Registrar of Companies",
+      legalRef: "NDI/DSG/2026/001",
+      state: "ACTIVE",
+      proposedBy: null,
+      proposedAt: null,
+      approvedBy: null,
+      approvedAt: null,
+      acceptedBy: null,
+      acceptedAt: day(-125),
+      declinedBy: null,
+      declinedReason: null,
+      withdrawnBy: null,
+      withdrawnAt: null,
+      withdrawnReason: null,
+      withdrawnFrom: null,
+      expiredReason: null,
+      expiresAt: null,
+      infoRequests: [],
+      activatedAt: day(-124),
+      publishingDid: "did:ethr:bt:0x5a2f7c19e0b4d8a63c11f0e97b2d4a6c8e3f1b07",
+      didMethodAtActivation: "did:ethr",
+      suspendedReason: null,
+      checks: null,
+      checkedAt: null,
+      ndiGrant: { by: "registrar", at: day(-125) },
+      ndiAccess: "ACTIVE",
+      ndiAccessChangedBy: null,
+      ndiAccessChangedAt: null,
+    },
+  ],
+  adoptions: [
+    {
+      id: "ado-cra-company-1",
+      designationId: "dsg-cra",
+      orgId: "org-cra",
+      entityType: "company",
+      version: 1,
+      state: "ACTIVE",
+      adoptedBy: "registrar",
+      adoptedAt: day(-120),
+      asked: draftFor("company").asked,
+      purpose: draftFor("company").purpose,
+      stoppedBy: null,
+      stoppedAt: null,
+    },
+  ],
+  artefactObjections: [],
+  draftRevisions: [],
+  /* The authority's own grant, written when it adopted for companies. */
+  authorisations: [
+    {
+      id: "auth-cra-company-1",
+      designationId: "dsg-cra",
+      orgId: "org-cra",
+      entityType: "company",
+      principal: NDI_SERVICE_PRINCIPAL,
+      permittedPurpose: "Confirming a company's representative, for entity onboarding",
+      grantedBy: "registrar",
+      grantedAt: day(-120),
+      state: "ACTIVE",
+      withdrawnBy: null,
+      withdrawnAt: null,
+    },
+  ],
+
+  offerings: SEED_OFFERINGS,
+  credentialRequests: [],
+  /* One attempt the wallet refused on its own: an offer from a sender not
+     on NDI's list. Never notified (UXD-36) — the Activity tab is the only
+     place it shows, which is the point of keeping it. */
+  refusedOffers: [
+    {
+      id: "rof-1",
+      orgId: "org-pelden",
+      claimedIssuer: "Bhutan Revenue Authority",
+      credential: "Tax Exemption Certificate",
+      reason: "not from an organisation on NDI's list of trusted organisations",
+      listed: false,
+      at: day(-6),
+    },
+  ],
+  integration: SEED_INTEGRATION,
 
   orgInterests: [],
   responsibilities: [],
@@ -3237,7 +4756,9 @@ export function firstRunState(s: DemoState): DemoState {
        credentials issued…) stay for the same reason: they are the issuers',
        and Pelden, a holder only, never sees them. */
     organizations: [
-      { ...entity, memberIds: ["dorji"], members: 1, createdAt: today },
+      /* No listing as an issuer of authority: that comes with its first
+         grant (Flow 8, D5), which the first day hasn't made. */
+      { ...entity, memberIds: ["dorji"], members: 1, createdAt: today, authorityListing: undefined },
       ...s.organizations.filter((o) => o.id !== PELDEN),
     ],
     activity: [],
@@ -3284,10 +4805,15 @@ export function firstRunState(s: DemoState): DemoState {
       ...(foundational ? [{ ...foundational, receivedAt: today }] : []),
     ],
     offers: s.offers.filter((o) => !inOrg(PELDEN)(o)),
-    verificationRequests: s.verificationRequests.filter((v) => !inOrg(PELDEN)(v)),
+    presentationRequests: s.presentationRequests.filter((v) => !inOrg(PELDEN)(v)),
+    presentationSessions: [],
     parkedOperations: [],
-    delegatedAuthorities: [],
-    decisions: [],
+    authorityGrants: [],
+    authorityDraft: null,
+    counterpartyRegistrations: [],
+    authoritySessions: [],
+    counterpartyDeclarations: [],
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
     auditEntries: [
       {
         id: "au-onb-2",
@@ -3364,17 +4890,23 @@ export function dayZeroState(seed: DemoState): DemoState {
     /* Yeshey has had an account since the bank came onto NDI; root since the
        platform was deployed. Nobody else has one yet. */
     people: seed.people.map((p) =>
-      p.id === "yeshey" || p.platformRole === "root"
+      /* Kesang and Deki too: their offices have been on NDI as long as the bank. */
+      p.id === "yeshey" || p.id === "kesang" || p.id === "deki" || p.id === "registrar" || p.platformRole === "root"
         ? p
         : { ...p, hasAccount: false, memberRole: undefined, platformRole: undefined },
     ),
     relations: [],
     heldCredentials: [],
     offers: [],
-    verificationRequests: [],
+    presentationRequests: [],
+    presentationSessions: [],
     parkedOperations: [],
-    delegatedAuthorities: [],
-    decisions: [],
+    authorityGrants: [],
+    authorityDraft: null,
+    counterpartyRegistrations: [],
+    authoritySessions: [],
+    counterpartyDeclarations: [],
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
     auditEntries: [],
     appeals: [],
     signup: null,
