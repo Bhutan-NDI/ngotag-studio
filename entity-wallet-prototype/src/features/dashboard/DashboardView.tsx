@@ -71,6 +71,10 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
     );
   }
 
+  /* A body constituted by statute (a ministry, an authority) is never a
+     holder and has no verification to offer: it reaches the platform through
+     a designation, so its dashboard is what it does and the designation card
+     (EW-FLOW2-SD §2.2, D4). */
   /* An organisation on NDI its authority has not confirmed — Bank of
      Bhutan before its owner verifies it. Its dashboard is about what it
      already does, with the way to verify it beside that (FLOW-ORG-01 A1).
@@ -89,12 +93,14 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
             }
             lead={`${orgName} issues and verifies credentials on the Bhutan NDI network.`}
             action={
-              <Link href="/entity-wallet">
-                <GradientButton>
-                  <Icon name="shieldCheck" size={16} strokeWidth={2} />
-                  Verify {orgName}
-                </GradientButton>
-              </Link>
+              org?.statutory ? undefined : (
+                <Link href="/entity-wallet">
+                  <GradientButton>
+                    <Icon name="shieldCheck" size={16} strokeWidth={2} />
+                    Verify {orgName}
+                  </GradientButton>
+                </Link>
+              )
             }
           />
           <DesignationNotice />
@@ -123,6 +129,7 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
                 </ul>
               </div>
             </Panel>
+            {org?.statutory ? null : (
             <Panel>
               <div className="relative z-[4] flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -136,6 +143,7 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
                 </p>
               </div>
             </Panel>
+            )}
           </div>
         </div>
       </AppShell>

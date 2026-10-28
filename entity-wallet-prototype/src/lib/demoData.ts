@@ -102,6 +102,14 @@ export interface Organization {
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
+  /**
+   * Constituted by statute or executive order, with no register to verify it
+   * against — a ministry, an authority. It is an issuer and a verifier and
+   * never a holder, so it has no business-verification route; it reaches the
+   * platform through a designation or an approval (EW-FLOW2-SD v0.13 §2.2,
+   * D4; FLOW-ORG-01 §1.2).
+   */
+  statutory?: boolean;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -2546,6 +2554,7 @@ export const SEED: DemoState = {
          needs. Not driven in the demo: its office is only ever seen through
          what it confirms. */
       id: "org-cra",
+      statutory: true,
       name: "Corporate Regulatory Authority",
       legalName: "Corporate Regulatory Authority",
       description: "Statutory authority · Registrar of Companies.",
@@ -2570,6 +2579,7 @@ export const SEED: DemoState = {
          one entitlement: schema creation, which it has never needed. That
          is the E4 the activation checks catch, and NDI resolves. */
       id: "org-moice",
+      statutory: true,
       name: "Ministry of Industry, Commerce & Employment",
       legalName: "Ministry of Industry, Commerce & Employment",
       description: "Licenses sole proprietorships and partnerships. Verifies trade licences on NDI.",
