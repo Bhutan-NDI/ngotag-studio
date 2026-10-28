@@ -84,6 +84,20 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Agent and wallet provisioning, the brokered credential offer with automatic acceptance, and completion that survives the page closing.",
       },
       {
+        shown: "Accepting an appointment with one NDI wallet approval, from \"Bhutan NDI Verification\"",
+        reality:
+          "No request is sent and nothing is signed. The name is a stand-in — the real one is set when NDI's verification organisation is created — and the acceptance wording is a placeholder awaiting GovTech's drafting.",
+        needs:
+          "NDI's dedicated verification organisation, a proof request whose challenge carries the appointment, and the versioned acceptance and attestation texts.",
+      },
+      {
+        shown: "Withdrawing an appointment before it is accepted, and the appointee being told",
+        reality:
+          "Recorded in your browser. Nobody is notified: the appointee finds out by opening the appointment, which then says it was withdrawn. That an acceptance arriving first wins is a check in the demo store, not a lock on anything.",
+        needs:
+          "The withdraw route on the relation, serialised with acceptance on the server, and a notification to the appointee.",
+      },
+      {
         shown: "\"Tell us you're waiting\" and \"email me when it's done\"",
         reality: "Recorded in your browser. Nobody is emailed.",
         needs: "An interest store keeping the type and an address only, and a notification service.",

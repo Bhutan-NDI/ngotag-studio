@@ -96,6 +96,12 @@ export type OrgCapability = "issuer" | "verifier" | "holder";
 
 export interface Organization {
   id: string;
+  /**
+   * The entity type its authority verified it as (FLOW-ORG-01). Decides,
+   * among other things, whether appointing someone is offered at all
+   * (UXD-24). Absent on organisations that predate verification.
+   */
+  kind?: OrgKind;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -394,7 +400,11 @@ export type ControllerOperation =
   | "credential:list"
   | "proof:present"
   | "connection:create"
-  | "approval:decide";
+  | "approval:decide"
+  /* Giving someone authority to act in their own wallet (EW-FLOW8-SD §8.1).
+     The Root holds it, and so does a Controller ticked for *Give authority
+     to act* on SCR-DEL-02 (EW-FLOW3-SD §4.2, D18). */
+  | "authority:issue";
 
 export type ApprovalPolicy = "AUTO" | "SINGLE_APPROVER" | "DUAL_CONTROL";
 
@@ -465,7 +475,120 @@ export interface ControllershipRelation {
   activatedAt: string | null;
   suspendedAt?: string | null;
   endedReason?: string | null;
+  /**
+   * Why a pending appointment became EXPIRED (EW-FLOW3-SD §5.1). One state,
+   * because none of them ever authorised anything; four reasons, because
+   * each tells the person something different.
+   */
+  expiryReason?: ExpiryReason | null;
+  /*
+   * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
+   * older relations, which were authored operation by operation before the
+   * presets were agreed (EW-FLOW3-SD/D8).
+   */
+  /** Which presets were ticked — one or more (EW-FLOW3-SD §4.2, D18). */
+  presets?: PresetId[];
+  /**
+   * The single preset an appointment carried before presets could be
+   * combined. Only a demo saved then still has it; `presetsOf` reads it.
+   */
+  preset?: string;
+  /** For *Share*: named organisations, or any (§4.2). */
+  shareReach?: ShareReach;
+  /** For *Share*: whether each share needs someone to approve it. */
+  shareNeedsApproval?: boolean;
+  /** For *Give authority to act*: whether each grant needs approval. */
+  issueNeedsApproval?: boolean;
+  /** The representative's required statement that they may make it (D5). */
+  attestation?: { attestedBy: PersonId; attestedAt: string };
+  /** The optional authorising document — cited, never uploaded (D5). */
+  document?: AppointmentDocument | null;
+  /** A pending appointment lapses after 14 days (DEL-01/E4). */
+  expiresAt?: string | null;
+  /** The appointee's name as their citizen credential gave it, at acceptance (D6). */
+  verifiedName?: string | null;
 }
+
+/**
+ * The four things a representative can let someone do, ticked in any
+ * combination (EW-FLOW3-SD §4.2, D18; UXD-58). Raw scope is never authored
+ * on a screen; the ticked presets resolve to one, in
+ * `features/appointment/presets.ts`. There is no *Everything*.
+ */
+export type PresetId = "receive" | "share" | "approve" | "give_authority";
+
+/** Who *Share* may share with: the organisations named, or any (§4.2). */
+export type ShareReach = "named" | "any";
+
+/**
+ * Whether a relation still stands — in force, or offered and not yet
+ * lapsed. A pending appointment past its 14 days is over (DEL-01/E4) even
+ * before anything records it as EXPIRED, so everything that asks "does this
+ * person already have authority?" asks this, not the raw state. Otherwise an
+ * expired offer would block appointing the same person again.
+ */
+export function standsNow(r: Pick<ControllershipRelation, "state" | "expiresAt">, today: string): boolean {
+  return r.state === "ACTIVE" || (r.state === "PENDING_ACCEPTANCE" && !(r.expiresAt && r.expiresAt < today));
+}
+
+/**
+ * The four reasons an appointment that was never accepted ends: the
+ * appointee said no, the representative withdrew it (D19), 14 days passed,
+ * or the organisation or its representative stopped standing behind it.
+ */
+export type ExpiryReason = "DECLINED" | "WITHDRAWN" | "TIMED_OUT" | "BASIS_LOST";
+
+/**
+ * Whether a member can be appointed now, and if not, which refusal applies
+ * (FLOW-DEL-01 P3). Split since FLOW-DEL-01 v0.8: someone who can already
+ * act is E3, and someone with an appointment still waiting for them is E14 —
+ * they can't act yet, so the screen mustn't say they can. The store refuses
+ * with this, and SCR-DEL-02 shows the same answer, so the two never differ.
+ */
+export function appointmentHeld(
+  relations: Pick<ControllershipRelation, "orgId" | "personId" | "isRootAuthority" | "state" | "expiresAt">[],
+  orgId: string,
+  personId: string,
+  today: string,
+): "E3" | "E14" | null {
+  const theirs = relations.filter((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today));
+  if (theirs.some((r) => r.state === "ACTIVE")) return "E3";
+  if (theirs.length) return "E14";
+  return null;
+}
+
+/**
+ * The document behind an appointment, if the representative cites one. The
+ * type, date and where the original is kept — and the file's name, standing
+ * in for the hash the browser would compute. The file never leaves the
+ * device, and NDI never reads it (EW-FLOW3-SD/D5).
+ */
+export interface AppointmentDocument {
+  type: "board_resolution" | "power_of_attorney" | "other";
+  date: string;
+  reference: string;
+  fileName: string | null;
+}
+
+/**
+ * The representative's acceptance of responsibility for an organisation
+ * (FLOW-DEL-02). Written when the authority confirms them, and accepted on
+ * SCR-DEL-01. An organisation with no entry here is one whose
+ * representative accepted long ago — the story's lived-in organisations.
+ */
+export interface Responsibility {
+  orgId: string;
+  state: "PENDING" | "ACCEPTED" | "DECLINED";
+  at: string;
+}
+
+/**
+ * The NDI-operated organisation that sends the appointee's identity request
+ * (EW-FLOW3-SD/D15). Its display name is set when it is seeded and is not
+ * decided yet; this is the prototype's stand-in, and SCR-DEL-04 names it
+ * exactly as the wallet would.
+ */
+export const VERIFICATION_ORG_NAME = "Bhutan NDI Verification";
 
 /** An attribute as it actually arrived, value included. */
 export interface CredentialAttribute {
@@ -593,6 +716,9 @@ export interface ParkedOperation {
   expiresAt: string;
   /** Set when `stale` — why an approved operation stopped being valid. */
   invalidatedReason?: string | null;
+  /** For `authority:issue`: the credential held back, issued only once the
+   *  approval is given (FLOW-DEL-01 A1). */
+  heldAuthority?: DelegatedAuthority;
 }
 
 export type AuthorityKind = "role" | "capability";
@@ -1118,6 +1244,8 @@ export interface DemoState {
   orgOnboarding: OrgOnboarding | null;
   /** SCR-ORG-06 — people waiting for an authority to connect. Not applications. */
   orgInterests: OrgInterest[];
+  /** FLOW-DEL-02 — whether each new organisation's representative has accepted. */
+  responsibilities: Responsibility[];
   accessRequests: AccessRequest[];
   /**
    * True from the moment onboarding completes until the story jumps past
@@ -1678,6 +1806,10 @@ export const SEED: DemoState = {
           { operation: "proof:present", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "connection:create", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
           { operation: "approval:decide", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
+          /* The Root preset gained authority:issue when giving authority to
+             act became something the Root can also tick for others
+             (EW-FLOW3-SD §4.2, EW-FLOW8-SD/D21). */
+          { operation: "authority:issue", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
         ],
       },
       state: "ACTIVE",
@@ -2097,8 +2229,10 @@ export const SEED: DemoState = {
       expiresAt: day(4),
     },
     {
-      /* Dual control, half collected. The plan folds multi-sig into B7 as a
-         variant rather than building D3, and this is that variant. */
+      /* Dual control, nothing collected yet: two approvers, neither of them
+         Dorji, who asked — a requester never signs their own (A2). The plan
+         folds multi-sig into B7 as a variant rather than building D3, and
+         this is that variant. */
       id: "park-issue-highvalue",
       operation: "authority:issue",
       summary: "Issue Declaration authority to Pema Choden — cap Nu. 1,200,000",
@@ -2110,7 +2244,7 @@ export const SEED: DemoState = {
       payloadHash: "sha256:7d19a4fe0c38b5217e9c460da3f8b12a4e07c1685bd93fa2",
       policy: "DUAL_CONTROL",
       requiredSignatures: 2,
-      signatures: [{ personId: "dorji", at: day(-1), method: "wallet" }],
+      signatures: [],
       state: "parked",
       decisionReason: null,
       createdAt: day(-1),
@@ -2556,6 +2690,7 @@ export const SEED: DemoState = {
   ],
 
   orgInterests: [],
+  responsibilities: [],
 
   orgInvitations: [
     {
@@ -2860,6 +2995,7 @@ export function dayZeroState(seed: DemoState): DemoState {
     orgInvitations: [],
     orgOnboarding: null,
     orgInterests: [],
+    responsibilities: [],
     /* Nothing waiting. It used to hold one request so the new admin's queue
        was not only the one the story was about to send — but a request
        sitting in a queue on a platform nobody administers yet read as
