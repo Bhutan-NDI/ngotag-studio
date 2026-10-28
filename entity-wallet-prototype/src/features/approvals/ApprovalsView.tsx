@@ -33,7 +33,6 @@ import { useDemo } from "@/lib/demoStore";
    calls sharing (UX-EW-04 §2.4). */
 const KIND: Record<string, string> = {
   "proof:present": "Sharing",
-  "credential:accept": "Accepting a credential",
   "authority:issue": "Giving authority",
 };
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
@@ -12,11 +13,11 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { draftFor, isPlatformAdmin, objectionHolds, type OrgKind } from "@/lib/demoData";
+import { draftAsked, draftFor, isPlatformAdmin, openObjectionFor, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
-import { kindPlural, kindSingular, kindTitle, useAuthority } from "./shared";
+import { kindPlural, kindSingular, kindTitle, kindsInWords, useAuthority } from "./shared";
 
 /**
  * SCR-ADO-02 — Adopt for an entity type. FLOW-ORG-03 step 4: the
@@ -50,19 +51,21 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
   const router = useRouter();
   const params = useSearchParams();
   const changing = params.get("change") === "1";
-  const { artefactObjections, currentPerson, adoptArtefacts, hydrated } = useDemo();
+  const { artefactObjections, draftRevisions, currentPerson, adoptArtefacts, hydrated } = useDemo();
   const forced = useScreenState("SCR-ADO-02", ["live", "default", "loading", "e1", "e2", "e3", "e4", "e7", "success", "offline", "ndi_admin"]) as Face;
 
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ version: number } | null>(null);
-  const [error, setError] = useState<"E1" | "E4" | "E5" | "E7" | "offline" | null>(null);
+  const [error, setError] = useState<"E1" | "E5" | "E7" | "objection_open" | "offline" | null>(null);
 
   const { org, active: d, owner } = useAuthority();
   const draft = draftFor(kind);
-  const objection = artefactObjections.find((o) => o.designationId === d?.id && o.entityType === kind);
-  const asked = objection?.item ? draft.asked.filter((a) => a.item !== objection.item) : draft.asked;
-  const held = objectionHolds(objection);
+  /* What is adopted is NDI's current draft — its revision, if it revised. */
+  const asked = draftAsked(draftRevisions, d?.id, kind);
+  /* A5 — an open objection against this type or the whole draft holds it. */
+  const objection = openObjectionFor(artefactObjections, d?.id, kind);
+  const held = Boolean(objection);
 
   const natural: Face = isPlatformAdmin(currentPerson) ? "ndi_admin" : result ? "success" : busy ? "loading" : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -148,20 +151,20 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
       const r = adoptArtefacts(d.id, kind, changing);
       setBusy(false);
       if (r.ok) setResult({ version: r.version });
-      else if (r.error === "E1" || r.error === "E4" || r.error === "E5" || r.error === "E7") setError(r.error);
+      else if (r.error === "E1" || r.error === "objection_open" || r.error === "E5" || r.error === "E7") setError(r.error);
     }, ROUND_TRIP_MS);
   };
 
   /* The error faces, in UX-EW-02 §3.5's words, each saying whose it is to fix. */
   const errorFace =
     face === "e1" || error === "E1"
-      ? `Your designation doesn't cover ${kindPlural(kind)}. NDI has to extend it before you can adopt this.`
+      ? `Your designation doesn't cover ${kindPlural(kind)}. NDI would need to propose a new designation that does.`
       : face === "e2"
         ? "That schema isn't published yet. It has to be published before it can be adopted."
         : face === "e3"
           ? "This schema belongs to another organisation. A foundational credential has to be published by the authority that issues it."
-          : held || error === "E4"
-            ? "You've sent this back to NDI. Nothing can be adopted until you and NDI agree a change."
+          : held || error === "objection_open"
+            ? `Your objection has gone to NDI. Adopting ${objection?.entityType === null && d ? kindsInWords(d.entityTypes) : kindPlural(kind)} is on hold until they revise the draft or you withdraw your objection.`
             : face === "e4"
             ? `This request asks for more than is needed to confirm a representative: ${draft.overBroad ?? "Date of birth"}. Go back and send it back with a note.`
             : face === "e7" || error === "E7"
@@ -180,9 +183,19 @@ export function AdoptView({ kind }: { kind: OrgKind }) {
           </p>
         ) : null}
         {errorFace ? (
-          <p role="alert" className="m-0 rounded-[12px] border px-4 py-3 text-[13.5px] leading-[1.6] text-body" style={{ borderColor: "var(--ndi-warning)" }}>
-            {errorFace}
-          </p>
+          <div role="alert" className="flex flex-col gap-1.5 rounded-[12px] border px-4 py-3" style={{ borderColor: "var(--ndi-warning)" }}>
+            <p className="m-0 text-[13.5px] leading-[1.6] text-body">{errorFace}</p>
+            {/* E1's recovery: scope is immutable, so the only route is NDI. */}
+            {face === "e1" || error === "E1" ? (
+              <Link href="/legal/support" className="ndi-plainlink text-[12.5px] font-medium text-accent">
+                Contact NDI
+              </Link>
+            ) : held || error === "objection_open" ? (
+              <Link href={`/authority/${kind}`} className="ndi-plainlink text-[12.5px] font-medium text-accent">
+                Withdraw the objection
+              </Link>
+            ) : null}
+          </div>
         ) : null}
         {!owner ? (
           <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">

@@ -41,12 +41,35 @@ import { FullTerms, Responsibilities } from "./Responsibilities";
  * before they press it that their NDI wallet is needed. Everyone scans,
  * whoever they are: the approval is the acceptance, not only the proof.
  */
-type Face = "default" | "already_accepted" | "not_found" | "expired" | "declined" | "registration_lost" | "no_longer_valid" | "offline" | "not_yours";
+type Face =
+  | "default"
+  | "already_accepted"
+  | "accepted_by_them"
+  | "ended"
+  | "not_found"
+  | "expired"
+  | "declined"
+  | "withdrawn"
+  | "registration_lost"
+  | "no_longer_valid"
+  | "offline"
+  | "not_yours";
 
 export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   const router = useRouter();
   const { relations, people, organizations, harness, declineAppointment, setPersona, hydrated } = useDemo();
-  const forced = useScreenState("SCR-DEL-03", ["live", "default", "expired", "declined", "registration_lost", "no_longer_valid", "offline"]);
+  const forced = useScreenState("SCR-DEL-03", [
+    "live",
+    "default",
+    "expired",
+    "declined",
+    "withdrawn",
+    "registration_lost",
+    "no_longer_valid",
+    "accepted_by_them",
+    "ended",
+    "offline",
+  ]);
   const [declined, setDeclined] = useState(false);
 
   const r = relations.find((x) => x.id === relationId);
@@ -59,7 +82,7 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   /* What was ticked, read back as one grant: allows from the boxes ticked,
      "won't" from the ones left unticked (UX-EW-01 SCR-DEL-03, UXD-58). */
   const ticked = presetsOf(r);
-  const grant = describeGrant(ticked.length ? ticked : ["receive"], {
+  const grant = describeGrant(ticked, {
     name: "You",
     orgName: shortOrgName(orgName),
     shareWith: r ? shareTargetsOf(r) : null,
@@ -70,26 +93,36 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
   ].filter(Boolean);
   const now = new Date().toISOString().slice(0, 10);
 
-  /* E8 and E9 are both "the basis was lost", and the screen says which in
-     plain words: the organisation's registration, or the representative. */
-  /* An appointment already accepted is not offered again — reached by Back
+  /* An ended appointment says why, from the reason the store recorded
+     (EW-FLOW3-SD §5.1): declined, withdrawn by the representative (E15),
+     lapsed (E4), or its basis lost — and for that, which of the two in
+     plain words: the organisation's registration (E8) or the
+     representative (E9). Only that last reason gets those two faces.
+     An appointment already accepted is not offered again — reached by Back
      after accepting, it would otherwise reopen as pending. An address that
      matches nothing says so, without claiming anything about anyone. */
   const natural: Face = !r
     ? "not_found"
     : r.state === "ACTIVE" && r.personId === harness.persona
       ? "already_accepted"
-      : declined || (r.state === "TERMINATED" && r.endedReason === "declined")
-      ? "declined"
-      : r.state === "EXPIRED" || (r.state === "PENDING_ACCEPTANCE" && r.expiresAt && r.expiresAt < now)
-        ? "expired"
-        : r.state !== "PENDING_ACCEPTANCE"
-          ? org && !org.capabilities.includes("holder")
-            ? "registration_lost"
-            : "no_longer_valid"
-          : r.personId !== harness.persona
-            ? "not_yours"
-            : "default";
+      : declined || (r.state === "EXPIRED" && r.expiryReason === "DECLINED")
+        ? "declined"
+        : r.state === "EXPIRED" && r.expiryReason === "WITHDRAWN"
+          ? "withdrawn"
+          : (r.state === "EXPIRED" && r.expiryReason !== "BASIS_LOST") ||
+              (r.state === "PENDING_ACCEPTANCE" && r.expiresAt && r.expiresAt < now)
+            ? "expired"
+            : r.state === "EXPIRED"
+              ? org && !org.capabilities.includes("holder")
+                ? "registration_lost"
+                : "no_longer_valid"
+              : r.state === "ACTIVE"
+                ? "accepted_by_them"
+                : r.state !== "PENDING_ACCEPTANCE"
+                  ? "ended"
+                  : r.personId !== harness.persona
+                    ? "not_yours"
+                    : "default";
   const face: Face = forced === "live" ? natural : (forced as Face);
 
   if (!hydrated) {
@@ -126,9 +159,23 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
         <GradientButton onClick={() => router.push("/organisation")}>See what you can do</GradientButton>
       </div>,
     );
+  /* Accepted, but opened by someone else — say so, and nothing more about
+     anyone. Ended or paused after acceptance is not a lost basis: E8 and E9
+     are for an appointment that never started (EXPIRED, BASIS_LOST). */
+  if (face === "accepted_by_them")
+    return outcome(<>{appointee?.name ?? "The person appointed"} has accepted this appointment.</>);
+  if (face === "ended")
+    return outcome(
+      r?.state === "SUSPENDED" ? (
+        <>This appointment is paused. {repName} can tell you more.</>
+      ) : (
+        <>This appointment has ended. {repName} can tell you more.</>
+      ),
+    );
   if (face === "not_found") return outcome(<>We can&rsquo;t find this appointment. Ask the person who appointed you.</>);
   if (face === "expired") return outcome(<>This appointment has expired. Ask {repName} to make it again.</>);
   if (face === "declined") return outcome(<>You&rsquo;ve declined. Nothing has changed.</>);
+  if (face === "withdrawn") return outcome(<>{repName} has withdrawn this appointment. Nothing has changed.</>);
   if (face === "registration_lost")
     return outcome(<>This appointment can&rsquo;t go ahead because {orgName}&rsquo;s registration can&rsquo;t be confirmed.</>);
   if (face === "no_longer_valid")
@@ -160,7 +207,7 @@ export function ReviewAppointmentView({ relationId }: { relationId: string }) {
       <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
         {header}
         <p className="max-w-[64ch] text-[14.5px] leading-[1.65] text-body">
-          {repName} has given you authority to act for {orgName.replace(/\.$/, "")}. {first} is recorded as its representative,
+          {repName} has appointed you to act for {orgName.replace(/\.$/, "")}. {first} is recorded as its representative,
           and has confirmed they&rsquo;re authorised to appoint you.
           {r?.document
             ? ` They cited a ${r.document.type === "board_resolution" ? "board resolution" : r.document.type === "power_of_attorney" ? "power of attorney" : "written authority"}${r.document.date ? ` dated ${formatDate(r.document.date)}` : ""}${r.document.reference ? `, kept at ${r.document.reference}` : ""}.`

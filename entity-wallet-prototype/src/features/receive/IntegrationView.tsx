@@ -9,6 +9,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { Switch } from "@/components/ui/Switch";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { formatDate } from "@/features/controllership/scopeModel";
@@ -34,12 +35,29 @@ import { useIssuer } from "./issuerShared";
  * down rather than stopping it. The failing banner says how long and what
  * the last error was — the two things the integration lead needs first.
  *
+ * KIND A, AS THE PROTOTYPE WALKS IT
+ *
+ * Once a URL is saved and a client created, a request for an offering the
+ * system answers is delivered to it, and the log shows
+ * `credential-request.received`; the system answers a moment later, and the
+ * business accepting adds `credential-request.issued` (FLOW-CRD-03 Q3). What
+ * the system does with the next request is the dashed stand-in's — answer,
+ * refer it with a note (A2) or not pick it up (E6), where the log shows a
+ * failed delivery and the banner appears until a test event succeeds.
+ *
  * Nothing here sends anything: the test event and the log are fixtures.
  */
 type Face = "live" | "default" | "empty" | "failing" | "error" | "offline";
 
+/* What the stand-in for the system can be told to do with the next request. */
+const NEXT_ANSWERS = [
+  { id: "answer", action: "Have it answer the next request", says: "The next request your system receives, it answers with the values it supplies." },
+  { id: "refer", action: "Have it refer the next request", says: "The next request your system receives, it refers to your officers with a note." },
+  { id: "miss", action: "Have it not pick up the next request", says: "The next request your system receives, it doesn't pick up: delivery fails." },
+] as const;
+
 export function IntegrationView() {
-  const { integration, setWebhook, rotateSecret, createClient, setQueueFallback, sendTestEvent, hydrated } = useDemo();
+  const { integration, setWebhook, rotateSecret, createClient, setQueueFallback, sendTestEvent, setSystemNextAnswer, hydrated } = useDemo();
   const issuer = useIssuer();
   const forced = useScreenState("SCR-CRD-10", ["live", "default", "empty", "failing", "error", "offline"]) as Face;
   const [url, setUrl] = useState(integration.webhookUrl ?? "");
@@ -211,6 +229,19 @@ export function IntegrationView() {
             </div>
           </div>
         </Panel>
+
+        {integration.webhookUrl ? (
+          <SimulatedStep
+            standsFor="your system's answer"
+            action={NEXT_ANSWERS.filter((n) => n.id !== integration.nextAnswer).map((n) => (
+              <SimulatedAction key={n.id} onClick={() => setSystemNextAnswer(n.id)}>
+                {n.action}
+              </SimulatedAction>
+            ))}
+          >
+            {NEXT_ANSWERS.find((n) => n.id === integration.nextAnswer)?.says}
+          </SimulatedStep>
+        ) : null}
 
         <section aria-labelledby="int-log" className="flex flex-col gap-3">
           <h2 id="int-log" className="m-0 font-display text-[15px] font-semibold text-strong">

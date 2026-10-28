@@ -17,11 +17,11 @@ import { StatusPill } from "@/components/ui/StatusPill";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { isNamedAdmin, type Designation } from "@/lib/demoData";
+import { dsgReminderSent, isNamedAdmin, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindSingular, kindsInWords } from "./shared";
+import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindSingular, kindsInWords, scopePairs } from "./shared";
 
 /**
  * SCR-DSG-02 — Approve a designation. FLOW-ORG-02 A1: dual control, for a
@@ -42,20 +42,54 @@ import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindSingular, kindsInWords } fro
  * organisation will create the credential that makes these businesses
  * real, and everyone on the platform will trust what it issues (SC 3.3.4).
  *
+ * THREE WAYS IT ENDS BEFORE THE AUTHORITY HEARS OF IT
+ *
+ * Refused (E12) — DECLINED, with the approver's reason carried to the
+ * proposer word for word. Lapsed (E13) — nobody decided in 30 days, which is
+ * NDI's lapse, so the page says so plainly. Withdrawn (A3) — by its
+ * proposer, with a reason, and kept on record rather than deleted. Asking
+ * for more information is none of these: it changes nothing, and the
+ * window keeps running.
+ *
  * Also the record of a designation in its later states, because an
  * administrator following one up arrives at the same address.
  */
-type Face = "live" | "default" | "self_proposed" | "expired" | "loading" | "error" | "success" | "offline" | "empty";
+type Face =
+  | "live"
+  | "default"
+  | "self_proposed"
+  | "expired"
+  | "lapsed"
+  | "declined"
+  | "withdrawn"
+  | "loading"
+  | "error"
+  | "success"
+  | "offline"
+  | "empty";
 
 export function ApproveDesignationView({ id }: { id: string }) {
   const router = useRouter();
-  const { designations, organizations, people, currentPerson, harness, personById, decideDesignation, withdrawDesignation, hydrated } =
-    useDemo();
+  const {
+    designations,
+    organizations,
+    people,
+    currentPerson,
+    harness,
+    personById,
+    decideDesignation,
+    askForMoreInformation,
+    withdrawDesignation,
+    hydrated,
+  } = useDemo();
   const forced = useScreenState("SCR-DSG-02", [
     "live",
     "default",
     "self_proposed",
     "expired",
+    "lapsed",
+    "declined",
+    "withdrawn",
     "loading",
     "error",
     "success",
@@ -63,29 +97,62 @@ export function ApproveDesignationView({ id }: { id: string }) {
     "empty",
   ]) as Face;
 
-  const [confirming, setConfirming] = useState<"approve" | "refuse" | null>(null);
+  const [confirming, setConfirming] = useState<"approve" | "refuse" | "ask" | "withdraw" | null>(null);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   const live = designations.find((d) => d.id === id);
+  const today = new Date().toISOString().slice(0, 10);
+  const in30 = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
   const sample: Designation | undefined =
     live ??
     (forced !== "live" && forced !== "empty"
-      ? { ...SAMPLE_DESIGNATION, id, state: "PROPOSED", approvedBy: null, proposedAt: new Date().toISOString().slice(0, 10) }
+      ? { ...SAMPLE_DESIGNATION, id, state: "PROPOSED", approvedBy: null, proposedAt: today, expiresAt: in30 }
       : undefined);
-  const d: Designation | undefined = sample && forced === "expired" ? { ...sample, state: "EXPIRED" } : sample;
+  /* The ended faces, for the state switcher, each with what its record would carry. */
+  const d: Designation | undefined = !sample
+    ? undefined
+    : forced === "expired"
+      ? { ...sample, state: "EXPIRED", expiredReason: "NOT_ACCEPTED" }
+      : forced === "lapsed"
+        ? { ...sample, state: "EXPIRED", expiredReason: "NOT_APPROVED", approvedBy: null }
+        : forced === "declined"
+          ? {
+              ...sample,
+              state: "DECLINED",
+              approvedBy: null,
+              declinedBy: sample.declinedBy ?? "tshendu",
+              declinedReason: sample.declinedReason ?? "The legal basis needs the Ministry's notification number before this goes further.",
+            }
+          : forced === "withdrawn"
+            ? {
+                ...sample,
+                state: "WITHDRAWN",
+                approvedBy: null,
+                withdrawnBy: sample.withdrawnBy ?? sample.proposedBy,
+                withdrawnAt: sample.withdrawnAt ?? today,
+                withdrawnFrom: "PROPOSED",
+                withdrawnReason: sample.withdrawnReason ?? "Proposed against the wrong organisation.",
+              }
+            : sample;
 
   const natural: Face = !d
     ? "empty"
     : done
       ? "success"
       : d.state === "EXPIRED"
-        ? "expired"
-        : d.state === "PROPOSED" && d.proposedBy === harness.persona
-          ? "self_proposed"
-          : "default";
+        ? d.expiredReason === "NOT_APPROVED"
+          ? "lapsed"
+          : "expired"
+        : d.state === "DECLINED" && !d.approvedBy
+          ? "declined"
+          : d.state === "WITHDRAWN"
+            ? "withdrawn"
+            : d.state === "PROPOSED" && d.proposedBy === harness.persona
+              ? "self_proposed"
+              : "default";
   const face: Face = forced === "live" ? natural : forced;
   const offline = face === "offline";
   const isRoot = currentPerson.platformRole === "root";
@@ -124,7 +191,11 @@ export function ApproveDesignationView({ id }: { id: string }) {
   const whoCan = people
     .filter((p) => isNamedAdmin(p) && p.hasAccount !== false && p.id !== d.proposedBy)
     .map((p) => p.name);
-  const proposedHere = d.state === "PROPOSED" && face !== "expired";
+  const ended = face === "expired" || face === "lapsed" || face === "declined" || face === "withdrawn";
+  const proposedHere = d.state === "PROPOSED" && !ended;
+  /* A3 after approval: any named administrator, while it hasn't activated —
+     an abandoned set-up, or an incumbent overlap (E5). */
+  const withdrawable = !ended && (d.state === "PENDING" || d.state === "ACCEPTED");
 
   const decide = (approve: boolean) => {
     setBusy(true);
@@ -143,13 +214,56 @@ export function ApproveDesignationView({ id }: { id: string }) {
         setFailed(true);
         return;
       }
+      setReason("");
       setDone(
         approve
           ? `Approved. ${d.orgName} has been asked to accept, and has 30 days to.`
-          : `Refused. ${d.orgName} isn't told — nothing was ever sent to it.`,
+          : `Declined. ${d.proposedBy ? personById(d.proposedBy).name : "The proposer"} has been told why. ${d.orgName} isn't told — nothing was ever sent to it.`,
       );
     }, LOCAL_MS);
   };
+
+  const ask = () => {
+    const r = askForMoreInformation(d.id, reason);
+    setConfirming(null);
+    if (!r.ok) {
+      setFailed(true);
+      return;
+    }
+    setReason("");
+    /* Not `done`: nothing was decided, and the item stays in the queue. */
+    setFailed(false);
+  };
+
+  const withdraw = () => {
+    const r = withdrawDesignation(d.id, reason);
+    setConfirming(null);
+    if (!r.ok) {
+      setFailed(true);
+      return;
+    }
+    setReason("");
+    router.push("/admin/designations");
+  };
+
+  const reasonField = (label: string) => (
+    <label className={FIELD_BLOCK_CLASS}>
+      <span className={LABEL_CLASS}>{label}</span>
+      <textarea className={`${FIELD_CLASS} resize-y py-3`} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+    </label>
+  );
+
+  /* E12, E13, E6 and A3 — each in UX-EW-02 §3.5's words. */
+  const endedMessage =
+    face === "declined"
+      ? `${d.declinedBy ? personById(d.declinedBy).name : "The second administrator"} declined this: ${d.declinedReason ?? "no reason was recorded"}.`
+      : face === "lapsed"
+        ? "This proposal lapsed without a decision."
+        : face === "expired"
+          ? "This designation expired without being accepted. A new one needs a fresh second approval."
+          : face === "withdrawn"
+            ? `Withdrawn by ${d.withdrawnBy ? personById(d.withdrawnBy).name : "an administrator"}${d.withdrawnAt ? ` on ${formatDate(d.withdrawnAt)}` : ""}: ${d.withdrawnReason ?? "no reason was recorded"}.`
+            : null;
 
   return (
     <AppShell>
@@ -180,7 +294,7 @@ export function ApproveDesignationView({ id }: { id: string }) {
                 <p className="m-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Designation proposed</p>
                 <p className="m-0 font-display text-[18px] font-semibold text-strong">{d.orgName}</p>
               </div>
-              <StatusPill status={face === "expired" ? "lapsed" : pill.status} label={face === "expired" ? "Expired" : pill.label} />
+              <StatusPill status={pill.status} label={pill.label} />
             </div>
             <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
               {d.orgName} would become the authority that confirms {kindsInWords(d.entityTypes)} on the
@@ -189,23 +303,30 @@ export function ApproveDesignationView({ id }: { id: string }) {
             <DetailList
               items={[
                 { label: "Legal identity", value: org?.legalName ?? d.orgName },
-                { label: "Will confirm", value: kindsInWords(d.entityTypes) },
+                { label: "Will confirm", value: scopePairs(d.entityTypes) },
                 { label: "Legal basis", value: d.legalBasis },
                 ...(d.legalRef ? [{ label: "Reference", value: d.legalRef, mono: true }] : []),
                 {
                   label: "Proposed by",
                   value: d.proposedBy ? `${personById(d.proposedBy).name}${d.proposedAt ? `, ${formatDate(d.proposedAt)}` : ""}` : "Before this platform's administrators",
                 },
-                ...(d.approvedBy ? [{ label: d.state === "REFUSED" ? "Refused by" : "Approved by", value: `${personById(d.approvedBy).name}${d.approvedAt ? `, ${formatDate(d.approvedAt)}` : ""}` }] : []),
+                ...(d.approvedBy ? [{ label: "Approved by", value: `${personById(d.approvedBy).name}${d.approvedAt ? `, ${formatDate(d.approvedAt)}` : ""}` }] : []),
                 ...(d.acceptedAt ? [{ label: "Accepted", value: `${d.acceptedBy ? `${personById(d.acceptedBy).name}, ` : ""}${formatDate(d.acceptedAt)}` }] : []),
                 ...(d.activatedAt ? [{ label: "Switched on", value: formatDate(d.activatedAt) }] : []),
               ]}
             />
-            {d.state === "PENDING" ? (
+            {proposedHere ? (
+              /* E13, SC 2.2.1 — the deadline wherever the proposal appears. */
+              <p className="m-0 text-[13.5px] text-body">
+                This proposal lapses in {daysLeft(d.expiresAt)} days if no one approves it.
+                {dsgReminderSent(d) ? " A reminder has gone to NDI's administrators." : ""}
+              </p>
+            ) : null}
+            {d.state === "PENDING" && !ended ? (
               <p className="m-0 text-[13.5px] text-body">The organisation has {daysLeft(d.expiresAt)} days to accept this.</p>
             ) : null}
-            {d.state === "REFUSED" && d.refusedReason ? (
-              <p className="m-0 text-[13.5px] text-body">Reason: {d.refusedReason}</p>
+            {d.state === "DECLINED" && d.approvedBy && !ended ? (
+              <p className="m-0 text-[13.5px] text-body">{d.orgName} declined it. Nothing was created.</p>
             ) : null}
             {d.state === "ACCEPTED" ? (
               <p className="m-0 text-[13.5px] text-body">
@@ -221,10 +342,23 @@ export function ApproveDesignationView({ id }: { id: string }) {
                 the authority if this wasn&rsquo;t expected.
               </p>
             ) : null}
-            {face === "expired" ? (
+            {endedMessage ? (
               <p role="status" className="m-0 text-[13.5px] text-body">
-                This designation expired without being accepted. A new one needs a fresh second approval.
+                {endedMessage}
               </p>
+            ) : null}
+
+            {d.infoRequests.length ? (
+              <div className="flex flex-col gap-1.5 rounded-[12px] border border-grid px-4 py-3">
+                <p className={LABEL_CLASS}>Asked for more information</p>
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {d.infoRequests.map((q, i) => (
+                    <li key={i} className="text-[13px] leading-[1.55] text-body">
+                      {personById(q.by).name}, {formatDate(q.at)}: &ldquo;{q.note}&rdquo;
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ) : null}
 
             {isRoot && proposedHere ? (
@@ -246,13 +380,7 @@ export function ApproveDesignationView({ id }: { id: string }) {
                       Approve
                     </GradientButton>
                     <HairlineButton disabled>Refuse</HairlineButton>
-                    <HairlineButton
-                      disabled={offline}
-                      onClick={() => {
-                        withdrawDesignation(d.id);
-                        router.push("/admin/designations");
-                      }}
-                    >
+                    <HairlineButton disabled={offline} onClick={() => setConfirming("withdraw")}>
                       Withdraw it
                     </HairlineButton>
                   </div>
@@ -263,7 +391,8 @@ export function ApproveDesignationView({ id }: { id: string }) {
               ) : (
                 <div className="flex flex-col gap-3 border-t border-subtle pt-4">
                   <p className="m-0 text-[13px] leading-[1.6] text-muted">
-                    Approving asks {d.orgName} to accept. Refusing means it is never asked.
+                    Approving asks {d.orgName} to accept. Refusing means it is never asked. Asking for more
+                    information changes nothing — the proposal stays here, and its days keep counting.
                   </p>
                   <div className="flex flex-wrap gap-2.5">
                     <GradientButton onClick={() => setConfirming("approve")} disabled={!canAct}>
@@ -273,16 +402,35 @@ export function ApproveDesignationView({ id }: { id: string }) {
                     <HairlineButton onClick={() => setConfirming("refuse")} disabled={!canAct}>
                       Refuse
                     </HairlineButton>
+                    <HairlineButton onClick={() => setConfirming("ask")} disabled={!canAct}>
+                      Ask for more information
+                    </HairlineButton>
                   </div>
                 </div>
               )
             ) : null}
+
+            {withdrawable && isNamedAdmin(currentPerson) ? (
+              <div className="flex flex-col gap-2 border-t border-subtle pt-4">
+                <p className="m-0 text-[13px] leading-[1.6] text-muted">
+                  It hasn&rsquo;t been switched on. If it shouldn&rsquo;t go ahead, withdraw it with a reason.{" "}
+                  {d.orgName} is told.
+                </p>
+                <div>
+                  <HairlineButton onClick={() => setConfirming("withdraw")} disabled={offline}>
+                    Withdraw this designation
+                  </HairlineButton>
+                </div>
+              </div>
+            ) : null}
           </div>
         </Panel>
 
-        {face === "expired" ? (
+        {face === "expired" || face === "lapsed" || face === "declined" ? (
           <div>
-            <GradientButton onClick={() => router.push("/admin/designations/new")}>Propose again</GradientButton>
+            <GradientButton onClick={() => router.push("/admin/designations/new")}>
+              {face === "declined" ? "Propose again, changed" : "Propose again"}
+            </GradientButton>
           </div>
         ) : null}
 
@@ -305,15 +453,39 @@ export function ApproveDesignationView({ id }: { id: string }) {
           onClose={() => setConfirming(null)}
           tone="danger"
           title={`Refuse ${d.orgName}?`}
-          lead="It is never sent. If it should go ahead later, it has to be proposed again — and approved again."
+          lead="It is never sent. Your reason goes to the proposer word for word. If it should go ahead later, it has to be proposed again — and approved again."
           confirmLabel={busy ? "Recording…" : "Refuse"}
           confirmDisabled={busy || !reason.trim()}
           onConfirm={() => decide(false)}
         >
-          <label className={FIELD_BLOCK_CLASS}>
-            <span className={LABEL_CLASS}>Reason, for the proposer</span>
-            <textarea className={`${FIELD_CLASS} resize-y py-3`} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-          </label>
+          {reasonField("Reason, for the proposer")}
+        </Dialog>
+        <Dialog
+          open={confirming === "ask"}
+          onClose={() => setConfirming(null)}
+          title="Ask for more information?"
+          lead={`${d.proposedBy ? personById(d.proposedBy).name : "The proposer"} is asked. Nothing else changes: the proposal stays waiting for approval, and its days keep counting.`}
+          confirmLabel="Ask"
+          confirmDisabled={!reason.trim()}
+          onConfirm={ask}
+        >
+          {reasonField("What do you need to know?")}
+        </Dialog>
+        <Dialog
+          open={confirming === "withdraw"}
+          onClose={() => setConfirming(null)}
+          tone="danger"
+          title="Withdraw this designation?"
+          lead={
+            d.state === "PROPOSED"
+              ? "It ends here and is kept on record with your reason. Nothing was ever sent to the organisation."
+              : `It ends here and is kept on record with your reason. ${d.orgName} is told: "NDI has withdrawn this designation: <your reason>."`
+          }
+          confirmLabel="Withdraw it"
+          confirmDisabled={!reason.trim()}
+          onConfirm={withdraw}
+        >
+          {reasonField("Reason")}
         </Dialog>
       </div>
     </AppShell>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -19,7 +20,7 @@ import { roleIn, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
-import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindsInWords } from "./shared";
+import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindsInWords, scopePairs } from "./shared";
 
 /**
  * SCR-DSG-03 — What is being proposed. FLOW-ORG-02 A2: the authority's
@@ -42,14 +43,25 @@ import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindsInWords } from "./shared";
  * created and NDI is told. And accepting doesn't switch anything on —
  * nothing happens in the authority's name until it agrees what people will
  * be asked — so the officer doesn't leave thinking the obligation began.
+ *
+ * ACCEPTING IS THE GRANT
+ *
+ * NDI's service account joins the organisation only because the OWNER
+ * grants it (FLOW-ORG-02 S5). For Kind E, accepting here issues that grant
+ * (A2). For Kind N, accepted by its invitation, this screen is where the
+ * officer grants it after registering (step 2) — the `grant` face, with no
+ * Decline, because an ACCEPTED designation can only activate or be
+ * withdrawn (EW-FLOW5-SD §5.1). The service adds itself to nothing.
  */
-type Face = "live" | "default" | "loading" | "empty" | "error" | "success" | "offline" | "no_permission";
+type Face = "live" | "default" | "grant" | "loading" | "empty" | "error" | "success" | "offline" | "no_permission";
 
 /**
  * What an old link says once the designation has moved on — one sentence
  * per state the authority has been told about, so nothing is reported as
- * accepted that wasn't. PENDING is the screen itself; PROPOSED and REFUSED
- * are NDI's own process and show the empty state (FLOW-ORG-02 A1).
+ * accepted that wasn't. PENDING is the screen itself; what never reached
+ * the authority is NDI's own process and shows the empty state
+ * (FLOW-ORG-02 A1). WITHDRAWN carries NDI's reason (A3), so it is written
+ * where it is shown.
  */
 const OPENED_LATER: Record<"ACCEPTED" | "ACTIVE" | "DECLINED" | "EXPIRED" | "SUSPENDED", string> = {
   ACCEPTED: "You've accepted this. NDI is finishing switching it on — your authority console shows where it stands.",
@@ -59,15 +71,31 @@ const OPENED_LATER: Record<"ACCEPTED" | "ACTIVE" | "DECLINED" | "EXPIRED" | "SUS
   SUSPENDED: "Your designation is suspended. Businesses already confirmed stay confirmed. Your authority console shows why.",
 };
 
+/**
+ * Whether the authority was ever asked. Before the second approval nothing
+ * is sent (A1); a proposal refused (E12), lapsed unapproved (E13) or
+ * withdrawn by its proposer (A3) never reached it.
+ */
+const reachedAuthority = (d: Designation) =>
+  d.state === "PROPOSED"
+    ? false
+    : d.state === "DECLINED"
+      ? Boolean(d.approvedBy)
+      : d.state === "EXPIRED"
+        ? d.expiredReason !== "NOT_APPROVED"
+        : d.state === "WITHDRAWN"
+          ? d.withdrawnFrom === "PENDING" || d.withdrawnFrom === "ACCEPTED"
+          : true;
+
 export function AcceptDesignationView({ id }: { id: string }) {
   const router = useRouter();
-  const { designations, organizations, currentPerson, personById, acceptDesignation, declineDesignation, hydrated } = useDemo();
-  const forced = useScreenState("SCR-DSG-03", ["live", "default", "loading", "empty", "error", "success", "offline", "no_permission"]) as Face;
+  const { designations, organizations, currentPerson, personById, acceptDesignation, grantNdiAccess, declineDesignation, hydrated } = useDemo();
+  const forced = useScreenState("SCR-DSG-03", ["live", "default", "grant", "loading", "empty", "error", "success", "offline", "no_permission"]) as Face;
 
   const [busy, setBusy] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [outcome, setOutcome] = useState<"accepted" | "declined" | null>(null);
+  const [outcome, setOutcome] = useState<"accepted" | "granted" | "declined" | null>(null);
 
   const d: Designation | undefined = designations.find((x) => x.id === id);
   const org = organizations.find((o) => o.id === d?.orgId);
@@ -78,14 +106,18 @@ export function AcceptDesignationView({ id }: { id: string }) {
      authority until A2"), and after one refuses, there is nothing the
      authority has been told — so an old or guessed link shows the same
      empty state as no designation at all, not NDI's internal process. */
-  const notYetTheirs = d?.state === "PROPOSED" || d?.state === "REFUSED";
+  const notYetTheirs = d ? !reachedAuthority(d) : false;
+  /* Kind N's step 2: accepted by the invitation, NDI's access still to grant. */
+  const toGrant = d?.state === "ACCEPTED" && !d.ndiGrant;
   const natural: Face = !d || notYetTheirs
     ? "empty"
     : outcome
       ? "success"
       : !owner
         ? "no_permission"
-        : "default";
+        : toGrant
+          ? "grant"
+          : "default";
   const face: Face = forced === "live" ? (busy ? "loading" : natural) : forced;
   const offline = face === "offline";
   const readOnly = offline || face === "no_permission";
@@ -106,7 +138,7 @@ export function AcceptDesignationView({ id }: { id: string }) {
   }
 
   /* Something already decided, opened from an old link: say where it went. */
-  if (forced === "live" && d && d.state !== "PENDING" && !notYetTheirs && !outcome) {
+  if (forced === "live" && d && d.state !== "PENDING" && !toGrant && !notYetTheirs && !outcome) {
     {
       const pill = dsgPill(d, "authority");
       return (
@@ -116,11 +148,21 @@ export function AcceptDesignationView({ id }: { id: string }) {
             <Panel>
               <div className="relative z-[4] flex flex-col gap-3">
                 <StatusPill status={pill.status} label={pill.label} />
-                <p className="m-0 text-[14px] leading-[1.6] text-body">{OPENED_LATER[d.state as keyof typeof OPENED_LATER]}</p>
+                <p className="m-0 text-[14px] leading-[1.6] text-body">
+                  {/* A3 — an administrator's act with a reason, told to the
+                      authority in NDI's words, never a silent lapse. */}
+                  {d.state === "WITHDRAWN"
+                    ? `NDI has withdrawn this designation: ${d.withdrawnReason ?? "no reason was recorded"}.`
+                    : OPENED_LATER[d.state as keyof typeof OPENED_LATER]}
+                </p>
                 {d.state === "ACTIVE" || d.state === "ACCEPTED" || d.state === "SUSPENDED" ? (
                   <div>
                     <GradientButton onClick={() => router.push("/authority")}>Go to your authority console</GradientButton>
                   </div>
+                ) : d.state === "WITHDRAWN" ? (
+                  <Link href="/legal/support" className="ndi-plainlink text-[13.5px] font-medium text-accent">
+                    Contact NDI
+                  </Link>
                 ) : null}
               </div>
             </Panel>
@@ -149,6 +191,7 @@ export function AcceptDesignationView({ id }: { id: string }) {
   const name = shown.orgName;
   const types = kindsInWords(shown.entityTypes);
 
+  const granting = face === "grant";
   const accept = () => {
     setBusy(true);
     setFailed(false);
@@ -156,6 +199,13 @@ export function AcceptDesignationView({ id }: { id: string }) {
       if (forced === "error") {
         setBusy(false);
         setFailed(true);
+        return;
+      }
+      if (granting) {
+        const g = grantNdiAccess(shown.id);
+        setBusy(false);
+        if (g.ok) setOutcome("granted");
+        else setFailed(true);
         return;
       }
       const r = acceptDesignation(shown.id);
@@ -182,12 +232,17 @@ export function AcceptDesignationView({ id }: { id: string }) {
             <div className="relative z-[4] flex flex-col gap-3">
               <p role="status" className="m-0 flex items-center gap-2 text-[15px] font-medium text-strong">
                 <Icon name="check" size={16} strokeWidth={2.4} style={{ color: "var(--ndi-success)" }} />
-                {declined ? "You've declined. Nothing is created and NDI has been told." : `${name} has accepted.`}
+                {declined
+                  ? "You've declined. Nothing is created and NDI has been told."
+                  : outcome === "granted"
+                    ? `${name} has granted NDI's access.`
+                    : `${name} has accepted, and granted NDI's access.`}
               </p>
               {declined ? null : (
                 <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-muted">
-                  Nothing is live yet. NDI finishes switching this on, and then you agree what people
-                  will be asked, for each kind of business. Until you do, nobody can verify with you.
+                  Nothing is live yet. NDI finishes switching this on — its service account then appears in
+                  your members list — and then you agree what people will be asked, for each kind of business.
+                  Until you do, nobody can verify with you.
                 </p>
               )}
               {declined ? null : (
@@ -222,6 +277,12 @@ export function AcceptDesignationView({ id }: { id: string }) {
 
         <Panel>
           <div className="relative z-[4] flex flex-col gap-5">
+            {granting ? (
+              <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
+                You&rsquo;ve accepted this designation, and {name} is set up. One thing is left that only you can
+                do: let NDI&rsquo;s service account ask in your name.
+              </p>
+            ) : null}
             <div className="flex flex-col gap-2">
               <p className="m-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">What this means</p>
               <p className="m-0 max-w-[66ch] text-[15px] leading-[1.65] text-body">
@@ -232,32 +293,38 @@ export function AcceptDesignationView({ id }: { id: string }) {
 
             <DetailList
               items={[
-                { label: "You would confirm", value: types },
+                { label: "You would confirm", value: scopePairs(shown.entityTypes) },
                 { label: "Legal basis", value: shown.legalBasis },
                 ...(shown.legalRef ? [{ label: "Reference", value: shown.legalRef, mono: true }] : []),
                 { label: "Proposed by", value: shown.proposedBy ? `${personById(shown.proposedBy).name}, NDI` : "NDI" },
                 { label: "Approved by", value: shown.approvedBy ? `${personById(shown.approvedBy).name}, NDI` : "NDI" },
-                {
-                  label: "Time to decide",
-                  /* 30 is the window when nothing has started it yet; a real
-                     0 is the last day, not a missing date. */
-                  value: !shown.expiresAt
-                    ? "30 days"
-                    : daysLeft(shown.expiresAt) === 0
-                      ? `Today is the last day (${formatDate(shown.expiresAt)})`
-                      : `${daysLeft(shown.expiresAt)} days, until ${formatDate(shown.expiresAt)}`,
-                },
+                /* Kind N's grant has no deadline: an ACCEPTED designation
+                   doesn't lapse (EW-FLOW5-SD §5.1). */
+                ...(granting
+                  ? []
+                  : [
+                      {
+                        label: "Time to decide",
+                        /* 30 is the window when nothing has started it yet; a real
+                           0 is the last day, not a missing date. */
+                        value: !shown.expiresAt
+                          ? "30 days"
+                          : daysLeft(shown.expiresAt) === 0
+                            ? `Today is the last day (${formatDate(shown.expiresAt)})`
+                            : `${daysLeft(shown.expiresAt)} days, until ${formatDate(shown.expiresAt)}`,
+                      },
+                    ]),
               ]}
             />
 
             <div className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
               <p className="m-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">NDI&rsquo;s access</p>
               <p className="m-0 max-w-[68ch] text-[13.5px] leading-[1.65] text-body">
-                To ask a person for their identity on your behalf, NDI&rsquo;s service account will be added
-                to your organisation as a verifier. You can see it in your members list and remove it at
-                any time, without asking us. That account can only send the request you approve. NDI
-                hosts your organisation&rsquo;s keys, as it does for every organisation on the platform —
-                so this is a permission you control, not a technical barrier.
+                To ask a person for their identity on your behalf, NDI&rsquo;s service account needs to be a
+                member of your organisation. When you accept, you add it. You can see it in your members list
+                and remove it at any time, without asking us. That account can only send the request you
+                approve. NDI hosts your organisation&rsquo;s keys, as it does for every organisation on the
+                platform — so this is a permission you control, not a technical barrier.
               </p>
             </div>
 
@@ -265,25 +332,29 @@ export function AcceptDesignationView({ id }: { id: string }) {
               Accepting this doesn&rsquo;t switch anything on. Nothing happens in your name until you agree
               what people will be asked.
             </p>
-            <p className="m-0 max-w-[66ch] text-[13.5px] leading-[1.6] text-muted">
-              You can decline. Nothing is created and NDI is told.
-            </p>
+            {granting ? null : (
+              <p className="m-0 max-w-[66ch] text-[13.5px] leading-[1.6] text-muted">
+                You can decline. Nothing is created and NDI is told.
+              </p>
+            )}
 
             {face === "no_permission" ? (
               <p role="status" className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                 <Icon name="lockRounded" size={15} strokeWidth={2} className="mt-[3px] flex-none" style={{ color: "var(--ndi-warning)" }} />
                 Only {ownerName ? personById(ownerName).name : "your organisation's owner"}, who owns {name} on the
-                platform, can accept or decline this.
+                platform, can {toGrant ? "grant NDI’s access" : "accept or decline this"}.
               </p>
             ) : null}
 
             <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
               <GradientButton onClick={accept} disabled={readOnly || busy}>
-                {busy ? "Recording…" : "Accept"}
+                {busy ? "Recording…" : granting ? "Grant NDI’s access" : "Accept"}
               </GradientButton>
-              <HairlineButton onClick={() => setDeclining(true)} disabled={readOnly || busy}>
-                Decline
-              </HairlineButton>
+              {granting ? null : (
+                <HairlineButton onClick={() => setDeclining(true)} disabled={readOnly || busy}>
+                  Decline
+                </HairlineButton>
+              )}
               <HairlineButton onClick={() => window.print()}>Print what is being proposed</HairlineButton>
             </div>
           </div>

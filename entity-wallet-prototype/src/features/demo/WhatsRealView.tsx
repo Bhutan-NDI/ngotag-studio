@@ -91,6 +91,13 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
           "NDI's dedicated verification organisation, a proof request whose challenge carries the appointment, and the versioned acceptance and attestation texts.",
       },
       {
+        shown: "Withdrawing an appointment before it is accepted, and the appointee being told",
+        reality:
+          "Recorded in your browser. Nobody is notified: the appointee finds out by opening the appointment, which then says it was withdrawn. That an acceptance arriving first wins is a check in the demo store, not a lock on anything.",
+        needs:
+          "The withdraw route on the relation, serialised with acceptance on the server, and a notification to the appointee.",
+      },
+      {
         shown: "\"Tell us you're waiting\" and \"email me when it's done\"",
         reality: "Recorded in your browser. Nobody is emailed.",
         needs: "An interest store keeping the type and an address only, and a notification service.",
@@ -239,7 +246,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Two administrators, and the organisation accepting by name",
         reality:
-          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\" and \"only the owner accepts\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
+          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\", \"only the owner accepts\" and \"only a business's representative withdraws or stops what it asked for\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
         needs: "Dual control enforced by the platform's services against distinct principals, and the identity-anchored acceptance on the real wallet proof flow.",
       },
       {
@@ -273,8 +280,26 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Activation checks — issuing identity, set-up, entitlements",
         reality:
-          "Read from fields on the organisation in the demo data. \"Grant them\" flips a list in your browser; no marketplace is asked and no member is added.",
-        needs: "Reads of org_agents, the ledger namespace and the marketplace entitlements, and adding NDI's service principal as VERIFIER.",
+          "Read from fields on the organisation in the demo data. \"Grant them\" flips a list in your browser; no marketplace is asked. The owner's grant to NDI's service account, and the account accepting it, are fields on the designation — no invitation is sent and no membership row is written.",
+        needs: "Reads of org_agents, the ledger namespace and the marketplace entitlements; the owner's VERIFIER invitation to the service principal (POST /orgs/:orgId/invitations) and the principal accepting it in its own session.",
+      },
+      {
+        shown: "NDI's service account in the members list, removed and turned back on",
+        reality:
+          "A row drawn from the designation, not a member record. Removing it — from Members, the console or Stop something — flips the same field and marks the authorisation rows in your browser withdrawn; turning it back on writes new ones.",
+        needs: "The membership in user_org_roles, removable by the organisation's owner, and the authorisation records moving with it (EW-FLOW5-SD §4.4).",
+      },
+      {
+        shown: "\"Change it to another did:ethr\" on the authority console",
+        reality:
+          "A prototype control. Nothing in the prototype changes an organisation's primary DID, so this stands in for a member doing it; the designation is compared with the DID recorded at activation and suspended.",
+        needs: "E10 detection on next use, against publishingDid (FLOW-ORG-02 AC-08a), and telling both parties.",
+      },
+      {
+        shown: "Days left, lapses and reminders on designations",
+        reality:
+          "Worked out from dates when a page loads. A proposal past 30 days lapses then; \"reminder sent\" means 10 working days have passed — nobody is emailed.",
+        needs: "Scheduled lapses (E6, E13) and reminders to administrators.",
       },
       {
         shown: "Adopting what people will be asked, and stopping it",
@@ -283,10 +308,10 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Write-once schema publication, the versioned proof request and authorisation written in one transaction, and the service account's permission enforced at the agent.",
       },
       {
-        shown: "\"Mark it agreed\" after an objection to the whole draft",
+        shown: "\"NDI revises the draft\" after an objection",
         reality:
-          "A prototype control. An objection with no item holds adoption until it's resolved; nothing on NDI's side revises a draft, so this button stands in for NDI and the authority agreeing.",
-        needs: "NDI's side of the objection: revising the draft and the authority accepting the revision (FLOW-ORG-03 E4).",
+          "A prototype control. Every open objection holds adoption of what it covers until NDI revises the draft or the officer withdraws it; nothing on NDI's side drafts anything, so this button stands in for NDI sending a new draft — without the item the objection named, if it named one.",
+        needs: "NDI's side of the objection: being told, revising the draft, and the objection record keeping how it closed (FLOW-ORG-03 A5).",
       },
       {
         shown: "The second approver is always a named administrator",
@@ -313,10 +338,28 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "A credential offer over DIDComm to the organisation's agent, stored on acceptance, with the issuer's standing checked against NDI's list at that moment.",
       },
       {
-        shown: "\"Have it ask for a bank account too\"",
+        shown: "\"Ask, and have it ask for a bank account too\"",
         reality:
-          "A prototype control. No issuer system exists to ask for more; the button writes the wider ask into the request so the consent screen can be shown.",
+          "A prototype control on the ask screen. No issuer system exists to ask for more; the button writes the wider ask into the request before anything is shared, so the consent screen can be shown.",
         needs: "The issuer's proof request, compared with what the business agreed to before anything more is shared.",
+      },
+      {
+        shown: "\"Take it off the list\" and \"Make the list unreachable\"",
+        reality:
+          "Prototype controls on the review screen. Nothing checks NDI's list when Accept is pressed; these mark what the next check would find, so the delisted and can't-check messages can be shown.",
+        needs: "C2 run again against the Trust Registry at the moment of accepting (FLOW-CRD-01 E19, FLOW-CRD-02 E9).",
+      },
+      {
+        shown: "Offers sent without a request, and one replacing a credential already held",
+        reality:
+          "Seeded rows in your browser. No issuer sends anything; superseding is a field the demo store sets on the older credential when the newer one is accepted.",
+        needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "The tax office's system answers a request by itself",
+        reality:
+          "A timer in your browser. A few seconds after a request for the bonded-warehouse authorisation reaches the office, the demo writes the answer a system would send — the example values from the offering — recorded against the first client you created, and adds credential-request.received and credential-request.issued to the delivery log. No URL is called, no register is looked up and nothing is signed. \"Have it refer the next request\", \"Have it not pick up the next request\" and \"Have your system answer it now\" are prototype controls standing in for the system referring a request with a note, a webhook nobody answers, and the system and an officer answering at once, where the first answer wins. Whether the Department of Revenue & Customs answers this way at all is still open with GovTech (REQ-EW-01 item 23), so the taxpayer number stays with the officers' queue and the prototype shows the path without deciding it.",
+        needs: "The request service's outbox and signed delivery, the issuer request API with client credentials (offer, decline, refer), compare-and-set on the answer, and the one-hour check that puts a request nobody picked up in the queue (FLOW-CRD-03 steps 5–7, E6, E10, A2; EW-FLOW6-IIG).",
       },
       {
         shown: "Integration settings — webhook, secret, clients, delivery log",
@@ -365,22 +408,28 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "The verifier's DELETE on its session, or a problem report on the exchange.",
       },
       {
-        shown: "Who is told — requests waiting, passed on, approvers asked, the representative told of a share, a share approved or not",
+        shown: "Who is told — a request waiting, one left undecided, passed on, approvers asked, a share approved or not, the representative told of a share, a request open again",
         reality:
-          "UX-EW-04 has no copy for these yet. The prototype's wording (lib/sharing.ts, NOTICE) names the organisation, the credential types and the date, never a value, and is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. The 10-minute notice for a request left undecided on a website isn't simulated; keeping it for later sends the same notice at once.",
-        needs: "A notification copy table in UX-EW-04 §3.5, and in-app and email delivery.",
+          "The wording is UX-EW-04 §3.5's notification table, word for word, and each is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. Ten minutes passing with a website request undecided is a dashed button on Sharing; keeping it for later sends the same notice at once. An approver's note is never in the notice, only in the wallet.",
+        needs: "In-app and email delivery, with the link opening the right screen after sign-in.",
       },
       {
         shown: "A request held while NDI's list is checked",
         reality:
-          "UX-EW-04's Sharing states start at OPEN, while FLOW-PRS-01 E8 tells the person the request is under Sharing. The prototype lists it on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer, and tells nobody until it passes.",
-        needs: "A RECEIVED row in SCR-PRS-05 (or E8 reworded), to be settled in the specification.",
+          "A dashed sign-in on the wallet's page, and a dashed button on Sharing, stand in for NDI's list being out of reach. As UX-EW-04 v0.3 says, a request held this way from a website is listed on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer; one that arrived on a connection isn't listed at all until it passes. Nobody is told until it does.",
+        needs: "Trust Registry re-checks with back-off, and the RECEIVED state on the holder-side request record.",
       },
       {
         shown: "Where NDI sends people back to",
         reality:
           "Return addresses are kept in your browser; the fresh Bhutan NDI sign-in for each change is a dashed step, and \"sent to every owner and to NDI\" is a line in the activity feed.",
         needs: "SCR-PRS-06's registration with exact matching, step-up sign-in, audit and notification.",
+      },
+      {
+        shown: "Refused shares and approvals on the record",
+        reality:
+          "A share refused for want of Share or outside its reach, an approval of one's own share, and a sharer whose standing lapsed before approval each add a row to the audit trail in your browser, with the relation, the request and the reason (FLOW-PRS-01/02 §10). The screens never offer the first two, so they are reached only by calling the store.",
+        needs: "The same rows written by the presentation-request routes when they refuse, in the append-only store.",
       },
       {
         shown: "A sharer whose appointment ends while their share waits for approval",

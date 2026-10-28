@@ -116,7 +116,7 @@ export const FLOW_ENTRIES: FlowEntry[] = [
     start: "platformReady",
   },
   { group: "members", label: "Invite a member", persona: "dorji", route: "/members", start: "firstDay" },
-  { group: "appoint", label: "Appoint someone", persona: "dorji", route: "/people-who-can-act/give", start: "teamReady" },
+  { group: "appoint", label: "Appoint someone", persona: "dorji", route: "/people-who-can-act/appoint", start: "teamReady" },
   { group: "accredit", label: "Recognise an organisation already verifying", persona: "tshering", route: "/admin/accreditations", start: "teamReady" },
   { group: "accredit", label: "A business asks to verify", persona: "dorji", route: "/organisation", start: "teamReady" },
   { group: "designate", label: "Designate the ministry for sole proprietorships", persona: "tshering", route: "/admin/designations", start: "platformReady" },

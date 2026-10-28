@@ -18,7 +18,7 @@ import { Tabs } from "@/components/ui/Tabs";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { inOrg, type PresentationRequest } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
-import { isLive, statusOf } from "@/lib/sharing";
+import { isLive, onWaiting, statusOf } from "@/lib/sharing";
 
 import { refusedSentence, stateWords } from "./shared";
 
@@ -62,12 +62,16 @@ export function SharingView() {
     whoApproves,
     simulateIncomingRequest,
     resolveRegistryCheck,
+    remindUndecided,
   } = useDemo();
   const forced = useScreenState("SCR-PRS-05", ["live", "default", "empty", "loading", "error", "offline"]) as Face;
   const [tab, setTab] = useState<Tab>("waiting");
 
   const mine = presentationRequests.filter(inOrg(activeOrgId));
-  const waiting = mine.filter((r) => isLive(statusOf(r)));
+  /* A request held while NDI's list is checked is on Waiting only if it
+     came from a website, whose person was told to look here (E8); one that
+     arrived on a connection stays unlisted until it passes (E2). */
+  const waiting = mine.filter(onWaiting);
   const history = mine.filter((r) => !isLive(statusOf(r)) && statusOf(r) !== "BLOCKED");
   const refused = mine.filter((r) => statusOf(r) === "BLOCKED");
 
@@ -112,7 +116,9 @@ export function SharingView() {
     );
   }
 
-  const checking = waiting.filter((r) => statusOf(r) === "RECEIVED");
+  const checking = mine.filter((r) => statusOf(r) === "RECEIVED");
+  /* Website requests nobody has decided, not yet announced as left undecided (A3). */
+  const undecided = mine.filter((r) => r.sessionId && statusOf(r) === "OPEN" && !r.undecidedToldAt);
 
   return (
     <AppShell>
@@ -275,13 +281,19 @@ export function SharingView() {
                     NDI&rsquo;s list answers for {r.verifierName}
                   </SimulatedAction>
                 ))}
+                {undecided.map((r) => (
+                  <SimulatedAction key={`u-${r.id}`} onClick={() => remindUndecided(r.id)}>
+                    Ten minutes pass with {r.verifierName}&rsquo;s request undecided
+                  </SimulatedAction>
+                ))}
               </>
             }
           >
             A bank re-checking a customer, or an agency checking bidders, sends its request to the wallet with nobody at a
             website. A request from a sender NDI doesn&rsquo;t list is refused and goes only to <strong>Refused</strong>; one
-            that arrives while NDI&rsquo;s list can&rsquo;t be reached is held and checked again, and nobody is told until it
-            passes. Asking again while one is waiting makes a second request, marked as a repeat.
+            that arrives while NDI&rsquo;s list can&rsquo;t be reached is held and checked again — it isn&rsquo;t listed, and
+            nobody is told, until it passes. Asking again while one is waiting makes a second request, marked as a repeat. A
+            request opened from a website and left undecided for ten minutes is announced to the others who may answer it.
           </SimulatedStep>
         ) : null}
 

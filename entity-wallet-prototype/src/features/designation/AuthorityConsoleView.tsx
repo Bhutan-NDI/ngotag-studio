@@ -14,12 +14,13 @@ import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { roleIn, type Adoption, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { daysLeft, dsgPill, kindTitle, kindsInWords, useAuthority } from "./shared";
+import { daysLeft, dsgPill, kindTitle, kindsInWords, scopePairs, useAuthority } from "./shared";
 
 /**
  * The authority console — SCR-DSG-05 (designation status) and SCR-ADO-03
@@ -36,7 +37,16 @@ import { daysLeft, dsgPill, kindTitle, kindsInWords, useAuthority } from "./shar
  *
  * Its capability is stated and its removal is offered in the same place,
  * not only at acceptance (UN-24, UC-17) — and NDI's service account shows
- * in the members list, as SCR-DSG-03 promised it would.
+ * in the members list, as SCR-DSG-03 promised it would. Removing it here,
+ * there, or on SCR-ADO-04 is one store action with one end state
+ * (EW-FLOW5-SD §4.4), so the removed state below reads the same whichever
+ * route was taken. Turning it back on is the owner granting it again (A4).
+ *
+ * SUSPENDED SAYS WHY
+ *
+ * An issuing identity that no longer matches the one designated (E10) is a
+ * configuration change the authority can put back itself; anything else
+ * (E9) is NDI's to explain. The two get different sentences and recoveries.
  *
  * STOPS ARE SHOWN, NOT HIDDEN
  *
@@ -51,7 +61,7 @@ type Face = "live" | "default" | "loading" | "empty" | "error" | "offline" | "su
 
 export function AuthorityConsoleView() {
   const router = useRouter();
-  const { adoptions, personById, setNdiAccess, hydrated } = useDemo();
+  const { adoptions, personById, setNdiAccess, setPrimaryDid, hydrated } = useDemo();
   const forced = useScreenState("SCR-DSG-05", ["live", "default", "loading", "empty", "error", "offline", "suspended", "no_permission"]) as Face;
 
   const [confirmAccess, setConfirmAccess] = useState<"remove" | "restore" | null>(null);
@@ -124,6 +134,9 @@ export function AuthorityConsoleView() {
   }
 
   const pill = dsgPill(face === "suspended" ? { state: "SUSPENDED" } : d, "authority");
+  /* The forced face shows E10, the one the prototype can also reach live. */
+  const identityChanged = face === "suspended" && (forced === "suspended" || d.suspendedReason === "IDENTITY_CHANGED");
+  const canPutBack = forced === "live" && identityChanged && Boolean(d.publishingDid) && owner;
   const disabledReason = face === "no_permission" ? `Only ${ownerName}, who owns ${org?.name ?? "the organisation"} on the platform, can change this.` : null;
 
   return (
@@ -166,11 +179,21 @@ export function AuthorityConsoleView() {
               </div>
 
               {face === "suspended" ? (
-                <p role="status" className="m-0 rounded-[12px] border px-4 py-3 text-[13.5px] leading-[1.6] text-body" style={{ borderColor: "var(--ndi-warning)" }}>
-                  {org?.name ?? d.orgName}&rsquo;s issuing identity has changed since it was designated. New
-                  verifications have stopped until this is put back. Businesses already verified are not
-                  affected. Contact NDI if you need help putting it back.
-                </p>
+                <div role="status" className="flex flex-col gap-2 rounded-[12px] border px-4 py-3" style={{ borderColor: "var(--ndi-warning)" }}>
+                  <p className="m-0 text-[13.5px] leading-[1.6] text-body">
+                    {identityChanged
+                      ? `${org?.name ?? d.orgName}'s issuing identity has changed since it was designated. New verifications have stopped until this is put back. Businesses already verified are not affected.`
+                      : "New verifications have stopped. Businesses already verified are not affected."}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {canPutBack ? (
+                      <HairlineButton onClick={() => setPrimaryDid(d.orgId, d.publishingDid!)}>Restore the previous issuing identity</HairlineButton>
+                    ) : null}
+                    <Link href="/legal/support" className="ndi-plainlink text-[13px] font-medium text-accent">
+                      Contact NDI
+                    </Link>
+                  </div>
+                </div>
               ) : null}
               {d.state === "PENDING" ? (
                 <p className="m-0 text-[13.5px] text-body">
@@ -180,7 +203,16 @@ export function AuthorityConsoleView() {
                   </Link>
                 </p>
               ) : null}
-              {d.state === "ACCEPTED" ? (
+              {d.state === "ACCEPTED" && !d.ndiGrant ? (
+                /* Kind N, step 2 — the grant is the owner's to give, so the
+                   console sends them to it rather than saying NDI is busy. */
+                <p className="m-0 text-[13.5px] text-body">
+                  You&rsquo;ve accepted. One thing is left that only you can do.{" "}
+                  <Link className="ndi-plainlink font-medium text-accent" href={`/designation/${d.id}`}>
+                    Let NDI&rsquo;s service account ask in your name
+                  </Link>
+                </p>
+              ) : d.state === "ACCEPTED" ? (
                 <p className="m-0 text-[13.5px] text-body">
                   You&rsquo;ve accepted. NDI is finishing switching it on.{" "}
                   {(d.checks ?? []).some((c) => !c.pass && c.resolver === "authority") ? (
@@ -195,7 +227,7 @@ export function AuthorityConsoleView() {
 
               <DetailList
                 items={[
-                  { label: "Confirms", value: kindsInWords(d.entityTypes) },
+                  { label: "Confirms", value: scopePairs(d.entityTypes) },
                   {
                     label: "Proposed and approved",
                     value:
@@ -214,7 +246,7 @@ export function AuthorityConsoleView() {
                   <p className="m-0 text-[13.5px] leading-[1.6] text-body">
                     {d.ndiAccess === "ACTIVE"
                       ? "NDI's service account can send the request you approved, in your name. Remove it and that stops immediately."
-                      : "NDI's service account can no longer send in your name. Your designation and what you've agreed are unchanged."}
+                      : "NDI's service account can no longer send in your name. Your designation and what you've agreed are unchanged, and you can turn it back on."}
                   </p>
                   {d.ndiAccess === "REMOVED" && d.ndiAccessChangedAt ? (
                     <p className="m-0 text-[12.5px] text-faint">
@@ -222,10 +254,17 @@ export function AuthorityConsoleView() {
                       {d.ndiAccessChangedBy ? ` by ${personById(d.ndiAccessChangedBy).name}` : ""}.
                     </p>
                   ) : null}
-                  <div>
-                    <HairlineButton onClick={() => setConfirmAccess(d.ndiAccess === "ACTIVE" ? "remove" : "restore")} disabled={!canAct}>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Turning it back on needs the designation ACTIVE (A4). */}
+                    <HairlineButton
+                      onClick={() => setConfirmAccess(d.ndiAccess === "ACTIVE" ? "remove" : "restore")}
+                      disabled={!canAct || (d.ndiAccess !== "ACTIVE" && d.state !== "ACTIVE")}
+                    >
                       {d.ndiAccess === "ACTIVE" ? "Remove NDI's access" : "Turn NDI's access back on"}
                     </HairlineButton>
+                    <Link className="ndi-plainlink text-[12.5px] font-medium text-accent" href="/members">
+                      Your members list
+                    </Link>
                   </div>
                 </div>
               ) : null}
@@ -323,11 +362,35 @@ export function AuthorityConsoleView() {
                     <span className="text-[13.5px] text-body">NDI service account</span>
                     <span className="text-[12.5px] text-faint">Sends only the request you approved, in your name</span>
                   </span>
-                  <StatusPill status={d.ndiAccess === "ACTIVE" ? "active" : "withdrawn"} label={d.ndiAccess === "ACTIVE" ? "Verifier" : "Removed"} />
+                  {/* Plain words, not the platform's role name (§2.4 bans "verifier"). */}
+                  <StatusPill status={d.ndiAccess === "ACTIVE" ? "active" : "withdrawn"} label={d.ndiAccess === "ACTIVE" ? "Can send your request" : "Removed"} />
                 </li>
               </ul>
             </Panel>
           </section>
+        ) : null}
+
+        {/* E10 can only happen after activation, by a member changing the
+            primary DID — which nothing else in the prototype does. */}
+        {forced === "live" && d.state === "ACTIVE" && d.publishingDid ? (
+          <SimulatedStep
+            standsFor="A member changing the organisation's primary issuing identity"
+            action={
+              <SimulatedAction
+                onClick={() =>
+                  setPrimaryDid(
+                    d.orgId,
+                    `did:ethr:bt:0x${Array.from({ length: 40 }, () => Math.floor(Math.random() * 16).toString(16)).join("")}`,
+                  )
+                }
+              >
+                Change it to another did:ethr
+              </SimulatedAction>
+            }
+          >
+            Any member of an organisation can change its primary DID. The designation is compared with the one it was
+            designated under, so even another did:ethr suspends it (FLOW-ORG-02 E10).
+          </SimulatedStep>
         ) : null}
 
         <Dialog
@@ -351,12 +414,13 @@ export function AuthorityConsoleView() {
           open={confirmAccess === "restore"}
           onClose={() => setConfirmAccess(null)}
           title="Turn NDI's access back on?"
-          lead="NDI's service account will again be able to send the request you approved, in your name."
+          lead="You add NDI's service account to your organisation again, as when you accepted. It can again send the request you approved, in your name, for each kind of business that's live."
+          consequences={["Nothing is adopted again — what you agreed is unchanged", "You can remove it again at any time"]}
           confirmLabel="Turn it back on"
           onConfirm={() => {
             const r = setNdiAccess(d.id, true);
             setConfirmAccess(null);
-            if (r.ok) setNotice("NDI's service account can send the request you approved again.");
+            if (r.ok) setNotice("NDI's service account can send requests in your name again.");
           }}
         />
       </div>

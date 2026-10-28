@@ -10,7 +10,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Icon } from "@/components/ui/icons";
 import { NextCredentialAction } from "@/features/onboarding/NextCredentialAction";
-import { inOrg, shortOrgName } from "@/lib/demoData";
+import { accSeenByOrg, inOrg, shortOrgName, type PresetId } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
@@ -23,7 +23,7 @@ import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
  * accept (FLOW-DEL-01 step 9). What it shows depends on who is looking:
  *
  * - The representative sees everything: the next credential as the primary
- *   action, and giving someone authority and seeing who can act beside it.
+ *   action, and appointing someone and seeing who can act beside it.
  * - An appointed person sees only what their authority covers, in the
  *   words of the presets they were given, with what it doesn't cover
  *   beside it — computed from the boxes left unticked (UXD-58).
@@ -45,14 +45,15 @@ export function OrganisationView() {
   const mine = relations.find((r) => inOrg(activeOrgId)(r) && r.personId === harness.persona && r.state === "ACTIVE");
   const face: Face =
     forced !== "live" ? forced : mine?.isRootAuthority ? "representative" : mine ? "appointed" : "member";
-  /* Anything it has asked NDI for, or been approved for (Flow 4). Not a
-     proposal that lapsed before NDI decided it, which the organisation
-     never saw; a replaced approval is still counted through its
-     replacement. */
-  const accs = accreditations.filter((a) => a.orgId === activeOrgId && a.state !== "LAPSED");
+  /* Anything it has asked NDI for, or been approved for (Flow 4). Not an
+     NDI proposal before a second administrator approved it, nor one NDI
+     declined or let lapse — the organisation is never told of those
+     (FLOW-ACC-01 step 3, E13, E14); a replaced approval is still counted
+     through its replacement. */
+  const accs = accreditations.filter((a) => a.orgId === activeOrgId && accSeenByOrg(a));
   /* A forced face with no appointment shows the guided grant, Receive. */
-  const minePresets = presetsOf(mine);
-  const grant = describeGrant(minePresets.length ? minePresets : ["receive"], {
+  const minePresets: PresetId[] = mine ? presetsOf(mine) : ["receive"];
+  const grant = describeGrant(minePresets, {
     name: "You",
     orgName: short,
     shareWith: mine ? shareTargetsOf(mine) : null,
@@ -123,17 +124,19 @@ export function OrganisationView() {
                     </>
                   )}
                 </p>
-                {/* UXD-24: not for a sole proprietorship. */}
-                {org?.kind === "sole_proprietorship" ? null : (
+                {/* UXD-24 is a rule about the prompt only: a sole proprietorship
+                    isn't offered appointing here, but may still appoint — an
+                    accountant, say — from who can act. */}
                 <div className="mt-2 flex flex-wrap items-center gap-2.5">
-                  <Link href="/people-who-can-act/give">
-                    <HairlineButton>Appoint someone</HairlineButton>
-                  </Link>
+                  {org?.kind === "sole_proprietorship" ? null : (
+                    <Link href="/people-who-can-act/appoint">
+                      <HairlineButton>Appoint someone</HairlineButton>
+                    </Link>
+                  )}
                   <Link href="/people-who-can-act" className="ndi-plainlink text-[12.5px] font-medium text-muted">
                     See who can act
                   </Link>
                 </div>
-                )}
               </div>
             </Panel>
           </>

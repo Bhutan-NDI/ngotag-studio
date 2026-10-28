@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
@@ -26,10 +27,18 @@ import { describeGrant, presetsOf, shareTargetsOf } from "./presets";
  * representative is listed first, everyone else by the name their citizen
  * credential gave when they accepted (with the account's name beside it if
  * the two differ), what they can do in the preset's own words, since when
- * and until when. A pending appointment shows when it lapses; a declined
- * or expired one is stated per person, with the way to appoint again. The
- * earlier column on the members page had none of that, and after Ugyen
- * declined Dorji saw nothing at all.
+ * and until when. A pending appointment shows when it lapses; a declined,
+ * expired or withdrawn one is stated per person, with the way to appoint
+ * again. The earlier column on the members page had none of that, and after
+ * Ugyen declined Dorji saw nothing at all.
+ *
+ * WITHDRAWING
+ *
+ * A pending appointment can be withdrawn here (DEL-01/E15, EW-FLOW3-SD/D19).
+ * Without it, a representative who ticked the wrong boxes would wait out
+ * the 14 days, because nobody can be appointed twice at once (E14).
+ * Whether it can still be withdrawn is the store's answer: if the appointee
+ * accepted first, their acceptance stands, and changing it is flow 12's.
  *
  * Someone who was appointed sees only their own row: what others can do is
  * the representative's business.
@@ -39,15 +48,17 @@ interface Row {
   id: string;
   person: Person;
   relation: ControllershipRelation;
-  status: "representative" | "active" | "pending" | "declined" | "expired";
+  status: "representative" | "active" | "pending" | "declined" | "expired" | "withdrawn" | "basis_lost";
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function PeopleWhoCanActView() {
   const router = useRouter();
-  const { organizations, activeOrgId, relations, people, harness, setPersona } = useDemo();
-  const forced = useScreenState("SCR-DEL-05", ["live", "only_you", "pending", "accepted", "declined", "expired"]);
+  const { organizations, activeOrgId, relations, people, harness, setPersona, withdrawAppointment } = useDemo();
+  const forced = useScreenState("SCR-DEL-05", ["live", "only_you", "pending", "accepted", "declined", "expired", "withdrawn"]);
+  /* The store's refusal, if a withdrawal came too late. */
+  const [refused, setRefused] = useState<string | null>(null);
 
   const org = organizations.find((o) => o.id === activeOrgId);
   const orgName = org?.name ?? "the organisation";
@@ -57,8 +68,15 @@ export function PeopleWhoCanActView() {
     if (r.isRootAuthority) return r.state === "ACTIVE" ? "representative" : null;
     if (r.state === "ACTIVE") return "active";
     if (r.state === "PENDING_ACCEPTANCE") return r.expiresAt && r.expiresAt < today() ? "expired" : "pending";
-    if (r.state === "EXPIRED") return "expired";
-    if (r.state === "TERMINATED" && r.endedReason === "declined") return "declined";
+    /* One state, four reasons (EW-FLOW3-SD §5.1); each is told differently. */
+    if (r.state === "EXPIRED")
+      return r.expiryReason === "DECLINED"
+        ? "declined"
+        : r.expiryReason === "WITHDRAWN"
+          ? "withdrawn"
+          : r.expiryReason === "BASIS_LOST"
+            ? "basis_lost"
+            : "expired";
     return null;
   };
 
@@ -85,7 +103,7 @@ export function PeopleWhoCanActView() {
                 legalBasis: "entity_consent",
                 instrument: null,
                 scope: { version: 1, validFrom: today(), validUntil: null, grants: [] },
-                state: status === "active" ? "ACTIVE" : "PENDING_ACCEPTANCE",
+                state: status === "active" ? "ACTIVE" : status === "pending" ? "PENDING_ACCEPTANCE" : "EXPIRED",
                 isRootAuthority: false,
                 createdAt: today(),
                 acceptedAt: status === "active" ? today() : null,
@@ -112,7 +130,7 @@ export function PeopleWhoCanActView() {
           title={`People who can act for ${orgName}`}
           actions={
             isRepresentative ? (
-              <Link href="/people-who-can-act/give">
+              <Link href="/people-who-can-act/appoint">
                 <GradientButton>
                   <Icon name="plus" size={15} strokeWidth={2} />
                   Appoint someone
@@ -146,7 +164,7 @@ export function PeopleWhoCanActView() {
                           ? `Recorded as ${orgName}'s representative. Can do everything, and is the only one who can appoint people to act for it.`
                           : ticked.length
                             ? describeGrant(ticked, { name: first, orgName: shortOrgName(orgName), shareWith: shareTargetsOf(r) }).sentence
-                            : "What they can do was set individually, before the presets existed."}
+                            : "What they can do was set one permission at a time, before these choices existed."}
                       </span>
                       {(ticked.includes("share") && r.shareNeedsApproval) || (ticked.includes("give_authority") && r.issueNeedsApproval) ? (
                         <span className="text-[12.5px] text-faint">
@@ -167,7 +185,9 @@ export function PeopleWhoCanActView() {
                             ? "pending_acceptance"
                             : row.status === "declined"
                               ? "declined"
-                              : "expired"
+                              : row.status === "withdrawn"
+                                ? "withdrawn"
+                                : "expired"
                       }
                       label={
                         row.status === "representative"
@@ -178,7 +198,9 @@ export function PeopleWhoCanActView() {
                               ? "Waiting to accept"
                               : row.status === "declined"
                                 ? "Declined"
-                                : "Expired"
+                                : row.status === "withdrawn"
+                                  ? "Withdrawn"
+                                  : "Expired"
                       }
                     />
                   </div>
@@ -189,25 +211,45 @@ export function PeopleWhoCanActView() {
                         ? `${first} declined.`
                         : row.status === "expired"
                           ? `${first} didn't accept in time.`
-                          : `Since ${formatDate(r.activatedAt ?? r.createdAt)} · ${r.scope.validUntil ? `until ${formatDate(r.scope.validUntil)}` : "no end date"}`}
+                          : row.status === "withdrawn"
+                            ? `You've withdrawn ${first}'s appointment.`
+                            : row.status === "basis_lost"
+                              ? `${first}'s appointment can't go ahead any more.`
+                              : `Since ${formatDate(r.activatedAt ?? r.createdAt)} · ${r.scope.validUntil ? `until ${formatDate(r.scope.validUntil)}` : "no end date"}`}
                   </p>
-                  {isRepresentative && (row.status === "declined" || row.status === "expired") ? (
+                  {isRepresentative &&
+                  (row.status === "declined" || row.status === "expired" || row.status === "withdrawn" || row.status === "basis_lost") ? (
                     <div>
-                      <Link href="/people-who-can-act/give" className="ndi-plainlink text-[12.5px] font-medium text-accent">
+                      <Link href="/people-who-can-act/appoint" className="ndi-plainlink text-[12.5px] font-medium text-accent">
                         Appoint again
                       </Link>
                     </div>
                   ) : null}
-                  {isRepresentative && row.status === "pending" && row.id !== "sample" ? (
-                    <div>
-                      <SimulatedLink
+                  {isRepresentative && row.status === "pending" ? (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                      {/* DEL-01/E15: nothing is in force yet, so withdrawing
+                          changes nothing but the offer. */}
+                      <button
+                        type="button"
                         onClick={() => {
-                          setPersona(row.person.id as Parameters<typeof setPersona>[0]);
-                          router.push(`/appointments/${row.id}`);
+                          if (row.id === "sample") return;
+                          const res = withdrawAppointment(row.id);
+                          setRefused(res.ok ? null : `${first}'s appointment is no longer waiting, so it can't be withdrawn.`);
                         }}
+                        className="ndi-plainlink text-[12.5px] font-medium text-accent"
                       >
-                        Open it as {row.person.name} (stands in for their notification)
-                      </SimulatedLink>
+                        Withdraw
+                      </button>
+                      {row.id !== "sample" ? (
+                        <SimulatedLink
+                          onClick={() => {
+                            setPersona(row.person.id as Parameters<typeof setPersona>[0]);
+                            router.push(`/appointments/${row.id}`);
+                          }}
+                        >
+                          Open it as {row.person.name} (stands in for their notification)
+                        </SimulatedLink>
+                      ) : null}
                     </div>
                   ) : null}
                 </li>
@@ -216,10 +258,15 @@ export function PeopleWhoCanActView() {
           </ul>
         </Panel>
 
+        {refused ? (
+          <p role="alert" className="m-0 text-[13px] text-body">
+            {refused}
+          </p>
+        ) : null}
+
         {onlyYou ? (
           <p className="m-0 max-w-[64ch] text-[13px] leading-[1.6] text-muted">
-            Only you can act for {orgName} so far. You can give members authority to act for it — each
-            of them has to accept with their own NDI wallet.
+            Only you can act for {orgName}. You can appoint others to do some or all of what you can.
           </p>
         ) : null}
       </div>
