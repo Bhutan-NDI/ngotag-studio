@@ -139,12 +139,12 @@ export function counterpartyOptions(s: Pick<DemoState, "organizations">): Counte
   const ids = [...new Set(VOCABULARY.map((t) => t.counterparty))];
   return ids.map((orgId) => {
     const org = s.organizations.find((o) => o.id === orgId);
-    return { orgId, name: org?.name ?? "The counterparty", current: Boolean(listedVerifier(s, orgId)) };
+    return { orgId, name: org?.name ?? "The organisation", current: Boolean(listedVerifier(s, orgId)) };
   });
 }
 
 export const counterpartyName = (s: Pick<DemoState, "organizations">, orgId: string) =>
-  s.organizations.find((o) => o.id === orgId)?.name ?? "the counterparty";
+  s.organizations.find((o) => o.id === orgId)?.name ?? "the organisation";
 
 /* ------------------------------------------------------------------ */
 /* Who may give authority (G1, G2) and who approves (§8)               */
@@ -276,9 +276,9 @@ const LIVE: GrantStatus[] = ["ACTIVE", "ISSUING", "CLAIMABLE", "AWAITING_APPROVA
 
 /**
  * G7, by the keyed hash and never the number. Read over the waiting states
- * too, not only ACTIVE/ISSUING/CLAIMABLE as §6 lists — a second grant to
- * someone whose first is still waiting for approval is the same mistake
- * (pr-8, optional; recorded on the what's-real page).
+ * too — AWAITING_APPROVAL and AWAITING_LISTING as well as CLAIMABLE,
+ * ISSUING and ACTIVE (EW-FLOW8-SD v0.3 §6): a second grant to someone whose
+ * first is still waiting for approval is the same mistake (EW-FLOW8-SD v0.3 §6, G7).
  */
 export function duplicateOf(s: Pick<DemoState, "authorityGrants">, d: AuthorityDraft): AuthorityGrant | null {
   if (digitsOnly(d.cid).length !== 11) return null;
@@ -493,7 +493,13 @@ export const NOTICE_GRANT = {
   listingFailed: "We couldn't set this up. Nothing has been given. Try again later.",
   /** D18 — the Root, when someone else's grant puts a link in circulation. */
   rootLinkOut: (grantor: string, name: string, what: string) => `${grantor} gave ${name} authority to ${what}. The link to collect it is out.`,
-  /** D18 — the Root, when it is collected, declined, fails, lapses or — the prototype's addition (pr-8) — is cancelled. */
+  /** E14 — the Root, when someone else cancelled the authority (§3.5). */
+  rootCancelled: (person: string, name: string) => `${person} cancelled the authority for ${name}. Nothing was given.`,
+  /** E14 — the grantor, when someone else cancelled it: the prototype's, §3.5 gives only the Root's. */
+  cancelledBy: (person: string, name: string) => `${person} cancelled the authority for ${name}. The link no longer works.`,
+  /** E18 — the delegate, after identity matches again while an offer was out (§3.5). */
+  startedAlready: "You've already started collecting this. We've sent it to your Bhutan NDI app again.",
+  /** D18 — the Root, when it is collected, declined, fails or lapses. */
   rootOutcome: (grantor: string, text: string) => `${text} (Given by ${grantor}.)`,
 };
 

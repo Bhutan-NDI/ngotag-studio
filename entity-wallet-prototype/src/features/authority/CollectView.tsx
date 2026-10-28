@@ -11,7 +11,7 @@ import { QrPlaceholder } from "@/components/ui/QrPlaceholder";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { IDENTITY_MS, ending, orgName as orgNameOf, statement } from "@/lib/authority";
+import { IDENTITY_MS, NOTICE_GRANT, ending, orgName as orgNameOf, statement } from "@/lib/authority";
 import { SIM_CITIZENS } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
@@ -20,7 +20,7 @@ import { Statement } from "./shared";
 
 /**
  * SCR-AUT-05 — Collect your authority. FLOW-AUT-01 steps 9–16; E7–E14,
- * E17, A2.
+ * E17, E18, A2.
  *
  * NOTHING BEFORE IDENTITY (S3)
  *
@@ -30,8 +30,9 @@ import { Statement } from "./shared";
  * authority — and the sentence that must survive review unchanged, "Only
  * continue if you expected authority from <organisation>." What the
  * authority is comes only after the citizen credential matches the ID
- * number the grantor entered (G8). An unknown, lapsed, cancelled or used
- * link shows nothing at all, not even whose it was (E7).
+ * number the grantor entered (G8). An unknown link, or one whose authority
+ * is already active or has ended, shows nothing at all, not even whose it
+ * was (E7).
  *
  * TWO HOPS INTO THE APP
  *
@@ -47,12 +48,14 @@ import { Statement } from "./shared";
  * and, after the match, the grant it opened — nothing else, and it doesn't
  * matter who the demo is driven as.
  *
- * OPENED AGAIN
+ * OPENED AGAIN (E18)
  *
- * Opening the link again while an offer is out asks for identity again,
- * then shows the same offer — nothing is shown before the match, and no new
- * offer is made (the prototype's reading of pr-8 item 2). Once the
- * authority has been accepted the link is used, and reads as E7.
+ * The link stays good while the authority is being collected (E7), so it
+ * can be opened again — on another phone, say. It asks for identity again
+ * and shows nothing about the offer first. On a match, an offer not yet
+ * accepted is withdrawn and a new one made, and the page says so in §3.5's
+ * words. Once the delegate has accepted, nothing new is made and the page
+ * shows *Finishing*, or *Done* when the registration has gone through.
  */
 type Face =
   | "live"
@@ -60,6 +63,7 @@ type Face =
   | "waiting_app"
   | "checking"
   | "offer"
+  | "opened_again"
   | "done"
   | "error_link"
   | "error_no_app"
@@ -88,6 +92,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
     "waiting_app",
     "checking",
     "offer",
+    "opened_again",
     "done",
     "error_link",
     "error_no_app",
@@ -109,6 +114,8 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   const [phone, setPhone] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [askedAt, setAskedAt] = useState<number | null>(null);
+  /* E18 — this visit opened a link whose offer was already out. */
+  const [reopened, setReopened] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -142,7 +149,10 @@ export function CollectView({ claimRef }: { claimRef: string }) {
     if (g && phase === "proved") {
       if (g.status === "ACTIVE") return "done";
       if (g.status === "ISSUING" && g.accepted) return "finishing";
-      if (g.status === "ISSUING") return g.offerExpiresAt !== null && g.offerExpiresAt < now ? "error_offer_expired" : "offer";
+      if (g.status === "ISSUING") {
+        if (g.offerExpiresAt !== null && g.offerExpiresAt < now) return "error_offer_expired";
+        return reopened ? "opened_again" : "offer";
+      }
       if (g.status === "DECLINED") return "declined";
       if (g.status === "CANCELLED") return "cancelled";
       if (g.status === "FAILED") return "error_cant_give";
@@ -154,6 +164,10 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   })();
   const face: Face = forced === "live" ? natural : forced;
   const live = forced === "live";
+  /* Until the link has been looked up, nothing about it is said — not even
+     that it wants to give anyone authority, which a dead link must not
+     (E7, S3). */
+  const resolving = live && !look;
   const shown = g ?? (forced !== "live" ? sample : undefined);
 
   const share = (cid: string) => {
@@ -164,6 +178,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
       const res = presentCitizenCredential(claimRef, cid);
       if (res.ok) {
         setGrantId(res.grantId);
+        setReopened(res.reopened);
         setPhase("proved");
       } else if (res.error === "E7") {
         setLook({ kind: "invalid" });
@@ -174,6 +189,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
 
   const again = () => {
     setGrantId(null);
+    setReopened(false);
     setPhase("before");
     setAskedAt(null);
     setLook(openClaim(claimRef));
@@ -207,9 +223,11 @@ export function CollectView({ claimRef }: { claimRef: string }) {
             NDI Entity Wallet{address ? ` · ${address}` : ""}
           </p>
           <h1 className="m-0 font-display text-[clamp(23px,3vw,30px)] font-semibold leading-[1.15] tracking-[-0.02em] text-strong">
-            {unnamed
+            {resolving
+              ? "Collect your authority"
+              : unnamed
               ? "This link can't be opened"
-              : face === "offer"
+              : face === "offer" || face === "opened_again"
                 ? "Here's what you'll be able to do"
                 : face === "done" || face === "finishing"
                   ? "Collect your authority"
@@ -226,7 +244,9 @@ export function CollectView({ claimRef }: { claimRef: string }) {
 
         <Panel>
           <div className="relative z-[4] flex flex-col gap-4" aria-live="polite">
-            {error ? (
+            {resolving ? (
+              <div aria-hidden="true" className="h-12 animate-pulse rounded-[8px] bg-[rgb(var(--tint)/0.04)]" />
+            ) : error ? (
               <>
                 <p role="alert" className="m-0 text-[14.5px] leading-[1.6] text-body">
                   {error.text}
@@ -265,8 +285,13 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                   <HairlineButton onClick={() => setPhase("before")}>Cancel</HairlineButton>
                 </div>
               </>
-            ) : face === "offer" && shown ? (
+            ) : (face === "offer" || face === "opened_again") && shown ? (
               <>
+                {face === "opened_again" ? (
+                  <p role="status" className="m-0 text-[14.5px] leading-[1.6] text-strong">
+                    {NOTICE_GRANT.startedAlready}
+                  </p>
+                ) : null}
                 <Statement>{statement({ organizations }, shown, "delegate")}</Statement>
                 <p className="m-0 text-[13.5px] leading-[1.6] text-muted">
                   It will be in your own Bhutan NDI app, in your name. It doesn&rsquo;t include {orgName}&rsquo;s licence or TPN — only the licence number you act under.
@@ -335,7 +360,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
             time ends it.
           </SimulatedStep>
         ) : null}
-        {live && face === "offer" ? (
+        {live && (face === "offer" || face === "opened_again") ? (
           <SimulatedStep
             standsFor="the Bhutan NDI app's offer screen"
             action={
@@ -359,11 +384,13 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                 >
                   The offer can&rsquo;t be sent
                 </SimulatedAction>
+                <SimulatedAction onClick={again}>Open the link again, on another phone</SimulatedAction>
               </>
             }
           >
             The app shows {orgName} as the issuer, from NDI&rsquo;s list; what they may do in words, never codes; where; the licence number; the limit
-            in ngultrum; and the end date (UXD-50). Accepting registers its status with NDI, and only then is it active (D23).
+            in ngultrum; and the end date (UXD-50). Accepting registers its status with NDI, and only then is it active (D23). Opening the link
+            again, before accepting, asks for identity again and replaces this offer with a new one (E18).
           </SimulatedStep>
         ) : null}
         {live && face === "error_not_you" ? (
@@ -372,8 +399,17 @@ export function CollectView({ claimRef }: { claimRef: string }) {
           </SimulatedStep>
         ) : null}
         {live && face === "finishing" && g ? (
-          <SimulatedStep standsFor="NDI's revocation service" action={<SimulatedAction onClick={() => finishRegistration(g.id)}>The registration goes through</SimulatedAction>}>
+          <SimulatedStep
+            standsFor="NDI's revocation service"
+            action={
+              <>
+                <SimulatedAction onClick={() => finishRegistration(g.id)}>The registration goes through</SimulatedAction>
+                <SimulatedAction onClick={again}>Open the link again, on another phone</SimulatedAction>
+              </>
+            }
+          >
             Until its status is registered, the authority fails every check the Single Window makes — so a slow registration fails closed (E17).
+            Opening the link again now makes no new offer: this one was accepted first and stands (E18).
           </SimulatedStep>
         ) : null}
       </main>

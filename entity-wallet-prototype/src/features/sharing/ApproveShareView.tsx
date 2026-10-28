@@ -245,7 +245,8 @@ export function ApproveShareView({ requestId }: { requestId: string }) {
         ) : null}
         {face === "cancelled" ? (
           <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
-            {v} has cancelled this request. Nothing has been shared.
+            {/* FLOW-PRS-01 E14 and FLOW-PRS-02 E7 word it differently. */}
+            {r.sessionId ? `${v} has cancelled this request. Nothing has been shared.` : `${v} cancelled this request. Nothing has been shared.`}
           </p>
         ) : null}
         {face === "already_decided" ? (
@@ -255,7 +256,7 @@ export function ApproveShareView({ requestId }: { requestId: string }) {
                 {actedOn && op?.state === "rejected"
                   ? `Not approved. ${sharerName} has been told${note.trim() ? ", with your note" : ""}, and can ask someone else.`
                   : st === "SHARED"
-                    ? `${person(r.approvedBy ?? r.decidedBy)} already approved this on ${formatDate(r.decidedAt ?? r.receivedAt)}. It was shared with ${v}.`
+                    ? `${person(r.approvedBy ?? r.decidedBy)} already shared this on ${formatDate(r.decidedAt ?? r.receivedAt)}.`
                     : st === "OPEN" && r.rejection
                       ? `${person(r.rejection.by)} didn't approve this on ${formatDate(r.rejection.at)}. It's open again for someone who may share it.`
                       : st === "EXPIRED"

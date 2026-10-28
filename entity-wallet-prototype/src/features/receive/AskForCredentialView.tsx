@@ -9,6 +9,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { inOrg, requestInFlight } from "@/lib/demoData";
@@ -42,19 +43,51 @@ const KIND_PLURAL: Record<string, string> = { company: "companies", sole_proprie
  * rather than a surprise to be suspicious of (UN-37, UC-27).
  *
  * The store decides whether the request is allowed (P1–P5); the faces
- * below render what it said.
+ * below render what it said. E5 has two halves, told apart: a request
+ * already in flight goes to its status, a credential already held (and not
+ * renewable) to the organisation's credentials.
+ *
+ * ASKING FOR MORE, BEFORE ANYTHING IS SHARED
+ *
+ * The prototype's one way to reach A1 is offered here, at ask time, because
+ * that's the only time it can happen: a request reaches NEEDS_CONSENT only
+ * from AWAITING_PROOF, before the prerequisite is presented (EW-FLOW6-SD
+ * §5.1, D10). Once it has been, the request's one use is spent.
  */
-type Face = "live" | "default" | "loading" | "submitted" | "e3" | "not_eligible" | "e4" | "e5" | "offline" | "no_permission";
+type Face =
+  | "live"
+  | "default"
+  | "loading"
+  | "submitted"
+  | "e3"
+  | "not_eligible"
+  | "e4"
+  | "e5"
+  | "e5_held"
+  | "offline"
+  | "no_permission";
 
 export function AskForCredentialView({ offeringId }: { offeringId: string }) {
   const router = useRouter();
-  const { offerings, credentialRequests, askForCredential, hydrated } = useDemo();
+  const { offerings, credentialRequests, askForCredential, simulateAskForMore, hydrated } = useDemo();
   const holder = useHolder();
-  const forced = useScreenState("SCR-CRD-02", ["live", "default", "loading", "submitted", "e3", "not_eligible", "e4", "e5", "offline", "no_permission"]) as Face;
+  const forced = useScreenState("SCR-CRD-02", [
+    "live",
+    "default",
+    "loading",
+    "submitted",
+    "e3",
+    "not_eligible",
+    "e4",
+    "e5",
+    "e5_held",
+    "offline",
+    "no_permission",
+  ]) as Face;
 
   const [busy, setBusy] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [refused, setRefused] = useState<"E3" | "E4" | "E5" | "not_eligible" | "offline" | null>(null);
+  const [refused, setRefused] = useState<"E3" | "E4" | "E5" | "E5_held" | "not_eligible" | "offline" | null>(null);
 
   const offering = offerings.find((o) => o.id === offeringId);
   const existing = credentialRequests.find((r) => inOrg(holder.orgId)(r) && r.offeringId === offeringId && requestInFlight(r));
@@ -69,6 +102,8 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
           ? "not_eligible"
         : refused === "E5" || (existing && !submitted)
           ? "e5"
+          : refused === "E5_held" || (!offering.renewable && holder.held.some((c) => c.type === offering.credential))
+            ? "e5_held"
           : refused === "E4" || !holder.held.some((c) => c.type === offering.prerequisite.credential)
             ? "e4"
           : refused === "offline"
@@ -96,7 +131,9 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
     );
   }
 
-  const ask = () => {
+  /* `more` — the stand-in below: the issuer's proof request will ask for
+     more than this consent covers (A1), before anything is presented. */
+  const ask = (more = false) => {
     if (forced === "offline") {
       setRefused("offline");
       return;
@@ -106,11 +143,12 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
       const r = askForCredential(offeringId);
       setBusy(false);
       if (r.ok) {
+        if (more) simulateAskForMore(r.id);
         setSubmitted(true);
         /* The confirmation, then where it stands — the spec's "Submitted"
            is a moment, not a page to dismiss. */
         window.setTimeout(() => router.push(`/wallet/requests/${r.id}`), ROUND_TRIP_MS);
-      } else if (r.error === "E3" || r.error === "E4" || r.error === "E5" || r.error === "not_eligible") setRefused(r.error);
+      } else if (r.error === "E3" || r.error === "E4" || r.error === "E5" || r.error === "E5_held" || r.error === "not_eligible") setRefused(r.error);
     }, LOCAL_MS);
   };
 
@@ -130,7 +168,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
     );
   }
 
-  if (face === "e3" || face === "not_eligible" || face === "e4" || face === "e5") {
+  if (face === "e3" || face === "not_eligible" || face === "e4" || face === "e5" || face === "e5_held") {
     /* E4 arrives here only by address — the catalogue doesn't offer Ask
        until the prerequisite is held — so it says what's needed and offers
        the way to get it. */
@@ -148,10 +186,14 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                     ? `${issuer} doesn't offer this to ${KIND_PLURAL[holder.kind]}. Nothing has been sent.`
                   : face === "e4"
                     ? `To ask for this you first need: ${offering?.prerequisite.credential ?? "another credential"}.`
-                    : "You've already asked for this. Here's where it stands."}
+                    : face === "e5_held"
+                      ? "Your organisation already has this."
+                      : "You've already asked for this. Here's where it stands."}
               </p>
               <div>
-                {face === "e5" && existing ? (
+                {face === "e5_held" ? (
+                  <GradientButton onClick={() => router.push("/wallet/credentials")}>Go to credentials</GradientButton>
+                ) : face === "e5" && existing ? (
                   <GradientButton onClick={() => router.push(`/wallet/requests/${existing.id}`)}>Go to status</GradientButton>
                 ) : face === "e5" ? (
                   <GradientButton onClick={() => router.push("/wallet/requests")}>Go to status</GradientButton>
@@ -243,13 +285,25 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
             </div>
 
             <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
-              <GradientButton onClick={ask} disabled={readOnly || face === "loading"}>
+              <GradientButton onClick={() => ask()} disabled={readOnly || face === "loading"}>
                 {face === "loading" ? "Asking…" : `Ask ${issuerInline(issuer)}`}
               </GradientButton>
               <HairlineButton onClick={() => router.push("/wallet/get")}>Cancel</HairlineButton>
             </div>
           </div>
         </Panel>
+
+        {forced === "live" && !readOnly ? (
+          <SimulatedStep
+            standsFor={`${issuer}'s system asking for more than the request said`}
+            action={
+              <SimulatedAction onClick={() => ask(true)}>Ask, and have it ask for a bank account too</SimulatedAction>
+            }
+          >
+            An issuer&rsquo;s proof request can ask for more than the business agreed to share. That can only happen
+            before anything is shared, and when it does, nothing is sent until someone here answers.
+          </SimulatedStep>
+        ) : null}
       </div>
     </AppShell>
   );

@@ -62,8 +62,10 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
     if (res.ok) router.push("/organisation");
     /* Each refusal keeps its own message. E7's neutral wording is for an
        identity that didn't match and nothing else; an appointment no longer
-       waiting (E8 — already accepted, declined or withdrawn) must not tell a
-       valid appointee their identity failed. */
+       waiting (E15 — withdrawn, declined or already accepted) must not tell
+       a valid appointee their identity failed. E8 and E9 — the basis lost at
+       the last moment — go back to the appointment, which says which. */
+    else if (res.error === "E8" || res.error === "E9") router.push(`/appointments/${relationId}`);
     else setStage(res.error === "E7" ? "could_not_confirm" : res.error === "E4" ? "expired" : "not_waiting");
   };
 

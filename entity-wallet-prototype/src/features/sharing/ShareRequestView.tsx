@@ -80,6 +80,7 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
     declineRequest,
     passRequest,
     keepForLater,
+    returnToVerifier,
     withdrawPresentationRequest,
   } = useDemo();
   const forced = useScreenState("SCR-PRS-02", [
@@ -206,6 +207,14 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
     toOutcome("kept");
   };
 
+  /* FLOW-PRS-01 only: back to the verifier's registered address, with the
+     status the request has reached (E12 V1/V2 failed, E14 expired). */
+  const goBack = () => {
+    if (!r.sessionId) return;
+    const back = returnToVerifier(r.sessionId);
+    if (back.url) router.push(back.url);
+  };
+
   const header = (
     <PageHeader
       crumbs={[{ label: "Wallet" }, { label: "Sharing", href: "/wallet/sharing" }, { label: v }]}
@@ -250,7 +259,10 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
     const canApprove = awaiting && !mineAwaiting && whoApproves(r.id).includes(harness.persona);
     const line =
       face === "cancelled"
-        ? `${v} cancelled this request. Nothing has been shared.`
+        ? /* FLOW-PRS-01 E14 and FLOW-PRS-02 E7 word it differently. */
+          fromWebsite
+          ? `${v} has cancelled this request. Nothing has been shared.`
+          : `${v} cancelled this request. Nothing has been shared.`
         : st === "SHARED"
           ? `${person(r.initiatedBy ?? r.decidedBy)} already shared this on ${formatDate(r.decidedAt ?? r.receivedAt)}.`
           : st === "DECLINED"
@@ -277,6 +289,9 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
               </p>
               <div className="flex flex-wrap gap-2.5">
                 {canApprove ? <GradientButton onClick={() => router.push(`/wallet/sharing/${r.id}/approve`)}>Approve</GradientButton> : null}
+                {fromWebsite && (face === "cancelled" || st === "FAILED") ? (
+                  <GradientButton onClick={goBack}>Go back to {v}</GradientButton>
+                ) : null}
                 <HairlineButton onClick={() => router.push("/wallet/sharing")}>Open history</HairlineButton>
               </div>
             </div>
@@ -308,8 +323,9 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
           </p>
         ) : null}
         {face === "recheck_error" || error ? (
-          <p role="alert" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
+          <p role="alert" className="m-0 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
             {error ?? `${v} can't receive this any more. Nothing has been shared.`}
+            {fromWebsite ? <HairlineButton onClick={goBack}>Go back to {v}</HairlineButton> : null}
           </p>
         ) : null}
         {r.failure && st === "OPEN" ? (
@@ -369,7 +385,10 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
             {face === "outside_reach" ? (
               <p role="alert" className="m-0 flex items-start gap-2 rounded-[12px] border border-grid px-4 py-3 text-[13.5px] leading-[1.6] text-body">
                 <Icon name="lockRounded" size={14} strokeWidth={2} className="mt-[3px] flex-none" style={{ color: "var(--ndi-warning)" }} />
-                You can share only with {namesOf(allowed) || "the organisations named for you"}. {namesOf(canNames) || "Your organisation's representative"} can share with {v}.
+                {/* FLOW-PRS-01 E10 covers the reach too, in its own words; FLOW-PRS-02 E5 names the limit. */}
+                {fromWebsite
+                  ? `You can't share with ${v}. ${namesOf(canNames) || "Your organisation's representative"} can. Pass it to them?`
+                  : `You can share only with ${namesOf(allowed) || "the organisations named for you"}. ${namesOf(canNames) || "Your organisation's representative"} can share with ${v}.`}
               </p>
             ) : null}
 

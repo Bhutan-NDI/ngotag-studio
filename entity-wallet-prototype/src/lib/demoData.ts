@@ -98,10 +98,18 @@ export interface Organization {
   id: string;
   /**
    * The entity type its authority verified it as (FLOW-ORG-01). Decides,
-   * among other things, whether giving others authority is offered at all
+   * among other things, whether appointing someone is offered at all
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
+  /**
+   * Constituted by statute or executive order, with no register to verify it
+   * against — a ministry, an authority. It is an issuer and a verifier and
+   * never a holder, so it has no business-verification route; it reaches the
+   * platform through a designation or an approval (EW-FLOW2-SD v0.13 §2.2,
+   * D4; FLOW-ORG-01 §1.2).
+   */
+  statutory?: boolean;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -531,6 +539,12 @@ export interface ControllershipRelation {
   activatedAt: string | null;
   suspendedAt?: string | null;
   endedReason?: string | null;
+  /**
+   * Why a pending appointment became EXPIRED (EW-FLOW3-SD §5.1). One state,
+   * because none of them ever authorised anything; four reasons, because
+   * each tells the person something different.
+   */
+  expiryReason?: ExpiryReason | null;
   /*
    * FLOW-DEL-01 — an appointment made on SCR-DEL-02. Absent on the story's
    * older relations, which were authored operation by operation before the
@@ -579,6 +593,32 @@ export type ShareReach = "named" | "any";
  */
 export function standsNow(r: Pick<ControllershipRelation, "state" | "expiresAt">, today: string): boolean {
   return r.state === "ACTIVE" || (r.state === "PENDING_ACCEPTANCE" && !(r.expiresAt && r.expiresAt < today));
+}
+
+/**
+ * The four reasons an appointment that was never accepted ends: the
+ * appointee said no, the representative withdrew it (D19), 14 days passed,
+ * or the organisation or its representative stopped standing behind it.
+ */
+export type ExpiryReason = "DECLINED" | "WITHDRAWN" | "TIMED_OUT" | "BASIS_LOST";
+
+/**
+ * Whether a member can be appointed now, and if not, which refusal applies
+ * (FLOW-DEL-01 P3). Split since FLOW-DEL-01 v0.8: someone who can already
+ * act is E3, and someone with an appointment still waiting for them is E14 —
+ * they can't act yet, so the screen mustn't say they can. The store refuses
+ * with this, and SCR-DEL-02 shows the same answer, so the two never differ.
+ */
+export function appointmentHeld(
+  relations: Pick<ControllershipRelation, "orgId" | "personId" | "isRootAuthority" | "state" | "expiresAt">[],
+  orgId: string,
+  personId: string,
+  today: string,
+): "E3" | "E14" | null {
+  const theirs = relations.filter((r) => inOrg(orgId)(r) && r.personId === personId && !r.isRootAuthority && standsNow(r, today));
+  if (theirs.some((r) => r.state === "ACTIVE")) return "E3";
+  if (theirs.length) return "E14";
+  return null;
 }
 
 /**
@@ -637,12 +677,30 @@ export interface HeldCredential {
   expiresAt: string | null;
   status: "active" | "expired" | "revoked";
   /**
-   * The held credential that replaced this one, when a renewal was accepted
-   * (FLOW-CRD-02 step 6). Both are kept — this one is the record — but only
-   * the newer is shared, so this one no longer satisfies a prerequisite.
+   * The held credential that replaced this one: a newer one of the same type
+   * from the same issuer DID, accepted by either route (EW-FLOW6-SD §4.5).
+   * Both are kept — this one is the record — but this one is never presented
+   * as a prerequisite and doesn't count towards one. Which one a relying
+   * party receives is flow 7's: it preselects the newest.
    */
   supersededBy?: string;
 }
+
+/**
+ * The held credential a newly stored one would supersede — same
+ * organisation, same type, same issuer DID, not already superseded — or
+ * undefined. One rule for both routes (EW-FLOW6-SD §4.5), read by the store
+ * when it stores and by SCR-CRD-04 when it says "This replaces …".
+ */
+export const supersedes = (
+  held: HeldCredential[],
+  orgId: string,
+  type: string,
+  issuerDid: string,
+): HeldCredential | undefined =>
+  held
+    .filter((c) => (c.orgId ?? PELDEN) === orgId && c.type === type && c.issuerDid === issuerDid && !c.supersededBy)
+    .sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : -1))[0];
 
 /**
  * What the server said about an operation the Controller wants to run.
@@ -650,6 +708,17 @@ export interface HeldCredential {
  */
 export type ScopeDecision = "allowed" | "out_of_scope" | "requires_approval";
 
+/**
+ * An offer sent without a request — the organisation's inbox item
+ * (FLOW-CRD-02). It is reviewed on SCR-CRD-04, the same screen a requested
+ * offer uses, under the same checks.
+ *
+ * Only offers from issuers on NDI's list get here: anything else is refused
+ * on arrival and kept on the Activity tab alone (`RefusedOffer`, D1/D14).
+ * Accepting needs a person with credential:accept and never an approver —
+ * every preset carries it AUTO (EW-FLOW6-SD §5.3) — so there is no
+ * waiting-for-approval state.
+ */
 export interface CredentialOffer {
   id: string;
   /** Whose wallet it was offered to. Absent means Pelden Trading's. */
@@ -657,15 +726,24 @@ export interface CredentialOffer {
   type: string;
   issuer: string;
   issuerDid: string;
-  issuerTrusted: boolean;
   /** Read from the offer payload, not from anything a user typed. */
   attributes: CredentialAttribute[];
-  decision: ScopeDecision;
-  /** Populated when the decision is anything but `allowed`. */
-  decisionReason: string | null;
-  state: "pending" | "parked" | "accepted" | "declined" | "expired";
+  state: "pending" | "accepted" | "declined" | "expired" | "failed";
   receivedAt: string;
+  /** offerExpiresAt — 30 days from arrival (EW-FLOW6-SD §4.4). */
   expiresAt: string;
+  /** Who accepted or declined it, and when (Q2). */
+  decidedBy?: PersonId | null;
+  decidedAt?: string | null;
+  /** Why it ended without being added, in words, and the reason code (E9). */
+  failReason?: string | null;
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | null;
+  /**
+   * What re-running C2 at acceptance will find — set only by SCR-CRD-04's
+   * prototype control, standing in for the issuer leaving NDI's list or the
+   * list being out of reach while the offer waited (E9 / FLOW-CRD-01 E19).
+   */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
 }
 
 /**
@@ -751,6 +829,10 @@ export interface PresentationRequest {
   repeatOf?: string | null;
   /** Why it FAILED, in §3.5's words. */
   failure?: string | null;
+  /** FLOW-PRS-01 — who redeemed the session: the sharer A3's notice leaves out. */
+  openedBy?: PersonId | null;
+  /** FLOW-PRS-01 A3 — when the people who may answer were told it was left undecided. Once only. */
+  undecidedToldAt?: string | null;
   receivedAt: string;
   expiresAt: string;
 }
@@ -776,7 +858,17 @@ export interface PresentationSession {
   status: SessionStatus;
   /** Milliseconds, because the windows are minutes (D16). */
   createdAt: number;
+  /** Set by the page once it has loaded in a browser, never by the request
+   *  that serves it — so a link preview neither starts the 30 minutes nor
+   *  uses the link (EW-FLOW7-SD v0.3 §4.2, D16). */
   firstLoadedAt: number | null;
+  /**
+   * When it was redeemed and the organisation it is bound to from then on
+   * (EW-FLOW7-SD v0.3 §4.2, S7). Never returned to the verifier: before
+   * anything is shared it would tell whoever started the session which
+   * organisation opened the link (§8).
+   */
+  redeemedAt: number | null;
   boundOrgId: string | null;
   requestId: string | null;
   /** The person went back to the verifier without a final answer. */
@@ -821,7 +913,8 @@ export interface ParkedOperation {
   relationId: string;
   scopeVersion: number;
   /**
-   * The offer or verification request this is holding back.
+   * The verification request this is holding back. Accepting an offer never
+   * parks: credential:accept is AUTO in every preset (EW-FLOW6-SD §5.3).
    *
    * Without it an approval is a state change and nothing else — the whole
    * point of the queue is that deciding it lets the held operation run, and
@@ -910,7 +1003,7 @@ export interface AuthorityGrant {
   counterparties: string[];
   licenceNumbers: string[];
   valueCapNu: number;
-  /** Always true at first release — the form offers only "per declaration" (pr-8 item 1). */
+  /** Always true at first release — the form offers only "per declaration" (EW-FLOW8-SD D25). */
   perTransaction: true;
   validFrom: string;
   validUntil: string;
@@ -1676,11 +1769,19 @@ export interface AccRequestPart {
   issue: IssueType[];
   legalBasis: string;
   legalBasisRef: string;
+  /**
+   * Names the ACTIVE approval this part replaces — "Ask for more"
+   * (ACC-02/E3, AC-10). The way past E3 for a business, as `replaces` is
+   * for NDI's proposals: that approval keeps working until this one is.
+   */
+  replaces: string | null;
 }
 
 /** What SCR-ACC-06 sends: one capability or both (D22). */
 export interface AccRequestInput {
   parts: AccRequestPart[];
+  /** The business's agreement with NDI, if it has one (FLOW-ACC-02 step 2). Optional, unlike a proposal's. */
+  agreementRef: string;
 }
 
 /**
@@ -1727,6 +1828,17 @@ export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "do
   accEnding(a, new Date().toISOString().slice(0, 10)) === null;
 
 /**
+ * Whether the organisation itself sees a record. Its own request it always
+ * does. Of what NDI proposes, it sees nothing until a second administrator
+ * has approved it — the owner is told only then (FLOW-ACC-01 step 3) — and
+ * never a proposal NDI declined or let lapse, whose reason was written to
+ * the proposer, not to it (E13, E14). A decline the organisation made
+ * itself (E3) is its own, and stays.
+ */
+export const accSeenByOrg = (a: Pick<Accreditation, "state" | "door" | "declinedByOrg">) =>
+  a.state !== "LAPSED" && (a.door === "REQUEST" || !(a.state === "PROPOSED" || (a.state === "DECLINED" && !a.declinedByOrg)));
+
+/**
  * ACC-01/E11 as a face, not a state: an `ACTIVE` approval whose organisation
  * no longer has the listed identity as its primary DID. Gated calls are
  * refused and both parties alerted, but the record stays `ACTIVE` (D24) —
@@ -1761,31 +1873,36 @@ export const REMINDER_WORKING_DAYS = 10;
 /* ------------------------------------------------------------------ */
 
 /**
- * A designation's life (FLOW-ORG-02). The spec keeps one `PENDING` from
- * the second approval until activation; the prototype splits it at the
- * authority's acceptance, because the two halves wait on different people
- * — the authority, then NDI's checks — and every screen that shows a
- * pending designation has to say on whom it is waiting (UN-25).
+ * A designation's life — EW-FLOW5-SD §5.1's eight states, and no others.
+ * Each says on whom it is waiting or how it ended, because every screen that
+ * shows a designation has to (UN-25).
  *
  * - `PROPOSED` — a Kind E proposal waiting for a second administrator (A1).
+ *   Lapses after 30 days (E13), with a reminder to administrators at 10
+ *   working days.
  * - `PENDING` — approved, waiting for the authority's OWNER (A2). 30 days (E6).
- * - `ACCEPTED` — accepted; the activation checks are not yet all passing (E1–E5).
+ * - `ACCEPTED` — accepted; the activation checks are not yet all passing
+ *   (E1–E5). It doesn't lapse: the authority has consented, so an abandoned
+ *   one is withdrawn by NDI, with a reason (A3).
  * - `ACTIVE` — switched on (step 5). Nothing is live until something is adopted.
- * - `REFUSED` — the second administrator refused it.
- * - `DECLINED` — the authority declined; NDI is told.
- * - `EXPIRED` — never accepted (E6). Confers nothing; a new one needs a fresh approval.
  * - `SUSPENDED` — the issuing identity changed after activation (E10), or the
  *   organisation was suspended (E9). Organisations already verified stay verified.
+ * - `DECLINED` — refused by the second administrator (E12, the reason carried
+ *   to the proposer) or declined by the authority (A2). One state for both,
+ *   as the spec has it: who said no is on the record, not in the state.
+ * - `WITHDRAWN` — ended by NDI with a reason (A3). Kept, never deleted.
+ * - `EXPIRED` — lapsed: not approved (`NOT_APPROVED`, E13) or not accepted
+ *   (`NOT_ACCEPTED`, E6). Confers nothing; a new one needs a fresh approval.
  */
 export type DesignationState =
   | "PROPOSED"
   | "PENDING"
   | "ACCEPTED"
   | "ACTIVE"
-  | "REFUSED"
+  | "SUSPENDED"
   | "DECLINED"
-  | "EXPIRED"
-  | "SUSPENDED";
+  | "WITHDRAWN"
+  | "EXPIRED";
 
 /** One activation check (FLOW-ORG-02 P2–P6), as SCR-DSG-04 lists it. */
 export interface ActivationCheck {
@@ -1818,24 +1935,94 @@ export interface Designation {
   /** The OWNER who accepted for the authority. */
   acceptedBy: PersonId | null;
   acceptedAt: string | null;
-  /** The second administrator's reason for refusing. */
-  refusedReason: string | null;
-  /** The running 30-day acceptance window (SC 2.2.1 — shown wherever it appears). */
+  /**
+   * Who said no, and why — the second administrator (E12, reason required
+   * and carried to the proposer verbatim) or the authority's OWNER (A2).
+   * Which of the two it was is read from `approvedBy`: a refusal comes
+   * before any approval.
+   */
+  declinedBy: PersonId | null;
+  declinedReason: string | null;
+  /** A3 — NDI ended it before activation, with a reason. The row is kept. */
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
+  withdrawnReason: string | null;
+  /**
+   * The state it was withdrawn from. The authority is told only if the
+   * proposal had reached it (PENDING or ACCEPTED) — before the second
+   * approval nothing was ever sent (A1).
+   */
+  withdrawnFrom: DesignationState | null;
+  /** E13 or E6 — which window ran out. */
+  expiredReason: "NOT_APPROVED" | "NOT_ACCEPTED" | null;
+  /**
+   * The running 30-day window — approval while PROPOSED (E13), acceptance
+   * while PENDING (E6). One field because only one window is ever open, and
+   * SC 2.2.1 wants the days left shown wherever either is.
+   */
   expiresAt: string | null;
+  /**
+   * SCR-DSG-02's "request more information" (A1). Changes nothing — the
+   * state stays PROPOSED and the window keeps running — so it is a note on
+   * the record, not a state.
+   */
+  infoRequests: { by: PersonId; at: string; note: string }[];
   activatedAt: string | null;
+  /**
+   * The primary DID observed at activation (step 5, Q1) — the DID itself,
+   * not only its method, so a switch to a different did:ethr is caught too
+   * (E10, AC-08a). Compared with the organisation's primary DID whenever
+   * that changes.
+   */
+  publishingDid: string | null;
   didMethodAtActivation: string | null;
+  /** Why it is SUSPENDED: the issuing identity changed (E10) or the organisation was (E9). */
+  suspendedReason: "IDENTITY_CHANGED" | "ORGANISATION" | null;
   /** The last run of the activation checks, if any. */
   checks: ActivationCheck[] | null;
   checkedAt: string | null;
   /**
-   * NDI's service account in the authority's organisation (step 4,
-   * EW-FLOW5-SD/D13). The authority removes it itself, without asking —
-   * FLOW-ORG-03 A3 from its side, FLOW-ORG-02 E8 from NDI's: the mechanism
-   * working, never an outage.
+   * The OWNER's grant of `VERIFIER` to NDI's service principal — the
+   * invitation issued in the officer's own session (FLOW-ORG-02 step 2 for
+   * Kind N, A2 for Kind E; A4 again on restore). P2 needs it: without it
+   * activation is E1, and nothing is added (AC-11). The service never
+   * grants itself anything (S5); it only accepts what this records.
    */
-  ndiAccess: "ACTIVE" | "REMOVED";
+  ndiGrant: { by: PersonId; at: string } | null;
+  /**
+   * NDI's service account as a member of the authority's organisation —
+   * `null` until step 4 accepts the grant. The authority removes it itself,
+   * without asking, from its members list or the console (FLOW-ORG-02 E8,
+   * FLOW-ORG-03 A3 — one control, EW-FLOW5-SD §4.4), and turns it back on by
+   * granting again (A4).
+   */
+  ndiAccess: "ACTIVE" | "REMOVED" | null;
   ndiAccessChangedBy: PersonId | null;
   ndiAccessChangedAt: string | null;
+}
+
+/** The named platform account that acts in an authority's name (EW-FLOW5-SD/D13). */
+export const NDI_SERVICE_PRINCIPAL = "NDI service account";
+
+/**
+ * The authorisation — EW-FLOW5-SD §4.4: the record of what NDI's service
+ * account was agreed to do, per entity type. Written with each adoption
+ * (FLOW-ORG-03 step 5), withdrawn with the membership when NDI's access is
+ * paused, and never reactivated: restoring writes a new row (A4), so the
+ * record of when NDI could and couldn't act stays readable.
+ */
+export interface Authorisation {
+  id: string;
+  designationId: string;
+  orgId: string;
+  entityType: OrgKind;
+  principal: string;
+  permittedPurpose: string;
+  grantedBy: PersonId;
+  grantedAt: string;
+  state: "ACTIVE" | "WITHDRAWN";
+  withdrawnBy: PersonId | null;
+  withdrawnAt: string | null;
 }
 
 /** What a person is asked, item by item, with why it is needed (SCR-ADO-01). */
@@ -1858,8 +2045,9 @@ export interface ArtefactDraft {
   purpose: string;
   /**
    * An item the draft asks for that the register query doesn't need — the
-   * case SCR-ADO-01's objection route exists for (FLOW-ORG-03 P5, E4). An
-   * objection takes it out of the draft; nothing is overridden.
+   * case SCR-ADO-01's objection route exists for (FLOW-ORG-03 P5, A5). An
+   * objection holds adoption until NDI revises the draft without it, or the
+   * officer withdraws the objection; nothing is overridden.
    */
   overBroad: string | null;
 }
@@ -1880,27 +2068,59 @@ export interface Adoption {
   stoppedAt: string | null;
 }
 
-/** An objection raised on SCR-ADO-01, sent back to NDI with the officer's note. */
+/**
+ * The officer's objection to NDI's draft (FLOW-ORG-03 A5), against one
+ * entity type or — `entityType: null` — the whole draft, every entity type
+ * in it. Kept with how it closed, permanently (§7.1).
+ */
 export interface ArtefactObjection {
+  id: string;
   designationId: string;
-  entityType: OrgKind;
+  entityType: OrgKind | null;
+  /** The item it names, when it names one — the over-broad one SCR-ADO-01 flags. */
   item: string | null;
   note: string;
   by: PersonId;
   at: string;
-  /** When the authority and NDI agreed a change. An objection naming an item is resolved by taking it out. */
-  resolvedAt?: string | null;
+  /**
+   * It closes one of two ways only: NDI revises the draft (a new draft to
+   * review), or the officer withdraws it. NDI can't close it alone and the
+   * officer can't override it, so there is no third value.
+   */
+  closedAt: string | null;
+  closedHow: "REVISED" | "WITHDRAWN" | null;
 }
 
 /**
- * Whether an objection is still holding adoption (FLOW-ORG-03 E4, "resolved
- * by agreement, not by override"). One that names an over-broad item is
- * resolved by taking the item out of what is adopted. One with no item — the
- * officer objects to the draft as a whole — holds adoption until the
- * authority and NDI agree, rather than adopting the full set while the
- * banner says it was sent back.
+ * NDI's revised draft for one entity type, in answer to an objection. A new
+ * draft rather than an edit to the old one, so what the officer objected to
+ * stays on record beside what replaced it.
  */
-export const objectionHolds = (o: ArtefactObjection | undefined) => Boolean(o && !o.item && !o.resolvedAt);
+export interface DraftRevision {
+  designationId: string;
+  entityType: OrgKind;
+  revision: number;
+  at: string;
+  asked: AskedItem[];
+  objectionId: string;
+}
+
+/**
+ * The objection holding adoption of an entity type, if any (A5): an open
+ * one against that type, or against the whole draft. Every open objection
+ * holds — the one the officer names an item in as much as a general one —
+ * until NDI revises the draft or the officer withdraws it.
+ */
+export const openObjectionFor = (objections: ArtefactObjection[], designationId: string | undefined, kind: OrgKind) =>
+  objections.find((o) => o.designationId === designationId && !o.closedAt && (o.entityType === null || o.entityType === kind));
+
+/** What the current draft asks for an entity type — NDI's latest revision, or its first draft. */
+export function draftAsked(revisions: DraftRevision[], designationId: string | undefined, kind: OrgKind): AskedItem[] {
+  const latest = revisions
+    .filter((r) => r.designationId === designationId && r.entityType === kind)
+    .sort((a, b) => b.revision - a.revision)[0];
+  return latest ? latest.asked : draftFor(kind).asked;
+}
 
 /**
  * NDI's drafts for each entity type. The sole proprietorship draft also
@@ -1950,16 +2170,29 @@ export const draftFor = (kind: OrgKind) => ARTEFACT_DRAFTS.find((d) => d.entityT
 /** The marketplace entitlements a foundational issuer needs (FLOW-ORG-02 P5). */
 export const ISSUER_ENTITLEMENTS = ["schemaCreate", "issuance", "verification"];
 
-/** Whether a designation still stands in the way of another for the same organisation. */
 /**
- * Whether a designation waiting on the authority has run out of its 30 days
- * (FLOW-ORG-02 E6). Read from the date, like an accreditation's window, so
- * the admin list, the console and "Propose again" agree without anyone first
- * having to press Accept to discover it.
+ * Whether a designation has run out of its open 30-day window — approval
+ * while PROPOSED (E13), acceptance while PENDING (E6). Read from the date,
+ * like an accreditation's window, so the admin list, the console and
+ * "Propose again" agree without anyone first having to press a button to
+ * discover it. ACCEPTED never lapses (EW-FLOW5-SD §5.1).
  */
 export const dsgExpired = (d: Pick<Designation, "state" | "expiresAt">, today: string) =>
-  d.state === "PENDING" && Boolean(d.expiresAt && d.expiresAt < today);
+  (d.state === "PROPOSED" || d.state === "PENDING") && Boolean(d.expiresAt && d.expiresAt < today);
 
+/**
+ * Whether the 10-working-day reminder to NDI administrators has gone for a
+ * proposal still waiting for approval (E13) or a designation still waiting
+ * for the authority (§5.1 — "after 10 working days of either").
+ */
+export const dsgReminderSent = (d: Pick<Designation, "state" | "proposedAt" | "approvedAt">) =>
+  d.state === "PROPOSED"
+    ? workingDaysSince(d.proposedAt) >= REMINDER_WORKING_DAYS
+    : d.state === "PENDING"
+      ? workingDaysSince(d.approvedAt) >= REMINDER_WORKING_DAYS
+      : false;
+
+/** Whether a designation still stands in the way of another for the same organisation. */
 export const designationInProgress = (d: Pick<Designation, "state" | "expiresAt">) =>
   ["PROPOSED", "PENDING", "ACCEPTED", "ACTIVE", "SUSPENDED"].includes(d.state) && !dsgExpired(d, new Date().toISOString().slice(0, 10));
 
@@ -2055,10 +2288,22 @@ export interface CredentialRequest {
   offer: { attributes: CredentialAttribute[]; validUntil: string | null; offeredAt: string; expiresAt: string } | null;
   answeredBy: PersonId | null;
   answeredAt: string | null;
-  /** Why a request failed, in words (E6, E11, E14, E18). */
+  /**
+   * Kind A: answered by the issuer's own system, through the API — recorded
+   * as its client, not as a person (FLOW-CRD-03 Q1, Q4; EW-FLOW6-SD §4.3,
+   * `answeredBy` is `SYSTEM` or the officer). `answeredBy` stays the
+   * officer's id, the one attribution every other screen reads, and is null
+   * when the system answered.
+   */
+  answeredBySystem?: { clientId: string; name: string } | null;
+  /** Kind A: where the request stands with the issuer's system. Absent on a request that was the officers' from the start. */
+  system?: SystemRoute | null;
+  /** Why a request failed, in words (E6, E11, E14, E16, E18, E19). */
   failReason: string | null;
-  /** The held credential this one replaces, when it does. */
-  replaces: string | null;
+  /** The reason code behind a FAILED or platform-WITHDRAWN request (E14, E16, E19). */
+  failCode?: "ISSUER_NOT_TRUSTED" | "ISSUANCE" | "REQUESTER_ENDED" | null;
+  /** As `CredentialOffer.simulatedRecheck` — what C2 finds when re-run at acceptance (E19). */
+  simulatedRecheck?: "delisted" | "unreachable" | null;
 }
 
 /** An offer refused automatically — only ever on the Activity tab (UXD-36). */
@@ -2073,6 +2318,44 @@ export interface RefusedOffer {
   at: string;
 }
 
+/**
+ * Kind A — where a request stands with the issuer's own system, once it has
+ * reached the issuer (FLOW-CRD-03 step 5).
+ *
+ * - `WAITING` — delivered; the system answers after a short delay.
+ * - `REFERRED` — A2: the system couldn't decide, and says why. Referring is
+ *   not an answer: the system may still offer afterwards, and the first
+ *   answer wins.
+ * - `MISSED` — E6: delivery to the system failed, so nothing picked it up.
+ *   It joins the officers' queue only while fallback is on; with it off, it
+ *   waits for the system until `answerBy`.
+ * - `UNCONNECTED` — the offering is answered by the system but the issuer
+ *   hadn't set it up when the request arrived (no URL, or no client to
+ *   answer with — P3), so it went straight to the queue, as SCR-CRD-10's
+ *   empty state says it does.
+ */
+export interface SystemRoute {
+  state: "WAITING" | "REFERRED" | "MISSED" | "UNCONNECTED";
+  /** What the simulated system does when its delay ends. */
+  plan: "answer" | "refer" | "miss";
+  /** A2's note — the system's own words, shown to the officers and never to the business. */
+  note: string | null;
+}
+
+/** A2's note is the issuer system's own words; this one is an example. */
+export const SAMPLE_REFERRAL_NOTE = "two records in the register match this registration number";
+
+/**
+ * Whether a request is on the officers' queue (SCR-CRD-08). A queue
+ * offering's always is; a request for an offering the system answers is only
+ * when the system referred it (A2), the issuer hadn't set the system up, or
+ * the system missed it and fallback is on (E6). Read from the request and the
+ * fallback setting, so turning fallback on moves a request already missed.
+ */
+export const inOfficerQueue = (r: Pick<CredentialRequest, "state" | "system">, queueFallback: boolean) =>
+  r.state === "WITH_ISSUER" &&
+  (!r.system || r.system.state === "REFERRED" || r.system.state === "UNCONNECTED" || (r.system.state === "MISSED" && queueFallback));
+
 /** The issuer's integration (SCR-CRD-10) — read by its IT lead, the one technical screen. */
 export interface IssuerIntegration {
   orgId: string;
@@ -2080,10 +2363,23 @@ export interface IssuerIntegration {
   secretRotatedAt: string | null;
   clients: { id: string; name: string; createdAt: string }[];
   queueFallback: boolean;
+  /**
+   * Prototype — what the simulated system does with the next request that
+   * reaches it, set by the dashed stand-in on SCR-CRD-10 and put back to
+   * `answer` once used. No system exists to decide this for itself.
+   */
+  nextAnswer: "answer" | "refer" | "miss";
   failingSince: string | null;
   lastError: string | null;
   log: { id: string; event: string; attempt: number; status: number; latencyMs: number; at: string }[];
 }
+
+/**
+ * Whether the issuer's system can answer: a URL to deliver to and a client
+ * to answer with (FLOW-CRD-03 P3). Either missing, and requests go to the
+ * officers' queue, as SCR-CRD-10 says before anything is set up.
+ */
+export const systemConnected = (i: Pick<IssuerIntegration, "webhookUrl" | "clients">) => Boolean(i.webhookUrl) && i.clients.length > 0;
 
 /**
  * What a request becomes when a date it was waiting on passes, or null. The
@@ -2128,6 +2424,16 @@ const REGISTRATION_ATTRIBUTES = [
  * the next credential in a company's chain (UX-EW-01 UXD-14) and what the
  * first day's dashboard leads with; the bonded-warehouse authorisation
  * needs the TPN first, which is E4's case in the catalogue.
+ *
+ * HOW EACH IS ANSWERED
+ *
+ * The TPN stays with the officers' queue. Whether the Department answers
+ * its taxpayer numbers through the API is still open with GovTech (REQ-EW-01
+ * item 23), and the prototype shows both paths without deciding it. The
+ * bonded-warehouse authorisation is the one the system answers — which
+ * only happens once the office has set its integration up on SCR-CRD-10;
+ * until then it lands on the queue like the other. It also comes second in
+ * the story, so the system's path can be walked after the queue's.
  */
 export const SEED_OFFERINGS: CredentialOffering[] = [
   {
@@ -2168,7 +2474,7 @@ export const SEED_OFFERINGS: CredentialOffering[] = [
       attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
       uses: ["Registered name", "Taxpayer number"],
     },
-    answering: "queue",
+    answering: "api",
     answerWindowDays: 15,
     renewable: true,
     status: "ACTIVE",
@@ -2187,6 +2493,7 @@ export const SEED_INTEGRATION: IssuerIntegration = {
   secretRotatedAt: null,
   clients: [],
   queueFallback: true,
+  nextAnswer: "answer",
   failingSince: null,
   lastError: null,
   log: [],
@@ -2290,7 +2597,7 @@ export interface DemoState {
   designations: Designation[];
   /** Flow 5 — what each authority has adopted, per entity type, every version kept. */
   adoptions: Adoption[];
-  /** Flow 5 — what an officer sent back on SCR-ADO-01. */
+  /** Flow 5 — what an officer objected to on SCR-ADO-01, with how each closed (A5). */
   artefactObjections: ArtefactObjection[];
   /** Flow 6 — what issuers offer on request. */
   offerings: CredentialOffering[];
@@ -2300,6 +2607,10 @@ export interface DemoState {
   refusedOffers: RefusedOffer[];
   /** Flow 6 — the issuer's delivery set-up (Kind A). */
   integration: IssuerIntegration;
+  /** Flow 5 — NDI's revised drafts, each answering an objection. */
+  draftRevisions: DraftRevision[];
+  /** Flow 5 — what NDI's service account was agreed to do, per entity type (EW-FLOW5-SD §4.4). */
+  authorisations: Authorisation[];
   /**
    * True from the moment onboarding completes until the story jumps past
    * act 1: the console is showing Pelden on its first day (`firstRunState`),
@@ -2673,6 +2984,7 @@ export const SEED: DemoState = {
          needs. Not driven in the demo: its office is only ever seen through
          what it confirms. */
       id: "org-cra",
+      statutory: true,
       name: "Corporate Regulatory Authority",
       legalName: "Corporate Regulatory Authority",
       description: "Statutory authority · Registrar of Companies.",
@@ -2697,6 +3009,7 @@ export const SEED: DemoState = {
          one entitlement: schema creation, which it has never needed. That
          is the E4 the activation checks catch, and NDI resolves. */
       id: "org-moice",
+      statutory: true,
       name: "Ministry of Industry, Commerce & Employment",
       legalName: "Ministry of Industry, Commerce & Employment",
       description: "Licenses sole proprietorships and partnerships. Verifies trade licences on NDI.",
@@ -3359,8 +3672,9 @@ export const SEED: DemoState = {
 
   offers: [
     {
-      /* Act 3's offer. In scope and automatic — accepting it is the whole
-         interaction, and the type is read from this payload, not typed.
+      /* Act 3's offer, sent without a request (FLOW-CRD-02) and reviewed on
+         SCR-CRD-04 like any other. Accepting it is the whole interaction,
+         and the type is read from this payload, not typed.
 
          A trade licence, because that is what a trading company is offered
          after incorporation (Story A2 in the user stories: MoICE issues the
@@ -3371,18 +3685,15 @@ export const SEED: DemoState = {
       type: "Business Licence",
       issuer: "Ministry of Industry, Commerce & Employment",
       issuerDid: "did:polygon:0xafb50adefe9b359e15a79eada5d0bbb2675f33d3",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "licence_number", value: "BL-THI-2026-10442" },
         { name: "licensed_activity", value: "General trading — import and wholesale" },
         { name: "valid_until", value: day(358) },
       ],
-      decision: "allowed",
-      decisionReason: null,
       state: "pending",
       receivedAt: day(-7),
-      expiresAt: day(7),
+      expiresAt: day(23),
     },
     {
       /* An ordinary offer. It used to be the denied example, refused because
@@ -3390,51 +3701,50 @@ export const SEED: DemoState = {
          §4.2 gives credential:accept no type filter in any preset, so no
          offer can be out of scope by its type. The one refusal SCR-CRD-04
          has is about the person — a role without credential:accept — and
-         that face is in B4's state switcher, on any offer. */
+         that face is in SCR-CRD-04's state switcher, on any offer. */
       id: "offer-insurance",
       type: "Fleet Insurance Certificate",
       issuer: "Royal Insurance Corporation of Bhutan",
       issuerDid: "did:polygon:0x4fc2bf84747e22ab86675163f6b59fc8ab469cb4",
-      issuerTrusted: true,
       attributes: [
         { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
         { name: "policy_number", value: "RICB-MV-2026-77412" },
         { name: "sum_insured", value: "BTN 4,200,000" },
       ],
-      decision: "allowed",
-      decisionReason: null,
       state: "pending",
       receivedAt: day(-4),
-      expiresAt: day(10),
+      expiresAt: day(26),
     },
     {
-      id: "offer-warehouse",
-      type: "Bonded Warehouse Authorisation",
-      issuer: "Department of Revenue & Customs",
-      issuerDid: "did:polygon:0x08b3ba5dcbac0b871587004b93f298dcc81726c3",
-      issuerTrusted: true,
+      /* A reissue of something Pelden already holds — the same type from the
+         same issuer DID as hc-bank — so SCR-CRD-04 says what it replaces,
+         and accepting it marks the earlier one superseded (EW-FLOW6-SD §4.5,
+         Journey L). It replaces what used to be an unasked Bonded Warehouse
+         Authorisation, which needed an approver to accept and a TPN Pelden
+         doesn't hold — neither of which the spec allows. */
+      id: "offer-bank",
+      type: "Business Current Account",
+      issuer: "Bank of Bhutan",
+      issuerDid: "did:polygon:0xa2a4e362eb3f8494b23536454137d49265f1725c",
       attributes: [
-        { name: "registered_name", value: "Pelden Trading Pvt. Ltd." },
-        { name: "facility_code", value: "BW-PHU-0043" },
-        { name: "bonded_capacity", value: "1,800 m³" },
+        { name: "account_holder", value: "Pelden Trading Pvt. Ltd." },
+        { name: "account_number", value: "•••• •••• 4417" },
+        { name: "branch", value: "Phuentsholing branch" },
+        { name: "opened_on", value: day(-104) },
       ],
-      decision: "requires_approval",
-      decisionReason: "Accepting an authorisation of this kind needs one approver.",
-      state: "parked",
+      state: "pending",
       receivedAt: day(-3),
-      expiresAt: day(11),
+      expiresAt: day(27),
     },
     {
+      /* Nobody reviewed it within 30 days (FLOW-CRD-02 E4). */
       id: "offer-lapsed",
       type: "Warehouse Safety Certificate",
       issuer: "Department of Labour",
       issuerDid: "did:polygon:0x37c307beb791b306b109010ad5d97de062f28f02",
-      issuerTrusted: true,
       attributes: [{ name: "registered_name", value: "Pelden Trading Pvt. Ltd." }],
-      decision: "allowed",
-      decisionReason: null,
       state: "expired",
-      receivedAt: day(-36),
+      receivedAt: day(-52),
       expiresAt: day(-22),
     },
   ],
@@ -3632,24 +3942,6 @@ export const SEED: DemoState = {
       expiresAt: day(2),
     },
     {
-      id: "park-accept-warehouse",
-      operation: "credential:accept",
-      summary: "Accept Bonded Warehouse Authorisation from Department of Revenue & Customs",
-      requestedBy: "rinzin",
-      relationId: "rel-rinzin",
-      scopeVersion: 3,
-      targetId: "offer-warehouse",
-      targetRelyingParty: null,
-      payloadHash: "sha256:38f5b2ce7a41d09628e5c3ba147f60d92b8074ae5c13f6d8",
-      policy: "SINGLE_APPROVER",
-      requiredSignatures: 1,
-      signatures: [],
-      state: "parked",
-      decisionReason: null,
-      createdAt: day(-3),
-      expiresAt: day(4),
-    },
-    {
       /* Flow 8, Journey T: Rinzin gave an employee authority to act, and
          her *Give authority to act* is SINGLE_APPROVER, so it waits for one
          other person (EW-FLOW8-SD §8.2). One approver, never Rinzin — the
@@ -3695,24 +3987,6 @@ export const SEED: DemoState = {
       invalidatedReason: "Karma Wangmo can no longer share this, so it hasn't been sent.",
       createdAt: day(-9),
       expiresAt: day(-2),
-    },
-    {
-      id: "park-expired",
-      operation: "credential:accept",
-      summary: "Accept Warehouse Safety Certificate from Department of Labour",
-      requestedBy: "rinzin",
-      relationId: "rel-rinzin",
-      scopeVersion: 3,
-      targetId: "offer-lapsed",
-      targetRelyingParty: null,
-      payloadHash: "sha256:4a8e13d705b9c2f6481ade37f0b5924c6d81073be5a2fc94",
-      policy: "SINGLE_APPROVER",
-      requiredSignatures: 1,
-      signatures: [],
-      state: "expired",
-      decisionReason: "Nobody decided this before it expired.",
-      createdAt: day(-35),
-      expiresAt: day(-28),
     },
     {
       id: "park-approved-bob-loan",
@@ -4226,12 +4500,22 @@ export const SEED: DemoState = {
       approvedAt: null,
       acceptedBy: null,
       acceptedAt: day(-125),
-      refusedReason: null,
+      declinedBy: null,
+      declinedReason: null,
+      withdrawnBy: null,
+      withdrawnAt: null,
+      withdrawnReason: null,
+      withdrawnFrom: null,
+      expiredReason: null,
       expiresAt: null,
+      infoRequests: [],
       activatedAt: day(-124),
+      publishingDid: "did:ethr:bt:0x5a2f7c19e0b4d8a63c11f0e97b2d4a6c8e3f1b07",
       didMethodAtActivation: "did:ethr",
+      suspendedReason: null,
       checks: null,
       checkedAt: null,
+      ndiGrant: { by: "registrar", at: day(-125) },
       ndiAccess: "ACTIVE",
       ndiAccessChangedBy: null,
       ndiAccessChangedAt: null,
@@ -4254,6 +4538,23 @@ export const SEED: DemoState = {
     },
   ],
   artefactObjections: [],
+  draftRevisions: [],
+  /* The authority's own grant, written when it adopted for companies. */
+  authorisations: [
+    {
+      id: "auth-cra-company-1",
+      designationId: "dsg-cra",
+      orgId: "org-cra",
+      entityType: "company",
+      principal: NDI_SERVICE_PRINCIPAL,
+      permittedPurpose: "Confirming a company's representative, for entity onboarding",
+      grantedBy: "registrar",
+      grantedAt: day(-120),
+      state: "ACTIVE",
+      withdrawnBy: null,
+      withdrawnAt: null,
+    },
+  ],
 
   offerings: SEED_OFFERINGS,
   credentialRequests: [],

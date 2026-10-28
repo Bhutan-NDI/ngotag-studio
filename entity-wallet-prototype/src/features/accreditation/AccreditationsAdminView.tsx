@@ -43,19 +43,23 @@ import { accPill, capVerb, daysUntil } from "./shared";
  * and "approved two years ago" side by side and made the first easy to miss.
  *
  * Proposing from scratch — Kind N or E — is the page action, not a list.
+ *
+ * Every reminder is at 10 working days (D20), proposals included: an NDI
+ * proposal is still counting down to its lapse, and NDI is reminded on the
+ * way (FLOW-ACC-01/E14), so its row says so beside the days left. A
+ * request is overdue on the same count (ACC-02/E8).
  */
-const OVERDUE_DAYS = 14;
 
 export function AccreditationsAdminView() {
   const router = useRouter();
-  const { accreditations, organizations, personById, hydrated } = useDemo();
+  const { accreditations, organizations, personById, harness, hydrated } = useDemo();
   const forced = useScreenState("SCR-ACC-ADMIN", ["live", "loading", "empty", "offline"]);
 
   const empty = forced === "empty";
   const now = new Date().toISOString().slice(0, 10);
   const lapsed = (a: Accreditation) => a.state === "PROPOSED" && a.door !== "REQUEST" && Boolean(a.expiresAt && a.expiresAt < now);
-  const since = (date: string | null) =>
-    `since ${date ? formatDate(date) : "—"}${workingDaysSince(date) >= REMINDER_WORKING_DAYS ? " · reminded" : ""}`;
+  const reminded = (date: string | null) => workingDaysSince(date) >= REMINDER_WORKING_DAYS;
+  const since = (date: string | null) => `since ${date ? formatDate(date) : "—"}${reminded(date) ? " · reminded" : ""}`;
   const toApprove = empty ? [] : accreditations.filter((a) => a.state === "PROPOSED");
   const toReview = empty ? [] : accreditations.filter((a) => a.state === "SUBMITTED" || a.state === "IN_REVIEW");
   /* The recognition list: what the gate observed, less anyone already on
@@ -133,12 +137,21 @@ export function AccreditationsAdminView() {
                 {toApprove.map((a, i) =>
                   row(
                     a,
-                    `/admin/accreditations/${a.id}`,
+                    /* The reviewer's own recommended decline opens where it
+                       can be withdrawn (SCR-ACC-05, ACC-02/E11). */
+                    a.door === "REQUEST" && a.recommendation && !a.recommendation.approve && a.recommendation.by === harness.persona
+                      ? `/admin/accreditations/${a.id}/review`
+                      : `/admin/accreditations/${a.id}`,
                     lapsed(a)
                       ? "This proposal lapsed without a decision."
                       : a.door === "REQUEST"
-                        ? `Reviewed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · waiting ${since(a.proposedAt)}`
-                        : `Proposed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · ${daysUntil(a.expiresAt)} days left`,
+                        ? a.recommendation?.approve && reminded(a.proposedAt)
+                          ? /* ACC-02/E12, in §3.5's words. */
+                            `A recommendation to approve has waited since ${a.proposedAt ? formatDate(a.proposedAt) : "—"}.`
+                          : `Reviewed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · waiting since ${a.proposedAt ? formatDate(a.proposedAt) : "—"}`
+                        : `Proposed by ${a.proposedBy ? personById(a.proposedBy).name : "—"} · ${daysUntil(a.expiresAt)} days left${
+                            reminded(a.proposedAt) ? " · reminded" : ""
+                          }`,
                     i,
                   ),
                 )}
@@ -156,19 +169,18 @@ export function AccreditationsAdminView() {
               <EmptyState icon="fileText" title="No requests are waiting for review." message="When a verified business asks to verify or issue, its request comes here first." />
             ) : (
               <ul className="relative z-[4] m-0 list-none p-0">
-                {toReview.map((a, i) => {
-                  const waited = a.requestedAt ? Math.floor((Date.now() - new Date(a.requestedAt).getTime()) / 86_400_000) : 0;
-                  return row(
+                {toReview.map((a, i) =>
+                  row(
                     a,
                     `/admin/accreditations/${a.id}/review`,
                     <>
                       Asked by {a.requestedBy ? personById(a.requestedBy).name : "—"} · waiting since{" "}
                       {a.requestedAt ? formatDate(a.requestedAt) : "—"}
-                      {waited > OVERDUE_DAYS ? " · overdue" : ""}
+                      {reminded(a.requestedAt) ? " · overdue" : ""}
                     </>,
                     i,
-                  );
-                })}
+                  ),
+                )}
               </ul>
             )}
           </Panel>

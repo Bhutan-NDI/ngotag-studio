@@ -280,7 +280,9 @@ export function GrantView({ grantId }: { grantId: string }) {
               <Fact label="Given by">
                 {person(g.grantedBy)}, {formatDate(g.submittedAt)}
               </Fact>
-              <Fact label="Approved by">{g.approvedBy ? person(g.approvedBy) : g.status === "AWAITING_APPROVAL" ? "Not yet" : "Not needed"}</Fact>
+              <Fact label="Approved by">
+                {g.approvedBy ? person(g.approvedBy) : !g.approvalId ? "Not needed" : g.status === "AWAITING_APPROVAL" ? "Not yet" : "Not approved"}
+              </Fact>
               <Fact label="Name">{g.delegateName ? `${g.delegateName}, confirmed by Bhutan NDI` : `${g.name} — not yet collected`}</Fact>
             </div>
           </div>

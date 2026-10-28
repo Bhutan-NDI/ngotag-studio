@@ -24,7 +24,7 @@ import { namesOf, statusOf, type DescriptorMatch } from "@/lib/sharing";
 /** An attribute's label, with the acronyms people know kept as acronyms. */
 export const attrLabel = (name: string) => (name === "tpn" ? "TPN" : baseLabel(name));
 
-/** Whole sentences per state — SCR-PRS-05's content table, and RECEIVED as chosen (pr-7 item 1). */
+/** Whole sentences per state — SCR-PRS-05's content table (UX-EW-04 v0.3). */
 export function stateWords(
   r: PresentationRequest,
   names: { person: (id: string | null | undefined) => string; approvers: string[] },
@@ -32,10 +32,9 @@ export function stateWords(
   const st: PresentationStatus = statusOf(r);
   switch (st) {
     case "RECEIVED":
-      /* Not in SCR-PRS-05's table, which starts at OPEN, while FLOW-PRS-01
-         E8 tells the person the request is "under Sharing". The prototype
-         lists it on Waiting with no Answer, in these words — nobody can act
-         on it until NDI's list confirms the sender (FLOW-PRS-02 E2). */
+      /* Listed on Waiting with no Answer, and only when it came through a
+         website session (FLOW-PRS-01 E8) — `onWaiting` decides that. Nobody
+         can act on it until NDI's list confirms the sender. */
       return { status: "received", label: "Checking", sentence: `Checking ${r.verifierName} — you can't answer this yet` };
     case "OPEN":
       return { status: "open", label: "Waiting", sentence: `${r.verifierName} is asking — answer by ${formatDate(r.expiresAt)}` };

@@ -13,7 +13,6 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
-import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { inOrg, type CredentialRequest } from "@/lib/demoData";
@@ -37,9 +36,9 @@ import { requestWords, useHolder, useSimulatedDelivery } from "./shared";
  *
  * What needs a person here — an offer to review, a wider ask to answer —
  * comes first, with when it lapses. It also takes offers that arrived
- * without a request (FLOW-CRD-02), which until this flow had a page of
- * their own; they're the same thing to the person: something waiting to be
- * accepted or declined.
+ * without a request (FLOW-CRD-02); they're the same thing to the person —
+ * something waiting to be accepted or declined — and Review opens them on
+ * the same SCR-CRD-04 a requested offer uses.
  *
  * Withdrawing is offered until the issuer has replied (A2), and says what
  * it does before it does it.
@@ -48,19 +47,19 @@ type Face = "live" | "default" | "empty" | "loading" | "error" | "offline" | "no
 
 export function RequestsView() {
   const router = useRouter();
-  const { credentialRequests, offers, offerings, personById, withdrawCredentialRequest, simulateAskForMore, hydrated, presentationRequests } = useDemo();
+  const { credentialRequests, offers, offerings, personById, withdrawCredentialRequest, hydrated, presentationRequests } = useDemo();
   const holder = useHolder();
   const forced = useScreenState("SCR-CRD-03", ["live", "default", "empty", "loading", "error", "offline", "no_permission"]) as Face;
   const [withdrawing, setWithdrawing] = useState<CredentialRequest | null>(null);
 
   const requests = credentialRequests.filter(inOrg(holder.orgId));
   useSimulatedDelivery(requests);
-  const legacy = offers.filter(inOrg(holder.orgId)).filter((o) => o.state === "pending" || o.state === "parked");
+  const unasked = offers.filter(inOrg(holder.orgId)).filter((o) => o.state === "pending");
   const waiting = requests.filter((r) => r.state === "OFFER_READY" || r.state === "NEEDS_CONSENT");
   const sharingWaiting = presentationRequests.filter(inOrg(holder.orgId)).filter((r) => r.status === "OPEN" || r.status === "AWAITING_APPROVAL").length;
 
   const canAct = holder.can("credential:receive") || holder.can("credential:accept");
-  const natural: Face = !requests.length && !legacy.length ? "empty" : !canAct ? "no_permission" : "default";
+  const natural: Face = !requests.length && !unasked.length ? "empty" : !canAct ? "no_permission" : "default";
   const face: Face = forced === "live" ? natural : forced;
   const readOnly = face === "no_permission" || face === "offline";
   const windowFor = (r: CredentialRequest) => offerings.find((o) => o.id === r.offeringId)?.answerWindowDays ?? 5;
@@ -110,11 +109,6 @@ export function RequestsView() {
     );
   }
 
-  /* The prototype's one way to reach A1 — an issuer whose proof request
-     asks for more than the consent covered. Offered on the first request
-     still with the issuer, and drawn as a stand-in. */
-  const askable = requests.find((r) => r.state === "WITH_ISSUER" && !r.askedMore);
-
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -147,7 +141,7 @@ export function RequestsView() {
           <h2 id="crd-waiting" className="m-0 font-display text-[15px] font-semibold text-strong">
             Waiting for you
           </h2>
-          {waiting.length || legacy.length ? (
+          {waiting.length || unasked.length ? (
             <ul className="m-0 flex list-none flex-col gap-3 p-0">
               {waiting.map((r) => {
                 const words = requestWords(r, windowFor(r));
@@ -171,7 +165,7 @@ export function RequestsView() {
                   </li>
                 );
               })}
-              {legacy.map((o) => (
+              {unasked.map((o) => (
                 <li key={o.id}>
                   <Panel>
                     <div className="relative z-[4] flex flex-wrap items-center justify-between gap-3">
@@ -180,7 +174,7 @@ export function RequestsView() {
                         <p className="m-0 text-[13px] text-body">{o.issuer} has sent you this — review it</p>
                         <p className="m-0 text-[12.5px] text-faint">Until {formatDate(o.expiresAt)}</p>
                       </div>
-                      <HairlineButton onClick={() => router.push(`/wallet/offers/${o.id}`)}>Review</HairlineButton>
+                      <GradientButton onClick={() => router.push(`/wallet/requests/${o.id}`)}>Review</GradientButton>
                     </div>
                   </Panel>
                 </li>
@@ -251,16 +245,6 @@ export function RequestsView() {
             </DataTable>
           </Panel>
         </section>
-
-        {askable && !readOnly ? (
-          <SimulatedStep
-            standsFor={`${askable.issuerName}'s system asking for more than the request said`}
-            action={<SimulatedAction onClick={() => simulateAskForMore(askable.id)}>Have it ask for a bank account too</SimulatedAction>}
-          >
-            An issuer&rsquo;s proof request can ask for more than the business agreed to share. When it does, nothing more
-            is sent until someone here answers.
-          </SimulatedStep>
-        ) : null}
 
         <Dialog
           open={Boolean(withdrawing)}

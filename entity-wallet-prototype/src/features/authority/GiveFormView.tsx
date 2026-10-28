@@ -45,10 +45,9 @@ import { Notice } from "./shared";
  *
  * THE LIMIT IS PER DECLARATION
  *
- * The form offers "Nu, per declaration" and nothing else, as UX-EW-05
- * gives it; every grant is written per transaction. Whether a running total
- * can ever be granted is open in the specification (pr-8 item 1), and the
- * simplest reading consistent with the screen is chosen.
+ * The form offers "Nu, per declaration" and nothing else, with no choice
+ * of an in-total limit (EW-FLOW8-SD D25); every grant is written per
+ * transaction. A running total is later.
  *
  * WHO MAY OPEN IT
  *

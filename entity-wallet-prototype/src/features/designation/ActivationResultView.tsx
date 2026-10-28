@@ -6,10 +6,12 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
+import { Dialog } from "@/components/ui/Dialog";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
+import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { isNamedAdmin, roleIn, type ActivationCheck, type Designation } from "@/lib/demoData";
@@ -43,8 +45,15 @@ import { CheckList, SAMPLE_DESIGNATION, kindPlural, kindsInWords } from "./share
  * Switched on means designated, and nothing live: the success copy says so,
  * because "activated" is easily read as "businesses can verify now".
  *
+ * NO PROMISED ROUTE
+ *
+ * E5 names the incumbent and says replacing it isn't supported yet — the
+ * supersession flow doesn't exist, so the screen doesn't promise one. What
+ * an administrator can do instead is withdraw this designation, with a
+ * reason (A3), from here.
+ *
  * Readable by the authority's OWNER too, for the checks they must resolve;
- * only an NDI administrator re-runs.
+ * only an NDI administrator re-runs or withdraws.
  */
 type Face = "live" | "default" | "loading" | "e1" | "e2" | "e3" | "e3_unseeded" | "e4" | "e5" | "success" | "offline";
 
@@ -53,21 +62,22 @@ const SAMPLE: Designation = { ...SAMPLE_DESIGNATION, state: "ACCEPTED", accepted
 /** A full set of checks with one failing, for the forced error faces. */
 function forcedChecks(fail: ActivationCheck["error"]): ActivationCheck[] {
   const base: ActivationCheck[] = [
-    { id: "P2", label: "Accepted by the organisation", pass: true, observed: null, resolver: null, error: null },
+    { id: "P2", label: "Accepted by the organisation, and NDI's access granted", pass: true, observed: null, resolver: null, error: null },
     { id: "P3", label: "Organisation set up — agent and wallet", pass: true, observed: null, resolver: null, error: null },
     { id: "P4", label: "Issuing identity is did:ethr on the national network", pass: true, observed: null, resolver: null, error: null },
     { id: "P5", label: "Entitlements: schema creation, issuance, verification", pass: true, observed: null, resolver: null, error: null },
     { id: "P6", label: "No other foundational issuer for these entity types", pass: true, observed: null, resolver: null, error: null },
   ];
   const at = { E1: 0, E2: 1, E3: 2, E4: 3, E5: 4 }[fail ?? "E1"];
-  const observed = { E1: "Not accepted yet", E2: "No agent or wallet", E3: "did:key", E4: "schemaCreate", E5: "Corporate Regulatory Authority" }[fail ?? "E1"];
+  /* E1 shows AC-11's case: accepted, but the OWNER hasn't granted NDI's access. */
+  const observed = { E1: "Accepted; NDI's access not granted", E2: "No agent or wallet", E3: "did:key", E4: "schemaCreate", E5: "Corporate Regulatory Authority" }[fail ?? "E1"];
   base[at] = { ...base[at], pass: false, observed, error: fail, resolver: fail === "E4" || fail === "E5" ? "NDI" : "authority" };
   return base;
 }
 
 export function ActivationResultView({ id }: { id: string }) {
   const router = useRouter();
-  const { designations, organizations, currentPerson, rerunActivation, grantEntitlements, hydrated } = useDemo();
+  const { designations, organizations, currentPerson, rerunActivation, grantEntitlements, withdrawDesignation, hydrated } = useDemo();
   const forced = useScreenState("SCR-DSG-04", [
     "live",
     "default",
@@ -84,6 +94,8 @@ export function ActivationResultView({ id }: { id: string }) {
 
   const [running, setRunning] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [reason, setReason] = useState("");
 
   const live = designations.find((x) => x.id === id);
   const d: Designation = live ?? SAMPLE;
@@ -160,8 +172,12 @@ export function ActivationResultView({ id }: { id: string }) {
           : `This organisation's issuing identity is ${c.observed}. A foundational issuer has to use did:ethr on the national network. ${d.orgName} adds this themselves — NDI can't do it for them.`;
       case "E4":
         return `${d.orgName} is missing: ${c.observed}. NDI grants these.`;
-      case "E5":
-        return `${c.observed} is already the foundational issuer for ${kindPlural(d.entityTypes[0] ?? "company")}. That designation has to be superseded first.`;
+      case "E5": {
+        /* The entity type the incumbent actually covers, not merely the first in scope. */
+        const inc = designations.find((x) => x.orgName === c.observed && x.state === "ACTIVE");
+        const overlap = d.entityTypes.find((k) => inc?.entityTypes.includes(k)) ?? d.entityTypes[0] ?? "company";
+        return `${c.observed} is already the foundational issuer for ${kindPlural(overlap)}. Replacing it isn't supported yet.`;
+      }
       default:
         return null;
     }
@@ -242,6 +258,18 @@ export function ActivationResultView({ id }: { id: string }) {
                     View the acceptance status
                   </Link>
                 ) : null}
+                {c.error === "E5" ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {(() => {
+                      const inc = designations.find((x) => x.orgName === c.observed && x.state === "ACTIVE");
+                      return inc ? (
+                        <Link className="ndi-plainlink text-[12.5px] font-medium text-accent" href={`/admin/designations/${inc.id}`}>
+                          View the incumbent
+                        </Link>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : null}
               </div>
             ))}
 
@@ -264,9 +292,36 @@ export function ActivationResultView({ id }: { id: string }) {
               {admin ? (
                 <HairlineButton onClick={() => router.push(`/admin/designations/${d.id}`)}>View the designation</HairlineButton>
               ) : null}
+              {/* A3 — an ACCEPTED designation doesn't lapse, so one that can't
+                  go ahead (an E5 overlap, an abandoned set-up) is withdrawn. */}
+              {admin && live && d.state === "ACCEPTED" && face !== "success" ? (
+                <HairlineButton disabled={offline || running} onClick={() => setWithdrawing(true)}>
+                  Withdraw this designation
+                </HairlineButton>
+              ) : null}
             </div>
           </div>
         </Panel>
+
+        <Dialog
+          open={withdrawing}
+          onClose={() => setWithdrawing(false)}
+          tone="danger"
+          title="Withdraw this designation?"
+          lead={`It ends here and is kept on record with your reason. ${d.orgName} is told: "NDI has withdrawn this designation: <your reason>."`}
+          confirmLabel="Withdraw it"
+          confirmDisabled={!reason.trim()}
+          onConfirm={() => {
+            const r = withdrawDesignation(d.id, reason);
+            setWithdrawing(false);
+            if (r.ok) router.push("/admin/designations");
+          }}
+        >
+          <label className={FIELD_BLOCK_CLASS}>
+            <span className={LABEL_CLASS}>Reason</span>
+            <textarea className={`${FIELD_CLASS} resize-y py-3`} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+        </Dialog>
       </div>
     </AppShell>
   );

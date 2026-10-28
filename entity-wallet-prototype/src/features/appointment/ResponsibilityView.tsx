@@ -49,7 +49,7 @@ import { FullTerms, Responsibilities } from "./Responsibilities";
  * NDI holds the organisation's keys. Acting for an organisation is a duty
  * before it is a permission, and the screen leads with that.
  */
-type Face = "default" | "returning" | "not_representative" | "could_not_finish" | "not_confirmed" | "offline";
+type Face = "default" | "returning" | "not_representative" | "could_not_finish" | "not_confirmed" | "no_longer_representative" | "offline";
 
 export function ResponsibilityView() {
   const router = useRouter();
@@ -62,6 +62,7 @@ export function ResponsibilityView() {
     "not_representative",
     "could_not_finish",
     "not_confirmed",
+    "no_longer_representative",
     "offline",
   ]);
 
@@ -135,12 +136,22 @@ export function ResponsibilityView() {
             </div>
           </div>
         </Panel>
-      ) : face === "not_confirmed" ? (
+      ) : face === "not_confirmed" || face === "no_longer_representative" ? (
+        /* One state, two causes (DEL-02/E4, E7): the registration, or the
+           representative link the authority has since given to someone else.
+           Both are the authority's record, not NDI's decision, and E7 says
+           nothing about why. */
         <Panel>
           <div className="relative z-[4] flex flex-col gap-3" role="alert">
             <p className="m-0 text-[14px] leading-[1.6] text-body">
-              {legalName}&rsquo;s registration can&rsquo;t be confirmed right now, so it can&rsquo;t be
-              used. The {kind.authority} holds its record.
+              {face === "no_longer_representative" ? (
+                <>You&rsquo;re no longer recorded as {legalName}&rsquo;s representative.</>
+              ) : (
+                <>
+                  {legalName}&rsquo;s registration can&rsquo;t be confirmed right now, so it can&rsquo;t be
+                  used. The {kind.authority} holds its record.
+                </>
+              )}
             </p>
             <div>
               <HairlineButton onClick={() => router.push("/welcome")}>Leave</HairlineButton>
@@ -160,7 +171,7 @@ export function ResponsibilityView() {
                 </p>
                 <p className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
                   <Icon name="check" size={14} strokeWidth={2.4} className="mt-[5px] flex-none text-accent" />
-                  Give other people authority to act for it — only you can.
+                  Appoint people to act for it — only you can.
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -169,17 +180,13 @@ export function ResponsibilityView() {
                   <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
                   Take {shortName}&rsquo;s credentials off the platform on your own.
                 </p>
-                <p className="m-0 flex items-start gap-2.5 text-[13.5px] leading-[1.6] text-body">
-                  <Icon name="close" size={14} strokeWidth={2.4} className="mt-[5px] flex-none" style={{ color: "var(--text-faint)" }} />
-                  Hold its keys. NDI keeps them.
-                </p>
               </div>
             </div>
           </Panel>
 
           <Panel>
             <div className="relative z-[4] flex flex-col gap-4">
-              <Responsibilities orgName={shortName} />
+              <Responsibilities orgName={shortName} keysSentence />
               <FullTerms orgName={shortName} />
             </div>
           </Panel>
