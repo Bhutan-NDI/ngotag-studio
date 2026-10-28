@@ -54,9 +54,9 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Root and NDI's organisation seeded by the deployment itself, with a hardware-backed second factor on root's account.",
       },
       {
-        shown: "Platform admins, access requests and their decisions",
+        shown: "Platform admins and their decisions",
         reality:
-          "Invitations, requests and approvals live in your browser. \"The root account approves nothing\" and \"only an admin can decide\" are checked by the demo store, which is not a boundary.",
+          "Invitations and approvals live in your browser. \"The root account approves nothing\" and \"only an admin can decide\" are checked by the demo store, which is not a boundary.",
         needs: "Role checks and the audit of every decision enforced by the platform's services.",
       },
       {
@@ -207,6 +207,40 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         shown: "Revocation reaching a verifier within a minute",
         reality: "Instant, because both sides are the same browser tab. Nothing propagates anywhere.",
         needs: "Status lists, and cache invalidation on the revocation agent.",
+      },
+    ],
+  },
+  {
+    area: "Approval to verify or issue",
+    icon: "certificate",
+    rows: [
+      {
+        shown: "Organisations seen verifying or issuing without approval",
+        reality:
+          "A fixed list in the demo data. There is no capability gate observing anything, and the enforcement date is a date in a fixture.",
+        needs: "The capability gate in observe mode, logging who verifies and issues, then switched to enforce on a decided date.",
+      },
+      {
+        shown: "Two administrators, and the organisation accepting by name",
+        reality:
+          "\"The proposer can't approve it\", \"a recommended decline can only be confirmed\", \"only the owner accepts\" and \"only a business's representative withdraws or stops what it asked for\" are checked by the demo store, which is not a boundary. The wallet approval is the same simulated scan as everywhere else. Reminders after 10 working days are shown as a note on the admin screens; nothing is sent.",
+        needs: "Dual control enforced by the platform's services against distinct principals, and the identity-anchored acceptance on the real wallet proof flow.",
+      },
+      {
+        shown: "Being added to NDI's public list of trusted organisations",
+        reality:
+          "\"Publishing your listing\" is a pause, then a state change in your browser. Nothing is written to any registry, and nobody else can see the list.",
+        needs: "The Trust Registry write — retried, with NDI alerted after 72 hours if it keeps failing — and the public lookup.",
+      },
+      {
+        shown: "A public identity set up in a moment",
+        reality: "A random string shaped like a did:ethr identifier. No key is made and nothing is anchored.",
+        needs: "DID creation on the national network, held in NDI's hosted keys.",
+      },
+      {
+        shown: "Requests refused for asking outside what was approved",
+        reality: "Fixture counts on the status page, shown only from the state switcher. Nothing is checked at the point of asking.",
+        needs: "Scope checks at the capability gate, and the refusal log behind the count.",
       },
     ],
   },

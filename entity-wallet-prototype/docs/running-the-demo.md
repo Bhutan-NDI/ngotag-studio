@@ -15,8 +15,9 @@ switches you to the right person when the story changes hands. **Next** and
 **Back** move between steps (and take you to the right screen), **Take me
 there** brings you back if you wander off, and the chevron minimises it.
 
-**The prototype's focus is onboarding**, and the guide walks exactly that —
-nine chapters, 37 steps, starting on the platform's day zero:
+**The prototype's focus is onboarding**, and the guide walks that and then
+approval to verify or issue — eleven chapters, 53 steps, starting on the
+platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -66,13 +67,30 @@ nine chapters, 37 steps, starting on the platform's day zero:
    three authorities: Dorji the representative, Ugyen able to receive
    credentials, Pema with a role in their own wallet. The screen is marked
    **Flow 8 · ahead of spec**.
-8. **Where to go next.**
+8. **Recognise Bank of Bhutan** (FLOW-ACC-01, recognition) — Kinzang opens
+   **Accreditations**, where the bank is listed as seen verifying without an
+   approval, asking for five things from the citizen credential. Kinzang
+   proposes approving it, removing the date of birth and the address that
+   opening an account doesn't need. Kinzang can't approve their own
+   proposal; Tshendu, the other named admin, does — never the root account. Yeshey, the bank's owner, sees it on the dashboard,
+   reads what accepting means — including that the bank goes on **NDI's
+   public list of trusted organisations** with Yeshey's name recorded — and
+   accepts with one wallet approval. The listing publishes and the bank is
+   approved to verify, for three items where it used to ask for five.
+9. **Pelden asks to verify customers** (FLOW-ACC-02) — Dorji, as Pelden's
+   representative, asks to check customers are **over 18** — a check only,
+   so Pelden never sees anyone's date of birth. Kinzang reviews and
+   recommends approval without being able to edit it; Tshendu approves it as
+   asked, and Pelden is listed.
+10. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
 (FLOW-ONB-02 §7.3). Giving authority follows FLOW-DEL-01; the role in a
 wallet is Flow 8, which has no specification yet, so it follows Story B5 and
-is marked as ahead of spec wherever it appears. The screens for what comes after onboarding — receiving and
+is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
+v0.2, FLOW-ACC-02 v0.4 and UX-EW-02 v0.5 SCR-ACC-01 to 06 — the first-release
+simplification of EW-FLOW4-SD v0.2 (D20–D24). The screens for what comes after onboarding — receiving and
 presenting, approvals, verification, revocation, appeals, and Bank of
 Bhutan being verified — still exist and are described further down, but
 the guide and the demo controls no longer walk them.
@@ -552,6 +570,114 @@ do, and what they can't, and nothing more.
 
 ---
 
+## Flow 4 — approval to verify or issue
+
+**Walk a flow → Recognise an organisation already verifying** (as Kinzang)
+or **A business asks to verify** (as Dorji), both from Pelden's first day
+with its team joined. About five minutes each. Organisation-facing screens
+never say "accreditation" — they say *approved to verify* or *approved to
+issue*; only the administrators' screens use the word.
+
+### Recognition — `/admin/accreditations`, as Kinzang
+
+Four lists: **Waiting for approval**, **Requests to review**, **Operating
+without approval** (with the date after which it will be refused) and, once
+there is anything, **All accreditations**. **Propose an accreditation** is
+for an organisation already on the platform or one that isn't yet (it is
+invited to register, then accepts).
+
+**Propose to verify** beside Bank of Bhutan opens SCR-ACC-01 with what the
+bank was seen asking for, each item marked *observed*. Untick **Date of
+birth** and **Permanent address**; the summary on the right says what it
+will be able to ask for, that anything else will be refused, what was
+removed, and that it will be publicly listed. Type the agreement reference —
+a proposal without one is refused at the field (P4). **Propose**.
+
+> "The bank has been asking for more than it needs. Recognition is where
+> that gets narrower, before anything is refused."
+
+Open it from **Waiting for approval**: Kinzang sees it all, with "You
+proposed this, so a different administrator has to approve it" in place of
+Approve, and who can. Its row shows the days left before it lapses, and
+*reminded* once it has waited 10 working days (E14). Switch to **Tshendu**
+and **Approve** — "Every citizen's NDI wallet will trust it for this."
+
+Until it is approved the bank sees nothing of it: an NDI proposal reaches
+the organisation only once a second administrator has approved it, and one
+NDI declines or lets lapse never does — the reason goes to the proposer
+(FLOW-ACC-01 step 3, E13, E14).
+
+### Acceptance — `/verify-or-issue/…`, as Yeshey
+
+The dashboard says NDI has proposed approving the bank, when it was
+approved, and the enforcement date. Nothing counts down: an approval waiting
+to be accepted never expires. The owner and NDI are reminded after 10
+working days, and an administrator can **Withdraw** it from its record with
+a reason, which the officer then reads as *NDI has withdrawn this approval:
+<reason>* — and a new proposal for the same organisation is no longer
+refused. **Review it** opens SCR-ACC-03: what the bank can
+ask for, that anything else is refused before it reaches anyone, the public
+listing sentence — *Accepting adds Bank of Bhutan to NDI's public list of
+trusted organisations. Anyone can see that it is on the list. Your name is
+recorded as the person who accepted.* — the public identity it will be
+listed under, and that NDI hosts the keys. **Accept with your NDI wallet**,
+**Simulate the scan**, **See approval status**: publishing, then approved.
+**Decline** asks first — *Nothing is listed and NDI is told*, and NDI would
+have to propose again — because a decline is final (SC 3.3.4).
+
+An organisation proposed through the ordinary door (not recognition)
+without a did:ethr public identity is first asked to **Set it up**, before
+the wallet step. The identity is created *not primary* and becomes the
+organisation's primary DID only when the acceptance is recorded, so a
+wallet step that doesn't confirm changes nothing. To see it for real, propose **Pelden Trading** to issue
+(*Already on the platform*), approve it as Tshendu, and accept as Dorji.
+
+### A business asks — `/organisation`, as Dorji
+
+**Ask NDI** opens SCR-ACC-06. **Verify customers**, open **Citizen ID**, tick
+**Is over 18** — *check only, you'll learn whether it's true, not the
+value*. Say what it's for, **Send to NDI**. The page says NDI will approve
+or decline it as written and won't change it. A business can choose
+**Verify customers** and **Issue credentials** together: each is its own part
+of the request, reviewed and decided on its own, so one can be approved and
+the other declined. Issuing names the credential types, then one purpose and
+one legal basis (with a reference) for all of them — not a basis per type.
+The agreement with NDI is asked for only if the business has one.
+
+As Kinzang, **Requests to review** → the request → **Recommend approval**
+(or **Recommend decline** with a reason written to the business). As Tshendu,
+**Waiting for approval** → **Approve**. A recommended decline has no
+Approve at all, and nothing to send it back to: Tshendu reads *Kinzang
+recommends declining: <reason>. Confirm the decline, or talk to Kinzang if
+you disagree* and can only **Confirm the decline**; the business then reads
+Kinzang's reason. If they do disagree, Kinzang — and only Kinzang — opens
+the request from **Waiting for approval** (it opens on the review page,
+*Decline waiting*) and presses **Withdraw the recommendation**: it comes back
+to review, to recommend afresh (ACC-02/E11).
+Nothing here expires: a request is *overdue* after 10 working days, and a
+recommendation to approve that has waited as long reads *A recommendation
+to approve has waited since <date>* (ACC-02/E8, E12). Back as Dorji,
+**Verify or issue** shows Pelden approved and listed; a declined request
+shows the reason word for word and **Change and ask again**. Withdrawing a
+waiting request, or stopping a business's approval, is the representative's
+alone — an owner who isn't the representative isn't offered either, and the
+store refuses them (ACC-02/S3, A1).
+
+A wider scope is a **replacement**. NDI proposes again naming the active
+approval; a business's representative presses **Ask for more** on the
+approved card (or on SCR-ACC-06, where the capability shows as already
+approved), which opens the request with today's scope filled in, names the
+approval it replaces, and says *Your current approval keeps working until
+the new one replaces it* (ACC-02/E3, AC-10). The current one stays in force
+until the replacement is listed, then shows under it as *Replaced* —
+nothing stops in between. **Stop verifying** / **Stop issuing** stops at once
+but leaves the public listing as it was (FLOW-ACC-01 A3). There is no
+suspension: if an organisation's primary identity stops matching its
+listed one, its requests are refused and the approval shows *Stopped* with
+**Restore**, but the approval itself still stands.
+
+---
+
 ## The Act 3 walkthrough
 
 About six minutes, as **Rinzin**. The story: an ordinary working day, and the
@@ -842,6 +968,13 @@ Worth showing:
 | `/onboarding/foundational` | **name_differs** | The authority's name shown, with the difference stated |
 | `/controllership/entity` | **foundational_expired** | What lapses when the root lapses |
 | `/appeals` | **under_review**, **upheld**, **rejected** | Every stage of an appeal |
+| `/admin/accreditations` | **empty**, **offline** | Nothing pending, nothing to review, nobody observed |
+| `/admin/accreditations/new` | **recognition**, **error**, **existing_org**, **overlap**, **success**, **offline**, **no_permission** | Observed scope; E10, including a Kind N name already on the platform; an issuer type someone else issues, shown not refused |
+| `/admin/accreditations/…` | **self_proposed**, **recommended_decline**, **lapsed**, **not_accepted**, **success**, **offline** | Dual control; a recommended decline can only be confirmed; E14, the one lapse; withdrawing an approval nobody accepted (E2) |
+| `/admin/accreditations/…/review` | **holder_alert**, **overdue**, **decline_waiting**, **lapsed**, **error**, **empty** | ACC-02/E8, E9, E10; withdrawing a recommended decline (E11) |
+| `/verify-or-issue/…` | **recognition**, **setting_up**, **set_up_failed**, **not_set_up**, **waiting_wallet**, **not_confirmed**, **withdrawn**, **offline**, **no_permission** | Every way acceptance can go, E2 (withdrawn by NDI) to E7 |
+| `/verify-or-issue` | **waiting**, **withdrawn**, **request_lapsed**, **listing_abandoned**, **withdrawn_by_ndi**, **replaced**, **declined**, **publishing**, **held**, **stopped**, **resigned**, **empty**, **member** | Every state an approval can be in |
+| `/verify-or-issue/ask` | **choosing_verify**, **choosing_issue**, **choosing_both**, **asking_more**, **step_up**, **already_asked**, **already_approved**, **error**, **offline**, **no_permission** | E2, E3 per capability (with *Ask for more* when approved), E6; one capability or both, one legal basis for issuing |
 | `/kitchen-sink` | — | Every component, both themes. Not part of the story |
 
 > "Denied, expired and suspended states get the same care as the happy path.

@@ -23,6 +23,7 @@ import {
   firstRunState,
   platformReadyState,
   inOrg,
+  isNamedAdmin,
   isPlatformAdmin,
   roleIn,
   type Attribute,
@@ -55,6 +56,13 @@ import {
   type ShareReach,
   appointmentHeld,
   REGISTER_RECORDS,
+  OBSERVED_OPERATORS,
+  accEnding,
+  accInProgress,
+  normaliseLegalName,
+  type AccProposalInput,
+  type AccRequestInput,
+  type Accreditation,
   type Verification,
   type VerificationDecision,
 } from "./demoData";
@@ -129,15 +137,23 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  14 — Flow 2 follows FLOW-ORG-01: one identifier, the authority decides,
  *       no manual review and no wallet requests to NDI. A version-13 save
  *       carries an onboarding with no stage and review cases nothing reads.
- *  15 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
+ *  15 — Flow 4: access requests replaced by accreditations, with two doors
+ *       and dual control. A version-14 save holds an `accessRequests` list
+ *       nothing reads and no `accreditations` list everything expects.
+ *  16 — Flow 4 simplified for the first release (EW-FLOW4-SD v0.2): no
+ *       SUPERSEDED, STOPPED or acceptance EXPIRED states, issue types without
+ *       a basis each, and records that carry a legal basis, a replacement
+ *       link, a request id and a withdrawal reason. A version-15 save would
+ *       hold rows in states no screen has words for any more.
+ *  17 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
  *       acceptance is EXPIRED with a reason (declined, withdrawn, basis
- *       lost). A version-14 save records a decline as TERMINATED, which the
+ *       lost). A version-16 save records a decline as TERMINATED, which the
  *       screens no longer read as declined.
- *  16 — The high-value grant waiting for dual control no longer carries
- *       Dorji's own signature on his own request. A version-15 save would
+ *  18 — The high-value grant waiting for dual control no longer carries
+ *       Dorji's own signature on his own request. A version-17 save would
  *       let one more approver complete it alone.
  */
-const SEED_VERSION = 16;
+const SEED_VERSION = 18;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -318,10 +334,95 @@ const newDidId = (method: string): string => {
       return `did:key:z6Mk${Array.from({ length: 44 }, () => base58[Math.floor(Math.random() * 58)]).join("")}`;
     case "did:web":
       return "did:web:issuer.bhutanndi.bt";
+    case "did:ethr":
+      return `did:ethr:0x${hex(40)}`;
     default:
       return `${method}:${hex(32)}`;
   }
 };
+/**
+ * SCR-ACC-03's checks, run when Accept is pressed and again when the wallet
+ * has confirmed — the second time because the first answer can be stale by
+ * then. Kept out of the action so both can ask the same question.
+ */
+function acceptanceCheck(
+  s0: DemoState,
+  id: string,
+): { ok: true } | { ok: false; error: "E5" | "E6" | "not_owner" | "invalid" } {
+  /* No date check: an approval waiting to be accepted no longer expires
+     (D20). It ends when the owner acts, or when an administrator withdraws
+     it (E2) — and a withdrawn one is no longer PENDING_ACCEPTANCE, so it
+     is "invalid" here like anything else that moved on. */
+  const acc = s0.accreditations.find((a) => a.id === id);
+  if (!acc || acc.state !== "PENDING_ACCEPTANCE") return { ok: false, error: "invalid" };
+  const org = s0.organizations.find((o) => o.id === acc.orgId);
+  /* E5: an invited institution that has not registered yet has nobody
+     who could accept. */
+  if (!org) return { ok: false, error: "E5" };
+  const me = s0.people.find((p) => p.id === s0.harness.persona);
+  if (roleIn(org, me) !== "Owner") return { ok: false, error: "not_owner" };
+  /* E6: new approvals are listed under a did:ethr identity. An
+     organisation recognised for what it already does keeps the identity it
+     has been operating under, whatever its method — recorded as an
+     exception (EW-FLOW4-SD §10). */
+  const did = listingDid(s0, org);
+  if (!did || (acc.door !== "RECOGNITION" && !did.startsWith("did:ethr:") && !listedUnder(s0, org.id, did)))
+    return { ok: false, error: "E6" };
+  return { ok: true };
+}
+
+/**
+ * The identity an acceptance would list the organisation under. Its
+ * primary DID when a standing approval is already listed under it (see
+ * listedUnder) or when there is no other; otherwise a did:ethr set up for
+ * this approval and not yet primary (step 5). The switch to primary happens
+ * only when the acceptance is recorded (step 8), so until then the
+ * organisation's invitations still carry the identity they always did.
+ */
+function listingDid(s0: DemoState, org: Organization): string | undefined {
+  if (org.publicDid && listedUnder(s0, org.id, org.publicDid)) return org.publicDid;
+  return org.pendingDid ?? org.publicDid;
+}
+
+/**
+ * Makes `did` the organisation's primary DID — ACC-01 step 8, ACC-02 step
+ * 8 — and clears it as pending. From this switch the primary-DID lock
+ * applies (listedUnder covers LISTING and ACTIVE), so there is no window
+ * between the identity becoming primary and it being locked.
+ */
+const switchPrimary = (o: Organization, did: string | null): Organization =>
+  !did ? o : { ...o, publicDid: did, pendingDid: o.pendingDid === did ? undefined : o.pendingDid };
+
+/**
+ * Whether an approval that still stands is listed under this identity. If
+ * one is, the identity can't be swapped: every wallet that trusts the
+ * organisation trusts it under that DID, and replacing it would leave the
+ * standing approval pointing at an identity the organisation no longer
+ * uses — the "stopped" face SCR-ACC-04 describes (ACC-01/E11), reached by
+ * the app itself. The lock runs from the switch to primary (step 8) through
+ * LISTING and ACTIVE (EW-FLOW4-SD §6.2).
+ * So a later approval for the same organisation keeps the identity it
+ * already has, whatever its method, the way a recognition does.
+ */
+function listedUnder(s0: DemoState, orgId: string, did: string): boolean {
+  return s0.accreditations.some(
+    (a) => a.orgId === orgId && a.publicIdentity === did && ["LISTING", "ACTIVE", "HELD"].includes(a.state),
+  );
+}
+
+/**
+ * Accreditations are decided by named platform admins — never the root
+ * account, which approves nothing (FLOW-ONB-02 S2, E13). Root reaching an
+ * accreditation action is a control failure worth recording, since no screen
+ * offers it. One guard for every action that proposes, reviews, decides or
+ * withdraws, so none of them can drift from the others again.
+ */
+function namedAdminRefusal(me: Person | undefined, log: (text: string, orgId?: string) => void): { ok: false; error: "not_admin" } | null {
+  if (isNamedAdmin(me)) return null;
+  if (me?.platformRole === "root") log("Control failure — the root account tried to act on an accreditation", NDI_ORG);
+  return { ok: false, error: "not_admin" };
+}
+
 const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
 /**
@@ -329,6 +430,20 @@ const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2,
  * exists and is not locked or suspended. One definition, used wherever the
  * flow counts admins, as the spec asks.
  */
+/**
+ * Who may end an organisation's accreditation record — resign it, or
+ * withdraw a request still waiting (SCR-ACC-04). For a business's request
+ * the Root, by its ACTIVE relation and never the role (FLOW-ACC-02 S3, A1);
+ * for anything NDI proposed, the organisation's OWNER, who accepted it.
+ */
+const mayEndAcc = (s: DemoState, acc: Pick<Accreditation, "orgId" | "door">, personId: PersonId | undefined) => {
+  if (!personId || !acc.orgId) return false;
+  if (acc.door === "REQUEST")
+    return s.relations.some((r) => inOrg(acc.orgId!)(r) && r.isRootAuthority && r.state === "ACTIVE" && r.personId === personId);
+  const org = s.organizations.find((o) => o.id === acc.orgId);
+  return roleIn(org, s.people.find((p) => p.id === personId)) === "Owner";
+};
+
 const activeAdmins = (s: DemoState) => s.people.filter((p) => p.platformRole === "admin" && p.hasAccount !== false);
 
 /**
@@ -822,13 +937,96 @@ interface DemoActions {
     invitationId: string,
     name: string,
   ) => { ok: true; personId: PersonId } | { ok: false; error: "E4" | "E5" | "E6" | "E7" | "invalid" | "has_account" };
+  /* ---- Accreditation (Flow 4) ----
+     Approval to verify or issue, through either door. Every rule that
+     decides — dual control, who may accept, what has already been asked —
+     is enforced here, the stand-in for the server, and the screens render
+     the answer (standing rule 9). The same rules are not re-implemented in
+     the screens as gating: a screen may grey out a button to say why, but
+     the refusal that counts is the one returned from here. */
+
   /**
-   * A platform admin decides a request to issue or verify. There is no
-   * request for a wallet: an organisation already on the platform verifies
-   * itself with its authority (FLOW-ORG-01 Kind E), and NDI decides nothing
-   * about it.
+   * SCR-ACC-01 — an administrator proposes. Refused with E10 when the
+   * organisation already has an approval in progress or ACTIVE for the same
+   * capability and the proposal does not say it replaces it; for Kind N,
+   * when the normalised legal name matches an open Kind N proposal for the
+   * capability, or — `E10_ORG` — an organisation already on the platform,
+   * which is proposed for as Kind E instead.
    */
-  decideAccessRequest: (id: string, approve: boolean, reason?: string) => void;
+  proposeAccreditation: (
+    input: AccProposalInput,
+  ) =>
+    | { ok: true; id: string }
+    | { ok: false; error: "E10" | "E12" | "not_admin" | "invalid" }
+    | { ok: false; error: "E10_ORG"; orgId: string; orgName: string };
+  /**
+   * SCR-ACC-02 — the second administrator decides. Never the proposer (E1)
+   * nor, for a business's request, its reviewer (ACC-02/E5). Against a
+   * recommendation to decline there is no approve and no send-back
+   * (ACC-02/E11, D21): only confirming it, with the reviewer's reason.
+   */
+  decideAccreditation: (
+    id: string,
+    approve: boolean,
+    reason?: string,
+  ) => { ok: true } | { ok: false; error: "E1" | "E5" | "E11" | "not_admin" | "invalid" };
+  /** SCR-ACC-05 — the first administrator recommends, on the request as written. */
+  reviewRequest: (
+    id: string,
+    approve: boolean,
+    reason: string | null,
+  ) => { ok: true } | { ok: false; error: "not_admin" | "invalid" };
+  /**
+   * SCR-ACC-02 — the reviewer takes back a recommendation to decline, so the
+   * request is reviewed again (ACC-02/E11). How two administrators who
+   * disagree settle it: between themselves, then the reviewer withdraws and
+   * recommends afresh. Only the reviewer can, and only before a decision.
+   */
+  withdrawRecommendation: (id: string) => { ok: true } | { ok: false; error: "not_reviewer" | "invalid" };
+  /**
+   * SCR-ACC-02 — an administrator withdraws an approval nobody has accepted
+   * (ACC-01/E2), with a reason the organisation is shown. The record is
+   * WITHDRAWN and no longer stands in the way of a new proposal (AC-15).
+   */
+  withdrawApproval: (id: string, reason: string) => { ok: true } | { ok: false; error: "not_admin" | "invalid" };
+  /**
+   * SCR-ACC-03 — the organisation's OWNER accepts, after the wallet step.
+   * E5 when the organisation has not finished setting up, E6 when its
+   * public identity does not conform. Nothing expires (D20).
+   */
+  acceptAccreditation: (
+    id: string,
+  ) => { ok: true } | { ok: false; error: "E5" | "E6" | "not_owner" | "invalid" };
+  /** SCR-ACC-03 — the same checks, before the wallet step, changing nothing. */
+  prepareAcceptance: (
+    id: string,
+  ) => { ok: true } | { ok: false; error: "E5" | "E6" | "not_owner" | "invalid" };
+  /**
+   * SCR-ACC-03 E6 — set up a conforming public identity for the
+   * organisation: a did:ethr, not primary, until the acceptance is recorded.
+   */
+  setUpPublicIdentity: (orgId: string) => { ok: true; did: string } | { ok: false; error: "E7" | "not_owner" | "listed" };
+  /** SCR-ACC-03 — the OWNER declines (E3). Nothing is listed; NDI is told. */
+  declineAccreditationAsOrg: (id: string) => void;
+  /** The listing is published: the approval becomes ACTIVE. Simulated. */
+  completeListing: (id: string) => void;
+  /** SCR-ACC-04 — resign a capability (A3, ACC-02/A2). Always a stop. */
+  resignAccreditation: (id: string) => void;
+  /**
+   * SCR-ACC-06 — a verified business's Root asks, for one capability or
+   * both (D22). E2 for anyone but the Root, E3 when a request or approval
+   * already exists for a capability it asks for — unless the part names
+   * the ACTIVE approval it replaces ("Ask for more", AC-10). Returns the
+   * request's id.
+   */
+  requestCapability: (
+    input: AccRequestInput,
+  ) => { ok: true; id: string } | { ok: false; error: "E2" | "E3" | "invalid" };
+  /**
+   * SCR-ACC-04 — the Root withdraws a request still waiting (ACC-02/A1):
+   * every part of it not yet decided. Nobody else can, not even an OWNER.
+   */
+  withdrawRequest: (id: string) => void;
 
   /* ---- Demo harness ----
      Not product surface. These drive the persona switcher, the story runner
@@ -916,6 +1114,28 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     }
     setHydrated(true);
   }, []);
+
+  /* A proposal whose 30 days have run out lapses (see accEnding), on load
+     and whenever state changes. Here rather than in each screen so every
+     list, count and duplicate check agrees: the queue's "Review
+     accreditations", the admin list and the E10 check all read the moved
+     row. Returns the same state when nothing has run out, so it settles.
+
+     It is the only thing a date ends any more (D20). It used to move three
+     other windows on too — acceptance, listing and a recommendation, the
+     last one back to IN_REVIEW — and each needed its own state and copy. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.accreditations.some((a) => accEnding(a, now))) return;
+    setState((s) => ({
+      ...s,
+      accreditations: s.accreditations.map((a) => {
+        const ending = accEnding(a, now);
+        return ending ? { ...a, state: ending } : a;
+      }),
+    }));
+  }, [state.accreditations, hydrated]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -2641,10 +2861,24 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             orgOnboarding: s.orgOnboarding,
             orgInterests: s.orgInterests,
             orgInvitations: [...s.orgInvitations.filter((i) => !seeded.has(i.id)), ...SEED.orgInvitations],
-            accessRequests: [
-              ...s.accessRequests.filter((a) => !SEED.accessRequests.some((x) => x.id === a.id)),
-              ...SEED.accessRequests,
-            ],
+            accreditations: s.accreditations,
+            /* Accreditations are kept, so what they changed on the
+               organisation is kept with them: the public identity one was
+               listed under, and the capability a completed listing switched
+               on. Restoring the seed's organisations alone left the status
+               page saying "listed" beside an organisation page saying it
+               can't verify. */
+            organizations: SEED.organizations.map((o) => {
+              const now = s.organizations.find((x) => x.id === o.id);
+              const live = s.accreditations.filter((a) => a.orgId === o.id && ["ACTIVE", "HELD"].includes(a.state));
+              if (!now || (!live.length && now.publicDid === o.publicDid && now.pendingDid === o.pendingDid)) return o;
+              return {
+                ...o,
+                publicDid: now.publicDid ?? o.publicDid,
+                pendingDid: now.pendingDid,
+                capabilities: [...new Set([...o.capabilities, ...live.map((a) => a.capability)])],
+              };
+            }),
             harness: s.harness,
             firstRun: false,
           };
@@ -2897,30 +3131,506 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { ok: true, personId };
       },
 
-      decideAccessRequest: (id, approve, reason) =>
+      proposeAccreditation: (input) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const refused = namedAdminRefusal(me, log);
+        if (refused) return refused;
+        /* P4: a scope, a purpose, an agreement reference and — for an
+           issuer — one legal basis covering every type (D23). The agreement
+           is required here, not on a business's request: NDI proposes to an
+           organisation it already has an agreement with, so a proposal
+           without one has skipped a step. */
+        if (
+          !input.orgName.trim() ||
+          !input.purpose.trim() ||
+          !input.agreementRef.trim() ||
+          (input.capability === "verifier" ? !input.ask.length : !input.issue.length || !input.legalBasis.trim())
+        )
+          return { ok: false, error: "invalid" };
+        /* E12 (FLOW-ONB-02 P7): a proposal needs a second named admin to
+           decide it, so with fewer than two active it is refused up front
+           rather than left waiting for someone who doesn't exist. */
+        if (activeAdmins(s0).length < 2) return { ok: false, error: "E12" };
+        /* E10, Kind N against the platform: an institution "not on the
+           platform yet" whose legal name matches one that is, on the name
+           alone, whatever the capability. Inviting it would register it a
+           second time; the proposal belongs to Kind E (FLOW-ACC-01 P3,
+           AC-14). Matched on the normalised legal name, and on the
+           register's name as well as the trading one. */
+        const key = normaliseLegalName(input.orgName);
+        if (input.door === "NEW") {
+          const existing = s0.organizations.find(
+            (o) => o.id !== NDI_ORG && [o.name, o.legalName].some((n) => n && normaliseLegalName(n) === key),
+          );
+          if (existing) return { ok: false, error: "E10_ORG", orgId: existing.id, orgName: existing.legalName ?? existing.name };
+        }
+        /* E10: a second approval for the same thing is never created
+           silently beside the first. Same organisation and capability —
+           or, for Kind N, which has no orgId yet, the same normalised legal
+           name among open Kind N proposals. Not the officer's email: two
+           different institutions can share one (a consultant acting for
+           both), and that isn't a duplicate.
+           Naming the ACTIVE one it replaces is the way through. That one
+           stays ACTIVE until the replacement is (D24), so the organisation
+           is never left with neither while the new one waits to be
+           accepted and listed — and anything else in progress still blocks,
+           including a replacement already on its way. */
+        const standing = s0.accreditations.filter(
+          (a) =>
+            a.capability === input.capability &&
+            accInProgress(a) &&
+            (input.orgId ? a.orgId === input.orgId : a.door === "NEW" && !a.orgId && normaliseLegalName(a.orgName) === key),
+        );
+        if (standing.some((a) => !(a.state === "ACTIVE" && input.replaces === a.id))) return { ok: false, error: "E10" };
+        const replacesId = standing.length ? input.replaces : null;
+        const observed =
+          input.door === "RECOGNITION"
+            ? OBSERVED_OPERATORS.find((o) => o.orgId === input.orgId && o.capability === input.capability) ?? null
+            : null;
+        const id = rid("acc");
+        setState((s) => ({
+          ...s,
+          accreditations: [
+            {
+              id,
+              orgId: input.orgId,
+              orgName: input.orgName.trim(),
+              officerEmail: input.officerEmail,
+              door: input.door,
+              capability: input.capability,
+              purpose: input.purpose.trim(),
+              legalBasis: input.capability === "issuer" ? input.legalBasis.trim() : "",
+              legalBasisRef: input.capability === "issuer" ? input.legalBasisRef.trim() : "",
+              agreementRef: input.agreementRef.trim(),
+              ask: input.ask,
+              issue: input.issue,
+              observed: observed ? { since: observed.since, ask: observed.ask, issue: observed.issue } : null,
+              state: "PROPOSED",
+              replacesId,
+              requestId: null,
+              proposedBy: s.harness.persona,
+              proposedAt: today(),
+              requestedBy: null,
+              requestedAt: null,
+              recommendation: null,
+              decidedBy: null,
+              decidedAt: null,
+              declineReason: null,
+              declinedByOrg: false,
+              withdrawal: null,
+              acceptedName: null,
+              acceptedAt: null,
+              listedAt: null,
+              /* E14: a proposal nobody decides lapses in 30 days — the one
+                 deadline left (D20). */
+              expiresAt: inDays(30),
+              publicIdentity: null,
+              refusals: null,
+            },
+            ...s.accreditations,
+          ],
+        }));
+        log(`Accreditation proposed for ${input.orgName.trim()}`, NDI_ORG);
+        return { ok: true, id };
+      },
+
+      decideAccreditation: (id, approve, reason) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const acc = s0.accreditations.find((a) => a.id === id);
+        const refused = namedAdminRefusal(me, log);
+        if (refused) return refused;
+        if (!acc || acc.state !== "PROPOSED") return { ok: false, error: "invalid" };
+        /* E14: thirty days without a decision and an NDI proposal lapses; it
+           confers nothing and cannot be revived by approving it late. A
+           business's recommendation is never late (ACC-02/E12, D20) — it is
+           reminded, and decided whenever the second administrator gets to it. */
+        if (acc.door !== "REQUEST" && acc.expiresAt && acc.expiresAt < today()) return { ok: false, error: "invalid" };
+        /* Dual control. The proposer cannot approve their own proposal, and
+           for a business's request the reviewer who recommended it is the
+           proposer here — the same rule, with its own words (E1, ACC-02/E5). */
+        if (acc.proposedBy === s0.harness.persona) return { ok: false, error: acc.door === "REQUEST" ? "E5" : "E1" };
+        /* ACC-02/E11: against a recommendation to decline there is no
+           approve, and no send-back either (D21) — only confirming it. The
+           business is told the reviewer's reason, verbatim: the reviewer
+           wrote it to the business, and the second administrator confirms
+           it rather than writing another. A disagreement is settled between
+           the two; the reviewer may then withdraw the recommendation. */
+        const recommendedDecline = Boolean(acc.recommendation && !acc.recommendation.approve);
+        if (approve && recommendedDecline) return { ok: false, error: "E11" };
+        const why = recommendedDecline ? acc.recommendation?.reason ?? "" : reason?.trim() ?? "";
+        if (!approve && !why) return { ok: false, error: "invalid" };
+        setState((s) => ({
+          ...s,
+          /* ACC-02 step 8: a business asked, and accepted by asking, so
+             approval switches its primary DID to the did:ethr made with the
+             request — unless an earlier part already did — and the lock
+             runs from here. A declined request leaves its primary as it was
+             (AC-07). */
+          organizations:
+            approve && acc.door === "REQUEST"
+              ? s.organizations.map((o) => (o.id === acc.orgId ? switchPrimary(o, acc.publicIdentity) : o))
+              : s.organizations,
+          accreditations: s.accreditations.map((a) =>
+            a.id !== id
+              ? a
+              : approve
+                ? {
+                    ...a,
+                    decidedBy: s.harness.persona,
+                    decidedAt: today(),
+                    /* A business's approval goes straight to publishing its
+                       listing. Anything NDI proposed now waits for the
+                       organisation — with reminders, not a deadline (D20). */
+                    state: a.door === "REQUEST" ? ("LISTING" as const) : ("PENDING_ACCEPTANCE" as const),
+                    expiresAt: null,
+                  }
+                : {
+                    ...a,
+                    decidedBy: s.harness.persona,
+                    decidedAt: today(),
+                    state: "DECLINED" as const,
+                    declineReason: why,
+                    expiresAt: null,
+                  },
+          ),
+        }));
+        log(`Accreditation for ${acc.orgName} ${approve ? "approved" : "declined"}`, NDI_ORG);
+        return { ok: true };
+      },
+
+      reviewRequest: (id, approve, reason) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const acc = s0.accreditations.find((a) => a.id === id);
+        const refused = namedAdminRefusal(me, log);
+        if (refused) return refused;
+        if (!acc || acc.door !== "REQUEST" || (acc.state !== "SUBMITTED" && acc.state !== "IN_REVIEW"))
+          return { ok: false, error: "invalid" };
+        /* The reason is addressed to the business and shown to it verbatim
+           if the decline is confirmed (UN-32), so declining needs one. */
+        if (!approve && !reason?.trim()) return { ok: false, error: "invalid" };
+        setState((s) => ({
+          ...s,
+          accreditations: s.accreditations.map((a) =>
+            a.id === id
+              ? {
+                  ...a,
+                  state: "PROPOSED" as const,
+                  proposedBy: s.harness.persona,
+                  proposedAt: today(),
+                  recommendation: { by: s.harness.persona, approve, reason: reason?.trim() || null, at: today() },
+                  /* No clock: a recommendation waits for its second
+                     administrator, who is reminded after 10 working days
+                     (ACC-02/E12, D20). */
+                  expiresAt: null,
+                }
+              : a,
+          ),
+        }));
+        log(`Request from ${acc.orgName} reviewed`, NDI_ORG);
+        return { ok: true };
+      },
+
+      withdrawRecommendation: (id) => {
+        const s0 = stateRef.current;
+        const acc = s0.accreditations.find((a) => a.id === id);
+        if (!acc || acc.door !== "REQUEST" || acc.state !== "PROPOSED" || !acc.recommendation || acc.recommendation.approve)
+          return { ok: false, error: "invalid" };
+        /* Only the reviewer takes their own recommendation back. This is not
+           the old send-back, which let the second administrator return it
+           to someone else and could go round with no end (D21): here the
+           person who wrote the reason decides it was wrong. */
+        if (acc.recommendation.by !== s0.harness.persona) return { ok: false, error: "not_reviewer" };
+        setState((s) => ({
+          ...s,
+          accreditations: s.accreditations.map((a) =>
+            a.id === id ? { ...a, state: "IN_REVIEW" as const, recommendation: null, proposedBy: null, proposedAt: null } : a,
+          ),
+        }));
+        log(`Recommendation on ${acc.orgName}'s request withdrawn, to review again`, NDI_ORG);
+        return { ok: true };
+      },
+
+      withdrawApproval: (id, reason) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const refused = namedAdminRefusal(me, log);
+        if (refused) return refused;
+        const acc = s0.accreditations.find((a) => a.id === id);
+        /* E2: only an approval still waiting to be accepted, and only with a
+           reason — the organisation is told it in NDI's words. Withdrawal is
+           an administrator's act, never a silent lapse. Any named
+           administrator may: it grants nothing, so dual control has nothing
+           to protect. */
+        if (!acc || acc.state !== "PENDING_ACCEPTANCE" || !reason.trim()) return { ok: false, error: "invalid" };
+        setState((s) => ({
+          ...s,
+          accreditations: s.accreditations.map((a) =>
+            a.id === id
+              ? {
+                  ...a,
+                  state: "WITHDRAWN" as const,
+                  withdrawal: { reason: "BY_NDI" as const, note: reason.trim(), by: s.harness.persona, at: today() },
+                }
+              : a,
+          ),
+        }));
+        log(`Approval for ${acc.orgName} withdrawn before it was accepted`, NDI_ORG);
+        return { ok: true };
+      },
+
+      prepareAcceptance: (id) => acceptanceCheck(stateRef.current, id),
+
+      acceptAccreditation: (id) => {
+        const s0 = stateRef.current;
+        const check = acceptanceCheck(s0, id);
+        if (!check.ok) return check;
+        const acc = s0.accreditations.find((a) => a.id === id)!;
+        const org = s0.organizations.find((o) => o.id === acc.orgId)!;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const did = listingDid(s0, org) ?? null;
+        setState((s) => ({
+          ...s,
+          /* Step 8: the acceptance is recorded and, in the same step, the
+             identity it covered becomes primary. A recognition keeps the
+             primary it has, which is the identity it was accepted under. */
+          organizations: s.organizations.map((o) => (o.id === org.id ? switchPrimary(o, did) : o)),
+          accreditations: s.accreditations.map((a) =>
+            a.id === id
+              ? {
+                  ...a,
+                  state: "LISTING" as const,
+                  acceptedName: me?.name ?? null,
+                  acceptedAt: today(),
+                  publicIdentity: did,
+                }
+              : a,
+          ),
+        }));
+        log(`${me?.name ?? "The owner"} accepted ${org.name}'s approval to ${acc.capability === "verifier" ? "verify" : "issue"}`, org.id);
+        return { ok: true };
+      },
+
+      setUpPublicIdentity: (orgId) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === orgId);
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        /* Only the owner accepting sets it up, and never over an identity a
+           standing approval is listed under (see listedUnder). */
+        if (!org || roleIn(org, me) !== "Owner") return { ok: false, error: "not_owner" };
+        if (org.publicDid && listedUnder(s0, orgId, org.publicDid)) return { ok: false, error: "listed" };
+        /* Step 5: created now, in the officer's session, but not primary.
+           If the wallet step then doesn't confirm (E4) nothing the
+           organisation does has changed, and the DID is reused on retry. */
+        const did = org.pendingDid?.startsWith("did:ethr:") ? org.pendingDid : newDidId("did:ethr");
+        setState((s) => ({
+          ...s,
+          organizations: s.organizations.map((o) => (o.id === orgId ? { ...o, pendingDid: did } : o)),
+        }));
+        log("Public identity set up", orgId);
+        return { ok: true, did };
+      },
+
+      declineAccreditationAsOrg: (id) => {
+        const s0 = stateRef.current;
+        const acc = s0.accreditations.find((a) => a.id === id);
+        const org = s0.organizations.find((o) => o.id === acc?.orgId);
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        if (!acc || acc.state !== "PENDING_ACCEPTANCE" || roleIn(org, me) !== "Owner") return;
+        setState((s) => ({
+          ...s,
+          accreditations: s.accreditations.map((a) =>
+            a.id === id ? { ...a, state: "DECLINED" as const, declinedByOrg: true } : a,
+          ),
+        }));
+        log(`${acc.orgName} declined its approval`, NDI_ORG);
+      },
+
+      completeListing: (id) =>
         setState((s) => {
-          const req = s.accessRequests.find((a) => a.id === id);
-          const me = s.people.find((p) => p.id === s.harness.persona);
-          /* A named platform admin — never the root account (S9). */
-          if (!req || req.state !== "PENDING" || me?.platformRole !== "admin") return s;
-          const decided = { decidedBy: s.harness.persona, decidedAt: today() };
-          if (!approve) {
-            return {
-              ...s,
-              accessRequests: s.accessRequests.map((a) =>
-                a.id === id ? { ...a, ...decided, state: "DECLINED" as const, reason: reason ?? null } : a,
-              ),
-            };
-          }
+          const acc = s.accreditations.find((a) => a.id === id);
+          if (!acc || acc.state !== "LISTING") return s;
           return {
             ...s,
             organizations: s.organizations.map((o) =>
-              o.id === req.orgId && !o.capabilities.includes(req.capability)
-                ? { ...o, capabilities: [...o.capabilities, req.capability] }
+              o.id === acc.orgId && !o.capabilities.includes(acc.capability)
+                ? { ...o, capabilities: [...o.capabilities, acc.capability] }
                 : o,
             ),
-            accessRequests: s.accessRequests.map((a) =>
-              a.id === id ? { ...a, ...decided, state: "APPROVED" as const } : a,
+            accreditations: s.accreditations.map((a) =>
+              a.id === id
+                ? { ...a, state: "ACTIVE" as const, listedAt: today() }
+                : /* The approval this one replaces ends in the same step,
+                     never before: until now it was ACTIVE and every gated
+                     call kept working (D24, AC-13). It stays on record,
+                     WITHDRAWN as REPLACED, under the one that replaced it.
+                     The capability itself never left the organisation. */
+                  a.id === acc.replacesId && a.state === "ACTIVE"
+                  ? {
+                      ...a,
+                      state: "WITHDRAWN" as const,
+                      withdrawal: { reason: "REPLACED" as const, note: null, by: null, at: today() },
+                    }
+                  : a,
+            ),
+          };
+        }),
+
+      resignAccreditation: (id) => {
+        const s0 = stateRef.current;
+        const acc = s0.accreditations.find((a) => a.id === id);
+        const me = s0.harness.persona;
+        /* OWNER for an institution, the Root for a business (SCR-ACC-04) —
+           decided by the door it came through. A business's approval is
+           its Root's to end, as it was the Root's to ask for: the check
+           reads the relation, never the role (ACC-02/S3), so an OWNER who
+           is not the Root can't resign it. */
+        if (!acc || acc.state !== "ACTIVE" || !mayEndAcc(s0, acc, me)) return;
+        setState((s) => ({
+          ...s,
+          organizations: s.organizations.map((o) =>
+            o.id === acc.orgId ? { ...o, capabilities: o.capabilities.filter((c) => c !== acc.capability) } : o,
+          ),
+          accreditations: s.accreditations.map((a) => (a.id === id ? { ...a, state: "RESIGNED" as const, decidedAt: today() } : a)),
+        }));
+        log(`${acc.orgName} stopped ${acc.capability === "verifier" ? "verifying" : "issuing"}`, acc.orgId ?? undefined);
+      },
+
+      requestCapability: (input) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const root = s0.relations.find((r) => inOrg(org?.id ?? "")(r) && r.isRootAuthority && r.state === "ACTIVE");
+        /* P1, P2: only the Root of a verified holder. The dashboard does not
+           offer it to anyone else; this is the refusal behind that. */
+        if (!org || !org.capabilities.includes("holder") || root?.personId !== s0.harness.persona)
+          return { ok: false, error: "E2" };
+        /* One part per capability, at most two (D22), each complete: a
+           scope, a purpose, and for issuing one legal basis (D23). The
+           agreement reference is optional — only if the business has one
+           (step 2). */
+        const caps = input.parts.map((p) => p.capability);
+        if (
+          !input.parts.length ||
+          new Set(caps).size !== caps.length ||
+          input.parts.some(
+            (p) => !p.purpose.trim() || (p.capability === "verifier" ? !p.ask.length : !p.issue.length || !p.legalBasis.trim()),
+          )
+        )
+          return { ok: false, error: "invalid" };
+        /* E3, per capability: SCR-ACC-06 doesn't offer one already asked
+           for or approved; this is the refusal behind that. In progress
+           includes an NDI approval waiting for the owner to accept (P3,
+           FLOW-ACC-02 v0.4), so the two can never both become ACTIVE.
+           Naming the ACTIVE approval a part replaces — "Ask for more" — is
+           the way through, as it is for NDI's proposals (E10): that one
+           stays ACTIVE until the replacement is listed (AC-10). Anything
+           else in progress still blocks, including a replacement already
+           on its way. */
+        const blocked = input.parts.some((p) =>
+          s0.accreditations.some(
+            (a) =>
+              a.orgId === org.id &&
+              a.capability === p.capability &&
+              accInProgress(a) &&
+              !(a.state === "ACTIVE" && p.replaces === a.id),
+          ),
+        );
+        if (blocked) return { ok: false, error: "E3" };
+        /* A part names what it replaces only if that is this organisation's
+           ACTIVE approval for the same capability; anything else is dropped
+           rather than linked, so completeListing never ends the wrong one. */
+        const replacing = (p: (typeof input.parts)[number]) =>
+          s0.accreditations.some((a) => a.id === p.replaces && a.orgId === org.id && a.capability === p.capability && a.state === "ACTIVE")
+            ? p.replaces
+            : null;
+        /* Step 4: the public identity it would be listed under is set up
+           with the request, so NDI approves a request that can actually be
+           listed — and set up *not primary*: it becomes primary only when
+           NDI approves (step 8). An existing did:ethr is kept, and so is
+           any identity a standing approval is already listed under;
+           otherwise a did:ethr waiting from an earlier attempt is reused,
+           or a new one made. */
+        const did =
+          org.publicDid && (org.publicDid.startsWith("did:ethr:") || listedUnder(s0, org.id, org.publicDid))
+            ? org.publicDid
+            : org.pendingDid?.startsWith("did:ethr:")
+              ? org.pendingDid
+              : newDidId("did:ethr");
+        const requestId = rid("req");
+        setState((s) => ({
+          ...s,
+          organizations: s.organizations.map((o) => (o.id === org.id && did !== o.publicDid ? { ...o, pendingDid: did } : o)),
+          accreditations: [
+            ...input.parts.map((p) => ({
+              id: rid("acc"),
+              orgId: org.id,
+              orgName: org.legalName ?? org.name,
+              officerEmail: null,
+              door: "REQUEST" as const,
+              capability: p.capability,
+              purpose: p.purpose.trim(),
+              legalBasis: p.capability === "issuer" ? p.legalBasis.trim() : "",
+              legalBasisRef: p.capability === "issuer" ? p.legalBasisRef.trim() : "",
+              agreementRef: input.agreementRef.trim(),
+              ask: p.capability === "verifier" ? p.ask : [],
+              issue: p.capability === "issuer" ? p.issue : [],
+              observed: null,
+              state: "SUBMITTED" as const,
+              replacesId: replacing(p),
+              requestId,
+              proposedBy: null,
+              proposedAt: null,
+              requestedBy: s.harness.persona,
+              requestedAt: today(),
+              recommendation: null,
+              decidedBy: null,
+              decidedAt: null,
+              declineReason: null,
+              declinedByOrg: false,
+              withdrawal: null,
+              acceptedName: null,
+              acceptedAt: null,
+              listedAt: null,
+              expiresAt: null,
+              publicIdentity: did,
+              refusals: null,
+            })),
+            ...s.accreditations,
+          ],
+        }));
+        log(
+          `Asked NDI for approval to ${caps.map((c) => (c === "verifier" ? "verify" : "issue")).join(" and ")}`,
+          org.id,
+        );
+        return { ok: true, id: requestId };
+      },
+
+      withdrawRequest: (id) =>
+        setState((s) => {
+          /* The Root withdraws the request, not a part of it: every part not
+             yet decided goes with it. A part already approved stays — it is
+             an approval now, ended by resigning it. Only the Root, as only
+             the Root could ask (ACC-02/A1, S3): the status page offers it to
+             nobody else, and this is the refusal behind that. */
+          const target = s.accreditations.find((a) => a.id === id);
+          if (!target || target.door !== "REQUEST" || !mayEndAcc(s, target, s.harness.persona)) return s;
+          const open = (a: (typeof s.accreditations)[number]) =>
+            a.door === "REQUEST" &&
+            (a.id === id || (target.requestId !== null && a.requestId === target.requestId)) &&
+            ["SUBMITTED", "IN_REVIEW", "PROPOSED"].includes(a.state);
+          return {
+            ...s,
+            accreditations: s.accreditations.map((a) =>
+              open(a)
+                ? {
+                    ...a,
+                    state: "WITHDRAWN" as const,
+                    decidedAt: today(),
+                    withdrawal: { reason: "REQUESTER" as const, note: null, by: s.harness.persona, at: today() },
+                  }
+                : a,
             ),
           };
         }),

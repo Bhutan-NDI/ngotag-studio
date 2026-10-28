@@ -123,6 +123,23 @@ export interface Organization {
    * `memberRole` for the seed's Pelden people.
    */
   roles?: Record<PersonId, "Owner" | "Admin" | "Member">;
+  /**
+   * The identity it would be publicly listed under, if it has one
+   * (EW-FLOW4-SD/D13). An organisation already issuing keeps the one it has,
+   * whatever its method — recorded as an exception (§10).
+   */
+  publicDid?: string;
+  /**
+   * A did:ethr created for an approval but not primary yet (FLOW-ACC-01
+   * step 5, FLOW-ACC-02 step 4). It becomes `publicDid` — the primary — only
+   * once the acceptance is recorded (ACC-01 step 8) or the request approved
+   * (ACC-02 step 8). Until then nothing the organisation already does uses
+   * it, so a wallet step that doesn't confirm (ACC-01/E4) or a declined
+   * request (ACC-02 AC-07) leaves the organisation exactly as it was. It used
+   * to be made primary the moment it was created, which put an unlisted DID
+   * into every invitation the organisation sent while it waited.
+   */
+  pendingDid?: string;
   /** Its name on the register, when that differs from how it is known. */
   legalName?: string;
 }
@@ -343,6 +360,17 @@ export const roleIn = (
 /** Whether someone administers the platform: root, or an admin root invited. */
 export const isPlatformAdmin = (person: { platformRole?: "root" | "admin" } | undefined) =>
   person?.platformRole === "root" || person?.platformRole === "admin";
+
+/**
+ * A named platform admin — never the root account. Routine decisions and
+ * every second approval belong to named admins only: the root account
+ * approves nothing and does no routine work (FLOW-ONB-02 v0.6, S2, S9,
+ * E13). isPlatformAdmin above still answers "may see NDI administration",
+ * which root may; this answers "may decide something there", which it may
+ * not.
+ */
+export const isNamedAdmin = (person: { platformRole?: "root" | "admin" } | undefined) =>
+  person?.platformRole === "admin";
 
 export interface Person {
   id: PersonId;
@@ -1142,29 +1170,300 @@ export interface OrgInterest {
   recordedAt: string;
 }
 
+/* ================================================================== */
+/* Accreditation — Flow 4 (FLOW-ACC-01, FLOW-ACC-02)                   */
+/* ================================================================== */
+
 /**
- * An organisation asking NDI for the right to issue or verify. Never to
- * hold: holding follows from the organisation's authority confirming it
- * (FLOW-ORG-01), so there is nothing for NDI to approve. Reviewed by a
- * platform admin, whose decision is
- * recorded with their name (rule 9: the decision is the server's; here, a
- * fixture or an admin's click, never the requester's screen deciding).
+ * Approval to verify or to issue, for an organisation, on NDI's public
+ * list of trusted organisations (EW-FLOW4-SD).
+ *
+ * WHY THIS REPLACED A SIMPLE REQUEST
+ *
+ * The prototype used to hold "access requests" a single platform admin
+ * approved with one click. The specification has two doors and neither is
+ * that: NDI proposes an approval and a *second* administrator approves it,
+ * then the organisation's officer accepts it — identity-anchored, knowing it
+ * will be publicly listed (FLOW-ACC-01); or a verified business asks, one
+ * administrator recommends and a second decides, on the request exactly as
+ * written (FLOW-ACC-02). Every state either door can reach is here.
  */
-export interface AccessRequest {
+export type AccCapability = "verifier" | "issuer";
+/**
+ * How the accreditation began. `NEW` is FLOW-ACC-01 Kind N (an institution
+ * not yet on the platform, invited to register), `EXISTING` Kind E,
+ * `RECOGNITION` Kind E for an organisation already issuing or verifying
+ * before approvals were enforced, and `REQUEST` FLOW-ACC-02 (a verified
+ * business asking).
+ */
+export type AccDoor = "NEW" | "EXISTING" | "RECOGNITION" | "REQUEST";
+/**
+ * What the first release keeps (EW-FLOW4-SD v0.2, D20–D24).
+ *
+ * `LAPSED` is the specification's `EXPIRED`, reason `NOT_APPROVED`: a
+ * FLOW-ACC-01 proposal no second administrator decided in 30 days (E14).
+ * It is the only ending a date causes (D20), and it keeps the name it has
+ * always had on screen — "Lapsed" — rather than share a word with the
+ * endings that went.
+ *
+ * Gone, and why:
+ * - `EXPIRED` for an approval nobody accepted, and the listing lapse with
+ *   it. Neither window expires any more: acceptance reminds the owner and
+ *   NDI and ends only when someone acts — the owner accepts or declines, or
+ *   an administrator withdraws it (ACC-01/E2) — and a listing retries and
+ *   alerts NDI after 72 hours (E8). A business never loses a request, and
+ *   an organisation never loses an approval, to a date nobody watched.
+ * - `SUPERSEDED`. Widening is a replacement: the new record names the one
+ *   it replaces (`replacesId`), and the old one is `WITHDRAWN`, reason
+ *   `REPLACED`, in the step that makes the new one `ACTIVE` (D24).
+ * - `STOPPED`. A changed primary DID refuses gated calls and alerts both
+ *   parties but leaves the record `ACTIVE` (ACC-01/E11) — so "stopped" is
+ *   read from the organisation's identity, by `accStopped`, not stored.
+ *   Suspension, its old neighbour, is flow 11's.
+ *
+ * `HELD` stays: a listing held because the DID is listed for someone else
+ * (E9) needs NDI, and the organisation is told so.
+ */
+export type AccState =
+  | "SUBMITTED"
+  | "IN_REVIEW"
+  | "PROPOSED"
+  | "PENDING_ACCEPTANCE"
+  | "LISTING"
+  | "ACTIVE"
+  | "DECLINED"
+  | "LAPSED"
+  | "WITHDRAWN"
+  | "RESIGNED"
+  | "HELD";
+
+/** One thing a verifier may ask people for, from a published credential. */
+export interface AskItem {
+  credential: string;
+  item: string;
+  /** "Check only — you'll learn whether it's true, not the value" (UXD-28). */
+  checkOnly: boolean;
+}
+
+/**
+ * A credential type an issuer may issue, named in words. It used to carry a
+ * basis of its own; an issuer now gives one purpose and one legal basis for
+ * the record (EW-FLOW4-SD/D23, UXD-59), because purpose and a basis per
+ * type both answered "why you can and will issue this". Whether one basis is
+ * enough is open with GovTech Liaison (§13 item 12).
+ */
+export interface IssueType {
+  name: string;
+}
+
+/**
+ * Why a record is `WITHDRAWN` — each is said differently to the
+ * organisation, so the reason is kept, not inferred from the door.
+ *
+ * - `REQUESTER` — the business's Root withdrew its request (ACC-02/A1).
+ * - `BY_NDI` — an administrator withdrew it, with a reason: an approval
+ *   nobody accepted (ACC-01/E2), or — catalogue flow 11, shown only from the
+ *   state switcher — one already active.
+ * - `NOT_LISTED` — NDI abandoned a listing that couldn't be published (E8,
+ *   ACC-02/E7). Shown only from the state switcher: the demo's listing
+ *   always publishes.
+ * - `REPLACED` — a wider approval became `ACTIVE` (D24).
+ */
+export type AccWithdrawReason = "REQUESTER" | "BY_NDI" | "NOT_LISTED" | "REPLACED";
+
+export interface Accreditation {
   id: string;
-  orgId: string;
-  capability: Exclude<OrgCapability, "holder">;
-  requestedBy: PersonId;
-  /** Printed as-is: the requester may be nobody the demo can be driven as. */
-  requesterName: string;
-  requesterEmail: string;
-  note: string;
-  submittedAt: string;
-  state: "PENDING" | "APPROVED" | "DECLINED";
+  /** Absent for `NEW` until the invited officer has registered the organisation. */
+  orgId: string | null;
+  orgName: string;
+  /** `NEW`: whom the Kind O invitation goes to. */
+  officerEmail: string | null;
+  door: AccDoor;
+  capability: AccCapability;
+  /**
+   * What it will use the capability for. For an issuer, the single
+   * justification for every type in scope (D23).
+   */
+  purpose: string;
+  /** Issuer only: the mandate it issues under, once for the record (D23). */
+  legalBasis: string;
+  /** Issuer only: where that mandate is written down — an act, a licence number. */
+  legalBasisRef: string;
+  agreementRef: string;
+  ask: AskItem[];
+  issue: IssueType[];
+  /** Recognition: what the gate observed it doing, and since when. */
+  observed: { since: string; ask: AskItem[]; issue: IssueType[] } | null;
+  state: AccState;
+  /** The `ACTIVE` record this one replaces, if any (D24). That one stays `ACTIVE` until this one is. */
+  replacesId: string | null;
+  /**
+   * FLOW-ACC-02: the request this record is a part of. A business may ask
+   * for both capabilities at once (D22); each is its own record — reviewed,
+   * recommended and decided on its own, so one can be approved and the
+   * other declined — and the two share this id, which is how they are
+   * withdrawn together and shown as one request.
+   */
+  requestId: string | null;
+  /** The administrator who proposed it — or, for a request, who reviewed and recommended it. */
+  proposedBy: PersonId | null;
+  proposedAt: string | null;
+  /** FLOW-ACC-02: the business's Root, and when they asked. */
+  requestedBy: PersonId | null;
+  requestedAt: string | null;
+  /** FLOW-ACC-02 step 6: the reviewer's recommendation. */
+  recommendation: { by: PersonId; approve: boolean; reason: string | null; at: string } | null;
   decidedBy: PersonId | null;
   decidedAt: string | null;
-  reason: string | null;
+  /**
+   * The reason the organisation is shown when it is declined, verbatim. For
+   * a recommended decline that is the reviewer's reason (ACC-02/E11): the
+   * second administrator confirms it and adds nothing.
+   */
+  declineReason: string | null;
+  /** The officer declined at acceptance (FLOW-ACC-01 E3). */
+  declinedByOrg: boolean;
+  /** Why it is `WITHDRAWN`, by whom, and NDI's words if NDI did it. */
+  withdrawal: { reason: AccWithdrawReason; note: string | null; by: PersonId | null; at: string } | null;
+  /** The officer's name as their citizen credential gave it, at acceptance. */
+  acceptedName: string | null;
+  acceptedAt: string | null;
+  listedAt: string | null;
+  /**
+   * The one deadline left (D20): a FLOW-ACC-01 proposal lapses 30 days after
+   * it is made if nobody decides it (E14). Null everywhere else — requests,
+   * recommendations, acceptance and listing are reminded, not expired.
+   */
+  expiresAt: string | null;
+  /** The public identity it is (to be) listed under. */
+  publicIdentity: string | null;
+  /** Refused in the last 30 days — asked for something outside scope. */
+  refusals: { count: number; items: string[] } | null;
 }
+
+/** What SCR-ACC-01 sends: an administrator's proposal, through any NDI door. */
+export interface AccProposalInput {
+  door: Exclude<AccDoor, "REQUEST">;
+  orgId: string | null;
+  orgName: string;
+  officerEmail: string | null;
+  capability: AccCapability;
+  purpose: string;
+  legalBasis: string;
+  legalBasisRef: string;
+  agreementRef: string;
+  ask: AskItem[];
+  issue: IssueType[];
+  /** Names the ACTIVE approval this one replaces — the way past E10. */
+  replaces: string | null;
+}
+
+/** One capability in a business's request, exactly as its Root wrote it. */
+export interface AccRequestPart {
+  capability: AccCapability;
+  purpose: string;
+  ask: AskItem[];
+  issue: IssueType[];
+  legalBasis: string;
+  legalBasisRef: string;
+  /**
+   * Names the ACTIVE approval this part replaces — "Ask for more"
+   * (ACC-02/E3, AC-10). The way past E3 for a business, as `replaces` is
+   * for NDI's proposals: that approval keeps working until this one is.
+   */
+  replaces: string | null;
+}
+
+/** What SCR-ACC-06 sends: one capability or both (D22). */
+export interface AccRequestInput {
+  parts: AccRequestPart[];
+  /** The business's agreement with NDI, if it has one (FLOW-ACC-02 step 2). Optional, unlike a proposal's. */
+  agreementRef: string;
+}
+
+/**
+ * Kind N's matching key (FLOW-ACC-01 P3, EW-FLOW4-SD §4.1): the legal name
+ * with case, spacing and punctuation folded, so "Druk Insurance Ltd." and
+ * "DRUK  INSURANCE LTD" are one institution. Trimming and lower-casing alone
+ * let a full stop through, and two administrators could each invite the
+ * same body as a verifier.
+ */
+export const normaliseLegalName = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/**
+ * What an accreditation becomes when its one window runs out, or null if it
+ * hasn't. Nobody acts to end it — the date does — so it is read from the
+ * date rather than waiting for someone to press a button that would discover
+ * it. Until it was, a lapsed proposal still counted as in progress, "Propose
+ * again" returned E10, and nothing could end it.
+ *
+ * Only an NDI proposal nobody decided lapses (FLOW-ACC-01/E14, D20). A
+ * business's request and the recommendation on it never expire
+ * (ACC-02/E8, E12): NDI is reminded after 10 working days and the business
+ * keeps its place. There used to be three more windows here — acceptance,
+ * listing and the recommendation — each with its own ending and copy, and
+ * most of the prototype's faults were in those edges.
+ */
+export const accEnding = (a: Pick<Accreditation, "state" | "expiresAt" | "door">, today: string): "LAPSED" | null =>
+  a.state === "PROPOSED" && a.door !== "REQUEST" && a.expiresAt !== null && a.expiresAt < today ? "LAPSED" : null;
+
+/**
+ * Whether an accreditation still stands in the way of another for the same
+ * organisation and capability — in progress, or ACTIVE (FLOW-ACC-01/E10,
+ * FLOW-ACC-02/E3). Ended ones do not, and nor does a proposal whose window
+ * has run out but which the store hasn't yet moved on. A withdrawn approval
+ * is ended, which is what lets NDI propose again after withdrawing one
+ * nobody accepted (AC-15).
+ */
+export const accInProgress = (a: Pick<Accreditation, "state" | "expiresAt" | "door">) =>
+  ["SUBMITTED", "IN_REVIEW", "PROPOSED", "PENDING_ACCEPTANCE", "LISTING", "ACTIVE", "HELD"].includes(a.state) &&
+  accEnding(a, new Date().toISOString().slice(0, 10)) === null;
+
+/**
+ * Whether the organisation itself sees a record. Its own request it always
+ * does. Of what NDI proposes, it sees nothing until a second administrator
+ * has approved it — the owner is told only then (FLOW-ACC-01 step 3) — and
+ * never a proposal NDI declined or let lapse, whose reason was written to
+ * the proposer, not to it (E13, E14). A decline the organisation made
+ * itself (E3) is its own, and stays.
+ */
+export const accSeenByOrg = (a: Pick<Accreditation, "state" | "door" | "declinedByOrg">) =>
+  a.state !== "LAPSED" && (a.door === "REQUEST" || !(a.state === "PROPOSED" || (a.state === "DECLINED" && !a.declinedByOrg)));
+
+/**
+ * ACC-01/E11 as a face, not a state: an `ACTIVE` approval whose organisation
+ * no longer has the listed identity as its primary DID. Gated calls are
+ * refused and both parties alerted, but the record stays `ACTIVE` (D24) —
+ * putting the listed DID back is enough, with no state to move back from.
+ */
+export const accStopped = (
+  a: Pick<Accreditation, "state" | "publicIdentity">,
+  org: Pick<Organization, "publicDid"> | undefined,
+) => a.state === "ACTIVE" && Boolean(a.publicIdentity) && org !== undefined && org.publicDid !== a.publicIdentity;
+
+/**
+ * Working days since a date — weekends skipped, holidays not modelled. The
+ * reminders that replaced the old expiries all fire at 10 working days
+ * (ACC-01/E2, E14; ACC-02/E8, E12), and the screens say when one has gone.
+ */
+export function workingDaysSince(date: string | null): number {
+  if (!date) return 0;
+  const d = new Date(`${date}T00:00:00`);
+  const end = new Date();
+  let n = 0;
+  while (d < end) {
+    d.setDate(d.getDate() + 1);
+    if (d < end && d.getDay() !== 0 && d.getDay() !== 6) n++;
+  }
+  return n;
+}
+
+export const REMINDER_WORKING_DAYS = 10;
 
 export interface HarnessState {
   /**
@@ -1246,7 +1545,8 @@ export interface DemoState {
   orgInterests: OrgInterest[];
   /** FLOW-DEL-02 — whether each new organisation's representative has accepted. */
   responsibilities: Responsibility[];
-  accessRequests: AccessRequest[];
+  /** Flow 4 — approvals to verify or issue, through either door. */
+  accreditations: Accreditation[];
   /**
    * True from the moment onboarding completes until the story jumps past
    * act 1: the console is showing Pelden on its first day (`firstRunState`),
@@ -1293,6 +1593,104 @@ const day = (offset: number): string =>
 
 /** A timestamp, for audit rows that show a time as well as a date. */
 const at = (offset: number, time: string): string => `${day(offset)}T${time}:00+06:00`;
+
+/**
+ * When the capability gate stops observing and starts refusing
+ * (EW-FLOW4-SD §6.5). A dated decision, not reached yet: organisations
+ * already operating are recognised before it, and every recognition screen
+ * shows it, because an officer who misses it finds out by being refused.
+ */
+export const ENFORCEMENT_DATE = day(53);
+
+/**
+ * Credentials published on the platform, and what can be asked for from
+ * each — the only things a verifier's scope may be made of (UXD-28). Items
+ * that can be answered as a yes or no come first: asking whether someone is
+ * over 18 is less than asking for their date of birth.
+ */
+export const PUBLISHED_CREDENTIALS: { credential: string; issuer: string; items: { item: string; checkOnly: boolean }[] }[] = [
+  {
+    credential: "Citizen ID",
+    issuer: "Department of Civil Registration and Census",
+    items: [
+      { item: "Is over 18", checkOnly: true },
+      { item: "Is a Bhutanese citizen", checkOnly: true },
+      { item: "Full name", checkOnly: false },
+      { item: "Date of birth", checkOnly: false },
+      { item: "Citizenship ID number", checkOnly: false },
+      { item: "Photo", checkOnly: false },
+      { item: "Permanent address", checkOnly: false },
+    ],
+  },
+  {
+    credential: "Driving licence",
+    issuer: "Road Safety & Transport Authority",
+    items: [
+      { item: "Licence is valid", checkOnly: true },
+      { item: "Licence class", checkOnly: false },
+      { item: "Licence number", checkOnly: false },
+    ],
+  },
+  {
+    credential: "Business Registration",
+    issuer: "Corporate Regulatory Authority",
+    items: [
+      { item: "Registration is active", checkOnly: true },
+      { item: "Registered name", checkOnly: false },
+      { item: "Registration number", checkOnly: false },
+    ],
+  },
+];
+
+/**
+ * What the capability gate saw organisations doing while it only observed
+ * (EW-FLOW4-SD §10) — the recognition list. A fixture: there is no gate.
+ * Bank of Bhutan's verifying asks for more than opening an account needs,
+ * which is the case recognition exists to catch (UC-25).
+ */
+export const OBSERVED_OPERATORS: {
+  orgId: string;
+  capability: AccCapability;
+  since: string;
+  ask: AskItem[];
+  issue: IssueType[];
+  /** Issuer only: the mandate it already issues under, offered as the proposal's one legal basis (D23). */
+  legalBasis?: string;
+  suggestedPurpose: string;
+}[] = [
+  {
+    orgId: "org-bob",
+    capability: "verifier",
+    since: day(-210),
+    ask: [
+      { credential: "Citizen ID", item: "Full name", checkOnly: false },
+      { credential: "Citizen ID", item: "Citizenship ID number", checkOnly: false },
+      { credential: "Citizen ID", item: "Date of birth", checkOnly: false },
+      { credential: "Citizen ID", item: "Photo", checkOnly: false },
+      { credential: "Citizen ID", item: "Permanent address", checkOnly: false },
+    ],
+    issue: [],
+    suggestedPurpose: "Confirming who a customer is when they open an account",
+  },
+  {
+    orgId: "org-bob",
+    capability: "issuer",
+    since: day(-240),
+    ask: [],
+    issue: [{ name: "Bank account confirmation" }],
+    legalBasis: "Financial Services Act — the bank holds the account record",
+    suggestedPurpose: "Confirming to other organisations that a customer holds an account",
+  },
+  {
+    orgId: "org-tashicell",
+    capability: "issuer",
+    since: day(-150),
+    ask: [],
+    issue: [{ name: "SIM registration" }],
+    legalBasis: "Telecommunications licence — the operator registers its subscribers",
+    suggestedPurpose: "Proving which person a mobile number is registered to",
+  },
+];
 
 /** Dates are fixed strings, not computed: a demo should look the same twice. */
 export const SEED: DemoState = {
@@ -1486,12 +1884,15 @@ export const SEED: DemoState = {
       location: "Norzin Lam, Thimphu, Bhutan",
       visibility: "public",
       capabilities: ["issuer", "verifier", "holder"],
+      publicDid: ISSUER_DID,
       memberIds: ["yeshey"],
+      /* Yeshey is the bank's OWNER, and only an OWNER accepts an approval
+         for it (SCR-ACC-03) — recorded, not assumed from the org's role. */
+      roles: { yeshey: "Owner" },
     },
     {
-      /* Another existing NDI customer, here only so the platform admin's
-         queue holds a request that is not about the Entity Wallet — a
-         company asking to verify as well as issue. */
+      /* Another existing NDI customer, already issuing before approvals were
+         enforced — the second entry on the recognition list. */
       id: "org-tashicell",
       name: "Tashi InfoComm Ltd.",
       description: "Mobile network operator. Issues SIM-registration credentials.",
@@ -2672,22 +3073,7 @@ export const SEED: DemoState = {
 
   orgOnboarding: null,
 
-  accessRequests: [
-    {
-      id: "ar-tashicell-verify",
-      orgId: "org-tashicell",
-      capability: "verifier",
-      requestedBy: "tashicell-owner",
-      requesterName: "Pem Dorji",
-      requesterEmail: "pem.dorji@tashicell.bt",
-      note: "We want to check customers' citizen credentials in-store before issuing a SIM, instead of photocopying CIDs.",
-      submittedAt: day(-1),
-      state: "PENDING",
-      decidedBy: null,
-      decidedAt: null,
-      reason: null,
-    },
-  ],
+  accreditations: [],
 
   orgInterests: [],
   responsibilities: [],
@@ -3001,7 +3387,7 @@ export function dayZeroState(seed: DemoState): DemoState {
        sitting in a queue on a platform nobody administers yet read as
        history the day-zero platform cannot have, and the guide no longer
        walks the requests queue at all. */
-    accessRequests: [],
+    accreditations: [],
     firstRun: true,
     harness: { ...seed.harness, persona: "yeshey" },
   };
