@@ -1119,8 +1119,10 @@ export interface CounterpartyRegistration {
   legalName: string;
   registrationNumber: string;
   tpn: string | null;
-  /** Kept, never looked up (pr-9 item 1 — see lib/bnsw.ts). */
+  /** DRC's `revocation_id` for it — looked up at B4 and at each declaration (§6.2, §8.1). */
   tpnRevocationId: string | null;
+  /** The prototype's link to the held credential the TPN's status stands for, as `licences[].credentialId` is for each licence. */
+  tpnCredentialId: string | null;
   /** Each business licence number and its revocation_id (B3, B4). `credentialId` is the prototype's link to the held credential its status stands for. */
   licences: { number: string; revocationId: string; credentialId: string }[];
   registeredAt: string;
@@ -1208,6 +1210,21 @@ export interface BnswCheck {
 }
 
 /**
+ * What BNSW records of a sign-in it refused (FLOW-AUT-02 E8, E15): DIDs,
+ * never the attribute values behind them.
+ */
+export interface BnswAttempt {
+  id: string;
+  at: number;
+  code: "E8" | "E15";
+  /** E8 — the DID the authority was issued from, which matched no registered company. */
+  issuerDid: string | null;
+  /** E15 — the app that answered, and the person BNSW had signed in. */
+  answeredByDid: string | null;
+  signedInDid: string | null;
+}
+
+/**
  * The simulated BNSW portal's own state: who is signed in to it, the
  * request out to the app, what it last told the person, the draft, and the
  * two things the prototype can't otherwise produce — an outage at NDI and
@@ -1217,6 +1234,8 @@ export interface BnswState {
   signedInCid: string | null;
   servicesDown: boolean;
   suspendedCitizens: string[];
+  /** Refused sign-ins BNSW records — E8 the issuer DID, E15 both identities' DIDs (FLOW-AUT-02 §6). */
+  attempts: BnswAttempt[];
   /** Steps 2–3 — the proof request out to the app; five minutes (E2). */
   request: { id: string; startedAt: number } | null;
   /** The last outcome to show, set by the store: a refusal, A4, an acceptance. */
@@ -4221,6 +4240,7 @@ export const SEED: DemoState = {
       registrationNumber: "CRA-2019-04477",
       tpn: "TPN-114-8830",
       tpnRevocationId: "b81f04c2-6d3e-4a97-8e15-c2d07a9f3b64",
+      tpnCredentialId: "hc-tpn",
       licences: [{ number: "BL-PLG-2025-00871", revocationId: "e4a92c17-0b5d-4f38-a6c1-9d27f30e85b2", credentialId: "hc-licence-plg" }],
       registeredAt: day(-29),
       requestId: null,
@@ -4270,7 +4290,7 @@ export const SEED: DemoState = {
       authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
       delegateName: "Pema Choden",
       delegateCid: "11512002960",
-      statusResult: "authority ACTIVE · citizen ID ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · TPN ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
       at: day(-2),
     },
     {
@@ -4289,11 +4309,11 @@ export const SEED: DemoState = {
       authorityRevocationId: "7f2c9e14-5a3b-4d8e-9c61-0b4a2f7d83e5",
       delegateName: "Pema Choden",
       delegateCid: "11512002960",
-      statusResult: "authority ACTIVE · citizen ID ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
+      statusResult: "authority ACTIVE · citizen ID ACTIVE · TPN ACTIVE · licence ACTIVE · Pelden Trading Pvt. Ltd. CURRENT",
       at: day(-2),
     },
   ],
-  bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
+  bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
 
   auditEntries: [
     {
@@ -4793,7 +4813,7 @@ export function firstRunState(s: DemoState): DemoState {
     counterpartyRegistrations: [],
     authoritySessions: [],
     counterpartyDeclarations: [],
-    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
     auditEntries: [
       {
         id: "au-onb-2",
@@ -4886,7 +4906,7 @@ export function dayZeroState(seed: DemoState): DemoState {
     counterpartyRegistrations: [],
     authoritySessions: [],
     counterpartyDeclarations: [],
-    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], request: null, notice: null, draft: null },
+    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
     auditEntries: [],
     appeals: [],
     signup: null,

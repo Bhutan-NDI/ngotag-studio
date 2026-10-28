@@ -18,7 +18,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential,
 sharing one, giving a clearing agent authority to act and her using it at the
-Single Window — fifteen chapters, 103 steps, starting on the platform's day
+Single Window — fifteen chapters, 105 steps, starting on the platform's day
 zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
@@ -128,8 +128,11 @@ zero:
     bank's flow again, sharing the registration, TPN and licence. Pema tries
     again and is *acting for* Pelden: the sentence with licence, limit and
     end time, the TPN and name shown from the registration. One declaration
-    is accepted, one above the limit is refused with the draft kept, and
-    after Pelden withdraws the authority (dashed — flow 11) the next is
+    is accepted, one above the limit is refused with the draft kept; the
+    Department of Revenue & Customs revokes the TPN (dashed) and the next
+    declaration is refused and the session ends, and acting again is refused
+    at the start, naming the TPN; with the TPN reinstated, and after Pelden
+    withdraws the authority (dashed — flow 11), the next declaration is
     refused and the session ends.
 15. **Where to go next.**
 
@@ -1180,26 +1183,28 @@ Point at the disclosed line:
 
 ## Flow 9 — acting for a company at the Single Window
 
-Built to FLOW-AUT-02 v0.1, EW-FLOW9-SD v0.1, the counterparty integration
-guide (EW-FLOW9-CIG) and UX-EW-06 SCR-AUT-07. Pema, holding the authority
-Flow 8 gave her, signs in to the Bhutan National Single Window as herself,
-chooses **Act for a company**, and shares her citizen ID and her authority
-from her Bhutan NDI app **once**. NDI's `client-service` checks V1–V6, BNSW
-checks B0–B4, and an *authority session* opens: "You're acting for <company>
-under licence <number>, up to Nu <limit> per declaration, until <time>."
-After that each declaration is checked at submission — the authority's,
-her citizen ID's, the licence's and the listing's status, then the limit —
-with no further trip to the app. This replaces the page that predated the
-specification (`/verifier/bnsw`, which now redirects): a wallet hop per
-declaration and a signed PASS/FAIL from an "Authority Verification API".
+Built to FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3, the counterparty integration
+guide (EW-FLOW9-CIG v0.3) and UX-EW-06 v0.3 SCR-AUT-07. Pema, holding the
+authority Flow 8 gave her, signs in to the Bhutan National Single Window as
+herself, chooses **Act for a company**, and shares her citizen ID and her
+authority from her Bhutan NDI app **once**. NDI's `client-service` checks
+V1–V6, BNSW checks B0–B4 — B4 looks up the company's TPN and the licences
+her authority names — and an *authority session* opens: "You're acting for
+<company> under licence <number>, up to Nu <limit> per declaration, until
+<time>." After that each declaration is checked at submission — the
+authority's, her citizen ID's, the TPN's, the licence's and the listing's
+status, then the limit — with no further trip to the app. What the checks
+read is Flow 8's own grant. The old `/verifier/bnsw` page (a wallet hop per
+declaration and a signed PASS/FAIL) now redirects.
 
 Everything at `/simulated/bnsw` is **BNSW's**, not NDI's, so the whole site
 sits inside one dashed frame, with no Studio chrome. Below the site, three
 dashed panels: Pema's app (SCR-AUT-08 is the app team's screen), things that
 happen elsewhere (the company withdrawing — catalogue flow 11, unspecified —
-the ministry suspending a licence, NDI's services down, BNSW's sign-in timing
-out), and **BNSW's records** — the registration, the session and what it
-keeps with each declaration. Point at the last one: BNSW does see Pema's
+the ministry suspending a licence, the tax office revoking the TPN, NDI's
+services down, BNSW's sign-in timing out), and **BNSW's records** — the
+registration with each status as it is now, the session, the sign-ins BNSW
+refused and what it keeps with each declaration. Point at the last one: BNSW does see Pema's
 name and citizen ID number (EW-FLOW9-SD §4.2), and Pelden is told nothing
 (D7).
 
@@ -1219,10 +1224,13 @@ registration carries the identity it gives authority from.
 | Value `1200000` | E13 — above the limit; the draft stays, the session goes on |
 | **Pelden Trading withdraws the authority**, then submit | E12 — nothing submitted, the session ended, the draft kept. The withdrawal reached BNSW at the next check (DA-CORE's target is within 60 seconds; the prototype shows it as immediate) |
 | **The ministry suspends licence …**, then submit | E12 with the licence as the reason (AC-05) |
+| **The Department of Revenue & Customs revokes TPN …**, then submit | E12 with the TPN as the reason, the session ended, the draft kept (AC-17) |
+| With the TPN revoked, **Act for a company** and **Share** | E11 naming the TPN, before any session opens (AC-19). **… reinstates TPN …** puts it back |
 | **NDI's revocation service can't be reached**, then submit | E7 — nothing submitted, the session kept (D18) |
 | **Amend** on a declaration | A3 — offered only because Pema's authority includes amending |
 | **Close BNSW and come back later** | A4 — resumed after B0, no new proof |
 | **BNSW's sign-in times out** | E14 — the draft kept |
+| **Stop acting for Pelden Trading Pvt. Ltd.** | A5 — "You've stopped acting for … Your draft is saved." |
 | Sign in as **Kinley Wangdi**, **Act for a company**, then **Pema Choden scans the code and shares instead** | E15 — a relayed QR code: the authority shared isn't the signed-in person's (B0) |
 | **A copied authority, signed with another key** | E3 — V2, the holder binding |
 | Withdraw it, then **Act for a company** again | E5 at sign-in (AC-03) |
@@ -1240,14 +1248,10 @@ first registers with BNSW after Pema's first try.
 
 ### Choices the specification leaves open
 
-- **TPN status** (pr-9 item 1): not looked up — B4, step 13 and §8.1 name
-  the licence, the authority, the citizen ID and the listing only.
-- **Several licences** (pr-9 item 2): B4 checks every registered licence the
-  authority names; the session opens if any is ACTIVE, and A2 offers only
-  those.
 - **BNSW's sign-in length** (§13 item 8): eight hours.
-- **E12's reasons** and "You've stopped acting for <company>." are the
-  prototype's words.
+- **An authority the revocation service doesn't know**: E12's reason is "it
+  can't be found at NDI" — FLOW-AUT-02's list of reasons has none for it.
+- **The label Amend**, and the line under "Checking…".
 
 ---
 
@@ -1269,7 +1273,7 @@ Worth showing:
 | `/appointments/.../confirm` | **same_device**, **declined**, **could_not_confirm**, **no_wallet** | SCR-DEL-04's E6, E7, E11 |
 | `/people-who-can-act` | **only_you**, **pending**, **accepted**, **declined**, **expired**, **withdrawn** | SCR-DEL-05, including a verified name that differs from the account |
 | `/onboarding/foundational` | **not_yet_accepted**, **declined**, **declined_accredited**, **sole_proprietorship** | Verified but not usable yet (DEL-02/E2, with its accredited wording); no appointing prompt for a proprietor, who can still appoint from who can act (UXD-24) |
-| `/simulated/bnsw` | **signed_out**, **waiting**, **checking**, **acting**, **choose_licence**, **resumed**, **refused_E2**…**refused_E15**, **not_submitted_E7/E9/E12/E13**, **ended_E14**, **offline** | SCR-AUT-07: every state in UX-EW-06's table, with §3.5's copy |
+| `/simulated/bnsw` | **signed_out**, **waiting**, **checking**, **acting**, **choose_licence**, **resumed**, **refused_E2**…**refused_E15** (**refused_E11_tpn** for the TPN), **not_submitted_E7/E9/E12/E13** (**not_submitted_E12_tpn**), **ended_E14**, **stopped_A5**, **offline** | SCR-AUT-07: every state in UX-EW-06's table, with §3.5's copy |
 | `/authority-to-act` | **empty**, **no_permission**, **not_in_standing**, **first_grant**, **offline** | SCR-AUT-01: E1 and E2 in place of *Give authority*, and the first-grant notice |
 | `/authority-to-act/give` | **licence_unavailable**, **counterparty_unavailable**, **field_error**, **duplicate**, **no_permission** | SCR-AUT-02's E4, E5, E6 and A3 |
 | `/authority-to-act/give/check` | **default_auto**, **default_approval**, **error** | SCR-AUT-03 with and without an approver |

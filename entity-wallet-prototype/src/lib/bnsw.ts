@@ -6,6 +6,7 @@ import {
   SIM_CITIZENS,
   type AuthorityGrant,
   type AuthoritySession,
+  type BnswAttempt,
   type BnswCheck,
   type CounterpartyRegistration,
   type DemoState,
@@ -28,17 +29,16 @@ import { namesOf } from "./sharing";
  * anything — the BNSW page renders what comes back and decides nothing,
  * the same rule as every other screen.
  *
- * WHAT THIS REPLACES
+ * HOW IT WORKS
  *
- * The page before the specification sent every declaration to the agent's
- * wallet and asked an "NDI Authority Verification API" to walk a chain and
- * sign a PASS or FAIL (`lib/avs.ts`, align/flow-7-9 item 10). The
- * specification works the other way round: one presentation of the citizen
- * credential and the authority, from one did:key, opens an *authority
- * session* (D2); after that each declaration is only a status lookup and
- * the limit — no further hop to the app, and no signed decision object
- * (EW-FLOW9-SD §15, the DA-CORE §8.1 departures). There is no chain:
- * the authority is the organisation's (EW-FLOW8-SD D15).
+ * One presentation of the citizen credential and the authority, from one
+ * did:key, opens an *authority session* (D2); after that each declaration
+ * is only a status lookup and the limit — no further hop to the app, and no
+ * signed decision object (EW-FLOW9-SD §15, the DA-CORE §8.1 departures).
+ * There is no chain: the authority is the organisation's (EW-FLOW8-SD D15).
+ * What the checks read is Flow 8's own record — an `AuthorityGrant` with
+ * its `issuerDid`, `revocationId`, named licences and limit — and the
+ * held credentials its licence and TPN stand for.
  *
  * WHAT BNSW SEES
  *
@@ -49,6 +49,13 @@ import { namesOf } from "./sharing";
  * wallet at this point: BNSW has the company's name, TPN and licences from
  * the company's registration with it (D11), and the authority names only a
  * licence number.
+ *
+ * WHAT IS CHECKED AGAIN, AND WHEN
+ *
+ * At sign-in, B4 looks up the TPN and every registered licence the
+ * authority names (D20). At each declaration, one status lookup covers the
+ * authority, the citizen credential, the TPN, the licence on the declaration
+ * and the company's listing (§8.1), then the limit (§8.2).
  */
 
 export const BNSW = "org-bnsw";
@@ -71,12 +78,11 @@ export const SIGN_IN_MS = 8 * 60 * 60_000;
 /* ------------------------------------------------------------------ */
 
 /**
- * Every message the delegate reads on SCR-AUT-07. Where §3.5 gives the
- * words they are used exactly; the three lines it doesn't give — the
- * stopped notice, the "Checking…" detail and E12's reasons — are the
- * prototype's, written to the same rules (plain words, who can fix it) and
- * listed on the what's-real page. "BNSW" is the specification's own word
- * for the Single Window in this copy. A name ending in a full stop
+ * Every message the delegate reads on SCR-AUT-07. §3.5 gives the words
+ * and they are used exactly; the lines it doesn't give are E12's reason for
+ * a credential that is *not found*, and the "Checking…" detail beside the
+ * spinner, which are the prototype's. "BNSW" is the specification's own
+ * word for the Single Window in this copy. A name ending in a full stop
  * ("Pelden Trading Pvt. Ltd.") takes no second one (`ending`).
  */
 export const COPY = {
@@ -93,8 +99,22 @@ export const COPY = {
     `${c} needs to register with BNSW, or register again, before anyone can act for it here. Ask them to share their licence and TPN with BNSW from the NDI Entity Wallet.`,
   E9: (c: string, task: string) => `Your authority from ${c} doesn't let you ${task} at BNSW.`,
   E10: (c: string) => `The licence in your authority isn't registered with BNSW. Ask ${c} to register it.`,
+  /** E11, licence. */
   E11: (c: string, n: string) => `${c}'s business licence ${n} isn't valid at the moment, so you can't declare under it.`,
+  /** E11, TPN. */
+  E11tpn: (c: string) => `${c}'s TPN isn't valid at the moment, so you can't declare for it. Ask ${c} about it.`,
   E12: (c: string, reason: string) => `Your authority to act for ${c} has changed, so this declaration wasn't submitted: ${reason}. Your draft is saved.`,
+  /** E12's `<reason>`, as FLOW-AUT-02 E12 lists them — never a status code. */
+  E12reason: {
+    withdrawn: (c: string) => `${c} has withdrawn it`,
+    paused: (c: string) => `${c} has paused it`,
+    citizen: "your citizen ID in Bhutan NDI isn't valid at the moment",
+    tpn: (c: string) => `${c}'s TPN isn't valid at the moment`,
+    licence: (c: string, n: string) => `${c}'s business licence ${n} isn't valid at the moment`,
+    listing: (c: string) => `${c} can't give authority at the moment`,
+    /** The prototype's: the list has no reason for an authority the revocation service doesn't know. */
+    notFound: "it can't be found at NDI",
+  },
   E13: (limit: string, c: string) => `This declaration is above your limit of Nu ${limit} for ${ending(c)} Ask ${c} to submit it, or to change your authority.`,
   E14: (c: string, tail: string) => `You're no longer acting for ${ending(c)} Your authority ${tail}. Your draft is saved.`,
   E15: "The authority shared isn't yours. Only share authority from your own Bhutan NDI app.",
@@ -104,8 +124,8 @@ export const COPY = {
   acting: (c: string, licences: string, limit: string, time: string) =>
     `You're acting for ${c} under licence ${licences}, up to Nu ${limit} per declaration, until ${time}.`,
   offline: "You're offline. Nothing has been submitted.",
-  /** The prototype's: nothing in §3.5 covers *Stop acting*. */
-  stopped: (c: string) => `You've stopped acting for ${ending(c)}`,
+  /** A5. */
+  stopped: (c: string) => `You've stopped acting for ${ending(c)} Your draft is saved.`,
 };
 
 /** "1,000,000" — the number in "Nu <limit>". */
@@ -190,12 +210,11 @@ export const holderDidOf = (orgId: string) =>
  *
  * `publishingDid` is the platform's attestation (D8): filled only where the
  * organisation is CURRENT on NDI's list as an issuer of authority at the
- * moment it shares — SD9 §7's wording, not CIG §3's "once the company has
- * given authority to anyone" (pr-9, optional), because the listing is
- * CURRENT from the first grant, before anyone accepts. A company that
- * registered before its first grant has none, and its delegates fail B1
- * (E8) until it registers again — the specification's answer to the
- * registration-order problem (§7, R5), not a gap the prototype fills.
+ * moment it shares (§7, CIG §3) — the listing is CURRENT from the first
+ * grant, before anyone accepts. A company that registered before its first
+ * grant has none, and its delegates fail B1 (E8) until it registers again —
+ * the specification's answer to the registration-order problem (§7, R5),
+ * not a gap the prototype fills.
  */
 export function registrationFrom(
   s: Pick<DemoState, "organizations">,
@@ -217,6 +236,7 @@ export function registrationFrom(
     registrationNumber: attr("Business Registration", "registration_number") ?? "",
     tpn: tpnCredential ? (tpnCredential.attributes.find((a) => a.name === "tpn")?.value ?? null) : null,
     tpnRevocationId: tpnCredential ? revocationIdOf(tpnCredential.id) : null,
+    tpnCredentialId: tpnCredential?.id ?? null,
     licences: credentials
       .filter((c) => c.type === "Business Licence")
       .map((c) => ({ number: licenceNumberOf(c), revocationId: revocationIdOf(c.id), credentialId: c.id })),
@@ -264,6 +284,18 @@ export function licenceStatus(s: Pick<DemoState, "heldCredentials">, licence: Co
   return c.status === "active" && (c.expiresAt === null || c.expiresAt >= now) ? "ACTIVE" : "REVOKED";
 }
 
+/**
+ * The TPN's status by the `revocation_id` BNSW kept from the registration
+ * (§4.1, §8.1) — DRC's credential, read as the licence's is. A registration
+ * that kept no TPN has nothing to look up, which is NOT_FOUND and fails
+ * (D9).
+ */
+export function tpnStatus(s: Pick<DemoState, "heldCredentials">, reg: CounterpartyRegistration | undefined | null, now = today()): RevocationStatus {
+  const c = reg?.tpnCredentialId ? s.heldCredentials.find((x) => x.id === reg.tpnCredentialId) : undefined;
+  if (!c) return "NOT_FOUND";
+  return c.status === "active" && (c.expiresAt === null || c.expiresAt >= now) ? "ACTIVE" : "REVOKED";
+}
+
 export const citizenStatus = (s: Pick<DemoState, "bnsw">, cid: string): RevocationStatus =>
   s.bnsw.suspendedCitizens.includes(cid) ? "SUSPENDED" : "ACTIVE";
 
@@ -294,15 +326,15 @@ export type SignInResult =
 const CHECKS: { id: string; label: string }[] = [
   { id: "V1", label: "The presentation and every credential verify" },
   { id: "V2", label: "Both credentials are made out to whoever signed it" },
-  { id: "V3", label: "Each issuer is CURRENT on NDI's list for its type" },
+  { id: "V3", label: "Each credential comes from an organisation CURRENT on NDI's list for its type" },
   { id: "V4", label: "Each revocation id is ACTIVE" },
   { id: "V5", label: "Each credential is within its validity" },
-  { id: "V6", label: "The authority's principal is its issuer" },
+  { id: "V6", label: "The authority is the company's own" },
   { id: "B0", label: "The citizen ID is the signed-in user's" },
-  { id: "B1", label: "The issuer is a registered company's publishing DID" },
+  { id: "B1", label: "The authority comes from a company registered with BNSW" },
   { id: "B2", label: "It names BNSW and a BNSW task" },
   { id: "B3", label: "It names a licence registered for the company" },
-  { id: "B4", label: "That licence is ACTIVE" },
+  { id: "B4", label: "The TPN and a licence are ACTIVE" },
 ];
 
 /**
@@ -371,9 +403,11 @@ export function checkSignIn(s: DemoState, signedInCid: string, p: Presentation, 
   if (named.length === 0) return fail("B3", "E10", COPY.E10(company));
   pass("B3");
 
-  /* B4 — pr-9 item 2, chosen: every registered licence the authority
-     names is looked up; the session opens if at least one is ACTIVE, and
-     A2 offers only those. With none ACTIVE, E11 names the first. */
+  /* B4 (D20) — the TPN, and every registered licence the authority names,
+     are looked up together. The session opens if the TPN and at least one
+     licence are ACTIVE, and A2 offers only the ACTIVE licences. E11 names
+     the TPN when that is what failed, otherwise the first licence. */
+  if (tpnStatus(s, reg) !== "ACTIVE") return fail("B4", "E11", COPY.E11tpn(company));
   const active = named.filter((l) => licenceStatus(s, l) === "ACTIVE");
   if (active.length === 0) return fail("B4", "E11", COPY.E11(company, named[0].number));
   pass("B4");
@@ -431,14 +465,10 @@ export function sessionEndReason(session: AuthoritySession, now = Date.now()): A
 /**
  * FLOW-AUT-02 steps 13–15 — at every submission, before anything is
  * accepted. The order is the guide's: the action in the authority (B2),
- * then `POST /status` for the authority, the citizen credential, the
- * licence on this declaration and the listing (§8.1, CIG §6.1), then the
- * limit (§8.2).
- *
- * pr-9 item 1, chosen: the TPN is not looked up. Step 13, §8.1 and the
- * guide's request body name four things and the TPN isn't one, so a TPN
- * DRC has revoked does not stop a declaration here; BNSW shows the TPN
- * from the registration and keeps its id. Recorded on the what's-real page.
+ * then `POST /status` for the authority, the citizen credential, the TPN,
+ * the licence on this declaration and the listing (§8.1, CIG §6.1), then
+ * the limit (§8.2). A TPN DRC has revoked ends the session as a withdrawn
+ * authority does (E12, AC-17).
  */
 export function checkDeclaration(
   s: DemoState,
@@ -458,45 +488,66 @@ export function checkDeclaration(
   /* E7 — an outage stops the declaration but keeps the session (D18). */
   if (s.bnsw.servicesDown) return { ok: false, code: "E7", text: COPY.E7, keep: true };
 
-  const reg = s.counterpartyRegistrations.find((r) => r.id === session.registrationId);
+  /* The record BNSW kept, which a company registering again replaces. */
+  const reg = s.counterpartyRegistrations.find((r) => r.id === session.registrationId) ?? registrationOf(s, session.orgId);
   const licence = reg?.licences.find((l) => l.number === d.licenceNumber);
   const statuses = {
     authority: authorityStatus(s, session.authorityRevocationId),
     citizen: citizenStatus(s, session.delegateCid),
+    tpn: tpnStatus(s, reg),
     licence: licence ? licenceStatus(s, licence) : ("NOT_FOUND" as RevocationStatus),
     listing: listingOf(s, session.principalDid).current ? "CURRENT" : "TERMINATED",
   };
 
-  /* E12's <reason>, in plain words — pr-9 (optional) asks the docs to list
-     them; until they do, these are the prototype's. */
+  /* E12's <reason>, in plain words (FLOW-AUT-02 E12), in the order step 13
+     asks: the authority, the citizen credential, the TPN, the licence, the listing. */
+  const why = COPY.E12reason;
   const reason =
     statuses.authority === "REVOKED"
-      ? `${company} has withdrawn it`
+      ? why.withdrawn(company)
       : statuses.authority === "SUSPENDED"
-        ? `${company} has paused it`
+        ? why.paused(company)
         : statuses.authority === "NOT_FOUND"
-          ? "it can't be found at NDI"
+          ? why.notFound
           : statuses.citizen !== "ACTIVE"
-            ? "your citizen ID in Bhutan NDI isn't valid at the moment"
-            : statuses.licence !== "ACTIVE"
-              ? `business licence ${d.licenceNumber} isn't valid at the moment`
-              : statuses.listing !== "CURRENT"
-                ? `${company} can't give authority at the moment`
-                : null;
+            ? why.citizen
+            : statuses.tpn !== "ACTIVE"
+              ? why.tpn(company)
+              : statuses.licence !== "ACTIVE"
+                ? why.licence(company, d.licenceNumber)
+                : statuses.listing !== "CURRENT"
+                  ? why.listing(company)
+                  : null;
   if (reason) return { ok: false, code: "E12", text: COPY.E12(company, reason), keep: false, endReason: "changed" };
 
-  /* §8.2 — per declaration, the only kind a grant carries (pr-8 item 1). */
+  /* §8.2 — per declaration, the only kind a grant carries at first release (EW-FLOW8-SD D25). */
   if (d.valueNu > session.valueCapNu) return { ok: false, code: "E13", text: COPY.E13(grouped(session.valueCapNu), company), keep: true };
 
   return {
     ok: true,
-    statusResult: `authority ${statuses.authority} · citizen ID ${statuses.citizen} · licence ${statuses.licence} · ${company} ${statuses.listing}`,
+    statusResult: `authority ${statuses.authority} · citizen ID ${statuses.citizen} · TPN ${statuses.tpn} · licence ${statuses.licence} · ${company} ${statuses.listing}`,
   };
 }
 
 /** The *Acting for* sentence for a session. */
 export const actingSentence = (s: Pick<DemoState, "organizations">, session: AuthoritySession, now = Date.now()) =>
   COPY.acting(orgName(s, session.orgId), namesOf(session.licenceNumbers), grouped(session.valueCapNu), timeOf(session.endsAt, now));
+
+/**
+ * What BNSW records of a refused sign-in (FLOW-AUT-02 E8, E15) — the DIDs
+ * only: E8 the DID the authority was issued from, E15 the app that answered
+ * and the person BNSW had signed in, never the values behind them.
+ */
+export function attemptOf(
+  s: Pick<DemoState, "authorityGrants">,
+  code: RefusalCode,
+  signedInCid: string,
+  p: Presentation,
+): Omit<BnswAttempt, "id" | "at"> | null {
+  if (code === "E8") return { code, issuerDid: s.authorityGrants.find((x) => x.id === p.grantId)?.issuerDid ?? null, answeredByDid: null, signedInDid: null };
+  if (code === "E15") return { code, issuerDid: null, answeredByDid: appDidOf(s, p.answeredBy), signedInDid: appDidOf(s, signedInCid) };
+  return null;
+}
 
 /** Pelden's id, for the seed and the switcher's fixtures. */
 export const DEFAULT_COMPANY = PELDEN;

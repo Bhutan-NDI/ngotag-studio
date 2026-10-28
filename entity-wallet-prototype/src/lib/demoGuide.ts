@@ -102,8 +102,9 @@ export interface GuideStep {
  * Pelden has never registered with BNSW in this story, so her first try is
  * refused (E8) and Dorji registers Pelden from BNSW's site — the same
  * share-from-a-website flow as the bank's. Then she acts for Pelden, one
- * declaration goes through, one is above her limit, and Pelden withdraws
- * the authority before the next.
+ * declaration goes through, one is above her limit, the tax office revokes
+ * Pelden's TPN — which BNSW looks up at the start of a session and at every
+ * declaration — and Pelden withdraws the authority before the next.
  *
  * Member onboarding is here because the first day is now genuinely empty.
  * When it still listed the seed's colleagues, the room's first question on
@@ -125,7 +126,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "The tax office's system answers", shows: "Deki connects the office's system, and Pelden's next request is answered without an officer" },
   { title: "Pelden shares with its bank", shows: "From the bank's website and back, then a request in the wallet — the whole credential, said so" },
   { title: "Authority for the clearing agent", shows: "Dorji gives Pema authority to declare at the Single Window; she collects it with Bhutan NDI" },
-  { title: "Pema declares for Pelden", shows: "At the Single Window: one share from her app, then declarations checked each time — and refused, with why" },
+  { title: "Pema declares for Pelden", shows: "At the Single Window: one share from her app, then declarations checked each time — authority, TPN, licence, limit — and refused, with why" },
   { title: "Where to go next", shows: "The other routes, and what's simulated" },
 ];
 
@@ -1035,7 +1036,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 14,
     title: "Acting for Pelden",
     happening:
-      "Pema is still signed in. This time every check passes and BNSW opens a session: the one sentence that must survive review — company, licence, limit, until when — and Pelden's TPN and registered name, shown, never typed.",
+      "Pema is still signed in. This time every check passes — including a lookup of Pelden's TPN and licence — and BNSW opens a session: the one sentence that must survive review — company, licence, limit, until when — and Pelden's TPN and registered name, shown, never typed.",
     doThis:
       "Press **Act for a company**, then **Share** (dashed). Read the sentence. Type goods and **420000** as the value, and press **Submit declaration**.",
     say: "BNSW sees Pema's name and citizen ID number — it keeps them with every declaration. It never sees Pelden's credentials again, and Pelden isn't told each time.",
@@ -1045,8 +1046,27 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 14,
     title: "Above the limit",
     happening:
-      "Each declaration is checked when it's submitted: the authority, her citizen ID, the licence and Pelden's listing, then the limit. Above Nu 1,000,000 it isn't submitted — the draft stays, and the session goes on.",
+      "Each declaration is checked when it's submitted: the authority, her citizen ID, Pelden's TPN, the licence and Pelden's listing, then the limit. Above Nu 1,000,000 it isn't submitted — the draft stays, and the session goes on.",
     doThis: "Type **1200000** and press **Submit declaration**.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 14,
+    title: "The tax office revokes the TPN",
+    happening:
+      "Pelden's TPN is the tax office's credential, and BNSW checks it with every declaration. Revoking one is the Department of Revenue & Customs' own act, outside the wallet, so it's a dashed step. BNSW finds out at the very next declaration: nothing submitted, the session ended, and the draft kept.",
+    doThis:
+      "Press **The Department of Revenue & Customs revokes TPN-114-8830** (dashed). Change the value to **300000** and press **Submit declaration**.",
+    say: "Pelden isn't told that BNSW found out, and neither is Pema's phone. BNSW asked NDI one question and got an answer.",
+    route: "/simulated/bnsw",
+  },
+  {
+    chapter: 14,
+    title: "Refused at the start",
+    happening:
+      "The same check runs when a session opens. With the TPN still revoked, sharing the authority again stops at BNSW's own last check, and the message names the TPN and who to ask. Her draft is still saved.",
+    doThis:
+      "Press **Act for a company**, then **Share** (dashed) and read the message. Press **The Department of Revenue & Customs reinstates TPN-114-8830** (dashed), then **Act for a company** and **Share** again.",
     route: "/simulated/bnsw",
   },
   {
@@ -1054,7 +1074,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Pelden withdraws it",
     happening:
       "Withdrawing is catalogue flow 11, not specified yet, so it's a dashed step. It reaches NDI at once — the target is within a minute — and BNSW finds out at the very next declaration: nothing submitted, the session ended, the draft kept.",
-    doThis: "Press **Pelden Trading withdraws the authority** (dashed). Change the value to **300000** and press **Submit declaration**.",
+    doThis: "Press **Pelden Trading withdraws the authority** (dashed). Check the value is still **300000** and press **Submit declaration**.",
     say: "Nobody had to tell BNSW. It checks every time, so a withdrawal works between one declaration and the next.",
     route: "/simulated/bnsw",
   },

@@ -271,8 +271,14 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       simulated portal added, with Pelden's TPN credential and the
  *       Single Window's return address. A version-29 save holds decisions
  *       nothing reads and no registration for Pema's authority to match.
+ *  31 — Flow 9 follows FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3 and UX-EW-06
+ *       v0.3: BNSW looks up the company's TPN as well as its licences, so a
+ *       registration records which held credential its TPN stands for, and
+ *       BNSW records the sign-ins it refused (E8, E15). A version-30 save
+ *       has a registration with no TPN to look up, which would refuse every
+ *       sign-in as E11, and a portal with no list of attempts.
  */
-const SEED_VERSION = 30;
+const SEED_VERSION = 31;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -1693,6 +1699,13 @@ interface DemoActions {
   simulateLicenceIssued: () => void;
   /** Simulated — the ministry revokes a licence a waiting grant names (AC-06 → E11 at claim). */
   simulateLicenceRevoked: (licenceNumber: string) => void;
+  /**
+   * Simulated — the Department of Revenue & Customs revokes a TPN, or
+   * reinstates it (FLOW-AUT-02 AC-17, AC-19). Nothing in the Entity Wallet
+   * does this; the credential's status changes at DRC's revocation service
+   * and BNSW looks it up at B4 and at each declaration.
+   */
+  simulateTpnStatus: (credentialId: string, status: "REVOKED" | "ACTIVE") => void;
   /** SCR-AUT-01 — the first-grant notice, once read. */
   dismissFirstGrantNotice: () => void;
   /** SCR-AUT-05 step 9 — what the link may show before identity: the organisation's name, or nothing (S3, E7). */
@@ -3353,6 +3366,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         log(`Ministry of Industry, Commerce & Employment revoked business licence ${licenceNumber}`);
       },
 
+      simulateTpnStatus: (credentialId, status) => {
+        const c = stateRef.current.heldCredentials.find((x) => x.id === credentialId);
+        if (!c || c.status === "expired" || (status === "REVOKED" ? c.status === "revoked" : c.status === "active")) return;
+        setState((s) => ({
+          ...s,
+          heldCredentials: s.heldCredentials.map((x) => (x.id === credentialId ? { ...x, status: status === "REVOKED" ? ("revoked" as const) : ("active" as const) } : x)),
+        }));
+        const org = c.orgId ?? PELDEN;
+        log(`${c.issuer} ${status === "REVOKED" ? "revoked" : "reinstated"} ${auth.orgName(stateRef.current, org)}'s TPN`, org);
+      },
+
       dismissFirstGrantNotice: () =>
         setState((s) => ({
           ...s,
@@ -3530,9 +3554,20 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           setState((s) => ({ ...s, bnsw: { ...s.bnsw, request: null, notice: bnswNotice("E2", bnsw.COPY.E2) } }));
           return;
         }
-        const result = bnsw.checkSignIn(s0, cid, { grantId: answer.grantId, answeredBy: answer.answeredBy, copied: answer.copied });
+        const presentation = { grantId: answer.grantId, answeredBy: answer.answeredBy, copied: answer.copied };
+        const result = bnsw.checkSignIn(s0, cid, presentation);
         if (!result.ok) {
-          setState((s) => ({ ...s, bnsw: { ...s.bnsw, request: null, notice: bnswNotice(result.code, result.text, result.checks) } }));
+          /* E8 and E15 are also written down at BNSW, as DIDs (FLOW-AUT-02 §6). */
+          const attempt = bnsw.attemptOf(s0, result.code, cid, presentation);
+          setState((s) => ({
+            ...s,
+            bnsw: {
+              ...s.bnsw,
+              request: null,
+              notice: bnswNotice(result.code, result.text, result.checks),
+              attempts: attempt ? [{ ...attempt, id: rid("att"), at: Date.now() }, ...s.bnsw.attempts] : s.bnsw.attempts,
+            },
+          }));
           return;
         }
         const session: AuthoritySession = { ...result.session, id: rid("as"), status: "OPEN", endedAt: null, endReason: null };

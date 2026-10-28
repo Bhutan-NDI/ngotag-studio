@@ -250,7 +250,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "The checks at sign-in — NDI's V1–V6, then BNSW's B0–B4",
         reality:
-          "lib/bnsw.ts reads the demo state in the order the solution design gives, stopping at the first failure. Nothing cryptographic happens: V1 and V6 always pass for a grant the story made. The result lists each check's outcome, which client-service doesn't forward yet — a failed check is still reported as validated today (R11).",
+          "lib/bnsw.ts reads the demo state in the order the solution design gives, stopping at the first failure, and reads Flow 8's own grant: its publishing DID, revocation id, licences and limit. Nothing cryptographic happens: V1 and V6 always pass for a grant the story made. B4 looks up the TPN and every registered licence the authority names. The result lists each check's outcome, which client-service doesn't forward yet — a failed check is still reported as validated today (R11).",
         needs: "client-service forwarding the true outcome, V2–V6, the per-credential result fields and POST /status (FLOW-AUT-02 P3).",
       },
       {
@@ -258,6 +258,12 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         reality:
           "Withdrawing, pausing and resuming are dashed steps standing in for catalogue flow 11, which has no specification. The status changes at once, and BNSW sees it on its next check — the next declaration. DA-CORE's target is within 60 seconds of the action; the prototype shows it as immediate.",
         needs: "Flow 11, revocation for platform-issued credentials, and the 60-second propagation DA-CORE sets.",
+      },
+      {
+        shown: "The tax office revoking a TPN, and the ministry suspending a licence",
+        reality:
+          "Dashed steps under the Single Window's page. Each flips the held credential's status in your browser; nothing in the Entity Wallet does this. BNSW looks the TPN and the licences up at B4 when a session opens (E11), and again at each declaration (E12, which ends the session and keeps the draft). A licence the ministry suspends can't be reinstated here; the tax office's TPN can.",
+        needs: "DRC and MoICE issuing revocable credentials (FLOW-AUT-02 P5), and client-service's POST /status answering for their revocation ids (P3).",
       },
       {
         shown: "Pelden registering with the Single Window",
@@ -268,7 +274,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Choices the specification leaves open, made here",
         reality:
-          "The TPN isn't looked up: B4, step 13 and §8.1 name the licence, the authority, the citizen ID and the listing, so a revoked TPN doesn't stop a declaration (pr-9 item 1). Where an authority names several registered licences, B4 checks each, the session opens if any is ACTIVE, and A2 offers only those (pr-9 item 2). BNSW's sign-in lasts eight hours (§13 item 8 is open). E12's reasons are the prototype's plain words (pr-9, optional), and so are \"You've stopped acting for <company>.\" and the label Amend. The publishing DID is carried when the company is listed — SD9 §7, not CIG §3's \"once it has given authority to anyone\". A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
+          "BNSW's sign-in lasts eight hours (§13 item 8 is open). When the revocation service doesn't know an authority at all, E12's reason is \"it can't be found at NDI\" — the list in E12 has none for that. The label Amend is the prototype's too. \"Checking…\" has a line under it saying what is being looked at. A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
         needs: "The specification to settle each.",
       },
     ],

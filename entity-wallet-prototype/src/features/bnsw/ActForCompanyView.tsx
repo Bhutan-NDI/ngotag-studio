@@ -21,8 +21,10 @@ import {
   citizenOf,
   grouped,
   heldAuthorities,
+  licenceStatus,
   registrationOf,
   timeOf,
+  tpnStatus,
 } from "@/lib/bnsw";
 import { PELDEN, SIM_CITIZENS, type AuthoritySession, type BnswCheck, type DeclarationDraft } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
@@ -43,9 +45,9 @@ import { BnswFrame, BnswMessage, Fact } from "./shared";
  * both in one presentation (SCR-AUT-08, a dashed panel here). NDI's
  * client-service checks V1–V6, BNSW checks B0–B4, and an *authority
  * session* opens. Declarations after that need no trip to the app: each is
- * a status lookup and the limit, at submission (EW-FLOW9-SD D5, D6). That
- * replaces the page before the specification, which sent every declaration
- * to the wallet and rendered a signed PASS or FAIL.
+ * a status lookup and the limit, at submission (EW-FLOW9-SD D5, D6): the
+ * authority's, her citizen ID's, the TPN's, the licence's and the
+ * company's listing, one lookup, then the value.
  *
  * THE COMPANY'S DETAILS ARE SHOWN, NEVER ASKED FOR (UXD-52)
  *
@@ -88,12 +90,15 @@ const FACES = [
   "refused_E9",
   "refused_E10",
   "refused_E11",
+  "refused_E11_tpn",
   "refused_E15",
   "not_submitted_E7",
   "not_submitted_E9",
   "not_submitted_E12",
+  "not_submitted_E12_tpn",
   "not_submitted_E13",
   "ended_E14",
+  "stopped_A5",
   "offline",
 ] as const;
 
@@ -436,6 +441,7 @@ function fixtureModel(face: string, now: number): Model {
     refused_E9: COPY.E9(company, taskLabel("nsw:submit-declaration").toLowerCase()),
     refused_E10: COPY.E10(company),
     refused_E11: COPY.E11(company, "BL-PLG-2025-00871"),
+    refused_E11_tpn: COPY.E11tpn(company),
     refused_E15: COPY.E15,
   };
   if (face === "signed_out") return { ...base, phase: "signed_out", signedIn: null };
@@ -443,12 +449,14 @@ function fixtureModel(face: string, now: number): Model {
   if (face === "checking") return { ...base, phase: "checking" };
   if (face === "acting" || face === "choose_licence") return { ...base, phase: "acting", session, draft: face === "choose_licence" ? { ...draft, value: "640000", licence: "" } : null };
   if (face === "resumed") return { ...base, phase: "acting", session, notice: n("A4", COPY.A4(company, timeOf(session.endsAt, now))) };
-  if (face in refusals) return { ...base, notice: n(face.replace("refused_", "").replace("_citizen", "citizen"), refusals[face]) };
+  if (face in refusals) return { ...base, notice: n(face.replace("refused_", "").replace("_citizen", "citizen").replace("_tpn", ""), refusals[face]) };
   if (face === "not_submitted_E7") return { ...base, phase: "acting", session, draft, notice: n("E7", COPY.E7) };
   if (face === "not_submitted_E9")
     return { ...base, phase: "acting", session: { ...session, tasks: ["nsw:submit-declaration"] }, draft: { ...draft, value: "380000", amends: "dcl-84137" }, notice: n("E9", COPY.E9(company, taskLabel(AMEND).toLowerCase())) };
   if (face === "not_submitted_E13") return { ...base, phase: "acting", session, draft, notice: n("E13", COPY.E13(grouped(1000000), company)) };
-  if (face === "not_submitted_E12") return { ...base, draft, notice: n("E12", COPY.E12(company, `${company} has withdrawn it`)) };
+  if (face === "not_submitted_E12") return { ...base, draft, notice: n("E12", COPY.E12(company, COPY.E12reason.withdrawn(company))) };
+  if (face === "not_submitted_E12_tpn") return { ...base, draft, notice: n("E12", COPY.E12(company, COPY.E12reason.tpn(company))) };
+  if (face === "stopped_A5") return { ...base, draft, notice: n("stopped", COPY.stopped(company)) };
   if (face === "ended_E14") return { ...base, draft, notice: n("E14", COPY.E14(company, "needs to be shared again")) };
   if (face === "offline") return { ...base, phase: "acting", session, draft, offline: true };
   return base;
@@ -615,15 +623,16 @@ function AppPanel({ phase, share }: { phase: Phase; share: (a: Parameters<Return
 /**
  * What the prototype can't reach, by hand: the company withdrawing or
  * pausing the authority (catalogue flow 11, unspecified), the ministry
- * suspending a licence, NDI's services going down, the citizen ID being
- * suspended, BNSW's sign-in running out, and coming back to BNSW later.
+ * suspending a licence, the tax office revoking the TPN, NDI's services
+ * going down, the citizen ID being suspended, BNSW's sign-in running out,
+ * and coming back to BNSW later.
  * A withdrawal is at NDI's revocation service at once; DA-CORE's target is
  * within 60 seconds of the action, and the prototype shows it on BNSW's
  * very next check.
  */
 function Elsewhere() {
   const demo = useDemo();
-  const { bnsw: b, bnswSimulate, simulateAuthorityStatus, simulateLicenceRevoked, bnswComeBack, heldCredentials } = demo;
+  const { bnsw: b, bnswSimulate, simulateAuthorityStatus, simulateLicenceRevoked, simulateTpnStatus, bnswComeBack, heldCredentials } = demo;
   const cid = b.signedInCid;
   if (!cid) return null;
   const session = demo.authoritySessions.find((x) => x.status === "OPEN" && x.signedInCid === cid && x.counterpartyId === BNSW) ?? null;
@@ -635,10 +644,13 @@ function Elsewhere() {
     ? g.licenceNumbers.filter((n) => heldCredentials.some((c) => c.attributes.some((a) => a.name === "licence_number" && a.value === n) && c.status === "active"))
     : [];
   const suspended = b.suspendedCitizens.includes(cid);
+  /* The TPN BNSW kept from the company's registration, and the credential its status stands for. */
+  const reg = g ? registrationOf(demo, g.orgId) : null;
+  const tpn = reg?.tpnCredentialId ? heldCredentials.find((c) => c.id === reg.tpnCredentialId) : undefined;
 
   return (
     <SimulatedStep
-      standsFor="things that happen elsewhere — the company, the ministry, NDI, time"
+      standsFor="things that happen elsewhere — the company, the ministry, the tax office, NDI, time"
       action={
         <>
           {g && company && (g.status === "ACTIVE" || g.status === "SUSPENDED") ? (
@@ -655,6 +667,11 @@ function Elsewhere() {
               The ministry suspends licence {n}
             </SimulatedAction>
           ))}
+          {tpn && reg?.tpn && tpn.status !== "expired" ? (
+            <SimulatedAction onClick={() => simulateTpnStatus(tpn.id, tpn.status === "revoked" ? "ACTIVE" : "REVOKED")}>
+              The {tpn.issuer} {tpn.status === "revoked" ? "reinstates" : "revokes"} {reg.tpn}
+            </SimulatedAction>
+          ) : null}
           <SimulatedAction onClick={() => bnswSimulate(b.servicesDown ? "services_up" : "services_down")}>
             {b.servicesDown ? "NDI's services come back" : "NDI's revocation service can't be reached"}
           </SimulatedAction>
@@ -687,6 +704,7 @@ function Records({ notice, session }: { notice: Notice | null; session: Authorit
   const regs = demo.counterpartyRegistrations.filter((r) => r.counterpartyId === BNSW);
   const last = session ?? demo.authoritySessions.find((x) => x.counterpartyId === BNSW && x.signedInCid === demo.bnsw.signedInCid) ?? null;
   const decls = demo.counterpartyDeclarations.filter((d) => d.counterpartyId === BNSW).slice(0, 4);
+  const attempts = demo.bnsw.attempts.slice(0, 3);
   const row = (k: string, v: string | null) => (
     <div key={k} className="flex flex-wrap gap-x-2">
       <dt className="font-mono text-[11px] text-faint">{k}</dt>
@@ -713,8 +731,8 @@ function Records({ notice, session }: { notice: Notice | null; session: Authorit
             <dl key={r.id} className="m-0 flex flex-col gap-0.5">
               {row("legal name", r.legalName)}
               {row("registration no.", r.registrationNumber)}
-              {row("TPN", r.tpn ? `${r.tpn} · revocation_id ${r.tpnRevocationId} (kept, not looked up)` : null)}
-              {r.licences.map((l) => row("licence", `${l.number} · revocation_id ${l.revocationId}`))}
+              {row("TPN", r.tpn ? `${r.tpn} · revocation_id ${r.tpnRevocationId} · now ${tpnStatus(demo, r)}` : null)}
+              {r.licences.map((l) => row("licence", `${l.number} · revocation_id ${l.revocationId} · now ${licenceStatus(demo, l)}`))}
               {row("holderDid", r.holderDid)}
               {row("publishingDid", r.publishingDid ?? "none — registered before it was listed to give authority, so B1 fails (E8) until it registers again")}
               {row("registeredAt", r.registeredAt)}
@@ -751,6 +769,22 @@ function Records({ notice, session }: { notice: Notice | null; session: Authorit
                 <span className="w-6 flex-none font-mono text-[11px] text-faint">{c.id}</span>
                 <span className="min-w-0 flex-1">{c.label}</span>
                 <StatusPill status={c.outcome === "not_run" ? "inactive" : c.outcome} label={c.outcome === "pass" ? "Pass" : c.outcome === "fail" ? "Fail" : "Not run"} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {attempts.length ? (
+        <div className="flex flex-col gap-1.5">
+          <p className="m-0 font-display text-[13px] font-semibold text-strong">Refused sign-ins, as BNSW writes them down (E8, E15)</p>
+          <ul className="m-0 flex list-none flex-col gap-1 p-0">
+            {attempts.map((a) => (
+              <li key={a.id} className="break-all font-mono text-[11.5px] text-muted">
+                {a.code} ·{" "}
+                {a.code === "E8"
+                  ? `authority issued from ${a.issuerDid ?? "—"}, which matches no registered company`
+                  : `answered by ${a.answeredByDid ?? "—"} · signed in as ${a.signedInDid ?? "—"} — DIDs only, no attribute values`}
               </li>
             ))}
           </ul>
