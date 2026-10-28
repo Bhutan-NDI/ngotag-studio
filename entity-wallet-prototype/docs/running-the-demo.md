@@ -17,7 +17,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential
-and sharing one — thirteen chapters, 87 steps, starting on the platform's day
+and sharing one — fourteen chapters, 91 steps, starting on the platform's day
 zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
@@ -101,9 +101,14 @@ zero:
     every item listed. Deki Yangzom, the tax office's officer, opens the
     request and decides on what Pelden proved, with NDI's name for Pelden
     kept apart as unverified. Deki issues; Dorji checks the details and
-    accepts, and the Activity tab shows an offer the wallet refused on its
-    own.
-12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
+    accepts, and **View details** on the held taxpayer number lists what it
+    carries. The Activity tab shows an offer the wallet refused on its own.
+12. **The tax office's system answers** (FLOW-CRD-03 Kind A) — Deki connects
+    the office's system on **Integration** (a URL and a client), and Pelden
+    asks for the bonded-warehouse authorisation, which the system answers
+    by itself a few seconds later. Dorji still reviews and accepts by hand;
+    Deki's delivery log shows the request received and then issued.
+13. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
     Bhutan's website (dashed), Dorji presses **Share from NDI Entity Wallet**,
     checks the bank's reference on the wallet's page, signs in, and reads
     every detail of the registration under *Bank of Bhutan will receive all
@@ -112,7 +117,7 @@ zero:
     asks again with nobody at a website: Ugyen, who can receive but not
     share, passes it to Dorji, who shares. History shows who shared; Refused
     shows a sender NDI doesn't list, which nobody was told about.
-13. **Where to go next.**
+14. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
@@ -807,6 +812,13 @@ says *Your organisation already has this.* (E5) with **Go to credentials**.
 **Requests and offers** (SCR-CRD-03) lists it with the next date and
 **Withdraw**.
 
+The bonded-warehouse authorisation needs the TPN, so it can be asked for
+once the TPN is held (**Get another credential** on SCR-CRD-05). It is the
+offering the tax office's *system* answers — see *The system answers*
+below. The TPN stays with the officers' queue: whether the Department
+answers its taxpayer numbers through the API is still open with GovTech
+(REQ-EW-01 item 23), so the prototype shows both paths and decides neither.
+
 ### Answering — `/issuer/requests`, as Deki
 
 **Requests to answer** (SCR-CRD-08), least time left first, led by the
@@ -820,6 +832,37 @@ details — the fields start empty, showing the format — then **Issue**, or
 **Integration** (SCR-CRD-10) starts empty — *Not set up. Requests go to your
 officers' queue.*
 
+### The system answers — `/issuer/integration`, as Deki
+
+FLOW-CRD-03 Kind A, steps 5–7. Until the office has set its system up, a
+request for the bonded-warehouse authorisation lands on **Requests to answer**
+like any other, marked *Your system hasn't picked this up. You can answer it
+here.* On **Integration**, **Set up**, save a URL and **Create a client**
+(both are needed — the URL to deliver to, the client to answer with), and
+**Send a test event**. Then, as Dorji, ask for the authorisation: the request
+isn't on the officers' queue. The delivery log gets
+`credential-request.received`, and a few seconds later the system's answer
+arrives as an offer for Dorji to review and accept by hand (accepting
+automatically is a later option, EW-FLOW6-SD §13 item 4). On **Requests to
+answer**, *Answered* lists it as *Your system* with the client's name, not a
+person. When Dorji accepts, the log gets `credential-request.issued`.
+
+The dashed panel on **Integration** stands in for the system, and applies to
+the next request only:
+
+- **Have it refer the next request** — A2. The request lands on **Requests to
+  answer** as *Your system couldn't decide this: …*, with the system's note.
+  The system may still answer it afterwards, and the first answer wins.
+- **Have it not pick up the next request** — E6. The log shows a failed
+  delivery (503) and the *We haven't been able to deliver requests…* banner.
+  With **Fall back to the officers' queue** on, the request lands on the queue
+  (*Your system hasn't picked this up*); with it off, it waits for the system
+  until the answer date and isn't listed. A successful **Send a test event**
+  delivers what was missed, and the system answers it unless an officer did.
+- On an open request in the queue, the dashed **Have your system answer it
+  now** shows E10: the first answer wins, and the officer is told
+  *Your system already answered this: issued.*
+
 ### Accepting — `/wallet/requests`, as Dorji
 
 **Waiting for you → Review** (SCR-CRD-04): every detail, the office marked as
@@ -828,7 +871,10 @@ is wrong. Two dashed controls under it stand in for the issuer leaving NDI's
 list, or the list being out of reach, while the offer waited: the next
 **Accept** then shows E19 — *can't be added*, or *Try again shortly* with
 **Try again**. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
-beside the registration. **Activity** lists the request and an offer
+beside the registration. **View details** under any credential other than
+the foundational one lists what it carries — each item under the label the
+office gave it (*Taxpayer number*, *Tax office*, *Registered for*), who
+issued it, when, and how long it's valid. **Activity** lists the request and an offer
 *claiming to be from Bhutan Revenue Authority*, refused because the sender
 isn't on NDI's list — nobody was notified.
 
@@ -844,7 +890,7 @@ The old `/wallet/offers` pages redirect here.
 ## Flow 7 — presenting a credential
 
 Two ways in, from **Demo controls → Walk a flow → Presenting a credential**,
-and chapter 12 of the guided demo walks both routes in one go.
+and chapter 13 of the guided demo walks both routes in one go.
 
 The rules to point at: the **whole credential is shared** — every attribute,
 the asked-for ones marked, never a choice of attributes (EW-FLOW7-SD D4,

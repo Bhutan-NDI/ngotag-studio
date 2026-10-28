@@ -13,6 +13,7 @@ import {
 
 import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
+import { SYSTEM_ANSWER_MS } from "./demoTiming";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import * as sharing from "./sharing";
 import { NOTICE, namesOf, typesOf } from "./sharing";
@@ -71,7 +72,14 @@ import {
   draftFor,
   requestInFlight,
   crdEnding,
+  inOfficerQueue,
+  systemConnected,
+  SAMPLE_REFERRAL_NOTE,
   supersedes,
+  type CredentialOffering,
+  type CredentialRequest,
+  type IssuerIntegration,
+  type SystemRoute,
   shortOrgName,
   type CredentialAttribute,
   type HeldCredential,
@@ -197,18 +205,27 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  24 — The high-value grant waiting for dual control no longer carries
  *       Dorji's own signature on his own request. A version-23 save would
  *       let one more approver complete it alone.
- *  25 — Flow 7 (EW-FLOW7-SD, FLOW-PRS-01/02): verification requests with
+ *  25 — The ministry and the CRA are marked as constituted by statute, so
+ *       neither is offered business verification (EW-FLOW2-SD §2.2). A
+ *       version-24 save has no flag and would still offer it.
+ *  26 — Flow 6's Kind A path (FLOW-CRD-03 steps 5–7): the bonded-warehouse
+ *       authorisation is answered by the office's system, requests record
+ *       whether the system or an officer answered, and the integration
+ *       carries what the simulated system does next. A version-25 save has
+ *       that offering on the queue and an integration with no setting, so
+ *       connecting the system would change nothing.
+ *  27 — Flow 7 (EW-FLOW7-SD, FLOW-PRS-01/02): verification requests with
  *       a chosen disclosure are replaced by presentation requests that
  *       share whole credentials, presentation sessions and return
- *       addresses. A version-24 save holds `verificationRequests` nothing
+ *       addresses. A version-26 save holds `verificationRequests` nothing
  *       reads and parked shares pointing at requests that no longer exist.
- *  26 — Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02 v0.3 and UX-EW-04 v0.3:
+ *  28 — Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02 v0.3 and UX-EW-04 v0.3:
  *       a session records when it was redeemed (EW-FLOW7-SD v0.3 §4.2), and
  *       a request records who opened it from a website and when the people
- *       who may answer were told it was left undecided (A3). A version-25
+ *       who may answer were told it was left undecided (A3). A version-27
  *       save holds sessions with no redemption time.
  */
-const SEED_VERSION = 26;
+const SEED_VERSION = 28;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -628,6 +645,99 @@ function activationChecks(s: DemoState, d: Designation): ActivationCheck[] {
 }
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+/** One row on SCR-CRD-10's delivery log, newest first, kept to the twelve it shows. */
+function withLogRow(i: IssuerIntegration, event: string, status: number, attempt = 1): IssuerIntegration {
+  return {
+    ...i,
+    log: [{ id: rid("evt"), event, attempt, status, latencyMs: 90 + Math.floor(Math.random() * 150), at: today() }, ...i.log].slice(0, 12),
+  };
+}
+
+/**
+ * FLOW-CRD-03 step 5 — a request has reached the issuer. An offering the
+ * system answers goes to it only if the issuer has set it up (P3); until
+ * then it lands on the officers' queue, which is what SCR-CRD-10 says before
+ * anything is set up. Once set up, the event is delivered and the log says
+ * so — a 503 for the simulated miss (E6), which also raises the failing
+ * banner. `nextAnswer` is what the dashed stand-in chose, used once.
+ */
+function routeToIssuer(
+  integration: IssuerIntegration,
+  offering: CredentialOffering | undefined,
+  issuerOrgId: string,
+): { system: SystemRoute | null; integration: IssuerIntegration } {
+  if (offering?.answering !== "api" || integration.orgId !== issuerOrgId) return { system: null, integration };
+  if (!systemConnected(integration)) return { system: { state: "UNCONNECTED", plan: "answer", note: null }, integration };
+  const plan = integration.nextAnswer;
+  const used = { ...integration, nextAnswer: "answer" as const };
+  return {
+    system: { state: "WAITING", plan, note: null },
+    integration:
+      plan === "miss"
+        ? { ...withLogRow(used, "credential-request.received", 503), failingSince: used.failingSince ?? today(), lastError: "HTTP 503" }
+        : withLogRow(used, "credential-request.received", 200),
+  };
+}
+
+/**
+ * The issuer's system answering (FLOW-CRD-03 steps 6–7; A2, E6, E10).
+ *
+ * Run when the short delay after delivery ends, doing what the stand-in
+ * chose: offer the values the system supplies, refer with a note, or not pick
+ * the request up at all. `force` is the other stand-in — the system answering
+ * a request an officer already has open, which is how the first answer wins
+ * is shown. An offer is recorded against the first client the issuer created
+ * (Q1, Q4) and nothing about it is an officer's; the business still reviews
+ * and accepts by hand (D3). A request past `answerBy` is refused (410), and
+ * one an officer already answered is no longer `WITH_ISSUER` (409), so
+ * neither changes.
+ */
+function systemAnswers(s: DemoState, requestId: string, force = false): DemoState {
+  const r = s.credentialRequests.find((x) => x.id === requestId);
+  if (!r || r.state !== "WITH_ISSUER" || !r.system) return s;
+  if (!force && r.system.state !== "WAITING") return s;
+  if (r.answerBy && r.answerBy < today()) return s;
+  const offering = s.offerings.find((o) => o.id === r.offeringId);
+  const client = s.integration.clients[0];
+  const plan = force ? "answer" : r.system.plan;
+  const patch = (x: CredentialRequest, change: Partial<CredentialRequest>) => (x.id === requestId ? { ...x, ...change } : x);
+  const note = (text: string, orgId: string) => ({ id: rid("a"), text, at: today(), orgId });
+
+  if (plan === "refer")
+    return {
+      ...s,
+      credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "REFERRED", note: SAMPLE_REFERRAL_NOTE } })),
+      activity: [note(`Your system couldn't decide a request for ${r.credential}. It's on Requests to answer`, r.issuerOrgId), ...s.activity].slice(0, 20),
+    };
+  if (plan === "miss" || !client)
+    return { ...s, credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "MISSED" } })) };
+
+  return {
+    ...s,
+    credentialRequests: s.credentialRequests.map((x) =>
+      patch(x, {
+        state: "OFFER_READY",
+        answeredBy: null,
+        answeredBySystem: { clientId: client.id, name: client.name },
+        answeredAt: today(),
+        /* The values the system supplies: the offering's examples, since no
+           register exists to look them up in. */
+        offer: {
+          attributes: (offering?.fields ?? []).map((f) => ({ name: f.name, value: f.example })),
+          validUntil: null,
+          offeredAt: today(),
+          expiresAt: inDays(30),
+        },
+      }),
+    ),
+    activity: [
+      note(`${r.issuerName} has replied — review it`, r.orgId),
+      note(`Your system answered a request for ${r.credential}`, r.issuerOrgId),
+      ...s.activity,
+    ].slice(0, 20),
+  };
+}
 
 /**
  * Whether the person driving owns an issuing office — what changing its
@@ -1573,13 +1683,13 @@ interface DemoActions {
   issueOnRequest: (
     requestId: string,
     attributes: CredentialAttribute[],
-  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" };
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
   /** SCR-CRD-09 — decline, with a reason code and a message the business reads verbatim (A1). */
   declineOnRequest: (
     requestId: string,
     code: string,
     message: string,
-  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" };
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
   /**
    * SCR-CRD-04 — accept what arrived: an offer answering a request
    * (FLOW-CRD-01 step 11) or one sent unasked (FLOW-CRD-02 step 4), by the
@@ -1601,6 +1711,10 @@ interface DemoActions {
   createClient: (name: string) => void;
   setQueueFallback: (on: boolean) => void;
   sendTestEvent: () => void;
+  /** Prototype — SCR-CRD-10's dashed stand-in: what the simulated system does with the next request (A2, E6). */
+  setSystemNextAnswer: (next: IssuerIntegration["nextAnswer"]) => void;
+  /** Prototype — SCR-CRD-09's dashed stand-in: the system answers a request an officer has open, so the first answer wins (E10). */
+  simulateSystemAnswer: (requestId: string) => void;
 
   /* ---- Demo harness ----
      Not product surface. These drive the persona switcher, the story runner
@@ -1795,6 +1909,23 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       /* Over quota or private mode — the demo still works for this session. */
     }
   }, [state, hydrated]);
+
+  /* FLOW-CRD-03 steps 5–7, Kind A: the issuer's system answers a delivered
+     request a moment later. There's no server to do it, so a timer does —
+     here rather than on a screen, because the system answers whoever is
+     looking and wherever they are. Simulated; on the what's-real page. */
+  const awaitingSystem = state.credentialRequests
+    .filter((r) => r.state === "WITH_ISSUER" && r.system?.state === "WAITING")
+    .map((r) => r.id)
+    .join("|");
+  useEffect(() => {
+    if (!hydrated || !awaitingSystem) return;
+    const t = window.setTimeout(
+      () => setState((s) => awaitingSystem.split("|").reduce((next, id) => systemAnswers(next, id), s)),
+      SYSTEM_ANSWER_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [awaitingSystem, hydrated]);
 
   /* Each entry belongs to the organisation it happened in — the one being
      worked in, unless the caller names another. The feed on a dashboard is
@@ -4826,10 +4957,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               activity: [{ id: rid("a"), text: failReason, at: today(), orgId: r.orgId }, ...s.activity].slice(0, 20),
             };
           }
+          /* Step 5 — an offering the system answers is delivered to it. */
+          const route = routeToIssuer(s.integration, offering, r.issuerOrgId);
           return {
             ...s,
+            integration: route.integration,
             credentialRequests: s.credentialRequests.map((x) =>
-              x.id === requestId ? { ...x, state: "WITH_ISSUER" as const, answerBy: inDays(offering?.answerWindowDays ?? 5) } : x,
+              x.id === requestId
+                ? { ...x, state: "WITH_ISSUER" as const, answerBy: inDays(offering?.answerWindowDays ?? 5), system: route.system }
+                : x,
             ),
           };
         }),
@@ -4895,6 +5031,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* The OrgRoles.ISSUER user role in the issuer's own organisation. */
         if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
         if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        /* Not on the queue: the system has it, and an officer answers only
+           what the queue shows (E6 with fallback off). */
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
         if (r.answerBy && r.answerBy < today()) return { ok: false, error: "E7" };
         setState((s) => ({
           ...s,
@@ -4921,6 +5060,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
         if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
         if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
         setState((s) => ({
           ...s,
           credentialRequests: s.credentialRequests.map((x) =>
@@ -5004,6 +5144,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             offers: s.offers.map((x) =>
               x.id === id ? { ...x, state: "accepted" as const, decidedBy: s.harness.persona, decidedAt: now } : x,
             ),
+            /* Step 9 — the issuer's system is told what it answered was
+               issued (Q3). Only a system's answer: an officer's isn't
+               delivered to a webhook. */
+            integration: r?.answeredBySystem ? withLogRow(s.integration, "credential-request.issued", 200) : s.integration,
             auditEntries: appendAudit(s, {
               operation: "credential:accept",
               summary: `Accepted ${item.type} from ${item.issuer}`,
@@ -5101,18 +5245,31 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
       sendTestEvent: () =>
         issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
-        setState((s) => ({
-          ...s,
-          integration: {
-            ...s.integration,
-            failingSince: null,
-            lastError: null,
-            log: [
-              { id: rid("evt"), event: "test.ping", attempt: 1, status: 200, latencyMs: 140 + Math.floor(Math.random() * 120), at: today() },
-              ...s.integration.log,
-            ].slice(0, 12),
-          },
-        })),
+        setState((s) => {
+          /* A delivery that works again hands over what it missed (E5, E6):
+             the system gets those requests now and answers them, unless an
+             officer got there first. */
+          const missed = s.integration.failingSince
+            ? s.credentialRequests.filter((x) => x.state === "WITH_ISSUER" && x.system?.state === "MISSED").map((x) => x.id)
+            : [];
+          let integration = withLogRow({ ...s.integration, failingSince: null, lastError: null }, "test.ping", 200);
+          missed.forEach(() => {
+            integration = withLogRow(integration, "credential-request.received", 200, 2);
+          });
+          return {
+            ...s,
+            integration,
+            credentialRequests: s.credentialRequests.map((x) =>
+              missed.includes(x.id) && x.system ? { ...x, system: { ...x.system, state: "WAITING" as const, plan: "answer" as const } } : x,
+            ),
+          };
+        }),
+
+      setSystemNextAnswer: (next) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, nextAnswer: next } })),
+
+      simulateSystemAnswer: (requestId) => setState((s) => (systemConnected(s.integration) ? systemAnswers(s, requestId, true) : s)),
 
       stopEntityType: (designationId, entityType) => {
         const s0 = stateRef.current;

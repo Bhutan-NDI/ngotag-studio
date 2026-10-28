@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { inOrg, type CredentialRequest } from "@/lib/demoData";
+import { SAMPLE_REFERRAL_NOTE, inOfficerQueue, inOrg, type CredentialRequest } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { useIssuer } from "./issuerShared";
@@ -37,23 +37,33 @@ import { daysLeft, valueFor } from "./shared";
  *
  * A queue offering, something the office's system referred with its note
  * (A2), or something the system hasn't picked up (E6). The last two only
- * matter once the office connects its system (SCR-CRD-10); today every
- * request is the first kind, and the state switcher shows the others.
+ * matter once the office connects its system (SCR-CRD-10) — until then an
+ * offering the system answers lands here too, as one it hasn't picked up.
+ * A request the system is still answering isn't listed: it isn't the
+ * officers' yet, and may never be. The state switcher shows A2 and E6 for
+ * every row; the rows themselves are read from each request.
  */
 type Face = "live" | "default" | "empty" | "loading" | "error" | "offline" | "e6" | "a2";
 
-/* A2's note is the issuer system's own words; this one is an example. */
-const SAMPLE_REFERRAL_NOTE = "two records in the register match this registration number";
-
 export function IssuerRequestsView() {
   const router = useRouter();
-  const { credentialRequests, organizations, heldCredentials, personById, hydrated } = useDemo();
+  const { credentialRequests, organizations, heldCredentials, personById, integration, hydrated } = useDemo();
   const issuer = useIssuer();
   const forced = useScreenState("SCR-CRD-08", ["live", "default", "empty", "loading", "error", "offline", "e6", "a2"]) as Face;
 
   const mine = credentialRequests.filter((r) => r.issuerOrgId === issuer.org?.id);
-  const waiting = mine.filter((r) => r.state === "WITH_ISSUER").sort((a, b) => ((a.answerBy ?? "") < (b.answerBy ?? "") ? -1 : 1));
+  const waiting = mine
+    .filter((r) => inOfficerQueue(r, integration.queueFallback))
+    .sort((a, b) => ((a.answerBy ?? "") < (b.answerBy ?? "") ? -1 : 1));
   const answered = mine.filter((r) => r.state !== "WITH_ISSUER" && r.state !== "AWAITING_PROOF" && r.state !== "NEEDS_CONSENT");
+  /* Why a row is here — FLOW-CRD-03 A2 and E6, from the request's own route
+     (the switcher's faces stand for those routes on every row). */
+  const why = (r: CredentialRequest) => {
+    const route = face === "e6" ? "MISSED" : face === "a2" ? "REFERRED" : r.system?.state;
+    if (route === "REFERRED") return `Your system couldn't decide this: ${(face === "a2" ? null : r.system?.note) ?? SAMPLE_REFERRAL_NOTE}.`;
+    if (route === "MISSED" || route === "UNCONNECTED") return "Your system hasn't picked this up. You can answer it here.";
+    return "Queue offering";
+  };
 
   const natural: Face = !waiting.length && !answered.length ? "empty" : "default";
   const face: Face = forced === "live" ? natural : forced;
@@ -168,13 +178,7 @@ export function IssuerRequestsView() {
                       <td>{business(r)}</td>
                       <td>{formatDate(r.requestedAt)}</td>
                       <td>{daysLeft(r.answerBy)} days</td>
-                      <td className="max-w-[28ch] text-[12.5px] text-muted">
-                        {face === "e6"
-                          ? "Your system hasn't picked this up. You can answer it here."
-                          : face === "a2"
-                            ? `Your system couldn't decide this: ${SAMPLE_REFERRAL_NOTE}.`
-                            : "Queue offering"}
-                      </td>
+                      <td className="max-w-[28ch] text-[12.5px] text-muted">{why(r)}</td>
                       <td>
                         {face === "offline" ? (
                           <span className="text-[12.5px] text-faint">Open</span>
@@ -208,7 +212,13 @@ export function IssuerRequestsView() {
                           <StatusPill status={o.status} label={o.label} />
                           {r.state === "WITHDRAWN" ? <span className="block text-[12px] text-faint">{business(r)} withdrew this request.</span> : null}
                         </td>
-                        <td>{r.answeredBy ? `${personById(r.answeredBy).name}, ${formatDate(r.answeredAt ?? r.requestedAt)}` : "—"}</td>
+                        <td>
+                          {r.answeredBy
+                            ? `${personById(r.answeredBy).name}, ${formatDate(r.answeredAt ?? r.requestedAt)}`
+                            : r.answeredBySystem
+                              ? `Your system (${r.answeredBySystem.name}), ${formatDate(r.answeredAt ?? r.requestedAt)}`
+                              : "—"}
+                        </td>
                       </tr>
                     );
                   })

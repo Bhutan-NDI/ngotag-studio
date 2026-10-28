@@ -320,7 +320,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
          workspace is theirs to see — only what NDI's own organisation has. */
       if (platformAdmin) return Boolean(item.ndi) && inNdi;
       if (item.ndi === "only") return false;
-      if (item.needs === "no-holder" && can("holder")) return false;
+      if (item.needs === "no-holder" && (can("holder") || org?.statutory)) return false;
       if (item.needs && item.needs !== "no-holder" && !can(item.needs)) return false;
       if (item.label === "Approvals") return canDecideApprovals;
       /* Appeals exist for someone who has held an authority that could be

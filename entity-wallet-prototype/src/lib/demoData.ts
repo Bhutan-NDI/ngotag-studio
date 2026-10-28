@@ -102,6 +102,14 @@ export interface Organization {
    * (UXD-24). Absent on organisations that predate verification.
    */
   kind?: OrgKind;
+  /**
+   * Constituted by statute or executive order, with no register to verify it
+   * against — a ministry, an authority. It is an issuer and a verifier and
+   * never a holder, so it has no business-verification route; it reaches the
+   * platform through a designation or an approval (EW-FLOW2-SD v0.13 §2.2,
+   * D4; FLOW-ORG-01 §1.2).
+   */
+  statutory?: boolean;
   name: string;
   description: string;
   role: "Owner" | "Admin" | "Member";
@@ -2053,6 +2061,16 @@ export interface CredentialRequest {
   offer: { attributes: CredentialAttribute[]; validUntil: string | null; offeredAt: string; expiresAt: string } | null;
   answeredBy: PersonId | null;
   answeredAt: string | null;
+  /**
+   * Kind A: answered by the issuer's own system, through the API — recorded
+   * as its client, not as a person (FLOW-CRD-03 Q1, Q4; EW-FLOW6-SD §4.3,
+   * `answeredBy` is `SYSTEM` or the officer). `answeredBy` stays the
+   * officer's id, the one attribution every other screen reads, and is null
+   * when the system answered.
+   */
+  answeredBySystem?: { clientId: string; name: string } | null;
+  /** Kind A: where the request stands with the issuer's system. Absent on a request that was the officers' from the start. */
+  system?: SystemRoute | null;
   /** Why a request failed, in words (E6, E11, E14, E16, E18, E19). */
   failReason: string | null;
   /** The reason code behind a FAILED or platform-WITHDRAWN request (E14, E16, E19). */
@@ -2073,6 +2091,44 @@ export interface RefusedOffer {
   at: string;
 }
 
+/**
+ * Kind A — where a request stands with the issuer's own system, once it has
+ * reached the issuer (FLOW-CRD-03 step 5).
+ *
+ * - `WAITING` — delivered; the system answers after a short delay.
+ * - `REFERRED` — A2: the system couldn't decide, and says why. Referring is
+ *   not an answer: the system may still offer afterwards, and the first
+ *   answer wins.
+ * - `MISSED` — E6: delivery to the system failed, so nothing picked it up.
+ *   It joins the officers' queue only while fallback is on; with it off, it
+ *   waits for the system until `answerBy`.
+ * - `UNCONNECTED` — the offering is answered by the system but the issuer
+ *   hadn't set it up when the request arrived (no URL, or no client to
+ *   answer with — P3), so it went straight to the queue, as SCR-CRD-10's
+ *   empty state says it does.
+ */
+export interface SystemRoute {
+  state: "WAITING" | "REFERRED" | "MISSED" | "UNCONNECTED";
+  /** What the simulated system does when its delay ends. */
+  plan: "answer" | "refer" | "miss";
+  /** A2's note — the system's own words, shown to the officers and never to the business. */
+  note: string | null;
+}
+
+/** A2's note is the issuer system's own words; this one is an example. */
+export const SAMPLE_REFERRAL_NOTE = "two records in the register match this registration number";
+
+/**
+ * Whether a request is on the officers' queue (SCR-CRD-08). A queue
+ * offering's always is; a request for an offering the system answers is only
+ * when the system referred it (A2), the issuer hadn't set the system up, or
+ * the system missed it and fallback is on (E6). Read from the request and the
+ * fallback setting, so turning fallback on moves a request already missed.
+ */
+export const inOfficerQueue = (r: Pick<CredentialRequest, "state" | "system">, queueFallback: boolean) =>
+  r.state === "WITH_ISSUER" &&
+  (!r.system || r.system.state === "REFERRED" || r.system.state === "UNCONNECTED" || (r.system.state === "MISSED" && queueFallback));
+
 /** The issuer's integration (SCR-CRD-10) — read by its IT lead, the one technical screen. */
 export interface IssuerIntegration {
   orgId: string;
@@ -2080,10 +2136,23 @@ export interface IssuerIntegration {
   secretRotatedAt: string | null;
   clients: { id: string; name: string; createdAt: string }[];
   queueFallback: boolean;
+  /**
+   * Prototype — what the simulated system does with the next request that
+   * reaches it, set by the dashed stand-in on SCR-CRD-10 and put back to
+   * `answer` once used. No system exists to decide this for itself.
+   */
+  nextAnswer: "answer" | "refer" | "miss";
   failingSince: string | null;
   lastError: string | null;
   log: { id: string; event: string; attempt: number; status: number; latencyMs: number; at: string }[];
 }
+
+/**
+ * Whether the issuer's system can answer: a URL to deliver to and a client
+ * to answer with (FLOW-CRD-03 P3). Either missing, and requests go to the
+ * officers' queue, as SCR-CRD-10 says before anything is set up.
+ */
+export const systemConnected = (i: Pick<IssuerIntegration, "webhookUrl" | "clients">) => Boolean(i.webhookUrl) && i.clients.length > 0;
 
 /**
  * What a request becomes when a date it was waiting on passes, or null. The
@@ -2128,6 +2197,16 @@ const REGISTRATION_ATTRIBUTES = [
  * the next credential in a company's chain (UX-EW-01 UXD-14) and what the
  * first day's dashboard leads with; the bonded-warehouse authorisation
  * needs the TPN first, which is E4's case in the catalogue.
+ *
+ * HOW EACH IS ANSWERED
+ *
+ * The TPN stays with the officers' queue. Whether the Department answers
+ * its taxpayer numbers through the API is still open with GovTech (REQ-EW-01
+ * item 23), and the prototype shows both paths without deciding it. The
+ * bonded-warehouse authorisation is the one the system answers — which
+ * only happens once the office has set its integration up on SCR-CRD-10;
+ * until then it lands on the queue like the other. It also comes second in
+ * the story, so the system's path can be walked after the queue's.
  */
 export const SEED_OFFERINGS: CredentialOffering[] = [
   {
@@ -2168,7 +2247,7 @@ export const SEED_OFFERINGS: CredentialOffering[] = [
       attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
       uses: ["Registered name", "Taxpayer number"],
     },
-    answering: "queue",
+    answering: "api",
     answerWindowDays: 15,
     renewable: true,
     status: "ACTIVE",
@@ -2187,6 +2266,7 @@ export const SEED_INTEGRATION: IssuerIntegration = {
   secretRotatedAt: null,
   clients: [],
   queueFallback: true,
+  nextAnswer: "answer",
   failingSince: null,
   lastError: null,
   log: [],
@@ -2661,6 +2741,7 @@ export const SEED: DemoState = {
          needs. Not driven in the demo: its office is only ever seen through
          what it confirms. */
       id: "org-cra",
+      statutory: true,
       name: "Corporate Regulatory Authority",
       legalName: "Corporate Regulatory Authority",
       description: "Statutory authority · Registrar of Companies.",
@@ -2685,6 +2766,7 @@ export const SEED: DemoState = {
          one entitlement: schema creation, which it has never needed. That
          is the E4 the activation checks catch, and NDI resolves. */
       id: "org-moice",
+      statutory: true,
       name: "Ministry of Industry, Commerce & Employment",
       legalName: "Ministry of Industry, Commerce & Employment",
       description: "Licenses sole proprietorships and partnerships. Verifies trade licences on NDI.",
