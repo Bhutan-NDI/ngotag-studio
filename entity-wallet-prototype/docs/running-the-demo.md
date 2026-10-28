@@ -986,8 +986,8 @@ the audit trail.
 A business gives a named person — its clearing agent, or an employee —
 limited, time-bound authority to act for it at the Bhutan National Single
 Window, and that person collects it into their own Bhutan NDI app. It
-follows FLOW-AUT-01 v0.2, EW-FLOW8-SD v0.2 and UX-EW-05 v0.2, SCR-AUT-01 to
-06. Chapter 12 of the guided demo walks the representative's path; **Demo
+follows FLOW-AUT-01 v0.3, EW-FLOW8-SD v0.3 and UX-EW-05 v0.3, SCR-AUT-01 to
+06. Chapter 13 of the guided demo walks the representative's path; **Demo
 controls → Walk a flow → Giving authority to act** has three entries.
 
 The rules to point at:
@@ -1005,7 +1005,8 @@ The rules to point at:
   check screen says so in the sentence that must survive review.
 - **It is the organisation's**, not the grantor's: it stays in force if
   whoever gave it leaves (D15).
-- **At most a year**, 90 days by default; the limit is per declaration.
+- **At most a year**, 90 days by default; the limit is per declaration,
+  always — the form offers no other kind (D25).
 
 ### The representative gives it — **The owner gives a clearing agent authority**, as Dorji
 
@@ -1043,6 +1044,8 @@ Things worth trying on the way:
 | **Let seven days pass** on the waiting link | E15 — *…didn't collect their authority by…*, under Ended |
 | **Have the ministry revoke BL-PLG-2025-00871**, then collect | E11 at collection — nothing is given |
 | **Decline in the app**, **Let 30 minutes pass**, **The offer can't be sent**, **Accept — the registration is slow** | A2, E13, E12, E17 |
+| **Open the link again, on another phone** while the offer is showing | E18 — nothing about the offer before identity; share her ID again and the first offer is replaced by a new one with a new 30 minutes: *You've already started collecting this. We've sent it to your Bhutan NDI app again.* |
+| **Accept — the registration is slow**, then **Open the link again, on another phone** | E18 — the offer she accepted stands; after identity, *Finishing*, and no new offer |
 | **Cancel this authority** while it waits | E14 — *Cancelled. The link no longer works.*, and the link reads as dead |
 | Give Pema the same again | A3 — *Pema Choden already has authority for this until…* |
 
@@ -1056,7 +1059,8 @@ opens SCR-AUT-06 — *Rinzin Dema wants to give … authority* — with **Approv
 the link will be ready for …** and **Don't approve** with a note. Rinzin
 can't approve her own: she sees the content and *You can't approve your
 own.* Dorji is told whenever someone else's link goes out and when it is
-collected, declined, fails, lapses or is cancelled — in the activity feed.
+collected, declined, fails, lapses or is cancelled by anyone but him — in
+the activity feed.
 
 ### Collecting from a link — **Collect authority from a link**
 

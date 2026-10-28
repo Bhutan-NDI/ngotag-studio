@@ -942,7 +942,7 @@ export const GUIDE_STEPS: GuideStep[] = [
       "Before Pema proves who she is, the page names only Pelden — and tells her to continue only if she expected it. Whoever else holds the link gets no further. Once her citizen ID matches, she sees exactly what she'll be able to do, and collects it in the app.",
     doThis:
       "Press **Continue with Bhutan NDI**, then **Share Pema Choden's ID** (dashed — the Bhutan NDI app). Read what she'll be able to do, then press **Accept in the app** (dashed).",
-    say: "Try sharing someone else's ID first: the page says the authority is for someone else, and nothing is given — Open the link again (dashed) to go on. Three tries and the link is dead.",
+    say: "Try sharing someone else's ID first: the page says the authority is for someone else, and nothing is given — Open the link again (dashed) to go on. Three tries and the link is dead. And before she accepts, opening the link again on another phone (dashed) makes her prove who she is once more, then replaces the offer with a new one.",
     match: "^/authority/claim/[^/]+$",
   },
   {

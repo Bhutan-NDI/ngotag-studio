@@ -1003,7 +1003,7 @@ export interface AuthorityGrant {
   counterparties: string[];
   licenceNumbers: string[];
   valueCapNu: number;
-  /** Always true at first release — the form offers only "per declaration" (pr-8 item 1). */
+  /** Always true at first release — the form offers only "per declaration" (EW-FLOW8-SD D25). */
   perTransaction: true;
   validFrom: string;
   validUntil: string;

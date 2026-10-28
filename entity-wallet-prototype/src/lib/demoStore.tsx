@@ -768,17 +768,16 @@ function endByDate(s: DemoState, now = today()): GrantStep {
 }
 
 /**
- * The grant a claim link still opens: claimable and in date, or with an
- * offer out that hasn't been accepted. Anything else — unknown, lapsed,
- * cancelled, failed, or used — is E7. "Used" is read as the delegate
- * having accepted (ACTIVE, or ISSUING while the registration finishes),
- * which FLOW-AUT-01 E7 leaves undefined (pr-8 item 2).
+ * The grant a claim link still opens: claimable and in date, or in ISSUING
+ * — an offer out, or accepted and being finished (E13, E18). Anything else
+ * — unknown, or a grant that is ACTIVE or has ended — is E7: the link has
+ * been used, or has lapsed, been cancelled or failed.
  */
 function claimable(s: DemoState, ref: string): AuthorityGrant | undefined {
   const g = s.authorityGrants.find((x) => x.claimRef === ref);
   if (!g) return undefined;
   if (g.status === "CLAIMABLE" && g.claimExpiresAt !== null && g.claimExpiresAt >= today()) return g;
-  if (g.status === "ISSUING" && !g.accepted) return g;
+  if (g.status === "ISSUING") return g;
   return undefined;
 }
 
@@ -1611,11 +1610,20 @@ interface DemoActions {
   dismissFirstGrantNotice: () => void;
   /** SCR-AUT-05 step 9 — what the link may show before identity: the organisation's name, or nothing (S3, E7). */
   openClaim: (ref: string) => { kind: "valid"; orgName: string } | { kind: "invalid" };
-  /** SCR-AUT-05 steps 11–12 — the citizen credential presented; G8 and the re-checks. */
+  /**
+   * SCR-AUT-05 steps 11–12 — the citizen credential presented; G8 and the
+   * re-checks. `reopened` is E18: the link was opened again while an offer
+   * was out, so an offer not yet accepted was withdrawn and a new one made,
+   * or — once accepted — nothing new was made.
+   */
   presentCitizenCredential: (
     ref: string,
     cid: string,
-  ) => { ok: true; grantId: string } | { ok: false; error: "E7" } | { ok: false; error: "E9"; ended: boolean } | { ok: false; error: "E11" };
+  ) =>
+    | { ok: true; grantId: string; reopened: boolean }
+    | { ok: false; error: "E7" }
+    | { ok: false; error: "E9"; ended: boolean }
+    | { ok: false; error: "E11" };
   /** SCR-AUT-05 steps 14–16 — what happened to the offer in the app (simulated). */
   answerOffer: (ref: string, outcome: "accept" | "accept_unregistered" | "decline" | "expire" | "send_failed") => void;
   /** SCR-AUT-05 E17 — the revocation id finally registers. */
@@ -3145,13 +3153,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             { cancelledBy: me },
           );
         });
-        /* The grantor, if someone else cancelled it; and the Root, if the
-           grantor isn't the Root — cancellation isn't in D18's list, and is
-           added here (pr-8, optional). */
-        const { grantor, root } = auth.toldOf(s0, g);
+        /* The Root is told unless the Root cancelled it (E14, D18) — even
+           when the Root is the grantor. The grantor, if someone else
+           cancelled it and isn't the Root, who has been told already. */
+        const root = sharing.rootOf(s0, g.orgId);
         const name = auth.delegateNameOf(g);
-        if (grantor !== me) noteTo(s0, [grantor], `${by} cancelled the authority for ${name}. The link no longer works.`, g.orgId).forEach((n) => log(n.text, n.orgId));
-        if (root && root !== me) noteTo(s0, [root], auth.NOTICE_GRANT.rootOutcome(nameOf(s0, g.grantedBy), `${by} cancelled the authority for ${name}.`), g.orgId).forEach((n) => log(n.text, n.orgId));
+        if (root && root !== me) noteTo(s0, [root], auth.NOTICE_GRANT.rootCancelled(by, name), g.orgId).forEach((n) => log(n.text, n.orgId));
+        if (g.grantedBy !== me && g.grantedBy !== root) {
+          noteTo(s0, [g.grantedBy], auth.NOTICE_GRANT.cancelledBy(by, name), g.orgId).forEach((n) => log(n.text, n.orgId));
+        }
         return { ok: true };
       },
 
@@ -3252,6 +3262,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
         /* G8 — the keyed hash of the presented number against the grant's. */
         if (auth.keyedFor(g.orgId, cid) !== g.delegateIdKeyed) {
+          /* A mismatch counts towards E9 and leaves an offer out untouched
+             (E18). Once the delegate has accepted, nothing ends the grant
+             but its registration (§4.2), so it counts for nothing. */
+          if (g.accepted) return { ok: false, error: "E9", ended: false };
           const mismatches = g.mismatches + 1;
           if (mismatches >= auth.MAX_MISMATCHES) {
             /* E9, the third time: FAILED, the grantor and the Root told. */
@@ -3270,6 +3284,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           return { ok: false, error: "E9", ended: false };
         }
 
+        /* E18, accepted first: withdrawal and acceptance are serialised, so
+           an offer accepted first stands — no new offer is made, and the
+           page shows E17 or done. */
+        if (g.accepted) return { ok: true, grantId: g.id, reopened: true };
+
         /* G2–G6 again (E11). */
         const problem = auth.recheck(s0, g);
         if (problem) {
@@ -3279,39 +3298,41 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           return { ok: false, error: "E11" };
         }
 
-        /* Opened again while an offer is still out (pr-8 item 2): the same
-           offer is shown again once the identity matches — nothing new is
-           generated, and nothing is shown before the match. An offer whose
-           30 minutes have passed is withdrawn first (E13), so this one is
-           new, with a new revocation id. */
-        const offerLive = g.status === "ISSUING" && g.offerExpiresAt !== null && g.offerExpiresAt > Date.now();
-        if (!offerLive) {
-          setState((s) =>
-            patchGrant(
-              {
-                ...s,
-                auditEntries: appendAudit(s, {
-                  operation: "authority:claim",
-                  summary: `${citizen?.name ?? name} proved who they are and is collecting their authority`,
-                  actorId: g.grantedBy,
-                }),
-              },
-              g.id,
-              {
-                status: "ISSUING",
-                statusAt: today(),
-                /* The verified name, from the citizen credential (D11). */
-                delegateName: citizen?.name ?? name,
-                delegatePersonId: citizen?.personId ?? null,
-                delegateDid: g.delegateDid ?? newDidId("did:key"),
-                /* Generated now, registered only if accepted (D23). */
-                revocationId: uuidish(),
-                offerExpiresAt: Date.now() + auth.OFFER_MS,
-              },
-            ),
-          );
-        }
-        return { ok: true, grantId: g.id };
+        /* Opened again while an offer is out and not accepted (E18): that
+           offer is withdrawn, its generated id discarded, and a new offer
+           made with a new id and a new 30 minutes — nothing was shown
+           before this match. An offer whose 30 minutes have passed was
+           withdrawn already (E13), so this one is simply the next. The
+           prototype has one did:key per delegate, so the new offer goes to
+           the same one rather than to the phone that opened the link. */
+        const reopened = g.status === "ISSUING" && g.offerExpiresAt !== null && g.offerExpiresAt > Date.now();
+        setState((s) =>
+          patchGrant(
+            {
+              ...s,
+              auditEntries: appendAudit(s, {
+                operation: "authority:claim",
+                summary: reopened
+                  ? `${citizen?.name ?? name} opened the link again — the first offer was withdrawn and a new one made`
+                  : `${citizen?.name ?? name} proved who they are and is collecting their authority`,
+                actorId: g.grantedBy,
+              }),
+            },
+            g.id,
+            {
+              status: "ISSUING",
+              statusAt: today(),
+              /* The verified name, from the citizen credential (D11). */
+              delegateName: citizen?.name ?? name,
+              delegatePersonId: citizen?.personId ?? null,
+              delegateDid: g.delegateDid ?? newDidId("did:key"),
+              /* Generated now, registered only if accepted (D23). */
+              revocationId: uuidish(),
+              offerExpiresAt: Date.now() + auth.OFFER_MS,
+            },
+          ),
+        );
+        return { ok: true, grantId: g.id, reopened };
       },
 
       answerOffer: (ref, outcome) => {

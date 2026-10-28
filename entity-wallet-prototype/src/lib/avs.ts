@@ -221,7 +221,7 @@ export function verifyAuthority(
   });
   if (!taskOk) reasons.push(`This authority does not cover ${taskLabel(input.task).toLowerCase()}.`);
 
-  /* ---- Value limit, per declaration (pr-8 item 1) ---- */
+  /* ---- Value limit, per declaration (EW-FLOW8-SD D25) ---- */
   const withinCap = input.declaredValue <= authority.valueCapNu;
   checks.push({
     label: "Value within limit",

@@ -215,14 +215,19 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Who is told — approvers asked, the link ready, the Root told a link is out and how it ended",
         reality:
-          "Where UX-EW-05 §3.5 gives the words they are used verbatim; the approvers' notice, \"the link is ready\" and the Root's notices are the prototype's. Each is a line in the organisation's activity feed naming who it goes to. The Root is also told when someone else cancels a grant, which D18 doesn't list (pr-8, optional).",
+          "Where UX-EW-05 §3.5 gives the words they are used verbatim; the approvers' notice, \"the link is ready\" and the Root's notices are the prototype's. Each is a line in the organisation's activity feed naming who it goes to. The Root's notice that someone else cancelled a grant is E14's, word for word; the grantor's, when it wasn't the grantor who cancelled, is the prototype's.",
         needs: "In-app and email delivery, and those lines in UX-EW-05 §3.5.",
       },
       {
-        shown: "Choices the specification leaves open, made here",
+        shown: "A link opened again while the authority is being collected",
         reality:
-          "The limit is always per declaration — the form offers nothing else, and every grant is written per transaction (pr-8 item 1). A link is \"used\" once the authority is accepted; opened again while an offer is out, it asks for identity again, then shows the same offer (pr-8 item 2). The duplicate warning also counts grants still waiting for approval or for the listing (pr-8, optional). SCR-AUT-01's heading is the specification's and is also Flow 3's page heading (align D1).",
-        needs: "The specification to settle each.",
+          "A dashed \"Open the link again, on another phone\" step. The page asks for identity again; on a match the first offer is withdrawn, its id discarded, and a new one made with a new 30 minutes — or, once accepted, nothing new (E18). The prototype keeps one did:key per person, so the new offer goes to the same one, not to the phone that opened the link.",
+        needs: "The offer made to the did:key that signed the new presentation, with withdrawal and acceptance serialised (FLOW-AUT-01 E18).",
+      },
+      {
+        shown: "The limit, always per declaration",
+        reality: "The form offers nothing else and every authority is written per declaration (EW-FLOW8-SD D25). Nothing adds up what has been declared in total.",
+        needs: "A running total, which the specification marks as later (EW-FLOW9-SD §8.2).",
       },
       {
         /* The one row here about a counterparty rather than about NDI. */
