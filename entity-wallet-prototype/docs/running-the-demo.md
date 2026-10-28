@@ -16,8 +16,8 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
-approval to verify or issue — eleven chapters, 53 steps, starting on the
-platform's day zero:
+approval to verify or issue, and designating an authority — thirteen chapters,
+82 steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -82,7 +82,32 @@ platform's day zero:
    so Pelden never sees anyone's date of birth. Kinzang reviews and
    recommends approval without being able to edit it; Tshendu approves it as
    asked, and Pelden is listed.
-10. **Where to go next.**
+10. **Designate the ministry** (FLOW-ORG-02 Kind E, FLOW-ORG-03) — nobody
+    confirms sole proprietorships yet. Kinzang proposes the Ministry of
+    Industry, Commerce & Employment, already on the platform; Tshendu
+    approves. Kesang Wangmo, the ministry's director, reads what it is taking
+    on — including that NDI hosts its keys — and accepts, which is her adding
+    NDI's service account to the ministry. One activation check fails (an
+    entitlement NDI grants); Kinzang grants it and the checks run again.
+    Kesang reads what people will be asked and objects to the date of birth
+    the register doesn't need; adoption is on hold until NDI revises the
+    draft (a dashed stand-in), and she adopts the revised draft for sole
+    proprietorships. Then **Stop something** shows three different stops,
+    none pre-selected.
+11. **Pelden gets its TPN** (FLOW-CRD-01, FLOW-CRD-03) — Dorji opens **Get a
+    credential**, asks the Department of Revenue & Customs for the taxpayer
+    number, and reads exactly what is shared: all of Pelden's registration,
+    every item listed. Deki Yangzom, the tax office's officer, opens the
+    request and decides on what Pelden proved, with NDI's name for Pelden
+    kept apart as unverified. Deki issues; Dorji checks the details and
+    accepts, and **View details** on the held taxpayer number lists what it
+    carries. The Activity tab shows an offer the wallet refused on its own.
+12. **The tax office's system answers** (FLOW-CRD-03 Kind A) — Deki connects
+    the office's system on **Integration** (a URL and a client), and Pelden
+    asks for the bonded-warehouse authorisation, which the system answers
+    by itself a few seconds later. Dorji still reviews and accepts by hand;
+    Deki's delivery log shows the request received and then issued.
+13. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
@@ -90,7 +115,8 @@ identity is confirmed **at the appointment, not at the invitation**
 wallet is Flow 8, which has no specification yet, so it follows Story B5 and
 is marked as ahead of spec wherever it appears. Flow 4 follows FLOW-ACC-01
 v0.2, FLOW-ACC-02 v0.4 and UX-EW-02 v0.5 SCR-ACC-01 to 06 — the first-release
-simplification of EW-FLOW4-SD v0.2 (D20–D24). The screens for what comes after onboarding — receiving and
+simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
+and UX-EW-03 SCR-CRD-01 to 10. The screens for what comes after onboarding —
 presenting, approvals, verification, revocation, appeals, and Bank of
 Bhutan being verified — still exist and are described further down, but
 the guide and the demo controls no longer walk them.
@@ -352,11 +378,78 @@ sign-up detour), **expired**, **revoked**, **void** (the inviter lost their
 authority since sending — worded as a lapse, never a rejection),
 **already_accepted**, **declined** and **wrong_person**.
 
+### FLOW-ORG-02 · Designating an authority — `/admin/designations`, as Kinzang
+
+Starts on the platform with its two admins and no business. **Designations**
+lists who confirms what: the Corporate Regulatory Authority for companies,
+designated before the Entity Wallet opened. **Propose a designation**
+(SCR-DSG-01): the ministry, and the scope as entity type and credential
+pairs — sole proprietorships and partnerships, each with the Trade Licence —
+and a legal basis. The summary says what it will be able to do and nothing
+else, that the scope can't be edited once switched on, and that a different
+administrator has to approve it. A type another authority already confirms
+can't be ticked: "Replacing it isn't supported yet" (E5). **Propose**.
+
+**Waiting for approval** shows the days left before the proposal lapses
+(E13, 30 days) and, after 10 working days, that a reminder went to
+administrators. Kinzang opening it sees **Approve** disabled with the reason
+(E7), and can only withdraw it — with a reason; the row is kept as
+**Withdrawn**, never deleted (A3). As **Tshendu** (SCR-DSG-02), the lapse
+line reads "This proposal lapses in <n> days if no one approves it."
+**Ask for more information** records a question for Kinzang and changes
+nothing. **Refuse** needs a reason and ends it **Declined**, with "<Tshendu>
+declined this: <reason>." for the proposer (E12). **Approve** — the
+consequence is stated in the dialog. The root account can't: Designations
+isn't in its menu, and the store refuses it. The state switcher on SCR-DSG-02
+shows the **lapsed**, **declined** and **withdrawn** faces.
+
+As **Kesang**, the dashboard says NDI has proposed it, with the days left.
+**Review it** opens SCR-DSG-03: what the ministry would confirm, the legal
+basis, who proposed and approved, and NDI's access in the spec's words —
+"When you accept, you add it", and that NDI hosts the ministry's keys.
+**Accept**: this is Kesang granting NDI's service account its place in the
+ministry, in her own session (A2). Activation runs at once (SCR-DSG-04): P2
+needs both the acceptance and that grant (without the grant it is E1 and
+nothing is added — the switcher's **e1** face). One check fails — schema
+creation is missing — and says NDI grants it. As Kinzang, **Designations →
+Accepted — checks not passing yet**, **Grant them**: the checks run again,
+the service account accepts the grant and joins the ministry, and it's
+designated — recording the primary DID it was designated under — with
+nothing live yet. A pending or accepted designation can be withdrawn here or
+on SCR-DSG-02, with a reason the ministry is told; E5 offers **View the
+incumbent** and the withdrawal, and promises no replacement.
+
+As Kesang, **Authority** (SCR-DSG-05 and SCR-ADO-03, one page): the
+designation, NDI's access with **Remove NDI's access**, members including
+NDI's service account ("Can send your request"), and nothing live. **Members**
+lists the service account too, with **Remove** — the same control: either
+route removes the membership and withdraws every authorisation under the
+designation, and the console then reads "…unchanged, and you can turn it back
+on." **Turn NDI's access back on** is Kesang granting it again; a new
+authorisation is written for each live entity type and the withdrawn ones
+stay on record (A4). **Review and adopt** beside sole proprietorships
+(SCR-ADO-01): the date of birth is flagged as not needed. **Raise an
+objection** — against sole proprietorships, or the whole draft — and
+adoption of what it covers is on hold: "Your objection has gone to NDI.
+Adopting sole proprietorships is on hold until they revise the draft or you
+withdraw your objection." Only **Withdraw the objection** or the dashed
+**NDI revises the draft** releases it; NDI's revision is a new draft without
+the date of birth. **Continue to adopt** (SCR-ADO-02): three things as one
+act. Sole proprietorships are now live — and in Flow 2's first screen, sole
+proprietorship is no longer disabled. **Stop something** (SCR-ADO-04): pause
+NDI's access, stop an entity type, or change what people are asked — none
+pre-selected, and none un-verifies anyone.
+
+The console's dashed panel changes the ministry's primary DID to another
+did:ethr: the designation is suspended (E10), compared with the DID it was
+designated under, and **Restore the previous issuing identity** puts it back.
+
 ### Also built · Inviting an agency — as Kinzang, `/admin/invitations/new`
 
-Not in **Walk a flow**: bringing on a foundational issuer is Flow 5, which the
-catalogue has not designed yet. It is still reachable from NDI administration
-→ Invitations, and needs two NDI administrators.
+Not in **Walk a flow**: this is Kind N, a new authority invited to register,
+which the prototype doesn't walk past the invitation — Flow 5 walks Kind E, an
+organisation already on the platform, below. It is still reachable from NDI
+administration → Invitations, and needs two NDI administrators.
 
 1. As Kinzang, propose the agency. It waits in **Approvals**.
 2. Still as Kinzang, open **Approvals**: **Approve** is disabled with the
@@ -678,6 +771,109 @@ listed one, its requests are refused and the approval shows *Stopped* with
 
 ---
 
+## Flow 6 — receiving a credential
+
+Start from **Demo controls → Walk a flow → Pelden asks for its TPN**: Pelden
+is verified, with Dorji as its representative.
+
+### Asking — `/wallet/get`, as Dorji
+
+**Get a credential** (SCR-CRD-01) lists what offices issue to a company, each
+with what the office needs to see first. The bonded-warehouse authorisation
+is badged *Needs Taxpayer Number (TPN) first*. On the TPN, **Ask for this**
+(SCR-CRD-02): what Pelden shares, with every attribute of its registration —
+the ones the office doesn't use marked as shared, not used — beside what it
+may receive, and that nothing is added until someone accepts it. **Ask the
+Department of Revenue & Customs**. The request page says who has it:
+sending, then waiting for the office, usually within 5 days.
+
+The dashed **Ask, and have it ask for a bank account too** on the same
+screen stands in for an issuer asking for more than was agreed. It is
+offered at asking time because that is the only time it can happen: a
+request reaches *your answer needed* only before anything has been shared
+(EW-FLOW6-SD §5.1). **Answer** opens SCR-CRD-06, with what was agreed and
+what is asked now as two lists, and **Share this too** or **Don't share —
+withdraw the request**. Opening the TPN's ask page after the TPN is held
+says *Your organisation already has this.* (E5) with **Go to credentials**.
+
+**Requests and offers** (SCR-CRD-03) lists it with the next date and
+**Withdraw**.
+
+The bonded-warehouse authorisation needs the TPN, so it can be asked for
+once the TPN is held (**Get another credential** on SCR-CRD-05). It is the
+offering the tax office's *system* answers — see *The system answers*
+below. The TPN stays with the officers' queue: whether the Department
+answers its taxpayer numbers through the API is still open with GovTech
+(REQ-EW-01 item 23), so the prototype shows both paths and decides neither.
+
+### Answering — `/issuer/requests`, as Deki
+
+**Requests to answer** (SCR-CRD-08), least time left first, led by the
+registration number Pelden proved. **Open next** (SCR-CRD-09): the sentence
+*Decide on what Pelden Trading has proved. The name and type shown below come
+from NDI, not from Pelden Trading's credentials.* — then *Verified* and,
+dashed and below it, *From NDI (not verified by you)*. Fill in the taxpayer number's
+details — the fields start empty, showing the format — then **Issue**, or
+**Decline** with a reason and a message Pelden reads word for word.
+**What you offer** (SCR-CRD-07) pauses, retires or publishes a new version;
+**Integration** (SCR-CRD-10) starts empty — *Not set up. Requests go to your
+officers' queue.*
+
+### The system answers — `/issuer/integration`, as Deki
+
+FLOW-CRD-03 Kind A, steps 5–7. Until the office has set its system up, a
+request for the bonded-warehouse authorisation lands on **Requests to answer**
+like any other, marked *Your system hasn't picked this up. You can answer it
+here.* On **Integration**, **Set up**, save a URL and **Create a client**
+(both are needed — the URL to deliver to, the client to answer with), and
+**Send a test event**. Then, as Dorji, ask for the authorisation: the request
+isn't on the officers' queue. The delivery log gets
+`credential-request.received`, and a few seconds later the system's answer
+arrives as an offer for Dorji to review and accept by hand (accepting
+automatically is a later option, EW-FLOW6-SD §13 item 4). On **Requests to
+answer**, *Answered* lists it as *Your system* with the client's name, not a
+person. When Dorji accepts, the log gets `credential-request.issued`.
+
+The dashed panel on **Integration** stands in for the system, and applies to
+the next request only:
+
+- **Have it refer the next request** — A2. The request lands on **Requests to
+  answer** as *Your system couldn't decide this: …*, with the system's note.
+  The system may still answer it afterwards, and the first answer wins.
+- **Have it not pick up the next request** — E6. The log shows a failed
+  delivery (503) and the *We haven't been able to deliver requests…* banner.
+  With **Fall back to the officers' queue** on, the request lands on the queue
+  (*Your system hasn't picked this up*); with it off, it waits for the system
+  until the answer date and isn't listed. A successful **Send a test event**
+  delivers what was missed, and the system answers it unless an officer did.
+- On an open request in the queue, the dashed **Have your system answer it
+  now** shows E10: the first answer wins, and the officer is told
+  *Your system already answered this: issued.*
+
+### Accepting — `/wallet/requests`, as Dorji
+
+**Waiting for you → Review** (SCR-CRD-04): every detail, the office marked as
+on NDI's list, and the prompt to decline and contact the office if anything
+is wrong. Two dashed controls under it stand in for the issuer leaving NDI's
+list, or the list being out of reach, while the offer waited: the next
+**Accept** then shows E19 — *can't be added*, or *Try again shortly* with
+**Try again**. **Accept** → **Go to your credentials** (SCR-CRD-05): the TPN
+beside the registration. **View details** under any credential other than
+the foundational one lists what it carries — each item under the label the
+office gave it (*Taxpayer number*, *Tax office*, *Registered for*), who
+issued it, when, and how long it's valid. **Activity** lists the request and an offer
+*claiming to be from Bhutan Revenue Authority*, refused because the sender
+isn't on NDI's list — nobody was notified.
+
+Offers sent without a request (FLOW-CRD-02) sit under the same **Waiting for
+you** and open on the same SCR-CRD-04, marked *Sent unasked*. Accepting one
+never needs an approver. In the act-3 seed, Bank of Bhutan's reissued
+**Business Current Account** says *This replaces the Business Current
+Account you received on …*, and accepting it marks the old one *Superseded*.
+The old `/wallet/offers` pages redirect here.
+
+---
+
 ## The Act 3 walkthrough
 
 About six minutes, as **Rinzin**. The story: an ordinary working day, and the
@@ -703,7 +899,8 @@ not include deciding approvals.
 
 ### 2 · Accept an offer — the holder inbox
 
-Click the **Business Licence** offer.
+Click the **Business Licence** offer. It opens on SCR-CRD-04, the same
+review screen a requested credential uses, marked *Sent unasked*.
 
 > "Here is the thing the studio could never do before. Pelden Trading is
 > the *holder*. Somebody has offered the company a credential."
@@ -714,9 +911,11 @@ Two things to point at:
   > "She is accepting these values. A screen that said 'Business Licence,
   > 4 attributes' would be asking her to accept something she had not seen. And
   > this is read from the offer itself, not from anything anyone typed."
-- **The issuer's trust-registry status.**
+- **That the issuer is on NDI's list of trusted organisations.** An offer
+  from anyone else never reaches this screen — it is refused on arrival and
+  only shows on the **Activity** tab.
 
-Press **Accept**. Then follow **See what we hold** — note the **Root of trust**
+Press **Accept**. Then follow **Go to your credentials** — note the **Root of trust**
 panel, held apart from the table:
 
 > "The Business Registration is not one credential among several. It is the
@@ -726,14 +925,17 @@ panel, held apart from the table:
 
 ### 3 · The refusal — worth showing deliberately
 
-Go to **Offers** and open **Fleet Insurance Certificate**.
+Go to **Requests and offers**, open **Fleet Insurance Certificate**, and pick
+**no_permission** in the state switcher.
 
-> "This is a normal event, not an error. Her authority covers Business
-> Registration and Business Licence. Insurance was not granted."
+> "Accepting is never limited by what the credential is — every preset that
+> can accept can accept anything. So the only refusal here is about the
+> person: a role without accepting. She can still read every attribute; what
+> she can't do is accept or decline."
 
-Point at the only action available:
+Point at what replaced the buttons:
 
-> "One next step, and it routes to the owner. There is deliberately no way for
+> "It says who can accept, and nothing else. There is deliberately no way for
 > her to widen her own authority from here — this is exactly the moment
 > somebody would reach for that, and it must not exist."
 
@@ -952,7 +1154,9 @@ Worth showing:
 | `/delegated-authority/.../revoke` | **suspended**, **revoked** | Reversible vs final |
 | `/delegated-authority` | **empty** | First-run, before anything is delegated |
 | `/dashboard` | **all_clear**, **access_suspended** | An empty queue, and a pulled authority |
-| `/wallet/offers/...` | **out_of_scope**, **requires_approval** | Both refusal shapes on any offer |
+| `/wallet/requests/...` | **no_permission**, **e19_delisted**, **e19_unreachable**, **e13**, **e14** | SCR-CRD-04's one refusal (about the person, never the offer), and the issuer check failing at acceptance |
+| `/issuer/requests` | **e6**, **a2** | Why a request is in the officers' queue: not picked up, or referred by the office's system |
+| `/issuer/requests/...` | **e7**, **e10**, **e11** | Expired, already answered, withdrawn |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
 | `/controllership/audit` | **filtered_empty** | A filter finding nothing, trail still intact |
 | `/onboarding` | **none_supported**, **no_permission** | No authority connected yet; Kind E by someone who isn't the owner |

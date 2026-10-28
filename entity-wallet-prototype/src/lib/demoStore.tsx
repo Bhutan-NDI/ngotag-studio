@@ -13,6 +13,7 @@ import {
 
 import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
+import { SYSTEM_ANSWER_MS } from "./demoTiming";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import {
   NDI_ORG,
@@ -59,6 +60,29 @@ import {
   OBSERVED_OPERATORS,
   accEnding,
   accInProgress,
+  designationInProgress,
+  dsgExpired,
+  openObjectionFor,
+  draftAsked,
+  draftFor,
+  requestInFlight,
+  crdEnding,
+  inOfficerQueue,
+  systemConnected,
+  SAMPLE_REFERRAL_NOTE,
+  supersedes,
+  type CredentialOffering,
+  type CredentialRequest,
+  type IssuerIntegration,
+  type SystemRoute,
+  shortOrgName,
+  type CredentialAttribute,
+  type HeldCredential,
+  NDI_SERVICE_PRINCIPAL,
+  type Authorisation,
+  ISSUER_ENTITLEMENTS,
+  type ActivationCheck,
+  type Designation,
   normaliseLegalName,
   type AccProposalInput,
   type AccRequestInput,
@@ -140,20 +164,53 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  15 — Flow 4: access requests replaced by accreditations, with two doors
  *       and dual control. A version-14 save holds an `accessRequests` list
  *       nothing reads and no `accreditations` list everything expects.
- *  16 — Flow 4 simplified for the first release (EW-FLOW4-SD v0.2): no
+ *  16 — Flow 5: designations and adoptions decide which entity types are
+ *       connected, and two new organisations (the CRA and MoICE) with
+ *       Kesang as the ministry's officer. A version-15 save has none of it,
+ *       so nothing would be connected at all.
+ *  17 — Flow 6: offerings, requests and the issuer's integration, the
+ *       Department of Revenue & Customs and Deki as its officer.
+ *  18 — Rinzin's credential:accept takes any type, as EW-FLOW3-SD §4.2
+ *       gives it. A version-17 save still carries the narrow grant, which
+ *       the stricter permission check would now refuse the TPN under.
+ *  19 — The Fleet Insurance offer is an ordinary offer, not refused by its
+ *       type. A version-18 save still carries it as out of scope.
+ *  20 — Flow 4 simplified for the first release (EW-FLOW4-SD v0.2): no
  *       SUPERSEDED, STOPPED or acceptance EXPIRED states, issue types without
  *       a basis each, and records that carry a legal basis, a replacement
- *       link, a request id and a withdrawal reason. A version-15 save would
+ *       link, a request id and a withdrawal reason. A version-19 save would
  *       hold rows in states no screen has words for any more.
- *  17 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
+ *  21 — Flow 5 follows FLOW-ORG-02 and FLOW-ORG-03 v0.3: no REFUSED state
+ *       (DECLINED and WITHDRAWN instead), designations carry NDI's grant,
+ *       publishingDid and the withdrawal and lapse fields, and authorisation
+ *       rows and draft revisions exist. A version-20 save holds designations
+ *       with no grant — which P2 would now refuse — and objections that no
+ *       longer hold anything.
+ *  22 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
  *       acceptance is EXPIRED with a reason (declined, withdrawn, basis
- *       lost). A version-16 save records a decline as TERMINATED, which the
+ *       lost). A version-21 save records a decline as TERMINATED, which the
  *       screens no longer read as declined.
- *  18 — The high-value grant waiting for dual control no longer carries
- *       Dorji's own signature on his own request. A version-17 save would
+ *  23 — Flow 6 follows FLOW-CRD-01..03 and UX-EW-03 v0.4: an offer sent
+ *       unasked is an inbox item reviewed on SCR-CRD-04, with no approval
+ *       decision and no parked state, and the seeded credential:accept
+ *       approvals are gone; a request no longer carries `replaces`, because
+ *       superseding is read from the held credentials when one is stored. A
+ *       version-22 save holds an offer parked for an approver nobody can
+ *       give, and an approval that would accept it.
+ *  24 — The high-value grant waiting for dual control no longer carries
+ *       Dorji's own signature on his own request. A version-23 save would
  *       let one more approver complete it alone.
+ *  25 — The ministry and the CRA are marked as constituted by statute, so
+ *       neither is offered business verification (EW-FLOW2-SD §2.2). A
+ *       version-24 save has no flag and would still offer it.
+ *  26 — Flow 6's Kind A path (FLOW-CRD-03 steps 5–7): the bonded-warehouse
+ *       authorisation is answered by the office's system, requests record
+ *       whether the system or an officer answered, and the integration
+ *       carries what the simulated system does next. A version-25 save has
+ *       that offering on the queue and an integration with no setting, so
+ *       connecting the system would change nothing.
  */
-const SEED_VERSION = 18;
+const SEED_VERSION = 26;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -206,56 +263,36 @@ function appendAudit(
 }
 
 /**
- * Accepting an offer, whether directly or because an approver released it.
+ * Storing a credential that was accepted, by either route — what arrived
+ * goes into the organisation's held credentials, and anything it supersedes
+ * is marked (EW-FLOW6-SD §4.5).
  *
- * Shared rather than duplicated because the two paths must produce the same
- * result: the same credential in the wallet, the same audit row, differing
- * only in whether an approver is named on it. Two copies of this drift, and
- * the drift shows up as an audit trail that records approved operations
- * differently from automatic ones.
+ * One rule for both routes, in one place: same type, same issuer DID, both
+ * kept, the earlier one gets `supersededBy`. A requested offer and an unasked
+ * one used to decide this differently — one by a link set when the request
+ * was made, the other not at all — and a renewal accepted from the inbox
+ * left two credentials that both looked current.
  */
-function applyOfferAcceptance(
-  state: DemoState,
-  offerId: string,
-  approverId: string | null,
-): DemoState {
-  const offer = state.offers.find((o) => o.id === offerId);
-  if (!offer) return state;
-
-  const relation = state.relations.find(
-    (r) => r.personId === state.harness.persona && r.state === "ACTIVE",
-  );
-
-  return {
-    ...state,
-    offers: state.offers.map((o) => (o.id === offerId ? { ...o, state: "accepted" } : o)),
-    heldCredentials: [
-      {
-        id: rid("hc"),
-        type: offer.type,
-        issuer: offer.issuer,
-        issuerDid: offer.issuerDid,
-        issuerTrusted: offer.issuerTrusted,
-        /* Straight from the offer payload. The credential type and its
-           attributes are what was actually offered, never anything a user
-           typed — see the note at the top of demoData.ts. */
-        attributes: offer.attributes,
-        isFoundational: false,
-        receivedAt: today(),
-        expiresAt: offer.attributes.find((a) => a.name === "valid_until")?.value ?? null,
-        status: "active",
-      },
-      ...state.heldCredentials,
-    ],
-    auditEntries: appendAudit(state, {
-      operation: "credential:accept",
-      summary: `Accepted ${offer.type} from ${offer.issuer}`,
-      actorId: relation?.personId ?? state.harness.persona,
-      relationId: relation?.id ?? null,
-      scopeVersion: relation?.scope.version ?? null,
-      approvedById: approverId,
-    }),
-  };
+function storeAccepted(
+  held: HeldCredential[],
+  incoming: Omit<HeldCredential, "id" | "isFoundational" | "receivedAt" | "status" | "issuerTrusted">,
+): HeldCredential[] {
+  const id = rid("hc");
+  const orgId = incoming.orgId ?? PELDEN;
+  const older = supersedes(held, orgId, incoming.type, incoming.issuerDid);
+  return [
+    {
+      ...incoming,
+      id,
+      orgId: orgId === PELDEN ? undefined : orgId,
+      /* C2 passed a moment ago, or this wouldn't be stored. */
+      issuerTrusted: true,
+      isFoundational: false,
+      receivedAt: today(),
+      status: "active",
+    },
+    ...held.map((c) => (c.id === older?.id ? { ...c, supersededBy: id } : c)),
+  ];
 }
 
 /**
@@ -302,16 +339,244 @@ function applyPresentation(
 const today = () => new Date().toISOString().slice(0, 10);
 /**
  * FLOW-ORG-01 P3 as the server would answer it: which entity types have a
- * connected authority (Flow 2 solution design §2.2). On day zero nobody has
- * designated any authority yet, so nothing is connected — the one condition
- * the demo has for it.
+ * connected authority (Flow 2 solution design §2.2).
+ *
+ * Since Flow 5 this is read from the designations and adoptions, which is
+ * what P3 actually is: an authority designated `ACTIVE`, with NDI's access
+ * in place, an `ACTIVE` adoption for the entity type and an `ACTIVE`
+ * authorisation for it (FLOW-ORG-03 Q3, Q4).
+ * Stopping either — an entity type (A2) or NDI's access (A3) — takes the
+ * type off this list at once, and nothing else changes.
+ *
+ * WHY THERE IS STILL AN ADMINISTRATOR CONDITION
+ *
+ * Demo sequencing, not a rule from the spec. The Corporate Regulatory
+ * Authority's designation predates every state the demo starts in, so on
+ * day zero companies would already be connected — and the guide's first
+ * chapters are about a platform that takes nobody in until it has people
+ * to run it. Requiring an active platform admin keeps that story true
+ * without inventing a second CRA designation for the presenter to walk.
  */
 const ROUTED_KINDS: OrgKind[] = ["company", "sole_proprietorship", "partnership"];
 function connectedKinds(s: DemoState): OrgKind[] {
-  return s.people.some((p) => p.platformRole === "admin" && p.hasAccount !== false) ? ROUTED_KINDS : [];
+  if (!s.people.some((p) => p.platformRole === "admin" && p.hasAccount !== false)) return [];
+  return ROUTED_KINDS.filter((kind) =>
+    s.adoptions.some((a) => {
+      if (a.entityType !== kind || a.state !== "ACTIVE") return false;
+      const d = s.designations.find((x) => x.id === a.designationId);
+      /* The authorisation row as well as the membership: they move together
+         (EW-FLOW5-SD §4.4), and P3 reads both. */
+      return (
+        d?.state === "ACTIVE" &&
+        d.ndiAccess === "ACTIVE" &&
+        s.authorisations.some((z) => z.designationId === d.id && z.entityType === kind && z.state === "ACTIVE")
+      );
+    }),
+  );
+}
+
+/**
+ * FLOW-ORG-02 step 3 — the activation checks, read-only. Each is read from
+ * the organisation's record as it is now, never inferred from something
+ * having worked before (P5's note). What each failure says, and who fixes
+ * it, is SCR-DSG-04's content — the checks carry both so the screen only
+ * renders them.
+ */
+function activationChecks(s: DemoState, d: Designation): ActivationCheck[] {
+  const org = s.organizations.find((o) => o.id === d.orgId);
+  const did = org?.issuingDid ?? "";
+  const method = did.split(":").slice(0, 2).join(":");
+  const missing = ISSUER_ENTITLEMENTS.filter((e) => !org?.entitlements?.includes(e));
+  const incumbent = s.designations.find(
+    (x) => x.id !== d.id && x.state === "ACTIVE" && x.entityTypes.some((t) => d.entityTypes.includes(t)),
+  );
+  /* P2 is two things: the OWNER's acceptance, and the OWNER's grant of
+     VERIFIER to NDI's service principal. Either missing is E1 (AC-11) — and
+     nothing is added, because the membership is only accepted at step 4,
+     after every check passes. */
+  const accepted = d.state === "ACCEPTED" || d.state === "ACTIVE";
+  const granted = Boolean(d.ndiGrant);
+  const p2 = accepted && granted;
+  return [
+    {
+      id: "P2",
+      label: "Accepted by the organisation, and NDI's access granted",
+      pass: p2,
+      observed: p2 ? null : !accepted ? "Not accepted yet" : "Accepted; NDI's access not granted",
+      resolver: p2 ? null : "authority",
+      error: p2 ? null : "E1",
+    },
+    {
+      id: "P3",
+      label: "Organisation set up — agent and wallet",
+      pass: Boolean(org?.agentReady),
+      observed: org?.agentReady ? null : "No agent or wallet",
+      resolver: org?.agentReady ? null : "authority",
+      error: org?.agentReady ? null : "E2",
+    },
+    {
+      id: "P4",
+      label: "Issuing identity is did:ethr on the national network",
+      pass: method === "did:ethr",
+      observed: method === "did:ethr" ? null : method || "None",
+      resolver: method === "did:ethr" ? null : "authority",
+      error: method === "did:ethr" ? null : "E3",
+    },
+    {
+      id: "P5",
+      label: "Entitlements: schema creation, issuance, verification",
+      pass: missing.length === 0,
+      observed: missing.length ? missing.join(", ") : null,
+      resolver: missing.length ? "NDI" : null,
+      error: missing.length ? "E4" : null,
+    },
+    {
+      id: "P6",
+      label: "No other foundational issuer for these entity types",
+      pass: !incumbent,
+      observed: incumbent ? incumbent.orgName : null,
+      resolver: incumbent ? "NDI" : null,
+      error: incumbent ? "E5" : null,
+    },
+  ];
 }
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+/** One row on SCR-CRD-10's delivery log, newest first, kept to the twelve it shows. */
+function withLogRow(i: IssuerIntegration, event: string, status: number, attempt = 1): IssuerIntegration {
+  return {
+    ...i,
+    log: [{ id: rid("evt"), event, attempt, status, latencyMs: 90 + Math.floor(Math.random() * 150), at: today() }, ...i.log].slice(0, 12),
+  };
+}
+
+/**
+ * FLOW-CRD-03 step 5 — a request has reached the issuer. An offering the
+ * system answers goes to it only if the issuer has set it up (P3); until
+ * then it lands on the officers' queue, which is what SCR-CRD-10 says before
+ * anything is set up. Once set up, the event is delivered and the log says
+ * so — a 503 for the simulated miss (E6), which also raises the failing
+ * banner. `nextAnswer` is what the dashed stand-in chose, used once.
+ */
+function routeToIssuer(
+  integration: IssuerIntegration,
+  offering: CredentialOffering | undefined,
+  issuerOrgId: string,
+): { system: SystemRoute | null; integration: IssuerIntegration } {
+  if (offering?.answering !== "api" || integration.orgId !== issuerOrgId) return { system: null, integration };
+  if (!systemConnected(integration)) return { system: { state: "UNCONNECTED", plan: "answer", note: null }, integration };
+  const plan = integration.nextAnswer;
+  const used = { ...integration, nextAnswer: "answer" as const };
+  return {
+    system: { state: "WAITING", plan, note: null },
+    integration:
+      plan === "miss"
+        ? { ...withLogRow(used, "credential-request.received", 503), failingSince: used.failingSince ?? today(), lastError: "HTTP 503" }
+        : withLogRow(used, "credential-request.received", 200),
+  };
+}
+
+/**
+ * The issuer's system answering (FLOW-CRD-03 steps 6–7; A2, E6, E10).
+ *
+ * Run when the short delay after delivery ends, doing what the stand-in
+ * chose: offer the values the system supplies, refer with a note, or not pick
+ * the request up at all. `force` is the other stand-in — the system answering
+ * a request an officer already has open, which is how the first answer wins
+ * is shown. An offer is recorded against the first client the issuer created
+ * (Q1, Q4) and nothing about it is an officer's; the business still reviews
+ * and accepts by hand (D3). A request past `answerBy` is refused (410), and
+ * one an officer already answered is no longer `WITH_ISSUER` (409), so
+ * neither changes.
+ */
+function systemAnswers(s: DemoState, requestId: string, force = false): DemoState {
+  const r = s.credentialRequests.find((x) => x.id === requestId);
+  if (!r || r.state !== "WITH_ISSUER" || !r.system) return s;
+  if (!force && r.system.state !== "WAITING") return s;
+  if (r.answerBy && r.answerBy < today()) return s;
+  const offering = s.offerings.find((o) => o.id === r.offeringId);
+  const client = s.integration.clients[0];
+  const plan = force ? "answer" : r.system.plan;
+  const patch = (x: CredentialRequest, change: Partial<CredentialRequest>) => (x.id === requestId ? { ...x, ...change } : x);
+  const note = (text: string, orgId: string) => ({ id: rid("a"), text, at: today(), orgId });
+
+  if (plan === "refer")
+    return {
+      ...s,
+      credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "REFERRED", note: SAMPLE_REFERRAL_NOTE } })),
+      activity: [note(`Your system couldn't decide a request for ${r.credential}. It's on Requests to answer`, r.issuerOrgId), ...s.activity].slice(0, 20),
+    };
+  if (plan === "miss" || !client)
+    return { ...s, credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "MISSED" } })) };
+
+  return {
+    ...s,
+    credentialRequests: s.credentialRequests.map((x) =>
+      patch(x, {
+        state: "OFFER_READY",
+        answeredBy: null,
+        answeredBySystem: { clientId: client.id, name: client.name },
+        answeredAt: today(),
+        /* The values the system supplies: the offering's examples, since no
+           register exists to look them up in. */
+        offer: {
+          attributes: (offering?.fields ?? []).map((f) => ({ name: f.name, value: f.example })),
+          validUntil: null,
+          offeredAt: today(),
+          expiresAt: inDays(30),
+        },
+      }),
+    ),
+    activity: [
+      note(`${r.issuerName} has replied — review it`, r.orgId),
+      note(`Your system answered a request for ${r.credential}`, r.issuerOrgId),
+      ...s.activity,
+    ].slice(0, 20),
+  };
+}
+
+/**
+ * Whether the person driving owns an issuing office — what changing its
+ * offerings and integration needs (SCR-CRD-07, SCR-CRD-10). Answering
+ * requests needs only membership (OrgRoles.ISSUER), checked where it's done.
+ */
+function issuerOwner(s: DemoState, orgId: string): boolean {
+  const org = s.organizations.find((o) => o.id === orgId);
+  return org?.roles?.[s.harness.persona] === "Owner";
+}
+
+/**
+ * Whether a person may run an operation for an organisation — read from
+ * their ACTIVE relation's scope, the way the server would (FLOW-CRD-01 P2).
+ * The screens ask this to grey a button with its reason; the store asks it
+ * again before doing anything, because the screen is not the boundary.
+ *
+ * The whole grant is read, not only its operation: the scope has to be in
+ * force today, and when a credential type is given the grant has to cover
+ * it. Every preset leaves accepting unfiltered (EW-FLOW3-SD §4.2), but a
+ * grant may still name types — Rinzin may present exactly one kind. A
+ * grant that needs an approver is not a yes here. No preset puts one on
+ * receiving or accepting, and parking one for an approver isn't
+ * built for credentials, so it's refused rather than waved through.
+ */
+function mayOperate(s: DemoState, personId: string, orgId: string, op: string, credentialType?: string): boolean {
+  const now = today();
+  return s.relations.some(
+    (r) =>
+      r.personId === personId &&
+      (r.orgId ?? PELDEN) === orgId &&
+      r.state === "ACTIVE" &&
+      r.scope.validFrom <= now &&
+      (r.scope.validUntil === null || r.scope.validUntil >= now) &&
+      r.scope.grants.some(
+        (g) =>
+          g.operation === op &&
+          g.approval === "AUTO" &&
+          (!credentialType || g.credentialTypes.mode === "any" || g.credentialTypes.values.includes(credentialType)),
+      ),
+  );
+}
 
 /**
  * A DID shaped like the method it claims to be.
@@ -421,6 +686,55 @@ function namedAdminRefusal(me: Person | undefined, log: (text: string, orgId?: s
   if (isNamedAdmin(me)) return null;
   if (me?.platformRole === "root") log("Control failure — the root account tried to act on an accreditation", NDI_ORG);
   return { ok: false, error: "not_admin" };
+}
+
+/**
+ * Runs the activation checks (FLOW-ORG-02 P2–P6) and records the result: the
+ * checks on the designation and, if they all pass, ACTIVE with the two log
+ * entries that say nothing is live until the authority adopts. Accepting,
+ * re-running and granting entitlements all end here, so the record of how a
+ * designation became active never depends on which button did it.
+ */
+function runActivation(
+  s0: DemoState,
+  d: Designation,
+  setState: (f: (s: DemoState) => DemoState) => void,
+  log: (text: string, orgId?: string) => void,
+): boolean {
+  const checks = activationChecks(s0, d);
+  const allPass = checks.every((c) => c.pass);
+  /* Step 5 records the primary DID itself (Q1) — what E10 compares against
+     later — and the method read from it, not assumed. */
+  const did = s0.organizations.find((o) => o.id === d.orgId)?.issuingDid ?? null;
+  setState((s) => ({
+    ...s,
+    designations: s.designations.map((x) =>
+      x.id !== d.id
+        ? x
+        : allPass
+          ? {
+              ...x,
+              state: "ACTIVE" as const,
+              checks,
+              checkedAt: today(),
+              activatedAt: today(),
+              publishingDid: did,
+              didMethodAtActivation: did ? did.split(":").slice(0, 2).join(":") : null,
+              /* Step 4 — the service, as the named principal, accepts the
+                 VERIFIER grant the OWNER issued. It adds nothing itself (S5). */
+              ndiAccess: "ACTIVE" as const,
+              ndiAccessChangedBy: x.ndiGrant?.by ?? null,
+              ndiAccessChangedAt: today(),
+            }
+          : { ...x, checks, checkedAt: today() },
+    ),
+  }));
+  if (allPass) {
+    log(`${d.orgName} is designated — nothing is live until it adopts`, NDI_ORG);
+    log("NDI's service account joined, accepting the access you granted. It's in your members list", d.orgId);
+    log("Designated as foundational issuer. Nothing is live in your name yet", d.orgId);
+  }
+  return allPass;
 }
 
 const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
@@ -703,14 +1017,8 @@ interface DemoActions {
   declineRelation: (id: string, reason: string) => void;
 
   /* ---- The holder's daily loop (Pattern A) ----
-     Accepting what the entity is offered, presenting what it is asked for,
-     and the approval gate that sits between the two. */
-
-  /** Takes an offered credential into the entity's wallet. */
-  acceptOffer: (id: string) => void;
-  declineOffer: (id: string) => void;
-  /** Sends an offer to the approval queue instead of accepting it outright. */
-  parkOffer: (id: string) => void;
+     Presenting what the entity is asked for, and the approval gate in front
+     of it. Accepting what it is offered is Flow 6's, below: it never parks. */
 
   /** Sends a presentation, disclosing exactly these attributes. */
   presentProof: (requestId: string, attributes: string[]) => void;
@@ -1028,6 +1336,128 @@ interface DemoActions {
    */
   withdrawRequest: (id: string) => void;
 
+  /* ---- Designation and adoption (Flow 5) ----
+     As with Flow 4, every rule that decides lives here — dual control,
+     who may accept or adopt, what activation checks — and the screens
+     render the answer. */
+
+  /** SCR-DSG-01 — a named admin proposes a Kind E designation (FLOW-ORG-02 A1). */
+  proposeDesignation: (input: {
+    orgId: string;
+    entityTypes: OrgKind[];
+    legalBasis: string;
+    legalRef: string;
+  }) => { ok: true; id: string } | { ok: false; error: "not_admin" | "E12" | "exists" | "covered" | "invalid" };
+  /** SCR-DSG-02 — a second named admin decides. Never the proposer (E7), never root. Refusing is E12, with a reason. */
+  decideDesignation: (
+    id: string,
+    approve: boolean,
+    reason?: string,
+  ) => { ok: true } | { ok: false; error: "E6" | "E7" | "not_admin" | "invalid" };
+  /** SCR-DSG-02 — the approver asks the proposer for more information. Changes nothing (A1). */
+  askForMoreInformation: (id: string, note: string) => { ok: true } | { ok: false; error: "not_admin" | "E7" | "invalid" };
+  /**
+   * A3 — NDI withdraws a designation that hasn't activated, with a reason:
+   * the proposer before approval, any named admin afterwards. Marked
+   * WITHDRAWN, never deleted; the authority is told if it had been asked.
+   */
+  withdrawDesignation: (id: string, reason: string) => { ok: true } | { ok: false; error: "not_admin" | "not_proposer" | "invalid" };
+  /** SCR-DSG-03 — the authority's OWNER accepts (A2), granting NDI's access in the same act. Activation runs at once. */
+  acceptDesignation: (id: string) => { ok: true; active: boolean } | { ok: false; error: "not_owner" | "E6" | "invalid" };
+  /** SCR-DSG-03, Kind N — an OWNER who has accepted grants NDI's access (FLOW-ORG-02 step 2). Activation runs at once. */
+  grantNdiAccess: (id: string) => { ok: true; active: boolean } | { ok: false; error: "not_owner" | "invalid" };
+  /** SCR-DSG-03 — the authority declines. Nothing is created; NDI is told. */
+  declineDesignation: (id: string) => { ok: true } | { ok: false; error: "not_owner" | "invalid" };
+  /** SCR-DSG-04 — run the activation checks again. Switches on if all pass. */
+  rerunActivation: (id: string) => { ok: true; active: boolean } | { ok: false; error: "not_admin" | "invalid" };
+  /** SCR-DSG-04 — NDI grants the missing entitlements (E4 — "NDI grants these"). */
+  grantEntitlements: (orgId: string) => void;
+  /**
+   * NDI's access — one control with two entry points and the same end state
+   * (EW-FLOW5-SD §4.4). Off: the members list's Remove (FLOW-ORG-02 E8),
+   * "Remove NDI's access" on SCR-DSG-05 or SCR-ADO-04 option A (FLOW-ORG-03
+   * A3) — the membership goes and every ACTIVE authorisation under the
+   * designation is WITHDRAWN. On: A4 — the OWNER grants again and a new
+   * authorisation is written per live entity type.
+   */
+  setNdiAccess: (designationId: string, on: boolean) => { ok: true } | { ok: false; error: "not_owner" | "invalid" };
+  /** Prototype — a member changes the organisation's primary DID (E10 is detected against publishingDid). */
+  setPrimaryDid: (orgId: string, did: string) => void;
+  /** SCR-ADO-01 — the officer objects (A5), against one entity type or, with `null`, the whole draft. */
+  objectToArtefacts: (designationId: string, entityType: OrgKind | null, item: string | null, note: string) => { ok: true } | { ok: false; error: "not_owner" | "invalid" };
+  /** SCR-ADO-01 — the officer withdraws their own objection, releasing the hold (A5). */
+  withdrawObjection: (objectionId: string) => { ok: true } | { ok: false; error: "not_owner" | "invalid" };
+  /** Prototype — NDI revises the draft in answer to an objection: a new draft to review, which closes it (A5). */
+  reviseDraft: (objectionId: string) => void;
+  /**
+   * SCR-ADO-02 — adopt the set for an entity type, as one act. A second
+   * adoption for a type already live is a new version (A1), and only when
+   * the caller says so; otherwise it is E7, someone else got there first.
+   * An open objection holds it (`objection_open`, A5).
+   */
+  adoptArtefacts: (
+    designationId: string,
+    entityType: OrgKind,
+    newVersion: boolean,
+  ) => { ok: true; version: number } | { ok: false; error: "E1" | "E5" | "E7" | "objection_open" | "not_owner" | "invalid" };
+  /** SCR-ADO-04 Option B — stop an entity type (A2): its adoption set and authorisation. Nothing is un-verified. */
+  stopEntityType: (designationId: string, entityType: OrgKind) => { ok: true } | { ok: false; error: "not_owner" };
+
+  /* ---- Receiving a credential (Flow 6) ----
+     The holder's side (FLOW-CRD-01, -02) and the issuer's (FLOW-CRD-03).
+     Every precondition and who-may is decided here; the screens render. */
+
+  /** Whether the person driving may run an operation for an organisation (P2). */
+  mayOperate: (orgId: string, op: "credential:receive" | "credential:accept" | "credential:list", credentialType?: string) => boolean;
+  /** SCR-CRD-02 — one consent: share the prerequisite whole, and ask. P1–P5. */
+  askForCredential: (
+    offeringId: string,
+  ) => { ok: true; id: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E5" | "E5_held" | "not_eligible" };
+  /** The organisation's agent presents the prerequisite; the issuer verifies it (steps 4–8). Simulated. */
+  deliverPrerequisite: (requestId: string) => void;
+  /** Prototype — the issuer's proof request asks for more than the consent (A1). Only before anything is presented. */
+  simulateAskForMore: (requestId: string) => void;
+  /** SCR-CRD-06 — share the wider prerequisite too, or don't (and the request is withdrawn). */
+  answerAskForMore: (requestId: string, share: boolean) => void;
+  /** SCR-CRD-03 — withdraw before an offer arrives (A2). */
+  withdrawCredentialRequest: (requestId: string) => void;
+  /** SCR-CRD-09 — the issuer's officer issues. E10 if someone already answered. */
+  issueOnRequest: (
+    requestId: string,
+    attributes: CredentialAttribute[],
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
+  /** SCR-CRD-09 — decline, with a reason code and a message the business reads verbatim (A1). */
+  declineOnRequest: (
+    requestId: string,
+    code: string,
+    message: string,
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
+  /**
+   * SCR-CRD-04 — accept what arrived: an offer answering a request
+   * (FLOW-CRD-01 step 11) or one sent unasked (FLOW-CRD-02 step 4), by the
+   * request's or the inbox item's id. C2 is run again first (E19 / E9).
+   */
+  acceptCredentialOffer: (
+    id: string,
+  ) => { ok: true } | { ok: false; error: "not_permitted" | "E13" | "E19_delisted" | "E19_unreachable" | "invalid" };
+  /** SCR-CRD-04 — decline it (FLOW-CRD-01 A3, FLOW-CRD-02 A1). Nothing is added. */
+  declineCredentialOffer: (id: string) => void;
+  /** Prototype — what re-running C2 at acceptance will find: the issuer delisted, or NDI's list out of reach (E19). */
+  simulateIssuerRecheck: (id: string, outcome: "delisted" | "unreachable") => void;
+  /** SCR-CRD-07 — pause, resume or retire an offering, or publish a new version of it. */
+  setOfferingStatus: (offeringId: string, status: "ACTIVE" | "PAUSED" | "RETIRED") => void;
+  publishOfferingVersion: (offeringId: string, changes: { uses: string[]; answerWindowDays: number; renewable: boolean }) => void;
+  /** SCR-CRD-10 — the integration lead's settings. */
+  setWebhook: (url: string) => void;
+  rotateSecret: () => void;
+  createClient: (name: string) => void;
+  setQueueFallback: (on: boolean) => void;
+  sendTestEvent: () => void;
+  /** Prototype — SCR-CRD-10's dashed stand-in: what the simulated system does with the next request (A2, E6). */
+  setSystemNextAnswer: (next: IssuerIntegration["nextAnswer"]) => void;
+  /** Prototype — SCR-CRD-09's dashed stand-in: the system answers a request an officer has open, so the first answer wins (E10). */
+  simulateSystemAnswer: (requestId: string) => void;
+
   /* ---- Demo harness ----
      Not product surface. These drive the persona switcher, the story runner
      and the state switcher, which are what make the demo runnable by someone
@@ -1137,6 +1567,61 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     }));
   }, [state.accreditations, hydrated]);
 
+  /* FLOW-ORG-02 E13 and E6 — a proposal nobody approved, or a designation
+     nobody accepted, in 30 days expires on its date, for every screen at
+     once, with the reason that says which window ran out. It used to expire
+     only when someone pressed Accept, so until then the list said "0 days
+     left" and "Propose again" returned `exists`. The proposer is told of a
+     lapsed proposal (E13): it is NDI's lapse, not the authority's. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.designations.some((d) => dsgExpired(d, now))) return;
+    setState((s) => {
+      const lapsed = s.designations.filter((d) => d.state === "PROPOSED" && dsgExpired(d, now));
+      return {
+        ...s,
+        designations: s.designations.map((d) =>
+          dsgExpired(d, now)
+            ? { ...d, state: "EXPIRED" as const, expiredReason: d.state === "PROPOSED" ? ("NOT_APPROVED" as const) : ("NOT_ACCEPTED" as const) }
+            : d,
+        ),
+        activity: [
+          ...lapsed.map((d) => ({ id: rid("a"), text: `The proposal for ${d.orgName} lapsed without a decision`, at: now, orgId: NDI_ORG })),
+          ...s.activity,
+        ].slice(0, 20),
+      };
+    });
+  }, [state.designations, hydrated]);
+
+  /* FLOW-CRD-01 E10/E13, FLOW-CRD-03 E4 — a request whose date has passed
+     ends on that date (see crdEnding), for the lists, the inbox and the
+     store's own checks at once. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.credentialRequests.some((r) => crdEnding(r, now))) return;
+    setState((s) => ({
+      ...s,
+      credentialRequests: s.credentialRequests.map((r) => {
+        const ending = crdEnding(r, now);
+        return ending ? { ...r, state: ending.state, failReason: ending.failReason, consentBy: null } : r;
+      }),
+    }));
+  }, [state.credentialRequests, hydrated]);
+
+  /* FLOW-CRD-02 E4 — an offer sent unasked that nobody accepted in 30 days
+     lapses on its date, the same way. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.offers.some((o) => o.state === "pending" && o.expiresAt < now)) return;
+    setState((s) => ({
+      ...s,
+      offers: s.offers.map((o) => (o.state === "pending" && o.expiresAt < now ? { ...o, state: "expired" as const } : o)),
+    }));
+  }, [state.offers, hydrated]);
+
   useEffect(() => {
     if (!hydrated) return;
     try {
@@ -1145,6 +1630,23 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       /* Over quota or private mode — the demo still works for this session. */
     }
   }, [state, hydrated]);
+
+  /* FLOW-CRD-03 steps 5–7, Kind A: the issuer's system answers a delivered
+     request a moment later. There's no server to do it, so a timer does —
+     here rather than on a screen, because the system answers whoever is
+     looking and wherever they are. Simulated; on the what's-real page. */
+  const awaitingSystem = state.credentialRequests
+    .filter((r) => r.state === "WITH_ISSUER" && r.system?.state === "WAITING")
+    .map((r) => r.id)
+    .join("|");
+  useEffect(() => {
+    if (!hydrated || !awaitingSystem) return;
+    const t = window.setTimeout(
+      () => setState((s) => awaitingSystem.split("|").reduce((next, id) => systemAnswers(next, id), s)),
+      SYSTEM_ANSWER_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [awaitingSystem, hydrated]);
 
   /* Each entry belongs to the organisation it happened in — the one being
      worked in, unless the caller names another. The feed on a dashboard is
@@ -1743,51 +2245,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ),
         })),
 
-      acceptOffer: (id) =>
-        setState((s) => applyOfferAcceptance(s, id, null)),
-
-      declineOffer: (id) =>
-        setState((s) => ({
-          ...s,
-          offers: s.offers.map((o) => (o.id === id ? { ...o, state: "declined" } : o)),
-        })),
-
-      parkOffer: (id) =>
-        setState((s) => {
-          const offer = s.offers.find((o) => o.id === id);
-          if (!offer) return s;
-          const relation = s.relations.find(
-            (r) => r.personId === s.harness.persona && r.state === "ACTIVE",
-          );
-          return {
-            ...s,
-            offers: s.offers.map((o) => (o.id === id ? { ...o, state: "parked" } : o)),
-            parkedOperations: [
-              {
-                id: rid("park"),
-                operation: "credential:accept" as const,
-                summary: `Accept ${offer.type} from ${offer.issuer}`,
-                requestedBy: s.harness.persona,
-                relationId: relation?.id ?? "rel-rinzin",
-                scopeVersion: relation?.scope.version ?? 1,
-                targetId: offer.id,
-                targetRelyingParty: null,
-                payloadHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random()
-                  .toString(16)
-                  .slice(2, 10)}`,
-                policy: "SINGLE_APPROVER" as const,
-                requiredSignatures: 1,
-                signatures: [],
-                state: "parked" as const,
-                decisionReason: null,
-                createdAt: today(),
-                expiresAt: offer.expiresAt,
-              },
-              ...s.parkedOperations,
-            ],
-          };
-        }),
-
       presentProof: (requestId, attributes) =>
         setState((s) => applyPresentation(s, requestId, attributes, null)),
 
@@ -1892,9 +2349,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           }
 
           const approver = s.harness.persona;
-          if (operation.operation === "credential:accept" && operation.targetId) {
-            next = applyOfferAcceptance(next, operation.targetId, approver);
-          } else if (operation.operation === "proof:present" && operation.targetId) {
+          /* Only presentations park. Accepting an offer never does — every
+             preset carries credential:accept AUTO (EW-FLOW6-SD §5.3). */
+          if (operation.operation === "proof:present" && operation.targetId) {
             const request = next.verificationRequests.find(
               (v) => v.id === operation.targetId,
             );
@@ -1938,11 +2395,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             /* The held thing goes back to being undecided rather than
                vanishing: a rejected approval is the approver's answer, not
                the end of the relying party's request. */
-            offers: s.offers.map((o) =>
-              o.id === operation.targetId && o.state === "parked"
-                ? { ...o, state: "pending" }
-                : o,
-            ),
             verificationRequests: s.verificationRequests.map((v) =>
               v.id === operation.targetId && v.state === "parked"
                 ? { ...v, state: "ready" }
@@ -3634,6 +4086,961 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ),
           };
         }),
+
+      proposeDesignation: (input) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        /* A named admin proposes — never the root account, which does no
+           routine work (FLOW-ONB-02 S9). */
+        if (!isNamedAdmin(me)) {
+          if (me?.platformRole === "root") log("Control failure — the root account tried to propose a designation", NDI_ORG);
+          return { ok: false, error: "not_admin" };
+        }
+        const org = s0.organizations.find((o) => o.id === input.orgId);
+        if (!org || !input.entityTypes.length || !input.legalBasis.trim()) return { ok: false, error: "invalid" };
+        /* E12 (FLOW-ONB-02 P7): a proposal needs a second named admin, so
+           with fewer than two active it is refused up front. */
+        if (activeAdmins(s0).length < 2) return { ok: false, error: "E12" };
+        if (s0.designations.some((d) => d.orgId === org.id && designationInProgress(d))) return { ok: false, error: "exists" };
+        /* P6 — a kind of business another authority already confirms can't
+           be proposed: replacing an incumbent isn't supported yet (E5, a
+           later flow). The form disables the box, but a draft resumed from
+           storage could still carry it, and it would then pass proposal and
+           approval only to fail at activation after three people had acted.
+           So it's refused here, where it counts. */
+        if (
+          input.entityTypes.some((k) =>
+            s0.designations.some((d) => d.orgId !== org.id && designationInProgress(d) && d.state !== "PROPOSED" && d.entityTypes.includes(k)),
+          )
+        )
+          return { ok: false, error: "covered" };
+        const id = rid("dsg");
+        setState((s) => ({
+          ...s,
+          designations: [
+            {
+              id,
+              orgId: org.id,
+              orgName: org.legalName ?? org.name,
+              kind: "E",
+              entityTypes: input.entityTypes,
+              legalBasis: input.legalBasis.trim(),
+              legalRef: input.legalRef.trim(),
+              state: "PROPOSED",
+              proposedBy: s.harness.persona,
+              proposedAt: today(),
+              approvedBy: null,
+              approvedAt: null,
+              acceptedBy: null,
+              acceptedAt: null,
+              declinedBy: null,
+              declinedReason: null,
+              withdrawnBy: null,
+              withdrawnAt: null,
+              withdrawnReason: null,
+              withdrawnFrom: null,
+              expiredReason: null,
+              /* E13 — 30 days for a second administrator to decide. */
+              expiresAt: inDays(30),
+              infoRequests: [],
+              activatedAt: null,
+              publishingDid: null,
+              didMethodAtActivation: null,
+              suspendedReason: null,
+              checks: null,
+              checkedAt: null,
+              ndiGrant: null,
+              ndiAccess: null,
+              ndiAccessChangedBy: null,
+              ndiAccessChangedAt: null,
+            },
+            ...s.designations,
+          ],
+        }));
+        log(`Designation proposed for ${org.legalName ?? org.name}`, NDI_ORG);
+        return { ok: true, id };
+      },
+
+      decideDesignation: (id, approve, reason) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const d = s0.designations.find((x) => x.id === id);
+        if (!isNamedAdmin(me)) {
+          if (me?.platformRole === "root") log("Control failure — the root account tried to approve a designation", NDI_ORG);
+          return { ok: false, error: "not_admin" };
+        }
+        if (!d || d.state !== "PROPOSED") return { ok: false, error: "invalid" };
+        /* E7 — the proposer cannot approve their own. The screen doesn't
+           offer it; reaching here anyway is a control failure, logged. */
+        if (d.proposedBy === s0.harness.persona) {
+          log("Control failure — a designation's proposer tried to approve it", NDI_ORG);
+          return { ok: false, error: "E7" };
+        }
+        if (!approve && !reason?.trim()) return { ok: false, error: "invalid" };
+        setState((s) => ({
+          ...s,
+          designations: s.designations.map((x) =>
+            x.id !== id
+              ? x
+              : approve
+                ? { ...x, state: "PENDING" as const, approvedBy: s.harness.persona, approvedAt: today(), expiresAt: inDays(30) }
+                : /* E12 — DECLINED with the approver's reason, for the proposer. */
+                  { ...x, state: "DECLINED" as const, declinedBy: s.harness.persona, declinedReason: reason?.trim() ?? null, expiresAt: null },
+          ),
+        }));
+        log(
+          approve
+            ? `Designation for ${d.orgName} approved — waiting for it to accept`
+            : `${me?.name ?? "The second administrator"} declined the designation for ${d.orgName}: ${reason?.trim()}`,
+          NDI_ORG,
+        );
+        return { ok: true };
+      },
+
+      askForMoreInformation: (id, note) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const d = s0.designations.find((x) => x.id === id);
+        if (!isNamedAdmin(me)) return { ok: false, error: "not_admin" };
+        if (!d || d.state !== "PROPOSED" || !note.trim()) return { ok: false, error: "invalid" };
+        /* Asking is the approver's move, so the proposer can't ask themselves. */
+        if (d.proposedBy === s0.harness.persona) return { ok: false, error: "E7" };
+        /* A note on the record and a message to the proposer — the state and
+           the 30-day window are untouched (A1: "which changes nothing"). */
+        setState((s) => ({
+          ...s,
+          designations: s.designations.map((x) =>
+            x.id === id ? { ...x, infoRequests: [...x.infoRequests, { by: s.harness.persona, at: today(), note: note.trim() }] } : x,
+          ),
+        }));
+        log(`${me?.name ?? "An administrator"} asked for more information about the designation for ${d.orgName}`, NDI_ORG);
+        return { ok: true };
+      },
+
+      withdrawDesignation: (id, reason) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const d = s0.designations.find((x) => x.id === id);
+        if (!isNamedAdmin(me)) {
+          if (me?.platformRole === "root") log("Control failure — the root account tried to withdraw a designation", NDI_ORG);
+          return { ok: false, error: "not_admin" };
+        }
+        /* A3 is for a designation that hasn't activated. Ending an ACTIVE one
+           is a different act with its own consequences, not walked here. */
+        if (!d || !["PROPOSED", "PENDING", "ACCEPTED"].includes(d.state) || !reason.trim()) return { ok: false, error: "invalid" };
+        /* Before approval only its proposer withdraws it — the approver's
+           "no" is E12, with its own record. */
+        if (d.state === "PROPOSED" && d.proposedBy !== s0.harness.persona) return { ok: false, error: "not_proposer" };
+        const told = d.state === "PENDING" || d.state === "ACCEPTED";
+        setState((s) => ({
+          ...s,
+          designations: s.designations.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  state: "WITHDRAWN" as const,
+                  withdrawnBy: s.harness.persona,
+                  withdrawnAt: today(),
+                  withdrawnReason: reason.trim(),
+                  withdrawnFrom: x.state,
+                  expiresAt: null,
+                }
+              : x,
+          ),
+        }));
+        log(`Withdrew the designation for ${d.orgName}: ${reason.trim()}`, NDI_ORG);
+        /* The authority is told only if the proposal had reached it. */
+        if (told) log(`NDI has withdrawn this designation: ${reason.trim()}`, d.orgId);
+        return { ok: true };
+      },
+
+      acceptDesignation: (id) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === id);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        if (!d || !org || d.state !== "PENDING") return { ok: false, error: "invalid" };
+        /* E6 — thirty days without acceptance and it confers nothing. */
+        if (d.expiresAt && d.expiresAt < today()) {
+          setState((s) => ({
+            ...s,
+            designations: s.designations.map((x) => (x.id === id ? { ...x, state: "EXPIRED" as const, expiredReason: "NOT_ACCEPTED" as const } : x)),
+          }));
+          return { ok: false, error: "E6" };
+        }
+        /* Only an OWNER of the authority's own organisation (A2). */
+        if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        /* A2 — accepting is also the grant: the OWNER issues NDI's service
+           principal its VERIFIER invitation, in their own session. It confers
+           nothing until step 4 accepts it, after every check passes. */
+        const accepted: Designation = {
+          ...d,
+          state: "ACCEPTED",
+          acceptedBy: s0.harness.persona,
+          acceptedAt: today(),
+          expiresAt: null,
+          ndiGrant: { by: s0.harness.persona, at: today() },
+        };
+        const s1 = { ...s0, designations: s0.designations.map((x) => (x.id === id ? accepted : x)) };
+        setState((s) => ({ ...s, designations: s.designations.map((x) => (x.id === id ? accepted : x)) }));
+        log(`${d.orgName} accepted its designation`, NDI_ORG);
+        log("Accepted the designation as foundational issuer, and granted NDI's service account its access", org.id);
+        /* Step 3: activation is submitted and checked at once — through the
+           same path a re-run takes, so the audit trail records "designated"
+           whichever way it got there. */
+        return { ok: true, active: runActivation(s1, accepted, setState, log) };
+      },
+
+      grantNdiAccess: (id) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === id);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        /* Kind N, step 2: accepted by the invitation, and the grant is still
+           to come. Already granted is nothing to do. */
+        if (!d || !org || d.state !== "ACCEPTED" || d.ndiGrant) return { ok: false, error: "invalid" };
+        if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        const granted: Designation = { ...d, ndiGrant: { by: s0.harness.persona, at: today() } };
+        const s1 = { ...s0, designations: s0.designations.map((x) => (x.id === id ? granted : x)) };
+        setState((s) => ({ ...s, designations: s.designations.map((x) => (x.id === id ? granted : x)) }));
+        log("Granted NDI's service account its access", org.id);
+        return { ok: true, active: runActivation(s1, granted, setState, log) };
+      },
+
+      declineDesignation: (id) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === id);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        if (!d || !org || d.state !== "PENDING") return { ok: false, error: "invalid" };
+        if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        /* AC-13 — DECLINED, and no grant to NDI's service principal exists. */
+        setState((s) => ({
+          ...s,
+          designations: s.designations.map((x) =>
+            x.id === id ? { ...x, state: "DECLINED" as const, declinedBy: s.harness.persona, expiresAt: null } : x,
+          ),
+        }));
+        log(`${d.orgName} declined its designation`, NDI_ORG);
+        return { ok: true };
+      },
+
+      rerunActivation: (id) => {
+        const s0 = stateRef.current;
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const d = s0.designations.find((x) => x.id === id);
+        if (!isNamedAdmin(me)) return { ok: false, error: "not_admin" };
+        if (!d || (d.state !== "ACCEPTED" && d.state !== "PENDING")) return { ok: false, error: "invalid" };
+        return { ok: true, active: runActivation(s0, d, setState, log) };
+      },
+
+      grantEntitlements: (orgId) => {
+        const s0 = stateRef.current;
+        if (!isNamedAdmin(s0.people.find((p) => p.id === s0.harness.persona))) return;
+        const org = s0.organizations.find((o) => o.id === orgId);
+        /* Already granted: nothing to do, and nothing to log twice. */
+        if (!org || ISSUER_ENTITLEMENTS.every((e) => org.entitlements?.includes(e))) return;
+        const granted = { ...org, entitlements: Array.from(new Set([...(org.entitlements ?? []), ...ISSUER_ENTITLEMENTS])) };
+        const s1 = { ...s0, organizations: s0.organizations.map((o) => (o.id === orgId ? granted : o)) };
+        setState((s) => ({ ...s, organizations: s.organizations.map((o) => (o.id === orgId ? granted : o)) }));
+        log("Granted the entitlements a foundational issuer needs", NDI_ORG);
+        /* And the checks run again at once, so the E4 failure and its button
+           don't stay on screen describing something already fixed. */
+        const d = s1.designations.find((x) => x.orgId === orgId && x.state === "ACCEPTED");
+        if (d) runActivation(s1, d, setState, log);
+      },
+
+      setNdiAccess: (designationId, on) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === designationId);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        /* The authority's own control, without asking NDI (UN-24) — so no
+           NDI role can reach it. */
+        if (!d || !org || roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        /* Removing needs a member to remove. Restoring (A4) needs the
+           designation ACTIVE — a suspended one reads no authorisation. */
+        if (on ? d.state !== "ACTIVE" || d.ndiAccess !== "REMOVED" : d.ndiAccess !== "ACTIVE") return { ok: false, error: "invalid" };
+        const me = s0.harness.persona;
+        /* A4 writes a new row for each entity type whose adoption set is
+           ACTIVE; the WITHDRAWN rows stay as they are, never reactivated. */
+        const fresh: Authorisation[] = on
+          ? s0.adoptions
+              .filter((a) => a.designationId === d.id && a.state === "ACTIVE")
+              .map((a) => ({
+                id: rid("auth"),
+                designationId: d.id,
+                orgId: org.id,
+                entityType: a.entityType,
+                principal: NDI_SERVICE_PRINCIPAL,
+                permittedPurpose: draftFor(a.entityType).purpose,
+                grantedBy: me,
+                grantedAt: today(),
+                state: "ACTIVE" as const,
+                withdrawnBy: null,
+                withdrawnAt: null,
+              }))
+          : [];
+        setState((s) => ({
+          ...s,
+          designations: s.designations.map((x) =>
+            x.id === designationId
+              ? {
+                  ...x,
+                  ndiAccess: on ? ("ACTIVE" as const) : ("REMOVED" as const),
+                  ndiAccessChangedBy: me,
+                  ndiAccessChangedAt: today(),
+                  /* Restoring is the OWNER granting again, as at step 2 —
+                     the service only accepts it (S5). */
+                  ndiGrant: on ? { by: me, at: today() } : x.ndiGrant,
+                }
+              : x,
+          ),
+          /* Pausing moves every ACTIVE authorisation under the designation
+             to WITHDRAWN in the same act, whichever entry point was used —
+             membership is organisation-wide, so the pause is too. */
+          authorisations: [
+            ...s.authorisations.map((z) =>
+              !on && z.designationId === designationId && z.state === "ACTIVE"
+                ? { ...z, state: "WITHDRAWN" as const, withdrawnBy: me, withdrawnAt: today() }
+                : z,
+            ),
+            ...fresh,
+          ],
+        }));
+        log(
+          on ? "Granted NDI's service account its access again" : "Removed NDI's service account — it can no longer send in your name",
+          org.id,
+        );
+        /* E8 to NDI: the permission withdrawn, never an outage. */
+        if (!on) log(`${d.orgName} has withdrawn the platform's permission to request proofs in its name`, NDI_ORG);
+        return { ok: true };
+      },
+
+      setPrimaryDid: (orgId, did) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === orgId);
+        if (!org || !did || org.issuingDid === did) return;
+        /* E10 — compared with publishingDid, the DID itself, so a switch to
+           another did:ethr is caught as surely as a change of method. Any
+           member may change it (FLOW-ORG-02 §7.2), so the store checks on
+           every change rather than trusting who made it. Putting the
+           recorded DID back lifts an E10 suspension, and only that one. */
+        const changed = s0.designations.filter((d) => d.orgId === orgId && d.state === "ACTIVE" && d.publishingDid && d.publishingDid !== did);
+        const restored = s0.designations.filter(
+          (d) => d.orgId === orgId && d.state === "SUSPENDED" && d.suspendedReason === "IDENTITY_CHANGED" && d.publishingDid === did,
+        );
+        setState((s) => ({
+          ...s,
+          organizations: s.organizations.map((o) => (o.id === orgId ? { ...o, issuingDid: did } : o)),
+          designations: s.designations.map((d) =>
+            changed.some((c) => c.id === d.id)
+              ? { ...d, state: "SUSPENDED" as const, suspendedReason: "IDENTITY_CHANGED" as const }
+              : restored.some((r) => r.id === d.id)
+                ? { ...d, state: "ACTIVE" as const, suspendedReason: null }
+                : d,
+          ),
+        }));
+        for (const d of changed) {
+          const text = `${d.orgName}'s issuing identity has changed since it was designated. New verifications have stopped until this is put back`;
+          log(text, NDI_ORG);
+          log(text, orgId);
+        }
+        for (const d of restored) {
+          log(`${d.orgName}'s issuing identity is back to the one it was designated under. New verifications can resume`, NDI_ORG);
+          log("Your issuing identity is back to the one you were designated under. New verifications can resume", orgId);
+        }
+      },
+
+      objectToArtefacts: (designationId, entityType, item, note) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === designationId);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        if (!d || !org || roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        if (!note.trim()) return { ok: false, error: "invalid" };
+        /* One open objection at a time for what it covers — a second would
+           only repeat the hold. */
+        const kinds = entityType ? [entityType] : d.entityTypes;
+        if (kinds.some((k) => openObjectionFor(s0.artefactObjections, designationId, k))) return { ok: false, error: "invalid" };
+        setState((s) => ({
+          ...s,
+          artefactObjections: [
+            ...s.artefactObjections,
+            {
+              id: rid("obj"),
+              designationId,
+              entityType,
+              item: entityType ? item : null,
+              note: note.trim(),
+              by: s.harness.persona,
+              at: today(),
+              closedAt: null,
+              closedHow: null,
+            },
+          ],
+        }));
+        log(`Objected to NDI's draft${entityType ? ` for ${entityType.replace(/_/g, " ")}s` : ""} — adopting it is on hold`, org.id);
+        log(`${d.orgName} objected to the draft${entityType ? ` for ${entityType.replace(/_/g, " ")}s` : ""}: ${note.trim()}`, NDI_ORG);
+        return { ok: true };
+      },
+
+      withdrawObjection: (objectionId) => {
+        const s0 = stateRef.current;
+        const o = s0.artefactObjections.find((x) => x.id === objectionId);
+        const d = s0.designations.find((x) => x.id === o?.designationId);
+        const org = s0.organizations.find((x) => x.id === d?.orgId);
+        if (!o || !d || !org || o.closedAt) return { ok: false, error: "invalid" };
+        /* The officer's own objection, theirs to release. */
+        if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        setState((s) => ({
+          ...s,
+          artefactObjections: s.artefactObjections.map((x) =>
+            x.id === objectionId ? { ...x, closedAt: today(), closedHow: "WITHDRAWN" as const } : x,
+          ),
+        }));
+        log("Withdrew your objection to NDI's draft", org.id);
+        log(`${d.orgName} withdrew its objection to the draft`, NDI_ORG);
+        return { ok: true };
+      },
+
+      reviseDraft: (objectionId) => {
+        const s0 = stateRef.current;
+        const o = s0.artefactObjections.find((x) => x.id === objectionId);
+        const d = s0.designations.find((x) => x.id === o?.designationId);
+        if (!o || !d || o.closedAt) return;
+        /* NDI answers with a new draft for everything the objection covers.
+           Where the objection named an item, the revision leaves it out;
+           where it didn't, the prototype can't know what NDI would change,
+           so the revision carries the same items as a fresh draft to
+           review. Either way the objection closes, and the officer reads the
+           new draft before adopting it. */
+        const kinds = o.entityType ? [o.entityType] : d.entityTypes;
+        const revisions = kinds.map((k) => {
+          const prior = s0.draftRevisions.filter((r) => r.designationId === d.id && r.entityType === k);
+          const asked = draftAsked(s0.draftRevisions, d.id, k);
+          return {
+            designationId: d.id,
+            entityType: k,
+            revision: prior.reduce((n, r) => Math.max(n, r.revision), 1) + 1,
+            at: today(),
+            asked: o.item ? asked.filter((a) => a.item !== o.item) : asked,
+            objectionId,
+          };
+        });
+        setState((s) => ({
+          ...s,
+          draftRevisions: [...s.draftRevisions, ...revisions],
+          artefactObjections: s.artefactObjections.map((x) =>
+            x.id === objectionId ? { ...x, closedAt: today(), closedHow: "REVISED" as const } : x,
+          ),
+        }));
+        log(`NDI revised the draft for ${d.orgName}`, NDI_ORG);
+        log("NDI revised its draft in answer to your objection. Review it before adopting", d.orgId);
+      },
+
+      adoptArtefacts: (designationId, entityType, newVersion) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === designationId);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        if (!d || !org) return { ok: false, error: "invalid" };
+        /* P2 — the authority's OWNER, in its own organisation. No NDI role
+           has a route here (EW-FLOW5-SD/D7). */
+        if (roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        if (d.state === "SUSPENDED") return { ok: false, error: "E5" };
+        if (d.state !== "ACTIVE") return { ok: false, error: "invalid" };
+        if (!d.entityTypes.includes(entityType)) return { ok: false, error: "E1" };
+        const live = s0.adoptions.find((a) => a.designationId === designationId && a.entityType === entityType && a.state === "ACTIVE");
+        if (live && !newVersion) return { ok: false, error: "E7" };
+        /* A5 — an open objection, against this type or the whole draft,
+           holds adoption until NDI revises the draft or the officer
+           withdraws it. Nothing is adopted over it, and nothing is taken
+           out of the draft by the officer alone. */
+        if (openObjectionFor(s0.artefactObjections, designationId, entityType)) return { ok: false, error: "objection_open" };
+        const draft = draftFor(entityType);
+        const asked = draftAsked(s0.draftRevisions, designationId, entityType);
+        const prior = s0.adoptions.filter((a) => a.designationId === designationId && a.entityType === entityType);
+        const version = prior.reduce((n, a) => Math.max(n, a.version), 0) + 1;
+        /* The third part of the set — the authorisation — is written with the
+           adoption (step 5). A new version keeps the one already standing.
+           While NDI's access is paused none is written: the pause covers the
+           whole designation, and restoring (A4) writes one for every live
+           type, this one included. */
+        const authorised = s0.authorisations.some(
+          (z) => z.designationId === designationId && z.entityType === entityType && z.state === "ACTIVE",
+        );
+        const grant: Authorisation[] =
+          authorised || d.ndiAccess !== "ACTIVE"
+            ? []
+            : [
+                {
+                  id: rid("auth"),
+                  designationId,
+                  orgId: org.id,
+                  entityType,
+                  principal: NDI_SERVICE_PRINCIPAL,
+                  permittedPurpose: draft.purpose,
+                  grantedBy: s0.harness.persona,
+                  grantedAt: today(),
+                  state: "ACTIVE",
+                  withdrawnBy: null,
+                  withdrawnAt: null,
+                },
+              ];
+        setState((s) => ({
+          ...s,
+          adoptions: [
+            ...s.adoptions.map((a) =>
+              a.designationId === designationId && a.entityType === entityType && a.state === "ACTIVE"
+                ? { ...a, state: "SUPERSEDED" as const }
+                : a,
+            ),
+            {
+              id: rid("ado"),
+              designationId,
+              orgId: org.id,
+              entityType,
+              version,
+              state: "ACTIVE",
+              adoptedBy: s.harness.persona,
+              adoptedAt: today(),
+              asked,
+              purpose: draft.purpose,
+              stoppedBy: null,
+              stoppedAt: null,
+            },
+          ],
+          authorisations: [...s.authorisations, ...grant],
+        }));
+        log(`Adopted what people will be asked — version ${version}`, org.id);
+        return { ok: true, version };
+      },
+
+      mayOperate: (orgId, op, credentialType) => {
+        const s0 = stateRef.current;
+        return mayOperate(s0, s0.harness.persona, orgId, op, credentialType);
+      },
+
+      askForCredential: (offeringId) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const offering = s0.offerings.find((o) => o.id === offeringId);
+        /* P1 — a verified holder. The option is absent otherwise (E1). */
+        if (!org || !org.capabilities.includes("holder")) return { ok: false, error: "E1" };
+        /* P2 — the asker's preset carries credential:receive (E2). */
+        if (!mayOperate(s0, s0.harness.persona, org.id, "credential:receive", offering?.credential)) return { ok: false, error: "E2" };
+        /* P3 — still offered, and the issuer may still issue it (E3). */
+        if (!offering || offering.status !== "ACTIVE" || !offering.covered) return { ok: false, error: "E3" };
+        /* And offered to this kind of business. The catalogue only lists what
+           is, but a direct link reaches any offering, so it's checked here. */
+        if (!offering.eligibleKinds.includes(org.kind ?? "company")) return { ok: false, error: "not_eligible" };
+        /* Only what can be shared counts: a superseded credential is the
+           record, not something presented. */
+        const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active" && !c.supersededBy);
+        /* P4 — the prerequisite is held (E4). */
+        if (!held.some((c) => c.type === offering.prerequisite.credential)) return { ok: false, error: "E4" };
+        /* P5 — nothing in flight, and not held unless renewable (E5). The
+           two halves are told apart: one is "here's where it stands", the
+           other "your organisation already has this". */
+        if (s0.credentialRequests.some((r) => r.orgId === org.id && r.offeringId === offeringId && requestInFlight(r)))
+          return { ok: false, error: "E5" };
+        if (!offering.renewable && held.some((c) => c.type === offering.credential)) return { ok: false, error: "E5_held" };
+        const id = rid("crq");
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const isRoot = s0.relations.some(
+          (r) => r.personId === s0.harness.persona && (r.orgId ?? PELDEN) === org.id && r.isRootAuthority && r.state === "ACTIVE",
+        );
+        setState((s) => ({
+          ...s,
+          credentialRequests: [
+            {
+              id,
+              orgId: org.id,
+              offeringId,
+              offeringVersion: offering.version,
+              credential: offering.credential,
+              issuerName: offering.issuerName,
+              issuerOrgId: offering.issuerOrgId,
+              requestedBy: s.harness.persona,
+              requestedAt: today(),
+              state: "AWAITING_PROOF",
+              consented: offering.prerequisite,
+              askedMore: null,
+              consentBy: null,
+              answerBy: null,
+              declined: null,
+              offer: null,
+              answeredBy: null,
+              answeredAt: null,
+              failReason: null,
+            },
+            ...s.credentialRequests,
+          ],
+        }));
+        log(`Asked ${offering.issuerName} for ${offering.credential}`, org.id);
+        /* UXD-39 — a request made by anyone but the Root tells the Root at
+           once; it doesn't wait for the Root's approval. */
+        if (!isRoot)
+          log(
+            `${me?.name ?? "Someone"} asked ${offering.issuerName} for your ${offering.credential} and shared your ${offering.prerequisite.credential}`,
+            org.id,
+          );
+        return { ok: true, id };
+      },
+
+      deliverPrerequisite: (requestId) =>
+        setState((s) => {
+          const r = s.credentialRequests.find((x) => x.id === requestId);
+          const offering = s.offerings.find((o) => o.id === r?.offeringId);
+          if (!r || r.state !== "AWAITING_PROOF") return s;
+          /* E16 — the presentation runs on the requester's credential:receive,
+             re-checked as it runs (DA-CORE §5 step 3). If their relation has
+             ended, nothing is presented: the request is withdrawn and the
+             Root told. After this point nothing more runs on their authority. */
+          if (!mayOperate(s, r.requestedBy, r.orgId, "credential:receive", r.credential)) {
+            const who = s.people.find((p) => p.id === r.requestedBy)?.name ?? "The person who asked";
+            const org = s.organizations.find((o) => o.id === r.orgId);
+            const failReason = `This request was withdrawn because ${who} can no longer act for ${org ? shortOrgName(org.name) : "your organisation"}. Nothing was shared. You can ask again.`;
+            return {
+              ...s,
+              credentialRequests: s.credentialRequests.map((x) =>
+                x.id === requestId ? { ...x, state: "WITHDRAWN" as const, failCode: "REQUESTER_ENDED" as const, failReason } : x,
+              ),
+              activity: [{ id: rid("a"), text: failReason, at: today(), orgId: r.orgId }, ...s.activity].slice(0, 20),
+            };
+          }
+          /* Step 5 — an offering the system answers is delivered to it. */
+          const route = routeToIssuer(s.integration, offering, r.issuerOrgId);
+          return {
+            ...s,
+            integration: route.integration,
+            credentialRequests: s.credentialRequests.map((x) =>
+              x.id === requestId
+                ? { ...x, state: "WITH_ISSUER" as const, answerBy: inDays(offering?.answerWindowDays ?? 5), system: route.system }
+                : x,
+            ),
+          };
+        }),
+
+      /* NEEDS_CONSENT is reached only from AWAITING_PROOF, before anything
+         is presented (EW-FLOW6-SD §5.1, D10). Once the prerequisite has gone
+         the request's one use is spent: a later proof request isn't part of
+         it, so a request with the issuer can't be asked for more. */
+      simulateAskForMore: (requestId) =>
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId && x.state === "AWAITING_PROOF"
+              ? {
+                  ...x,
+                  state: "NEEDS_CONSENT" as const,
+                  askedMore: { credential: "Bank account", items: ["Account holder", "Account number", "Bank"] },
+                  consentBy: inDays(7),
+                }
+              : x,
+          ),
+        })),
+
+      answerAskForMore: (requestId, share) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        if (!r || r.state !== "NEEDS_CONSENT") return;
+        /* E4 — past the date the issuer stopped waiting, there's nothing left to answer. */
+        if (crdEnding(r, today())) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id !== requestId
+              ? x
+              : share
+                ? /* What was shared beyond the first consent is recorded with the
+                     request, so the record and the officer's panel both show it. */
+                  { ...x, state: "AWAITING_PROOF" as const, consentBy: null, alsoShared: x.askedMore }
+                : { ...x, state: "WITHDRAWN" as const, consentBy: null },
+          ),
+        }));
+        log(share ? `Agreed to share more with ${r.issuerName}` : `Withdrew the request to ${r.issuerName}`, r.orgId);
+      },
+
+      withdrawCredentialRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        /* A2 — whoever may ask may withdraw, until the issuer has replied. */
+        if (!r || !["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER"].includes(r.state)) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "WITHDRAWN" as const } : x)),
+        }));
+        log(`Withdrew the request to ${r.issuerName} for ${r.credential}`, r.orgId);
+      },
+
+      issueOnRequest: (requestId, attributes) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        /* The OrgRoles.ISSUER user role in the issuer's own organisation. */
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        /* Not on the queue: the system has it, and an officer answers only
+           what the queue shows (E6 with fallback off). */
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
+        if (r.answerBy && r.answerBy < today()) return { ok: false, error: "E7" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? {
+                  ...x,
+                  state: "OFFER_READY" as const,
+                  answeredBy: s.harness.persona,
+                  answeredAt: today(),
+                  offer: { attributes, validUntil: null, offeredAt: today(), expiresAt: inDays(30) },
+                }
+              : x,
+          ),
+        }));
+        log(`Issued ${r.credential} on request`, issuer.id);
+        log(`${r.issuerName} has replied — review it`, r.orgId);
+        return { ok: true };
+      },
+
+      declineOnRequest: (requestId, code, message) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? { ...x, state: "DECLINED_BY_ISSUER" as const, answeredBy: s.harness.persona, answeredAt: today(), declined: { code, message: message.trim() } }
+              : x,
+          ),
+        }));
+        log(`Declined a request for ${r.credential}`, issuer.id);
+        return { ok: true };
+      },
+
+      acceptCredentialOffer: (id) => {
+        const s0 = stateRef.current;
+        const now = today();
+        const r = s0.credentialRequests.find((x) => x.id === id);
+        const o = r ? undefined : s0.offers.find((x) => x.id === id);
+        /* The two routes differ only in where the offer is kept: a request
+           (FLOW-CRD-01) or the inbox (FLOW-CRD-02). Everything else — who
+           may accept, the expiry, C2 run again, storing and superseding,
+           the audit row — is the same, because SCR-CRD-04 is the same. */
+        const item = r
+          ? r.state === "OFFER_READY" && r.offer
+            ? { orgId: r.orgId, type: r.credential, issuer: r.issuerName, recheck: r.simulatedRecheck, expiresAt: r.offer.expiresAt }
+            : null
+          : o && o.state === "pending"
+            ? { orgId: o.orgId ?? PELDEN, type: o.type, issuer: o.issuer, recheck: o.simulatedRecheck, expiresAt: o.expiresAt }
+            : null;
+        if (!item) return { ok: false, error: "invalid" };
+        if (!mayOperate(s0, s0.harness.persona, item.orgId, "credential:accept", item.type)) return { ok: false, error: "not_permitted" };
+        const patch = (change: { state: string; failReason?: string | null; failCode?: string | null; simulatedRecheck?: null }) =>
+          setState((s) => ({
+            ...s,
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? ({ ...x, ...change } as typeof x) : x)),
+            offers: s.offers.map((x) => (x.id === id ? ({ ...x, ...change } as typeof x) : x)),
+          }));
+        /* E13 / FLOW-CRD-02 E4 — 30 days have passed. */
+        if (item.expiresAt < now) {
+          patch(
+            r
+              ? { state: "EXPIRED", failReason: `This offer from ${item.issuer} expired. You can ask again.` }
+              : { state: "expired" },
+          );
+          return { ok: false, error: "E13" };
+        }
+        /* C2 again, at the moment of accepting (FLOW-CRD-01 step 11, E19;
+           FLOW-CRD-02 step 4, E9). Unreachable is a pause: nothing is sent
+           and the offer waits. Delisted is a refusal: the offer is declined
+           and the issuer told. */
+        if (item.recheck === "unreachable") {
+          /* The list answers again next time — the prototype's way of
+             letting Try again succeed. */
+          patch({ state: r ? "OFFER_READY" : "pending", simulatedRecheck: null });
+          return { ok: false, error: "E19_unreachable" };
+        }
+        if (item.recheck === "delisted") {
+          const failReason = `${item.issuer} is no longer on NDI's list of trusted organisations, so this can't be added.`;
+          patch({ state: r ? "FAILED" : "failed", failReason, failCode: "ISSUER_NOT_TRUSTED", simulatedRecheck: null });
+          log(`${item.type} from ${item.issuer} wasn't added: ${item.issuer} is no longer on NDI's list of trusted organisations`, item.orgId);
+          return { ok: false, error: "E19_delisted" };
+        }
+        const issuerDid = r ? (s0.organizations.find((x) => x.id === r.issuerOrgId)?.publicDid ?? "") : (o?.issuerDid ?? "");
+        const attributes = r?.offer?.attributes ?? o?.attributes ?? [];
+        const validUntil = r ? (r.offer?.validUntil ?? null) : (o?.attributes.find((a) => a.name === "valid_until")?.value ?? null);
+        setState((s) => {
+          const relation = s.relations.find(
+            (x) => x.personId === s.harness.persona && (x.orgId ?? PELDEN) === item.orgId && x.state === "ACTIVE",
+          );
+          return {
+            ...s,
+            heldCredentials: storeAccepted(s.heldCredentials, {
+              orgId: item.orgId,
+              type: item.type,
+              issuer: item.issuer,
+              issuerDid,
+              attributes,
+              expiresAt: validUntil,
+            }),
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? { ...x, state: "ISSUED" as const } : x)),
+            /* Q2 — the inbox item is closed as accepted, with the accepter. */
+            offers: s.offers.map((x) =>
+              x.id === id ? { ...x, state: "accepted" as const, decidedBy: s.harness.persona, decidedAt: now } : x,
+            ),
+            /* Step 9 — the issuer's system is told what it answered was
+               issued (Q3). Only a system's answer: an officer's isn't
+               delivered to a webhook. */
+            integration: r?.answeredBySystem ? withLogRow(s.integration, "credential-request.issued", 200) : s.integration,
+            auditEntries: appendAudit(s, {
+              operation: "credential:accept",
+              summary: `Accepted ${item.type} from ${item.issuer}`,
+              actorId: s.harness.persona,
+              relationId: relation?.id ?? null,
+              scopeVersion: relation?.scope.version ?? null,
+            }),
+          };
+        });
+        log(`Added ${item.type} from ${item.issuer} to your credentials`, item.orgId);
+        return { ok: true };
+      },
+
+      declineCredentialOffer: (id) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === id);
+        const o = r ? undefined : s0.offers.find((x) => x.id === id);
+        if (r) {
+          if (r.state !== "OFFER_READY") return;
+          if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return;
+          setState((s) => ({
+            ...s,
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? { ...x, state: "DECLINED_BY_HOLDER" as const } : x)),
+          }));
+          log(`Declined ${r.credential} from ${r.issuerName}. Nothing was added`, r.orgId);
+          return;
+        }
+        /* FLOW-CRD-02 A1 — declined with a problem report; the issuer is told. */
+        if (!o || o.state !== "pending") return;
+        const orgId = o.orgId ?? PELDEN;
+        if (!mayOperate(s0, s0.harness.persona, orgId, "credential:accept", o.type)) return;
+        setState((s) => ({
+          ...s,
+          offers: s.offers.map((x) => (x.id === id ? { ...x, state: "declined" as const, decidedBy: s.harness.persona, decidedAt: today() } : x)),
+        }));
+        log(`Declined ${o.type} from ${o.issuer}. Nothing was added`, orgId);
+      },
+
+      simulateIssuerRecheck: (id, outcome) =>
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === id && x.state === "OFFER_READY" ? { ...x, simulatedRecheck: outcome } : x,
+          ),
+          offers: s.offers.map((x) => (x.id === id && x.state === "pending" ? { ...x, simulatedRecheck: outcome } : x)),
+        })),
+
+      setOfferingStatus: (offeringId, status) => {
+        const s0 = stateRef.current;
+        const o = s0.offerings.find((x) => x.id === offeringId);
+        if (!o || !issuerOwner(s0, o.issuerOrgId)) return;
+        setState((s) => ({ ...s, offerings: s.offerings.map((x) => (x.id === offeringId ? { ...x, status } : x)) }));
+        log(`${status === "PAUSED" ? "Paused" : status === "RETIRED" ? "Retired" : "Resumed"} ${o.credential}`, o.issuerOrgId);
+      },
+
+      publishOfferingVersion: (offeringId, changes) => {
+        const s0 = stateRef.current;
+        const o0 = s0.offerings.find((x) => x.id === offeringId);
+        if (!o0 || !issuerOwner(s0, o0.issuerOrgId)) return;
+        log(`Published version ${o0.version + 1} of ${o0.credential}`, o0.issuerOrgId);
+        setState((s) => ({
+          ...s,
+          offerings: s.offerings.map((o) =>
+            o.id === offeringId
+              ? {
+                  ...o,
+                  version: o.version + 1,
+                  answerWindowDays: changes.answerWindowDays,
+                  renewable: changes.renewable,
+                  prerequisite: { ...o.prerequisite, uses: changes.uses },
+                }
+              : o,
+          ),
+        }));
+      },
+
+      setWebhook: (url) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, webhookUrl: url.trim() || null, secretRotatedAt: s.integration.secretRotatedAt ?? today() } })),
+
+      rotateSecret: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, secretRotatedAt: today() } })),
+
+      createClient: (name) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({
+          ...s,
+          integration: { ...s.integration, clients: [...s.integration.clients, { id: rid("cli"), name: name.trim(), createdAt: today() }] },
+        })),
+
+      setQueueFallback: (on) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, queueFallback: on } })),
+
+      sendTestEvent: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => {
+          /* A delivery that works again hands over what it missed (E5, E6):
+             the system gets those requests now and answers them, unless an
+             officer got there first. */
+          const missed = s.integration.failingSince
+            ? s.credentialRequests.filter((x) => x.state === "WITH_ISSUER" && x.system?.state === "MISSED").map((x) => x.id)
+            : [];
+          let integration = withLogRow({ ...s.integration, failingSince: null, lastError: null }, "test.ping", 200);
+          missed.forEach(() => {
+            integration = withLogRow(integration, "credential-request.received", 200, 2);
+          });
+          return {
+            ...s,
+            integration,
+            credentialRequests: s.credentialRequests.map((x) =>
+              missed.includes(x.id) && x.system ? { ...x, system: { ...x.system, state: "WAITING" as const, plan: "answer" as const } } : x,
+            ),
+          };
+        }),
+
+      setSystemNextAnswer: (next) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, nextAnswer: next } })),
+
+      simulateSystemAnswer: (requestId) => setState((s) => (systemConnected(s.integration) ? systemAnswers(s, requestId, true) : s)),
+
+      stopEntityType: (designationId, entityType) => {
+        const s0 = stateRef.current;
+        const d = s0.designations.find((x) => x.id === designationId);
+        const org = s0.organizations.find((o) => o.id === d?.orgId);
+        if (!d || !org || roleIn(org, s0.people.find((p) => p.id === s0.harness.persona)) !== "Owner") return { ok: false, error: "not_owner" };
+        /* A2 — the whole set for this type stops, its authorisation with
+           it; other types and NDI's membership are untouched. */
+        setState((s) => ({
+          ...s,
+          adoptions: s.adoptions.map((a) =>
+            a.designationId === designationId && a.entityType === entityType && a.state === "ACTIVE"
+              ? { ...a, state: "WITHDRAWN" as const, stoppedBy: s.harness.persona, stoppedAt: today() }
+              : a,
+          ),
+          authorisations: s.authorisations.map((z) =>
+            z.designationId === designationId && z.entityType === entityType && z.state === "ACTIVE"
+              ? { ...z, state: "WITHDRAWN" as const, withdrawnBy: s.harness.persona, withdrawnAt: today() }
+              : z,
+          ),
+        }));
+        log("Stopped an entity type. Businesses already verified are not affected", org.id);
+        return { ok: true };
+      },
 
       setPersona: (persona) =>
         setState((s) => {
