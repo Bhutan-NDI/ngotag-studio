@@ -172,8 +172,11 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  20 — The high-value grant waiting for dual control no longer carries
  *       Dorji's own signature on his own request. A version-19 save would
  *       let one more approver complete it alone.
+ *  21 — The ministry and the CRA are marked as constituted by statute, so
+ *       neither is offered business verification (EW-FLOW2-SD §2.2). A
+ *       version-20 save has no flag and would still offer it.
  */
-const SEED_VERSION = 20;
+const SEED_VERSION = 21;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
