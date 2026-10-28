@@ -14,7 +14,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
 import { Tabs } from "@/components/ui/Tabs";
 import { Icon } from "@/components/ui/icons";
-import { issuerInline, requestWords } from "@/features/receive/shared";
+import { attrLabel, issuerInline, requestWords } from "@/features/receive/shared";
 import { inOrg, type CredentialOffer, type HeldCredential } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
@@ -46,6 +46,17 @@ import { formatDate } from "@/features/controllership/scopeModel";
  * click through warnings — but they're kept, with the reason, so the
  * question "did anyone send us something?" has an answer.
  *
+ * VIEW DETAILS (UX-EW-03 SCR-CRD-05's secondary action)
+ *
+ * A card is recognition, not disclosure (CredentialCard), so the values a
+ * credential carries sit beside it. The foundational credential lists them
+ * always; every other credential lists them on *View details*, closed to
+ * start with so a wall of cards still doesn't display the company's details
+ * to whoever is looking over a shoulder. Without it, once the taxpayer
+ * number was accepted there was nowhere to check the number, the tax office
+ * or what Pelden is registered for. Labels are the ones the offering gave
+ * the officer's fields, where there is an offering for it.
+ *
  * Empty is unreachable after verification (the foundational credential is
  * always held); the switcher keeps it because the screen predates that rule.
  */
@@ -56,6 +67,7 @@ export function HeldCredentialsView() {
   const { heldCredentials, activeOrgId, organizations, credentialRequests, offers, refusedOffers, offerings, personById, mayOperate } = useDemo();
   const orgName = organizations.find((o) => o.id === activeOrgId)?.name.replace(/ Pvt\. Ltd\.$/, "") ?? "The organisation";
   const [tab, setTab] = useState<"credentials" | "activity">("credentials");
+  const [opened, setOpened] = useState<string[]>([]);
 
   const face = useScreenState("SCR-CRD-05", ["live", "loading", "error", "offline", "empty"]) as Face;
   const variant = face === "empty" ? "empty" : "populated";
@@ -217,10 +229,10 @@ export function HeldCredentialsView() {
                   to this. If it lapses, nothing below it verifies anywhere.
                 </p>
                 <dl className="m-0 grid gap-x-6 gap-y-2 min-[641px]:grid-cols-2">
-                  {foundational.attributes.map((attribute) => (
-                    <div key={attribute.name} className="flex flex-col gap-0.5">
-                      <dt className="text-[12px] text-faint">{attribute.name.replace(/_/g, " ")}</dt>
-                      <dd className="m-0 text-[13px] text-body">{attribute.value}</dd>
+                  {[...attributeRows(foundational, offerings), { term: "Valid", value: validity(foundational) }].map((row) => (
+                    <div key={row.term} className="flex flex-col gap-0.5">
+                      <dt className="text-[12px] text-faint">{row.term}</dt>
+                      <dd className="m-0 text-[13px] text-body">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -243,6 +255,31 @@ export function HeldCredentialsView() {
                     Issued {formatDate(credential.receivedAt)}
                     {credential.expiresAt ? ` · valid until ${formatDate(credential.expiresAt)}` : ""}
                   </p>
+                  <button
+                    type="button"
+                    aria-expanded={opened.includes(credential.id)}
+                    aria-controls={`held-details-${credential.id}`}
+                    onClick={() => setOpened((o) => (o.includes(credential.id) ? o.filter((x) => x !== credential.id) : [...o, credential.id]))}
+                    className="ndi-plainlink inline-flex items-center gap-1.5 self-start text-[12.5px] font-medium text-muted"
+                  >
+                    {opened.includes(credential.id) ? "Hide details" : "View details"}
+                    <Icon name={opened.includes(credential.id) ? "chevronDown" : "chevronRight"} size={14} strokeWidth={2} />
+                  </button>
+                  {opened.includes(credential.id) ? (
+                    <dl id={`held-details-${credential.id}`} className="m-0 flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
+                      {[
+                        ...attributeRows(credential, offerings),
+                        { term: "Issued by", value: credential.issuer },
+                        { term: "Issued", value: formatDate(credential.receivedAt) },
+                        { term: "Valid", value: validity(credential) },
+                      ].map((row) => (
+                        <div key={row.term} className="flex flex-col gap-0.5">
+                          <dt className="text-[12px] text-faint">{row.term}</dt>
+                          <dd className="m-0 text-[13px] text-body">{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
                   {superseded(credential) ? <StatusPill status="superseded" label="Superseded" /> : null}
                   {!credential.issuerTrusted ? (
                     <p className="m-0 flex flex-col gap-1">
@@ -271,6 +308,23 @@ export function HeldCredentialsView() {
       </div>
     </AppShell>
   );
+}
+
+/**
+ * Each attribute of a held credential under the label the offering gave it —
+ * "Taxpayer number", not "tpn" — or the name set as words where no offering
+ * covers the type (a registration, a bank's credential).
+ */
+function attributeRows(credential: HeldCredential, offerings: { credential: string; fields: { name: string; label: string }[] }[]) {
+  const fields = offerings.find((o) => o.credential === credential.type)?.fields ?? [];
+  return credential.attributes.map((a) => ({ term: fields.find((f) => f.name === a.name)?.label ?? attrLabel(a.name), value: a.value }));
+}
+
+/** How long a held credential is valid, in the words SCR-CRD-04 uses for the offer. */
+function validity(credential: HeldCredential) {
+  if (credential.status === "revoked") return "Revoked";
+  if (!credential.expiresAt) return "Until it's revoked";
+  return credential.status === "expired" ? `Expired on ${formatDate(credential.expiresAt)}` : `Until ${formatDate(credential.expiresAt)}`;
 }
 
 /** An offer sent unasked, once it has ended, in the words §3.5 gives its endings. */

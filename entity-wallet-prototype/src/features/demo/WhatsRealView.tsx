@@ -333,6 +333,12 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
       },
       {
+        shown: "The tax office's system answers a request by itself",
+        reality:
+          "A timer in your browser. A few seconds after a request for the bonded-warehouse authorisation reaches the office, the demo writes the answer a system would send — the example values from the offering — recorded against the first client you created, and adds credential-request.received and credential-request.issued to the delivery log. No URL is called, no register is looked up and nothing is signed. \"Have it refer the next request\", \"Have it not pick up the next request\" and \"Have your system answer it now\" are prototype controls standing in for the system referring a request with a note, a webhook nobody answers, and the system and an officer answering at once, where the first answer wins. Whether the Department of Revenue & Customs answers this way at all is still open with GovTech (REQ-EW-01 item 23), so the taxpayer number stays with the officers' queue and the prototype shows the path without deciding it.",
+        needs: "The request service's outbox and signed delivery, the issuer request API with client credentials (offer, decline, refer), compare-and-set on the answer, and the one-hour check that puts a request nobody picked up in the queue (FLOW-CRD-03 steps 5–7, E6, E10, A2; EW-FLOW6-IIG).",
+      },
+      {
         shown: "Integration settings — webhook, secret, clients, delivery log",
         reality:
           "Fields in your browser. No URL is called, no secret exists behind the mask, and the test event and its latency are made up on the spot.",

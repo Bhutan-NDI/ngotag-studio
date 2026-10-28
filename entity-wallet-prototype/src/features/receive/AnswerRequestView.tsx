@@ -11,10 +11,11 @@ import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { Select } from "@/components/ui/Select";
+import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { inOrg, shortOrgName } from "@/lib/demoData";
+import { inOfficerQueue, inOrg, shortOrgName, systemConnected } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
@@ -43,9 +44,12 @@ import { KIND_WORDS, daysLeft, valueFor } from "./shared";
  * field says so. A reason code goes with it for the issuer's own records.
  *
  * Who may answer, and whether it's already answered or expired, is the
- * store's decision (E7, E10); the faces render what it returned.
+ * store's decision (E7, E10); the faces render what it returned. The first
+ * answer wins: when the office's system has already answered, the officer is
+ * told it was the system, not a colleague. A request the system still has,
+ * and hasn't handed to the queue, isn't the officer's to answer yet.
  */
-type Face = "live" | "default" | "loading" | "e8" | "e10" | "e7" | "e11" | "sent" | "offline";
+type Face = "live" | "default" | "loading" | "e8" | "e10" | "e7" | "e11" | "sent" | "offline" | "with_system";
 
 /* The issuer's own decline codes — the same list Kind A sends to
    …/decline (EW-FLOW6-IIG §5.2, FLOW-CRD-03 A1). */
@@ -58,9 +62,20 @@ const REASONS = [
 
 export function AnswerRequestView({ requestId }: { requestId: string }) {
   const router = useRouter();
-  const { credentialRequests, organizations, heldCredentials, offerings, personById, issueOnRequest, declineOnRequest, hydrated } = useDemo();
+  const {
+    credentialRequests,
+    organizations,
+    heldCredentials,
+    offerings,
+    personById,
+    integration,
+    issueOnRequest,
+    declineOnRequest,
+    simulateSystemAnswer,
+    hydrated,
+  } = useDemo();
   const issuer = useIssuer();
-  const forced = useScreenState("SCR-CRD-09", ["live", "default", "loading", "e8", "e10", "e7", "e11", "sent", "offline"]) as Face;
+  const forced = useScreenState("SCR-CRD-09", ["live", "default", "loading", "e8", "e10", "e7", "e11", "sent", "offline", "with_system"]) as Face;
 
   const r = credentialRequests.find((x) => x.id === requestId);
   const offering = offerings.find((o) => o.id === r?.offeringId);
@@ -97,11 +112,13 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
           ? "offline"
           : r?.state === "WITHDRAWN"
             ? "e11"
-            : failed === "E10" || (r && r.state !== "WITH_ISSUER")
-              ? "e10"
-              : touched && missing.length
-                ? "e8"
-                : "default";
+            : r && r.state === "WITH_ISSUER" && !inOfficerQueue(r, integration.queueFallback)
+              ? "with_system"
+              : failed === "E10" || (r && r.state !== "WITH_ISSUER")
+                ? "e10"
+                : touched && missing.length
+                  ? "e8"
+                  : "default";
   const face: Face = forced === "live" ? natural : forced;
 
   if (!hydrated) {
@@ -141,7 +158,7 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
     router.push(after ? `/issuer/requests/${after.id}` : "/issuer/requests");
   };
 
-  if (face === "sent" || face === "e10" || face === "e7" || face === "e11") {
+  if (face === "sent" || face === "e10" || face === "e7" || face === "e11" || face === "with_system") {
     /* The outcome is named only when there was one: declined, or an offer
        sent. The switcher's E10 on an open request shows the issued case. */
     const outcome = r.state === "DECLINED_BY_ISSUER" ? "declined" : r.offer || forced === "e10" ? "issued" : null;
@@ -151,8 +168,10 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
           ? `Declined. ${business} will see your message exactly as you wrote it.`
           : `Sent. It may take a moment to reach ${business}.`
         : face === "e10"
-          ? `${r.answeredBy ? personById(r.answeredBy).name : "A colleague"} already answered this${outcome ? `: ${outcome}` : ""}.`
-          : face === "e7"
+          ? `${r.answeredBy ? personById(r.answeredBy).name : r.answeredBySystem ? "Your system" : "A colleague"} already answered this${outcome ? `: ${outcome}` : ""}.`
+          : face === "with_system"
+            ? "Your system is answering this request. It comes to Requests to answer if your system can't."
+            : face === "e7"
             ? `This request expired on ${formatDate(r.answerBy ?? r.requestedAt)}. ${business} can ask again.`
             : `${business} withdrew this request.`;
     return (
@@ -310,6 +329,17 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
             </div>
           </div>
         </Panel>
+
+        {/* E10 — the system and an officer answering at the same moment: the
+            first wins, and the other is told who did. */}
+        {r.state === "WITH_ISSUER" && r.system && systemConnected(integration) ? (
+          <SimulatedStep
+            standsFor="your system answering at the same moment"
+            action={<SimulatedAction onClick={() => simulateSystemAnswer(r.id)}>Have your system answer it now</SimulatedAction>}
+          >
+            The first answer wins. If your system answers while you have this open, you&rsquo;re told that it already did.
+          </SimulatedStep>
+        ) : null}
 
         <Dialog
           open={declining}
