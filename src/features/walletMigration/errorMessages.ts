@@ -1,4 +1,5 @@
 import { IPreflightCheck, PreflightCheckId } from './types'
+import { REHEARSAL_MAX_AGE_DAYS } from './config'
 
 export interface IMigrationErrorContent {
   message: string
@@ -160,8 +161,24 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
       "The security alert for the key export couldn't be sent, so nothing ran.",
     recovery: 'Try again later. Platform admins have been notified.',
   },
-  // Booking taken back before the move started (the move's `error` on a
-  // REHEARSED move; FAILED on platforms without #128).
+  EXPORT_CLEANUP_FAILED: {
+    message:
+      "The rehearsal stopped because a leftover export from an earlier run couldn't be deleted. Nothing was changed.",
+    recovery:
+      'Run the rehearsal again later. Contact support if it happens again.',
+  },
+  // Booking taken back before the move started: the move's `error` on a
+  // REHEARSED move (platform #128), or on a FAILED one where the scheduler
+  // aborts instead.
+  SLOT_MISSED: {
+    message: "The move didn't start at its booked time. Nothing changed.",
+    recovery: 'Pick a new time.',
+  },
+  REHEARSAL_STALE: {
+    message: `Your rehearsal was more than ${REHEARSAL_MAX_AGE_DAYS} days old at your booked time, so the move didn't start. Nothing changed.`,
+    recovery:
+      'Run the rehearsal again in step 2, then pick a new time. Your wallet may have grown since, so the expected pause can change.',
+  },
   PREFLIGHT_FAILED: {
     message:
       "The final checks failed at your booked time, so the move didn't start. Nothing changed.",
@@ -180,16 +197,7 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
     recovery:
       'Your organisation is already on its new agent. The platform keeps retrying ({check}) and the platform team has been alerted. Issuing and verifying resume as soon as it finishes.',
   },
-  // Move outcomes (the move's `error`)
-  CANCELLED_BY_OWNER: {
-    message: 'The move was cancelled. Nothing changed.',
-    recovery:
-      'Your organisation stays on the shared agent. You can start a new move later.',
-  },
-  SLOT_MISSED: {
-    message: "The move didn't start at its booked time. Nothing changed.",
-    recovery: 'Pick a new time.',
-  },
+  // Move-day outcomes (the move's `error` on FAILED)
   FREEZE_BUDGET_EXCEEDED: {
     message:
       'The move took longer than the time limit and was cancelled automatically.',

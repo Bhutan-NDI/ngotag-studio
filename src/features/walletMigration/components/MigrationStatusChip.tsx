@@ -14,6 +14,7 @@ import {
   hoursUntil,
   isCutoverStuck,
   isPutBack,
+  isRehearsalStale,
 } from '../config'
 
 import { Badge } from '@/components/ui/badge'
@@ -49,23 +50,27 @@ const chipFor = (
         migration.rehearsalStatus === 'FAILED'
         ? needsAttention
         : preparing
-    case 'REHEARSED':
-      if (migration.phase === 'SCHEDULED' && migration.scheduledFor) {
-        // At the slot the final checks are retried for a while before the
-        // booking is taken back; failing ones need the owner's attention.
-        if (migration.preflight && !migration.preflight.passed) {
-          return needsAttention
-        }
-        return {
-          label: `Move scheduled: ${formatBtt(migration.scheduledFor)}`,
-          icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
-          className: info,
-        }
+    case 'SCHEDULED':
+      // At the slot the final checks are retried for a while before the
+      // booking is taken back; failing ones need the owner's attention.
+      if (
+        !migration.scheduledFor ||
+        (migration.preflight && !migration.preflight.passed)
+      ) {
+        return needsAttention
       }
-      // Any error here means the booking was taken back (missed slot, final
-      // checks failed); the platform clears it when a new slot is booked.
+      return {
+        label: `Move scheduled: ${formatBtt(migration.scheduledFor)}`,
+        icon: <Clock className="h-3.5 w-3.5" aria-hidden />,
+        className: info,
+      }
+    case 'REHEARSED':
+      // Any error here means the booking was taken back (missed slot, stale
+      // rehearsal, final checks failed); it clears when a new slot is booked.
       return isPutBack(migration) ||
         migration.rehearsalStatus === 'FAILED' ||
+        (migration.rehearsalStatus !== 'RUNNING' &&
+          isRehearsalStale(migration)) ||
         (migration.preflight !== null && !migration.preflight.passed)
         ? needsAttention
         : preparing
@@ -102,18 +107,18 @@ const chipFor = (
         icon: spin,
         className: info,
       }
+    case 'CANCELLED':
+      return {
+        label: 'Move cancelled',
+        icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+        className: warn,
+      }
     case 'FAILED':
-      return migration.error === 'CANCELLED_BY_OWNER'
-        ? {
-            label: 'Move cancelled',
-            icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
-            className: warn,
-          }
-        : {
-            label: 'Move cancelled automatically',
-            icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
-            className: warn,
-          }
+      return {
+        label: 'Move cancelled automatically',
+        icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden />,
+        className: warn,
+      }
     case 'COMPLETED': {
       const completedAt = completedTime(migration)
       const completed = completedAt ? new Date(completedAt) : null

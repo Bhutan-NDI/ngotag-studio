@@ -219,40 +219,38 @@ export default function MigrationWizard(): React.JSX.Element {
     const { status: current } = migration
     const startNew = (): void => setStartingNew(true)
 
-    if (current === 'FAILED') {
-      // The platform keeps a cancelled or failed move; a new move starts over.
-      if (
-        migration.error === 'CANCELLED_BY_OWNER' ||
-        !migration.freezeDeadline
-      ) {
-        // Ended before move day. The code's own recovery (re-run the checks,
-        // pick a new time) applies to a live move, not this one, so only its
-        // message is shown.
-        const ended =
-          migration.error === 'CANCELLED_BY_OWNER'
-            ? 'The move was cancelled. Nothing changed.'
-            : (findMigrationError(migration.error)?.message ??
-              "The move couldn't go ahead and was cancelled. Nothing changed.")
-        return (
-          <Card className="p-6 text-sm">
-            <p className="font-medium">{ended}</p>
-            <p className="text-muted-foreground mt-1">
-              Your organisation stays on the shared agent. Start a new move when
-              you&apos;re ready.
+    // The platform keeps an ended move; a new move starts over. CANCELLED is
+    // the owner's choice (any `error` left on it is from before, so it isn't
+    // shown); FAILED without a freeze deadline was aborted before move day.
+    const cancelled = current === 'CANCELLED'
+    if (cancelled || (current === 'FAILED' && !migration.freezeDeadline)) {
+      // The code's own recovery (re-run the checks, pick a new time) applies
+      // to a live move, not this one, so only its message is shown.
+      const ended = cancelled
+        ? 'The move was cancelled. Nothing changed.'
+        : (findMigrationError(migration.error)?.message ??
+          "The move couldn't go ahead and was cancelled. Nothing changed.")
+      return (
+        <Card className="p-6 text-sm">
+          <p className="font-medium">{ended}</p>
+          <p className="text-muted-foreground mt-1">
+            Your organisation stays on the shared agent. Start a new move when
+            you&apos;re ready.
+          </p>
+          {!cancelled && migration.error && (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Reference: {migration.error}
             </p>
-            {migration.error && migration.error !== 'CANCELLED_BY_OWNER' && (
-              <p className="text-muted-foreground mt-1 text-xs">
-                Reference: {migration.error}
-              </p>
-            )}
-            {isOwner && agentType === 'shared' && (
-              <Button size="sm" className="mt-4" onClick={startNew}>
-                Start a new move
-              </Button>
-            )}
-          </Card>
-        )
-      }
+          )}
+          {isOwner && agentType === 'shared' && (
+            <Button size="sm" className="mt-4" onClick={startNew}>
+              Start a new move
+            </Button>
+          )}
+        </Card>
+      )
+    }
+    if (current === 'FAILED') {
       return (
         <MoveDayProgress
           migration={migration}

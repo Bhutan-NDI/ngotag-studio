@@ -56,7 +56,7 @@ const needsFastPolling = (migration: IMigration | null): boolean => {
   if (migration.rehearsalStatus === 'RUNNING') {
     return true
   }
-  if (migration.phase === 'SCHEDULED' && migration.scheduledFor) {
+  if (migration.status === 'SCHEDULED' && migration.scheduledFor) {
     if (MOCK_MIGRATION_API) {
       return true
     }

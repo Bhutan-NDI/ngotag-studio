@@ -11,7 +11,11 @@
 //   old-release    first checks fail with RELEASE_MISMATCH
 //   unreachable    first checks fail with AGENT_UNREACHABLE
 //   rehearsal-fail first rehearsal fails (JOB_FAILED during export)
+//   cleanup-fail   first rehearsal stops because a leftover export can't be
+//                  deleted (EXPORT_CLEANUP_FAILED)
 //   slot-missed    first booked slot is missed (back to REHEARSED, SLOT_MISSED)
+//   rehearsal-stale  the rehearsal is too old at the first slot (back to
+//                  REHEARSED, REHEARSAL_STALE); rehearse again to rebook
 //   final-checks-fail  final checks fail at the first slot, are retried, then
 //                  the booking is taken back (PREFLIGHT_FAILED:AGENT_REACHABLE)
 //   checks-unavailable  as above, but the final checks can't run
@@ -23,13 +27,15 @@
 //   slow           move day fails with FREEZE_BUDGET_EXCEEDED during import
 //   disaster       ends in DISASTER_RESTORED during the first 48 hours
 // A re-run of the checks or rehearsal, or a new booking, then succeeds.
+//
+// Statuses follow the platform: REHEARSED → SCHEDULED → FROZEN …, an owner's
+// cancel ends as CANCELLED, an automatic abort as FAILED.
 
 import {
   IMigration,
   IMigrationWithPreflight,
   IPreflightReport,
   IStartMovePayload,
-  MigrationPhase,
   MigrationResult,
   MigrationStatus,
 } from './types'
@@ -64,6 +70,8 @@ interface IMockRecord {
   scheduledFor: string | null
   /** Set once the owner cancels; the move is kept, like on the platform. */
   cancelledAt: string | null
+  /** When the last finished rehearsal ended, while a new one runs. */
+  previousRehearsalAt?: string | null
 }
 
 const storageKey = (orgId: string): string => `walletMigrationMock:${orgId}`
@@ -99,7 +107,6 @@ const blank = (record: IMockRecord): IMigration => ({
   lastChangedDateTime: iso(Date.now()),
   orgId: record.orgId,
   status: 'CREATED',
-  phase: 'PREPARE',
   startedBy: 'mock-owner',
   targetAdminEndpoint: record.targetAdminEndpoint,
   targetDidcommEndpoint: record.targetDidcommEndpoint,
@@ -127,15 +134,32 @@ const blank = (record: IMockRecord): IMigration => ({
 const failed = (m: IMigration, error: string): IMigration => ({
   ...m,
   status: 'FAILED',
-  phase: 'CANCELLED',
   error,
 })
 
-const at = (
-  m: IMigration,
-  status: MigrationStatus,
-  phase: MigrationPhase,
-): IMigration => ({ ...m, status, phase })
+const at = (m: IMigration, status: MigrationStatus): IMigration => ({
+  ...m,
+  status,
+})
+
+const DAY_MS = 86_400_000
+const REHEARSAL_MAX_AGE_MS = 14 * DAY_MS
+
+const rehearsedResults = (finishedAt: string): Partial<IMigration> => ({
+  status: 'REHEARSED',
+  rehearsalStatus: 'DONE',
+  rehearsalDurationMs: 12 * 60_000,
+  predictedFreezeMs: 18 * 60_000,
+  storageVersion: '1.0',
+  counts: { entries: 48_210, keys: 3, skipped: 0 },
+  rehearsal: {
+    downloadMethod: 'PULL',
+    exportMs: 5 * 60_000,
+    importMs: 7 * 60_000,
+    exportCleanup: 'DELETED',
+    finishedAt,
+  },
+})
 
 const newest = (
   a: IPreflightReport | null,
@@ -149,35 +173,35 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   if (record.rehearsalStartedAt !== null) {
     m.rehearsalStartedAt = iso(record.rehearsalStartedAt)
     const done = now - record.rehearsalStartedAt >= REHEARSAL_MS
+    const firstRun = record.rehearsalRuns === 1
     if (!done) {
+      // A re-run keeps the move REHEARSED with the last results until it ends.
+      if (record.previousRehearsalAt) {
+        m = { ...m, ...rehearsedResults(record.previousRehearsalAt) }
+      }
       m.rehearsalStatus = 'RUNNING'
-    } else if (
-      record.rehearsalRuns === 1 &&
-      trigger(record, 'rehearsal-fail')
-    ) {
+    } else if (firstRun && trigger(record, 'rehearsal-fail')) {
       m.rehearsalStatus = 'FAILED'
       m.rehearsal = { step: 'EXPORT', code: 'JOB_FAILED', finishedAt: iso(now) }
+    } else if (firstRun && trigger(record, 'cleanup-fail')) {
+      m.rehearsalStatus = 'FAILED'
+      m.rehearsal = {
+        step: 'EXPORT',
+        code: 'EXPORT_CLEANUP_FAILED',
+        exportCleanup: 'FAILED',
+        finishedAt: iso(now),
+      }
     } else {
       m = {
-        ...at(m, 'REHEARSED', 'PREPARE'),
-        rehearsalStatus: 'DONE',
-        rehearsalDurationMs: 12 * 60_000,
-        predictedFreezeMs: 18 * 60_000,
-        storageVersion: '1.0',
-        counts: { entries: 48_210, keys: 3, skipped: 0 },
-        rehearsal: {
-          downloadMethod: 'PULL',
-          exportMs: 5 * 60_000,
-          importMs: 7 * 60_000,
-          exportCleanup: 'DELETED',
-          finishedAt: iso(record.rehearsalStartedAt + REHEARSAL_MS),
-        },
+        ...m,
+        ...rehearsedResults(iso(record.rehearsalStartedAt + REHEARSAL_MS)),
       }
     }
   }
 
   if (record.cancelledAt) {
-    return failed(m, 'CANCELLED_BY_OWNER')
+    // The owner's cancel: CANCELLED, with no error of its own (#118).
+    return at(m, 'CANCELLED')
   }
   if (m.status !== 'REHEARSED' || record.bookedAt === null) {
     return m
@@ -185,20 +209,33 @@ const derive = (record: IMockRecord, now: number): IMigration => {
 
   // Booked: move day starts START_DELAY_MS after booking, whatever slot was
   // picked, so the demo doesn't wait for the real date.
-  m = { ...m, phase: 'SCHEDULED', scheduledFor: record.scheduledFor }
+  m = { ...at(m, 'SCHEDULED'), scheduledFor: record.scheduledFor }
   const sinceBooking = now - record.bookedAt
   if (sinceBooking < START_DELAY_MS) {
     return m
   }
   const firstMove = record.bookings === 1
+  // The scheduler takes the booking back (#128): REHEARSED, slot cleared,
+  // reason in `error` until the owner books again.
   const putBack = (error: string): IMigration => ({
-    ...m,
-    phase: 'PREPARE',
+    ...at(m, 'REHEARSED'),
     scheduledFor: null,
     error,
   })
   if (firstMove && trigger(record, 'slot-missed')) {
     return putBack('SLOT_MISSED')
+  }
+  // The first rehearsal has aged past the limit by the slot (the demo ages it
+  // rather than waiting 14 days). Rehearsing again gives fresh results.
+  if (firstMove && trigger(record, 'rehearsal-stale')) {
+    if (record.rehearsalRuns > 1) {
+      return putBack('REHEARSAL_STALE')
+    }
+    const aged = iso(record.bookedAt - REHEARSAL_MAX_AGE_MS - DAY_MS)
+    return {
+      ...putBack('REHEARSAL_STALE'),
+      rehearsal: { ...m.rehearsal, finishedAt: aged },
+    }
   }
   // Final checks at the slot (platform #128): retried for a while, then the
   // booking is taken back. A later re-run by the owner replaces the report.
@@ -240,14 +277,14 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     return failed(m, 'VERIFICATION_FAILED:RELAY_PROBE')
   }
   if (step < steps.length) {
-    return at(m, steps[step], 'MOVE')
+    return at(m, steps[step])
   }
   const cutoverIndex = steps.length - 1
   const stepsMs = steps.length * STEP_MS
   const cutoverEnds = stepsMs + STUCK_MS
   if (stuck && moveT < cutoverEnds) {
     return {
-      ...at(m, steps[cutoverIndex], 'MOVE'),
+      ...at(m, steps[cutoverIndex]),
       error: 'COMPLETION_STEP_FAILED:RELAY_FORWARD',
     }
   }
@@ -262,13 +299,13 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   }
   if (afterSwitch < STABILISE_MS) {
     if (trigger(record, 'disaster') && afterSwitch >= STABILISE_MS / 2) {
-      return at(m, 'DISASTER_RESTORED', 'RESTORED')
+      return at(m, 'DISASTER_RESTORED')
     }
     // Show "48 hours" counting down on the compressed clock.
     const left = (STABILISE_MS - afterSwitch) / STABILISE_MS
     const leftMs = left * 48 * 3_600_000
     return {
-      ...at(m, 'STABILISING', 'FIRST_48_HOURS'),
+      ...at(m, 'STABILISING'),
       stabilisationEndsAt: iso(now + leftMs),
     }
   }
@@ -296,10 +333,10 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     polledAt: iso(now),
   }
   if (rotateT < ROTATE_MS) {
-    return { ...at(m, 'ROTATING', 'CHANGE_OF_ADDRESS'), rotation }
+    return { ...at(m, 'ROTATING'), rotation }
   }
   return {
-    ...at(m, 'COMPLETED', 'COMPLETE'),
+    ...at(m, 'COMPLETED'),
     rotation,
     completedAt: iso(switchedAt + STABILISE_MS + ROTATE_MS),
   }
@@ -311,7 +348,7 @@ const notFound = (): MigrationResult<never> => ({
 })
 
 const isActive = (m: IMigration): boolean =>
-  !['COMPLETED', 'FAILED', 'DISASTER_RESTORED'].includes(m.status)
+  !['COMPLETED', 'FAILED', 'CANCELLED', 'DISASTER_RESTORED'].includes(m.status)
 
 export const mockGetMigration = async (
   orgId: string,
@@ -366,7 +403,7 @@ export const mockRerunPreflight = async (
   if (
     !record ||
     !current ||
-    !['CREATED', 'REHEARSED'].includes(current.status)
+    !['CREATED', 'REHEARSED', 'SCHEDULED'].includes(current.status)
   ) {
     return notFound()
   }
@@ -386,16 +423,24 @@ export const mockRunRehearsal = async (
 ): Promise<MigrationResult<IMigration>> => {
   await wait()
   const record = load(orgId)
-  if (!record) {
+  const current = record ? derive(record, Date.now()) : null
+  if (!record || !current) {
     return notFound()
   }
-  if (!record.preflight?.passed) {
+  if (!['CREATED', 'REHEARSED'].includes(current.status)) {
+    return { ok: false, message: 'The move can no longer be rehearsed.' }
+  }
+  if (!current.preflight?.passed) {
     return { ok: false, message: 'The move checks have not passed yet.' }
   }
   const next: IMockRecord = {
     ...record,
     rehearsalRuns: record.rehearsalRuns + 1,
     rehearsalStartedAt: Date.now(),
+    previousRehearsalAt:
+      current.rehearsalStatus === 'DONE'
+        ? (current.rehearsal?.finishedAt ?? null)
+        : null,
   }
   save(next)
   return { ok: true, data: derive(next, Date.now()) }
@@ -411,8 +456,19 @@ export const mockScheduleMigration = async (
   if (!record) {
     return notFound()
   }
-  if (derive(record, Date.now()).status !== 'REHEARSED') {
+  const current = derive(record, Date.now())
+  if (!['REHEARSED', 'SCHEDULED'].includes(current.status)) {
     return { ok: false, message: 'The move has not been rehearsed yet.' }
+  }
+  // Like the platform: the rehearsal must still be recent at the slot.
+  const slot = scheduledFor ? Date.parse(scheduledFor) : Date.now()
+  const finishedAt = current.rehearsal?.finishedAt
+  if (!finishedAt || slot - Date.parse(finishedAt) > REHEARSAL_MAX_AGE_MS) {
+    return {
+      ok: false,
+      message:
+        'The rehearsal is too old to schedule a move from; run a new rehearsal first',
+    }
   }
   if (!confirmationName.trim()) {
     return { ok: false, message: 'The organisation name does not match.' }
@@ -436,7 +492,7 @@ export const mockCancelMigration = async (
     return notFound()
   }
   const current = derive(record, Date.now())
-  if (!['CREATED', 'REHEARSED'].includes(current.status)) {
+  if (!['CREATED', 'REHEARSED', 'SCHEDULED'].includes(current.status)) {
     return {
       ok: false,
       message: 'The move has already started and can no longer be cancelled.',

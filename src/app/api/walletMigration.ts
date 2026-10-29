@@ -238,14 +238,14 @@ export const scheduleMigration = async (
   }
   return call<IMigration>(() =>
     axiosPost({
-      url: migrationUrl(orgId, apiRoutes.walletMigration.start),
+      url: migrationUrl(orgId, apiRoutes.walletMigration.schedule),
       payload: { confirmationName, ...(scheduledFor ? { scheduledFor } : {}) },
       config: getHeaderConfigs(),
     }),
   )
 }
 
-/** Call the move off before it starts. It ends as FAILED / CANCELLED_BY_OWNER. */
+/** Call the move off before it starts (CREATED, REHEARSED or SCHEDULED). It ends as CANCELLED. */
 export const cancelMigration = async (
   orgId: string,
 ): Promise<MigrationResult<IMigration>> => {

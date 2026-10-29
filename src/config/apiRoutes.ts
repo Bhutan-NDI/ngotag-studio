@@ -147,7 +147,7 @@ export const apiRoutes = {
     root: '/agents/migrate',
     preflight: '/preflight',
     rehearse: '/rehearse',
-    start: '/start',
+    schedule: '/schedule',
     cancel: '/cancel',
     listAll: '/agents/migrations',
   },

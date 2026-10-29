@@ -1,10 +1,18 @@
 'use client'
 
 import { BookedSlot, PutBackNotice } from './ScheduleParts'
+import { Busy, stepStates } from './stepStates'
 import { CHECK_LABELS, describeMigrationError } from '../errorMessages'
 import { CHECK_STATUS_LABEL, CheckIcon, Failure } from './PreflightParts'
 import { IMigration, MigrationResult } from '../types'
 import { Loader2, RotateCw } from 'lucide-react'
+import {
+  REHEARSAL_MAX_AGE_DAYS,
+  formatBtt,
+  isPutBack,
+  isRehearsalStale,
+  isRehearsed,
+} from '../config'
 import React, { useMemo, useState } from 'react'
 import {
   Select,
@@ -13,8 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { StepCard, StepState } from './StepCard'
-import { formatBtt, isPutBack } from '../config'
 import {
   rerunPreflight,
   runRehearsal,
@@ -26,6 +32,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoveConfirmDialog } from './MoveConfirmDialog'
+import { StepCard } from './StepCard'
 
 // Off-peak suggestions, Bhutan time (spec SCR-WM-04).
 const SLOT_TIMES = [
@@ -57,56 +64,6 @@ const minutes = (ms: number | null): string => {
 // Failed checks that need something from the owner on the re-run.
 const NEEDS_API_KEY = ['API_KEY_REQUIRED', 'AGENT_TOKEN_REJECTED']
 
-type Busy = 'checks' | 'rehearsal' | 'schedule'
-
-/**
- * State of each card. The checks can fail again after the rehearsal (the
- * final checks at the slot), and must pass before a new time is booked.
- */
-export const stepStates = (
-  migration: IMigration,
-  busy: Busy | null,
-  changingSlot: boolean,
-): {
-  checksState: StepState
-  rehearsalState: StepState
-  scheduleState: StepState
-} => {
-  const { status, phase, preflight, rehearsalStatus } = migration
-  const rehearsed = status === 'REHEARSED'
-  const scheduled = rehearsed && phase === 'SCHEDULED'
-  const checksPassed = Boolean(preflight?.passed)
-
-  let checksState: StepState = 'action'
-  if (busy === 'checks') {
-    checksState = 'running'
-  } else if (preflight) {
-    checksState = checksPassed ? 'done' : 'failed'
-  }
-
-  let rehearsalState: StepState = 'action'
-  if (rehearsalStatus === 'RUNNING' || busy === 'rehearsal') {
-    rehearsalState = 'running'
-  } else if (rehearsed) {
-    rehearsalState = 'done'
-  } else if (!checksPassed) {
-    rehearsalState = 'locked'
-  } else if (rehearsalStatus === 'FAILED') {
-    rehearsalState = 'failed'
-  }
-
-  let scheduleState: StepState = 'action'
-  if (!rehearsed) {
-    scheduleState = 'locked'
-  } else if (scheduled && !changingSlot) {
-    scheduleState = 'done'
-  } else if (!checksPassed) {
-    scheduleState = 'locked'
-  }
-
-  return { checksState, rehearsalState, scheduleState }
-}
-
 interface ChecksRehearsalScheduleProps {
   orgId: string
   orgName: string
@@ -135,7 +92,7 @@ export function ChecksRehearsalSchedule({
   const [apiKey, setApiKey] = useState('')
   const [backupsConfirmed, setBackupsConfirmed] = useState(false)
 
-  const { status, phase, preflight } = migration
+  const { status, preflight } = migration
   const failedChecks =
     preflight?.checks.filter((c) => c.status === 'FAIL') ?? []
   const needsApiKey = failedChecks.some((c) =>
@@ -144,16 +101,32 @@ export function ChecksRehearsalSchedule({
   const needsBackups = failedChecks.some(
     (c) => c.code === 'BACKUPS_NOT_CONFIRMED',
   )
-  const rehearsed = status === 'REHEARSED'
-  const scheduled = rehearsed && phase === 'SCHEDULED'
+  const rehearsed = isRehearsed(status)
+  const scheduled = status === 'SCHEDULED'
   const putBack = isPutBack(migration)
   const checksPassed = Boolean(preflight?.passed)
+  const rehearsalStale =
+    status === 'REHEARSED' &&
+    migration.rehearsalStatus !== 'RUNNING' &&
+    isRehearsalStale(migration)
   // Checks can fail again after the rehearsal (the final checks at the slot);
-  // they must pass before a new time is booked.
+  // they must pass before a new time is booked. The platform re-runs them in
+  // any status before the move starts.
   const changing = changingSlot && checksPassed
   const canRerunChecks =
-    status === 'CREATED' ||
-    (rehearsed && !scheduled && (putBack || !checksPassed))
+    status === 'CREATED' || (rehearsed && (putBack || !checksPassed))
+  const rehearsalFinished = migration.rehearsal?.finishedAt
+  const maxAgeMs = REHEARSAL_MAX_AGE_DAYS * DAY_MS
+  const bookBy = rehearsalFinished
+    ? new Date(rehearsalFinished).getTime() + maxAgeMs
+    : null
+
+  let lockedReason = 'Complete first: the rehearsal must finish.'
+  if (rehearsed && !checksPassed) {
+    lockedReason = 'Complete first: all checks must pass again.'
+  } else if (rehearsalStale) {
+    lockedReason = `Complete first: run the rehearsal again. The last one is more than ${REHEARSAL_MAX_AGE_DAYS} days old.`
+  }
 
   const { checksState, rehearsalState, scheduleState } = stepStates(
     migration,
@@ -171,13 +144,19 @@ export function ChecksRehearsalSchedule({
   const slotInPast = slotValid && slotTime <= Date.now()
   // YYYY-MM-DD strings compare correctly as text.
   const slotTooFar = slotValid && date > bttDate(14)
-  const slotError = !slotValid
-    ? 'Pick a date.'
-    : slotInPast
-      ? 'Pick a time in the future.'
-      : slotTooFar
-        ? 'Pick a date within the next 14 days.'
-        : null
+  // The platform measures the rehearsal's age at the slot.
+  const slotAfterRehearsalLimit =
+    slotValid && bookBy !== null && slotTime > bookBy
+  let slotError: string | null = null
+  if (!slotValid) {
+    slotError = 'Pick a date.'
+  } else if (slotInPast) {
+    slotError = 'Pick a time in the future.'
+  } else if (slotTooFar) {
+    slotError = 'Pick a date within the next 14 days.'
+  } else if (slotAfterRehearsalLimit && bookBy !== null) {
+    slotError = `Pick a time before ${formatBtt(new Date(bookBy).toISOString())}, when your rehearsal turns ${REHEARSAL_MAX_AGE_DAYS} days old, or run the rehearsal again.`
+  }
 
   const fail = (
     kind: Busy,
@@ -391,6 +370,12 @@ export function ChecksRehearsalSchedule({
             )}
           </dl>
         )}
+        {rehearsalStale && (
+          <p className="mt-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            This rehearsal is more than {REHEARSAL_MAX_AGE_DAYS} days old, so it
+            no longer predicts the move. Run it again before you book a time.
+          </p>
+        )}
         {rehearsed && migration.downloadMethod === 'PUSH' && (
           <p className="text-muted-foreground mt-2 text-sm">
             Your agent couldn&apos;t download the wallet file directly.
@@ -400,10 +385,10 @@ export function ChecksRehearsalSchedule({
         {isOwner &&
           (rehearsalState === 'action' ||
             rehearsalState === 'failed' ||
-            (rehearsed && !scheduled && checksPassed)) && (
+            (status === 'REHEARSED' && checksPassed)) && (
             <Button
               size="sm"
-              variant={rehearsed ? 'outline' : 'default'}
+              variant={rehearsed && !rehearsalStale ? 'outline' : 'default'}
               className="mt-5"
               disabled={busy !== null}
               onClick={rehearse}
@@ -411,9 +396,9 @@ export function ChecksRehearsalSchedule({
               {busy === 'rehearsal' && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               )}
-              {rehearsalState === 'action'
-                ? 'Run rehearsal'
-                : 'Run rehearsal again'}
+              {rehearsed || rehearsalState === 'failed'
+                ? 'Run rehearsal again'
+                : 'Run rehearsal'}
             </Button>
           )}
         {errorFor('rehearsal')}
@@ -426,11 +411,7 @@ export function ChecksRehearsalSchedule({
         state={scheduleState}
       >
         {scheduleState === 'locked' && (
-          <p className="text-muted-foreground text-sm">
-            {rehearsed
-              ? 'Complete first: all checks must pass again.'
-              : 'Complete first: the rehearsal must finish.'}
-          </p>
+          <p className="text-muted-foreground text-sm">{lockedReason}</p>
         )}
         {scheduleState === 'done' && (
           <BookedSlot

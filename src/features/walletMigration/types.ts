@@ -5,6 +5,7 @@
 export type MigrationStatus =
   | 'CREATED'
   | 'REHEARSED'
+  | 'SCHEDULED'
   | 'FROZEN'
   | 'EXPORTING'
   | 'IMPORTING'
@@ -14,18 +15,8 @@ export type MigrationStatus =
   | 'ROTATING'
   | 'COMPLETED'
   | 'FAILED'
-  | 'DISASTER_RESTORED'
-
-/** Derived by the platform from the status; "scheduled" and "cancelled" only appear here. */
-export type MigrationPhase =
-  | 'PREPARE'
-  | 'SCHEDULED'
-  | 'MOVE'
-  | 'FIRST_48_HOURS'
-  | 'CHANGE_OF_ADDRESS'
-  | 'COMPLETE'
   | 'CANCELLED'
-  | 'RESTORED'
+  | 'DISASTER_RESTORED'
 
 export type PreflightCheckId =
   | 'ORG_IS_SHARED'
@@ -86,7 +77,6 @@ export interface IMigration {
   lastChangedDateTime: string
   orgId: string
   status: MigrationStatus
-  phase: MigrationPhase | null
   startedBy: string
   targetAdminEndpoint: string | null
   targetDidcommEndpoint: string | null
@@ -99,7 +89,7 @@ export interface IMigration {
   freezeDeadline: string | null
   stabilisationEndsAt: string | null
   purgedAt: string | null
-  /** Why the move failed or was put back, e.g. CANCELLED_BY_OWNER, SLOT_MISSED. */
+  /** Why the move failed or was put back, e.g. SLOT_MISSED. Empty for an owner's cancel. */
   error: string | null
   backupsConfirmedAt: string | null
   preflight: IPreflightReport | null

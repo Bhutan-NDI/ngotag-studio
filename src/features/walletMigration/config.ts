@@ -48,19 +48,44 @@ export const isCutoverStuck = (
   (migration.error ?? '').startsWith('COMPLETION_STEP_FAILED')
 
 /**
- * The platform took the booking back (platform #128): a missed slot, or final
- * checks that kept failing. The move waits in REHEARSED for a new slot, and the
- * error clears once the owner books one.
+ * The platform took the booking back (platform #128): a missed slot, a
+ * rehearsal gone stale, or final checks that kept failing. The move returns
+ * to REHEARSED with the slot cleared and the reason in `error`, which clears
+ * once the owner books again.
  */
 export const isPutBack = (
-  migration: Pick<IMigration, 'status' | 'phase' | 'error'>,
-): boolean =>
-  migration.status === 'REHEARSED' &&
-  migration.phase !== 'SCHEDULED' &&
-  Boolean(migration.error)
+  migration: Pick<IMigration, 'status' | 'error'>,
+): boolean => migration.status === 'REHEARSED' && Boolean(migration.error)
+
+/** Rehearsed, booked or not: the statuses the rehearsal results belong to. */
+export const isRehearsed = (status: MigrationStatus): boolean =>
+  status === 'REHEARSED' || status === 'SCHEDULED'
+
+/**
+ * A move can only start from a recent rehearsal, measured at the slot (the
+ * platform's ORG_MIGRATION_REHEARSAL_MAX_AGE_DAYS, 14 by default). Booking
+ * past it is refused, and a slot reached past it is taken back.
+ */
+export const REHEARSAL_MAX_AGE_DAYS = 14
+
+export const isRehearsalStale = (
+  migration: Pick<IMigration, 'rehearsal'>,
+  at: number = Date.now(),
+): boolean => {
+  const finishedAt = migration.rehearsal?.finishedAt
+  if (!finishedAt) {
+    return true
+  }
+  const maxAgeMs = REHEARSAL_MAX_AGE_DAYS * 86_400_000
+  return at - new Date(finishedAt).getTime() > maxAgeMs
+}
 
 /** The platform only accepts a cancel before the move starts. */
-export const CANCELLABLE_STATUSES: MigrationStatus[] = ['CREATED', 'REHEARSED']
+export const CANCELLABLE_STATUSES: MigrationStatus[] = [
+  'CREATED',
+  'REHEARSED',
+  'SCHEDULED',
+]
 
 /** Move-day steps (SAD Annex E.3) and the platform status that runs each. */
 export const MOVE_DAY_STEPS: { status: MigrationStatus; label: string }[] = [
