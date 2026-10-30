@@ -4,6 +4,7 @@ import { Check, Copy } from 'lucide-react'
 import React, { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { webhookUrlFor } from '../config'
 
 // Per-environment values the owner needs to set up their agent (UX spec v1.1,
 // SCR-WM-02). Set them in the environment; they aren't secrets.
@@ -59,7 +60,7 @@ const CopyValue = ({ value }: { value?: string }): React.JSX.Element => {
 export function BeforeYouStart({
   orgId,
 }: Readonly<{ orgId: string }>): React.JSX.Element {
-  const webhookUrl = `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/wh/${orgId}`
+  const webhookUrl = webhookUrlFor(orgId)
   const rows: { label: string; hint: string; value?: string }[] = [
     {
       label: 'Webhook URL',

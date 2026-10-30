@@ -99,7 +99,7 @@ export interface IMigration {
   rotation: IRotationProgress | null
   webhookConfirmedAt: string | null
   downloadMethod: DownloadMethod | null
-  // Only platforms with the completedAt column send it (ngotag-platform #130).
+  // Set when the move completes; a row from before the column existed has none.
   completedAt?: string | null
 }
 

@@ -330,7 +330,10 @@ export function ChecksRehearsalSchedule({
           </p>
         )}
         {rehearsalState === 'failed' && (
-          <Failure code={migration.rehearsal?.code ?? 'JOB_FAILED'} />
+          <Failure
+            code={migration.rehearsal?.code ?? 'REHEARSAL_FAILED'}
+            rehearsal
+          />
         )}
         {rehearsed && (
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">

@@ -10,7 +10,7 @@
 //   not-pristine   first checks fail with TARGET_NOT_PRISTINE
 //   old-release    first checks fail with RELEASE_MISMATCH
 //   unreachable    first checks fail with AGENT_UNREACHABLE
-//   rehearsal-fail first rehearsal fails (JOB_FAILED during export)
+//   rehearsal-fail first rehearsal fails (EXPORT_FAILED: its export job failed)
 //   cleanup-fail   first rehearsal stops because a leftover export can't be
 //                  deleted (EXPORT_CLEANUP_FAILED)
 //   slot-missed    first booked slot is missed (back to REHEARSED, SLOT_MISSED)
@@ -26,6 +26,11 @@
 //   verify-fail    move day fails at VERIFYING (VERIFICATION_FAILED:RELAY_PROBE)
 //   slow           move day fails with FREEZE_BUDGET_EXCEEDED during import
 //   disaster       ends in DISASTER_RESTORED during the first 48 hours
+//   agent-down     after the 48 hours the switch-over is held back for a
+//                  while (SWITCHOVER_DEFERRED:DEDICATED_AGENT_UNREACHABLE)
+//   webhook-broken the agent's webhooks never arrive (WEBHOOK_UNREACHABLE);
+//                  the switch-over waits, then goes ahead and keeps the error
+//   rotation-stalled  connection updates stall halfway (ROTATION_STALLED)
 // A re-run of the checks or rehearsal, or a new booking, then succeeds.
 //
 // Statuses follow the platform: REHEARSED → SCHEDULED → FROZEN …, an owner's
@@ -52,6 +57,8 @@ const LATENCY_MS = 400
 const FINAL_RETRY_MS = 8_000
 // How long a step after the switch keeps failing in the cutover-stuck demo.
 const STUCK_MS = 16_000
+// How long the switch-over is held back after the window in the demo.
+const DEFER_MS = 12_000
 const TOTAL_CONNECTIONS = 1240
 
 interface IMockRecord {
@@ -182,7 +189,11 @@ const derive = (record: IMockRecord, now: number): IMigration => {
       m.rehearsalStatus = 'RUNNING'
     } else if (firstRun && trigger(record, 'rehearsal-fail')) {
       m.rehearsalStatus = 'FAILED'
-      m.rehearsal = { step: 'EXPORT', code: 'JOB_FAILED', finishedAt: iso(now) }
+      m.rehearsal = {
+        step: 'EXPORT',
+        code: 'EXPORT_FAILED',
+        finishedAt: iso(now),
+      }
     } else if (firstRun && trigger(record, 'cleanup-fail')) {
       m.rehearsalStatus = 'FAILED'
       m.rehearsal = {
@@ -200,7 +211,7 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   }
 
   if (record.cancelledAt) {
-    // The owner's cancel: CANCELLED, with no error of its own (#118).
+    // The owner's cancel: CANCELLED, with no error of its own.
     return at(m, 'CANCELLED')
   }
   if (m.status !== 'REHEARSED' || record.bookedAt === null) {
@@ -215,7 +226,7 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     return m
   }
   const firstMove = record.bookings === 1
-  // The scheduler takes the booking back (#128): REHEARSED, slot cleared,
+  // The scheduler takes the booking back: REHEARSED, slot cleared,
   // reason in `error` until the owner books again.
   const putBack = (error: string): IMigration => ({
     ...at(m, 'REHEARSED'),
@@ -237,7 +248,7 @@ const derive = (record: IMockRecord, now: number): IMigration => {
       rehearsal: { ...m.rehearsal, finishedAt: aged },
     }
   }
-  // Final checks at the slot (platform #128): retried for a while, then the
+  // Final checks at the slot: retried for a while, then the
   // booking is taken back. A later re-run by the owner replaces the report.
   if (firstMove && trigger(record, 'final-checks-fail')) {
     const finalChecks = finalChecksReport(
@@ -258,7 +269,7 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   const frozenAt = record.bookedAt + START_DELAY_MS
   const stuck = firstMove && trigger(record, 'cutover-stuck')
   // The stuck demo runs past its deadline, which no longer applies after the
-  // switch (platform #131).
+  // switch.
   const freezeBudgetMs = stuck ? 5 * STEP_MS : 30 * 60_000
   m.freezeDeadline = iso(frozenAt + freezeBudgetMs)
   const moveT = now - frozenAt
@@ -294,8 +305,13 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   const switchedAt = frozenAt + moveDayMs
   const afterSwitch = now - switchedAt
   m.stabilisationEndsAt = iso(switchedAt + STABILISE_MS)
+  const webhookBroken = trigger(record, 'webhook-broken')
   if (afterSwitch >= WEBHOOK_CONFIRM_MS) {
-    m.webhookConfirmedAt = iso(switchedAt + WEBHOOK_CONFIRM_MS)
+    if (webhookBroken) {
+      m.error = 'WEBHOOK_UNREACHABLE'
+    } else {
+      m.webhookConfirmedAt = iso(switchedAt + WEBHOOK_CONFIRM_MS)
+    }
   }
   if (afterSwitch < STABILISE_MS) {
     if (trigger(record, 'disaster') && afterSwitch >= STABILISE_MS / 2) {
@@ -310,7 +326,20 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     }
   }
 
-  const rotateT = afterSwitch - STABILISE_MS
+  // The window has ended: the switch-over is held back while a blocker lasts.
+  // A webhook problem only holds it for a while, then stays on the move.
+  const agentDown = trigger(record, 'agent-down')
+  const holdMs = agentDown || webhookBroken ? DEFER_MS : 0
+  if (afterSwitch < STABILISE_MS + holdMs) {
+    const blocker = agentDown ? 'DEDICATED_AGENT_UNREACHABLE' : m.error
+    return {
+      ...at(m, 'STABILISING'),
+      error: `SWITCHOVER_DEFERRED:${blocker}`,
+    }
+  }
+  m.error = webhookBroken ? 'WEBHOOK_UNREACHABLE' : null
+
+  const rotateT = afterSwitch - STABILISE_MS - holdMs
   const share = Math.min(1, rotateT / ROTATE_MS)
   const updated = Math.round(TOTAL_CONNECTIONS * 0.95 * share)
   const refused = Math.round(12 * share)
@@ -318,7 +347,7 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   const rotation = {
     job: {
       status: share >= 1 ? 'COMPLETED' : 'RUNNING',
-      startedAt: iso(switchedAt + STABILISE_MS),
+      startedAt: iso(switchedAt + STABILISE_MS + holdMs),
     },
     counts: {
       total: TOTAL_CONNECTIONS,
@@ -333,12 +362,17 @@ const derive = (record: IMockRecord, now: number): IMigration => {
     polledAt: iso(now),
   }
   if (rotateT < ROTATE_MS) {
-    return { ...at(m, 'ROTATING'), rotation }
+    const stalled = trigger(record, 'rotation-stalled') && share >= 0.5
+    return {
+      ...at(m, 'ROTATING'),
+      rotation,
+      ...(stalled ? { error: 'ROTATION_STALLED' } : {}),
+    }
   }
   return {
     ...at(m, 'COMPLETED'),
     rotation,
-    completedAt: iso(switchedAt + STABILISE_MS + ROTATE_MS),
+    completedAt: iso(switchedAt + STABILISE_MS + holdMs + ROTATE_MS),
   }
 }
 

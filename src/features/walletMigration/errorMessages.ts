@@ -111,6 +111,12 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
       "You haven't confirmed that your new agent's wallet database is backed up.",
     recovery: 'Confirm your backups, then re-run the checks.',
   },
+  DOWNLOAD_METHOD_CHANGED: {
+    message:
+      "Your agent could download the wallet file during the rehearsal, but can't reach the export storage now.",
+    recovery:
+      "Restore the agent's access to its export bucket (AWS_WALLET_EXPORT_BUCKET, with AWS_REGION matching the platform's), then re-run the checks.",
+  },
   CHECK_FAILED: {
     message: "This check couldn't be completed.",
     recovery: 'Re-run the checks. Contact support if it repeats.',
@@ -142,8 +148,9 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
     message: "We couldn't use your agent or the shared agent just now.",
     recovery: 'Try again in a few minutes.',
   },
-  // Rehearsal
-  JOB_FAILED: {
+  // Rehearsal (rehearsal.code; see REHEARSAL_CONTENT for codes it shares
+  // with move day)
+  REHEARSAL_FAILED: {
     message: "The rehearsal didn't finish. Nothing was changed.",
     recovery: 'Run the rehearsal again. Contact support if it repeats.',
   },
@@ -168,8 +175,7 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
       'Run the rehearsal again later. Contact support if it happens again.',
   },
   // Booking taken back before the move started: the move's `error` on a
-  // REHEARSED move (platform #128), or on a FAILED one where the scheduler
-  // aborts instead.
+  // REHEARSED move waiting for a new slot.
   SLOT_MISSED: {
     message: "The move didn't start at its booked time. Nothing changed.",
     recovery: 'Pick a new time.',
@@ -232,6 +238,11 @@ const ERROR_CONTENT: Record<string, IMigrationErrorContent> = {
     message:
       "Incoming messages couldn't be held safely, so the move was cancelled automatically.",
     recovery: NEW_MOVE,
+  },
+  AGENT_ROW_CHANGED: {
+    message:
+      "Your organisation's agent settings changed during the move, so it was cancelled automatically. Nothing changed.",
+    recovery: 'Contact support before starting a new move.',
   },
   MOVE_INTERRUPTED: {
     message: 'The move was interrupted and cancelled automatically.',
@@ -324,6 +335,21 @@ const lookup = (
 const fill = (text: string, values: Record<string, string>): string =>
   text.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '…')
 
+// The rehearsal's export and import record the same codes as move day, but
+// only the rehearsal failed: nothing moved or was cancelled.
+const REHEARSAL_CONTENT: Record<string, IMigrationErrorContent> = {
+  EXPORT_FAILED: {
+    message:
+      "The rehearsal's wallet export didn't finish. Nothing was changed.",
+    recovery: 'Run the rehearsal again. Contact support if it repeats.',
+  },
+  IMPORT_FAILED: {
+    message:
+      "The rehearsal's import into your agent didn't finish. Nothing was changed.",
+    recovery: 'Run the rehearsal again. Contact support if it repeats.',
+  },
+}
+
 /** Known code → spec message. Unknown or missing code → null. */
 export const findMigrationError = (
   code?: string | null,
@@ -339,6 +365,12 @@ export const findMigrationError = (
       }
     : null
 }
+
+/** Message for a rehearsal's `rehearsal.code`. */
+export const findRehearsalError = (
+  code?: string | null,
+): IMigrationErrorContent | null =>
+  (code ? REHEARSAL_CONTENT[code] : undefined) ?? findMigrationError(code)
 
 /**
  * Message for a failed call or outcome. Some platform errors (slot invalid,

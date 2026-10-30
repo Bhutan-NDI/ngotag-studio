@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { IMigration } from '../types'
 import React from 'react'
+import { describeAfterSwitch } from '../afterSwitchMessages'
 
 // P-06 status chip: text, icon and colour (never colour alone).
 const chipFor = (
@@ -43,6 +44,11 @@ const chipFor = (
     icon: spin,
     className: info,
   }
+
+  // A problem after the switch that the owner has to fix on their agent.
+  const ownerMustFix = Boolean(
+    describeAfterSwitch(migration.error, '')?.ownerAction,
+  )
 
   switch (migration.status) {
     case 'CREATED':
@@ -91,17 +97,30 @@ const chipFor = (
         icon: <PauseCircle className="h-3.5 w-3.5" aria-hidden />,
         className: warn,
       }
-    case 'STABILISING':
+    case 'STABILISING': {
+      if (ownerMustFix) {
+        return needsAttention
+      }
+      const endsAt = migration.stabilisationEndsAt
+      if (endsAt && Date.parse(endsAt) <= Date.now()) {
+        return {
+          label: 'Move in progress: first 48 hours over',
+          icon: spin,
+          className: info,
+        }
+      }
       return {
         label: `Move in progress: first 48 hours (${
-          migration.stabilisationEndsAt
-            ? hoursUntil(migration.stabilisationEndsAt)
-            : 48
+          endsAt ? hoursUntil(endsAt) : 48
         } hours left)`,
         icon: spin,
         className: info,
       }
+    }
     case 'ROTATING':
+      if (ownerMustFix) {
+        return needsAttention
+      }
       return {
         label: 'Move in progress: updating connections',
         icon: spin,

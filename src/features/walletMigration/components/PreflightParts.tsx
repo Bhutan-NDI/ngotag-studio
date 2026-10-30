@@ -1,7 +1,11 @@
 'use client'
 
 import { CheckCircle2, MinusCircle, XCircle } from 'lucide-react'
-import { findMigrationError, formatCheckDetail } from '../errorMessages'
+import {
+  findMigrationError,
+  findRehearsalError,
+  formatCheckDetail,
+} from '../errorMessages'
 
 import { IPreflightCheck } from '../types'
 import React from 'react'
@@ -28,15 +32,23 @@ export const CheckIcon = ({
   return <MinusCircle className="text-muted-foreground h-4 w-4" aria-hidden />
 }
 
-/** Failure box: the spec message, the fix, any detail, and the code as a reference. */
+/**
+ * Failure box: the spec message, the fix, any detail, and the code as a
+ * reference. `rehearsal` reads codes the rehearsal shares with move day as a
+ * rehearsal failure.
+ */
 export const Failure = ({
   code,
   detail,
+  rehearsal = false,
 }: {
   code?: string | null
   detail?: IPreflightCheck['detail']
+  rehearsal?: boolean
 }): React.JSX.Element => {
-  const content = findMigrationError(code)
+  const content = rehearsal
+    ? findRehearsalError(code)
+    : findMigrationError(code)
   const facts = formatCheckDetail(detail)
   return (
     <div className="border-destructive/30 bg-destructive/5 mt-2 rounded-md border px-3 py-2.5 text-sm">

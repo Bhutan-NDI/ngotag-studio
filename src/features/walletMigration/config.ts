@@ -37,7 +37,7 @@ export const DEADLINE_STATUSES: MigrationStatus[] = [
 ]
 
 /**
- * A required step after the switch keeps failing (platform #131): the move
+ * A required step after the switch keeps failing: the move
  * stays in CUTOVER, paused, with COMPLETION_STEP_FAILED:<step> until it
  * succeeds. Owners and platform admins get the MOVE_STUCK alert.
  */
@@ -48,7 +48,7 @@ export const isCutoverStuck = (
   (migration.error ?? '').startsWith('COMPLETION_STEP_FAILED')
 
 /**
- * The platform took the booking back (platform #128): a missed slot, a
+ * The scheduler took the booking back: a missed slot, a
  * rehearsal gone stale, or final checks that kept failing. The move returns
  * to REHEARSED with the slot cleared and the reason in `error`, which clears
  * once the owner books again.
@@ -79,6 +79,10 @@ export const isRehearsalStale = (
   const maxAgeMs = REHEARSAL_MAX_AGE_DAYS * 86_400_000
   return at - new Date(finishedAt).getTime() > maxAgeMs
 }
+
+/** The address an org's agent sends its webhooks to. */
+export const webhookUrlFor = (orgId: string): string =>
+  `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/wh/${orgId}`
 
 /** The platform only accepts a cancel before the move starts. */
 export const CANCELLABLE_STATUSES: MigrationStatus[] = [
@@ -111,7 +115,7 @@ export const failedMoveDayStep = (error: string | null): number => {
   if (/^VERIFICATION_FAILED/.test(code)) {
     return 3
   }
-  if (/^(CUTOVER_FAILED|INVITATION_FAILED)/.test(code)) {
+  if (/^(CUTOVER_FAILED|INVITATION_FAILED|AGENT_ROW_CHANGED)/.test(code)) {
     return 4
   }
   return -1

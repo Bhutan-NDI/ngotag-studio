@@ -1,7 +1,11 @@
 'use client'
 
-import { AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
-import { completedTime, formatBtt, hoursUntil } from '../config'
+import { AlertTriangle, CheckCircle2, Clock, Info } from 'lucide-react'
+import {
+  IAfterSwitchProblem,
+  describeAfterSwitch,
+} from '../afterSwitchMessages'
+import { completedTime, formatBtt, hoursUntil, webhookUrlFor } from '../config'
 
 import { Card } from '@/components/ui/card'
 import { IMigration } from '../types'
@@ -65,6 +69,49 @@ const connectionCounts = (
 }
 
 /**
+ * A problem the platform noted after the switch. The owner's to fix (their
+ * agent or its webhooks) in amber; ours in a quieter note.
+ */
+const ProblemNotice = ({
+  problem,
+  code,
+  wentAhead,
+}: {
+  problem: IAfterSwitchProblem
+  code: string
+  wentAhead: boolean
+}): React.JSX.Element => (
+  <div
+    role="status"
+    className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
+      problem.ownerAction
+        ? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300'
+        : 'bg-muted/40 text-foreground'
+    }`}
+  >
+    {problem.ownerAction ? (
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+    ) : (
+      <Info
+        className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0"
+        aria-hidden
+      />
+    )}
+    <div className="min-w-0">
+      <p className="font-medium">{problem.message}</p>
+      {wentAhead && (
+        <p className="mt-1">
+          The move went ahead without them after waiting, so this still needs
+          fixing.
+        </p>
+      )}
+      <p className="mt-1">{problem.recovery}</p>
+      <p className="mt-1 text-xs opacity-80">Reference: {code}</p>
+    </div>
+  </div>
+)
+
+/**
  * SCR-WM-06: first 48 hours, updating connections, moved. Read-only for
  * everyone; there is no switch-back (problems are fixed forward). Shows only
  * what the platform records.
@@ -72,8 +119,19 @@ const connectionCounts = (
 export function MoveDashboard({
   migration,
 }: Readonly<{ migration: IMigration }>): React.JSX.Element {
-  const { status } = migration
+  const { status, error } = migration
   const counts = connectionCounts(migration.rotation?.counts)
+  const problem = describeAfterSwitch(error, webhookUrlFor(migration.orgId))
+  const windowEnded =
+    migration.stabilisationEndsAt !== null &&
+    Date.parse(migration.stabilisationEndsAt) <= Date.now()
+  // A webhook problem the switch-over went ahead with stays on the move.
+  const wentAhead =
+    status !== 'STABILISING' && Boolean(error?.startsWith('WEBHOOK_'))
+  const notice =
+    problem && error ? (
+      <ProblemNotice problem={problem} code={error} wentAhead={wentAhead} />
+    ) : null
   const completedAt = completedTime(migration)
 
   const phases = [
@@ -132,18 +190,30 @@ export function MoveDashboard({
 
       {status === 'STABILISING' && (
         <div className="mt-5 space-y-4">
-          <p className="text-sm">
-            <span className="font-semibold">
-              {migration.stabilisationEndsAt
-                ? hoursUntil(migration.stabilisationEndsAt)
-                : 48}{' '}
-              hours left
-            </span>
-            {migration.stabilisationEndsAt &&
-              ` (until ${formatBtt(migration.stabilisationEndsAt)})`}
-            . After that, your citizens&apos; connections start updating
-            automatically.
-          </p>
+          {windowEnded ? (
+            <p className="text-sm">
+              <span className="font-semibold">
+                The first 48 hours are over.
+              </span>{' '}
+              {problem?.deferred
+                ? `Connection updates are waiting for ${problem.waitingFor}.`
+                : "Your citizens' connections start updating shortly."}
+            </p>
+          ) : (
+            <p className="text-sm">
+              <span className="font-semibold">
+                {migration.stabilisationEndsAt
+                  ? hoursUntil(migration.stabilisationEndsAt)
+                  : 48}{' '}
+                hours left
+              </span>
+              {migration.stabilisationEndsAt &&
+                ` (until ${formatBtt(migration.stabilisationEndsAt)})`}
+              . After that, your citizens&apos; connections start updating
+              automatically.
+            </p>
+          )}
+          {notice}
           <div className="flex items-center gap-2 text-sm">
             {migration.webhookConfirmedAt ? (
               <>
@@ -169,6 +239,7 @@ export function MoveDashboard({
 
       {(status === 'ROTATING' || status === 'COMPLETED') && (
         <div className="mt-5 space-y-3">
+          {notice}
           {status === 'COMPLETED' && (
             <p className="text-sm">
               Your organisation now runs on its own agent
