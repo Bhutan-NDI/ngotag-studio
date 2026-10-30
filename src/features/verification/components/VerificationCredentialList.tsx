@@ -36,6 +36,7 @@ import { apiStatusCodes } from '@/config/CommonConstant'
 import { getOrganizationById } from '@/app/api/organization'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
+import { useMigrationPaused } from '@/features/walletMigration/components/PausedBanner'
 import { useRouter } from 'next/navigation'
 import { verificationSvgComponent } from '@/config/verificationSvgComponent'
 
@@ -53,6 +54,7 @@ interface ProofStateCellProps {
 }
 
 const VerificationCredentialList = (): JSX.Element => {
+  const migrationPaused = useMigrationPaused()
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [proofReqSuccess, setProofReqSuccess] = useState<string | null>(null)
@@ -433,6 +435,7 @@ const VerificationCredentialList = (): JSX.Element => {
               feature={Features.VERIFICATION}
               svgComponent={verificationSvgComponent()}
               onClickEvent={schemeSelection}
+              disabled={migrationPaused}
             />
           </div>
         )}

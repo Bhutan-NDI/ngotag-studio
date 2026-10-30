@@ -45,6 +45,7 @@ import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
 import { nanoid } from 'nanoid'
 import { BhutanndiCreateDid } from './BhutanndiCreateDid'
+import { useMigrationPaused } from '@/features/walletMigration/components/PausedBanner'
 
 const isValidUuid = (value: string): boolean =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -64,6 +65,7 @@ const isValidDomain = (value: string): boolean =>
   )
 
 const CreateDid = (): React.JSX.Element => {
+  const migrationPaused = useMigrationPaused()
   const [selectedProtocol, setSelectedProtocol] = useState<Protocol | null>(
     'didcomm',
   )
@@ -1068,6 +1070,7 @@ const CreateDid = (): React.JSX.Element => {
               <Button
                 onClick={handleSubmit}
                 disabled={
+                  migrationPaused ||
                   isApiInProgress ||
                   (selectedDid === 'did:web' &&
                     webFlowState === 'generated' &&
