@@ -32,6 +32,12 @@ import { namesOf, statusOf } from "@/lib/sharing";
  * and is back at the bank's site will assume the bank has it — so it must
  * be read, and a countdown would carry them past it.
  *
+ * NO RETURN ADDRESS (E15)
+ *
+ * The outcome is still the outcome: the face comes from the request, so a
+ * share waiting for approval still says "<Verifier> doesn't have this yet"
+ * (UC-35). Only the link goes, and a line says to go back by hand.
+ *
  * *Go back* works without the server: in the product the address is
  * already on the page. *Stay in the wallet* stops the countdown and opens
  * Sharing.
@@ -64,32 +70,34 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
 
   const natural: Face = !r
     ? "failed"
-    : !hasReturn
-      ? "no_return"
-      : st === "SHARED"
-        ? "shared"
-        : st === "AWAITING_APPROVAL"
-          ? "pending_approval"
-          : st === "RECEIVED"
-            ? "pending_checking"
-            : st === "DECLINED"
-              ? "declined"
-              : st === "BLOCKED"
-                ? "refused"
-                : st === "FAILED"
-                  ? "failed"
-                  : st === "EXPIRED"
-                    ? "expired"
-                    : st === "WITHDRAWN"
-                      ? "cancelled"
-                      : why === "passed"
-                        ? "pending_passed"
-                        : "pending_kept";
+    : st === "SHARED"
+      ? "shared"
+      : st === "AWAITING_APPROVAL"
+        ? "pending_approval"
+        : st === "RECEIVED"
+          ? "pending_checking"
+          : st === "DECLINED"
+            ? "declined"
+            : st === "BLOCKED"
+              ? "refused"
+              : st === "FAILED"
+                ? "failed"
+                : st === "EXPIRED"
+                  ? "expired"
+                  : st === "WITHDRAWN"
+                    ? "cancelled"
+                    : why === "passed"
+                      ? "pending_passed"
+                      : "pending_kept";
   const face: Face = forced === "live" ? natural : forced;
+  /* E15 — no address registered: no link and no countdown, but the outcome
+     is still the outcome (the request as reached). The *no_return* face
+     previews the line on its own. */
+  const noLink = face === "no_return" || (forced === "live" && !hasReturn);
 
   const [left, setLeft] = useState(5);
   const [stopped, setStopped] = useState(false);
-  const counting = face === "shared" && !stopped;
+  const counting = face === "shared" && !noLink && !stopped;
 
   const goBack = () => {
     if (!session) return;
@@ -115,14 +123,14 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
   const passedTo = verdict && "can" in verdict ? namesOf(verdict.can.map((id) => personById(id).name)) : "";
 
   const lines: Record<Exclude<Face, "live">, { lead: string; more?: string; ok?: boolean }> = {
-    shared: { lead: `Shared with ${v}. Taking you back in ${left} seconds.`, ok: true },
+    shared: { lead: noLink ? `Shared with ${v}.` : `Shared with ${v}. Taking you back in ${left} seconds.`, ok: true },
     pending_approval: {
       /* Must survive review unchanged (§2.4), "need" included. */
       lead: `${v} doesn't have this yet. ${approvers || "Someone"} need to approve it first. We'll send it as soon as they do.`,
     },
     pending_kept: { lead: `${v} doesn't have this yet. It's saved under Sharing until ${formatDate(r?.expiresAt ?? new Date().toISOString())}.` },
     pending_passed: { lead: `${v} doesn't have this yet. Passed to ${passedTo || "someone who can share it"}.` },
-    pending_checking: { lead: `We can't check ${v} right now. We've kept the request — you'll find it under Sharing.` },
+    pending_checking: { lead: `${v} doesn't have this yet. We can't check ${v} right now. We've kept the request — you'll find it under Sharing.` },
     declined: { lead: "You've declined. Nothing has been shared." },
     refused: { lead: `${v}'s request can't be answered through the NDI Entity Wallet. Nothing has been shared.` },
     /* E12 (V1/V2) says the bank can't receive it; anything else is E13. */
@@ -160,12 +168,15 @@ export function SharedOutcomeView({ requestId, why }: { requestId: string; why: 
               {face === "shared" && stopped ? `Shared with ${v}.` : shown.lead}
             </p>
             {shown.more ? <p className="m-0 text-[13.5px] text-muted">{shown.more}</p> : null}
+            {noLink && face !== "no_return" ? <p className="m-0 text-[13.5px] text-muted">{lines.no_return.lead}</p> : null}
             {face === "no_return" ? null : (
               <div className="flex flex-wrap gap-2.5">
-                <GradientButton onClick={goBack}>
-                  Go back to {v}
-                  <Icon name="arrowRight" size={15} strokeWidth={2} />
-                </GradientButton>
+                {noLink ? null : (
+                  <GradientButton onClick={goBack}>
+                    Go back to {v}
+                    <Icon name="arrowRight" size={15} strokeWidth={2} />
+                  </GradientButton>
+                )}
                 {face.startsWith("pending") || face === "shared" ? (
                   <HairlineButton
                     onClick={() => {

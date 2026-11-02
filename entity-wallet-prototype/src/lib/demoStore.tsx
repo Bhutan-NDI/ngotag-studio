@@ -351,9 +351,16 @@ function applyShare(
             decidedBy: sharer,
             decidedAt: today(),
             approvedBy: approverId,
-            initiatedBy: r.initiatedBy ?? sharer,
-            initiatedAt: r.initiatedAt ?? today(),
+            /* Whoever shares is the one whose consent this carries
+               (FLOW-PRS-02 Q2) — never an earlier attempt's sharer. The
+               approval path passes the sharer who chose, so that holds
+               there too. Their date stays only while it is theirs. */
+            initiatedBy: sharer,
+            initiatedAt: r.initiatedBy === sharer ? (r.initiatedAt ?? today()) : today(),
             rejection: null,
+            /* An answer ends any earlier V7 notice; History reads the
+               outcome from the status, not from a stale failure. */
+            failure: null,
           }
         : r,
     ),
@@ -480,8 +487,15 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
   if (changed) {
     const held = s.heldCredentials.find((c) => c.id === r.chosen?.[changed.descriptor.id]);
     const reason = `${changed.descriptor.credentialType} can't be shared any more: ${(held && sharing.whyUnshareable(held)) ?? "it is no longer in your wallet"}.`;
+    /* Open again for anyone who may share it: the failed attempt's sharer
+       goes with it, as on the E16 path above, and the reason stays so the
+       next person is told why (V7). */
     return {
-      next: { ...s, parkedOperations: ops({ state: "stale", invalidatedReason: reason }), presentationRequests: reqs({ status: "OPEN", approvalId: null, failure: reason }) },
+      next: {
+        ...s,
+        parkedOperations: ops({ state: "stale", invalidatedReason: reason }),
+        presentationRequests: reqs({ status: "OPEN", approvalId: null, failure: reason, initiatedBy: null, initiatedAt: null }),
+      },
       notes: noteTo(s, [op.requestedBy], reason, orgId),
     };
   }
@@ -523,7 +537,11 @@ function rejectShare(s: DemoState, id: string, approver: PersonId, note: string)
       ...s,
       parkedOperations: s.parkedOperations.map((p) => (p.id === id ? { ...p, state: "rejected", decisionReason: note || null } : p)),
       presentationRequests: s.presentationRequests.map((x) =>
-        x.id === r.id ? { ...x, status: "OPEN" as const, approvalId: null, rejection: { by: approver, note, at: today() } } : x,
+        /* Open again with no sharer: whoever answers next is the one whose
+           consent it carries, and the rejection says who declined this one. */
+        x.id === r.id
+          ? { ...x, status: "OPEN" as const, approvalId: null, initiatedBy: null, initiatedAt: null, failure: null, rejection: { by: approver, note, at: today() } }
+          : x,
       ),
       auditEntries: appendAudit(s, {
         operation: "approval:decide",
@@ -5556,7 +5574,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => ({
           ...s,
           presentationRequests: s.presentationRequests.map((x) =>
-            x.id === requestId ? { ...x, status: "DECLINED" as const, decidedBy: me, decidedAt: today() } : x,
+            x.id === requestId ? { ...x, status: "DECLINED" as const, decidedBy: me, decidedAt: today(), failure: null } : x,
           ),
           auditEntries: appendAudit(s, {
             operation: "proof:present",
