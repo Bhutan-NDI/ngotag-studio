@@ -265,20 +265,24 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       licences and its listing as an issuer of authority, and Rinzin's
  *       *Give authority to act*. A version-28 save holds a chain nothing
  *       reads and none of the grants every Flow 8 screen expects.
- *  30 — Flow 9 (EW-FLOW9-SD, FLOW-AUT-02): the pre-spec signed
+ *  30 — Flow 8: the seeded Ended row for Tashi Dorji's lapsed link reads
+ *       as FLOW-AUT-01 E15 does ("<Name> didn't collect their authority by
+ *       <date>. Nothing was given."), as one the demo lapses does. A
+ *       version-29 save keeps the old sentence on that row.
+ *  31 — Flow 9 (EW-FLOW9-SD, FLOW-AUT-02): the pre-spec signed
  *       `decisions` of an "Authority Verification API" removed; BNSW's
  *       registration records, authority sessions, declarations and its
  *       simulated portal added, with Pelden's TPN credential and the
- *       Single Window's return address. A version-29 save holds decisions
+ *       Single Window's return address. A version-30 save holds decisions
  *       nothing reads and no registration for Pema's authority to match.
- *  31 — Flow 9 follows FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3 and UX-EW-06
+ *  32 — Flow 9 follows FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3 and UX-EW-06
  *       v0.3: BNSW looks up the company's TPN as well as its licences, so a
  *       registration records which held credential its TPN stands for, and
- *       BNSW records the sign-ins it refused (E8, E15). A version-30 save
+ *       BNSW records the sign-ins it refused (E8, E15). A version-31 save
  *       has a registration with no TPN to look up, which would refuse every
  *       sign-in as E11, and a portal with no list of attempts.
  */
-const SEED_VERSION = 31;
+const SEED_VERSION = 32;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -416,9 +420,16 @@ function applyShare(
             decidedBy: sharer,
             decidedAt: today(),
             approvedBy: approverId,
-            initiatedBy: r.initiatedBy ?? sharer,
-            initiatedAt: r.initiatedAt ?? today(),
+            /* Whoever shares is the one whose consent this carries
+               (FLOW-PRS-02 Q2) — never an earlier attempt's sharer. The
+               approval path passes the sharer who chose, so that holds
+               there too. Their date stays only while it is theirs. */
+            initiatedBy: sharer,
+            initiatedAt: r.initiatedBy === sharer ? (r.initiatedAt ?? today()) : today(),
             rejection: null,
+            /* An answer ends any earlier V7 notice; History reads the
+               outcome from the status, not from a stale failure. */
+            failure: null,
           }
         : r,
     ),
@@ -545,8 +556,15 @@ function approveShare(s: DemoState, id: string, approver: PersonId, method: "web
   if (changed) {
     const held = s.heldCredentials.find((c) => c.id === r.chosen?.[changed.descriptor.id]);
     const reason = `${changed.descriptor.credentialType} can't be shared any more: ${(held && sharing.whyUnshareable(held)) ?? "it is no longer in your wallet"}.`;
+    /* Open again for anyone who may share it: the failed attempt's sharer
+       goes with it, as on the E16 path above, and the reason stays so the
+       next person is told why (V7). */
     return {
-      next: { ...s, parkedOperations: ops({ state: "stale", invalidatedReason: reason }), presentationRequests: reqs({ status: "OPEN", approvalId: null, failure: reason }) },
+      next: {
+        ...s,
+        parkedOperations: ops({ state: "stale", invalidatedReason: reason }),
+        presentationRequests: reqs({ status: "OPEN", approvalId: null, failure: reason, initiatedBy: null, initiatedAt: null }),
+      },
       notes: noteTo(s, [op.requestedBy], reason, orgId),
     };
   }
@@ -588,7 +606,11 @@ function rejectShare(s: DemoState, id: string, approver: PersonId, note: string)
       ...s,
       parkedOperations: s.parkedOperations.map((p) => (p.id === id ? { ...p, state: "rejected", decisionReason: note || null } : p)),
       presentationRequests: s.presentationRequests.map((x) =>
-        x.id === r.id ? { ...x, status: "OPEN" as const, approvalId: null, rejection: { by: approver, note, at: today() } } : x,
+        /* Open again with no sharer: whoever answers next is the one whose
+           consent it carries, and the rejection says who declined this one. */
+        x.id === r.id
+          ? { ...x, status: "OPEN" as const, approvalId: null, initiatedBy: null, initiatedAt: null, failure: null, rejection: { by: approver, note, at: today() } }
+          : x,
       ),
       auditEntries: appendAudit(s, {
         operation: "approval:decide",
@@ -639,12 +661,16 @@ const uuidish = () =>
     return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
   });
 
-/** D18 — the grantor and, when the grantor isn't the Root, the Root. */
-function toldAbout(s: DemoState, g: AuthorityGrant, grantorText: string | null, rootText: string | null): Note[] {
+/**
+ * D18 — the grantor and, when the grantor isn't the Root, the Root. The
+ * Root is told in the third person, with who gave it added; `rootWhole`
+ * is for a sentence that already names the grantor, so it isn't added again.
+ */
+function toldAbout(s: DemoState, g: AuthorityGrant, grantorText: string | null, rootText: string | null, rootWhole = false): Note[] {
   const { grantor, root } = auth.toldOf(s, g);
   return [
     ...(grantorText ? noteTo(s, [grantor], grantorText, g.orgId) : []),
-    ...(root && rootText ? noteTo(s, [root], auth.NOTICE_GRANT.rootOutcome(nameOf(s, g.grantedBy), rootText), g.orgId) : []),
+    ...(root && rootText ? noteTo(s, [root], rootWhole ? rootText : auth.NOTICE_GRANT.rootOutcome(nameOf(s, g.grantedBy), rootText), g.orgId) : []),
   ];
 }
 
@@ -730,7 +756,9 @@ function approveGrant(s: DemoState, opId: string, approver: PersonId, method: "w
 
   if (!auth.grantFor(s, g.grantedBy, g.orgId, "authority:issue")) {
     const next = endGrant({ ...s, parkedOperations: ops({ state: "stale", invalidatedReason: auth.NOTICE_GRANT.approverLapsed(grantorName) }) }, g.id, "FAILED", auth.NOTICE_GRANT.grantorLapsed(name));
-    return { next, notes: toldAbout(s, g, auth.NOTICE_GRANT.grantorLapsed(name), auth.NOTICE_GRANT.grantorLapsed(name)) };
+    /* E16 addresses "you can no longer give authority" to the grantor
+       only; the Root, who isn't them, is told in the third person. */
+    return { next, notes: toldAbout(s, g, auth.NOTICE_GRANT.grantorLapsed(name), auth.NOTICE_GRANT.approverLapsed(grantorName), true) };
   }
 
   const problem = auth.recheck(s, g);
@@ -1686,7 +1714,7 @@ interface DemoActions {
    */
   giveAuthority: () =>
     | { ok: true; grantId: string; status: GrantStatus }
-    | { ok: false; error: "E1" | "E2" | "E5" | "E6" | "A3" | "no_approver" | "no_draft" };
+    | { ok: false; error: "E1" | "E2" | "E5" | "E6" | "A3" | "no_approver" | "no_draft"; reason?: string };
   /** SCR-AUT-01 / SCR-AUT-04 *Cancel this authority* — any state before the delegate accepts (E14). */
   cancelGrant: (grantId: string) => { ok: true } | { ok: false; error: "not_permitted" | "too_late" };
   /** SCR-AUT-06 — the approvers for a grant: approval:decide here, never the grantor. */
@@ -3144,7 +3172,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            the screen that offered the button is not the boundary. */
         const verdict = auth.giveVerdict(s0, me, d.orgId);
         if (verdict.kind === "no_permission") return { ok: false, error: "E1" };
-        if (verdict.kind === "not_in_standing") return { ok: false, error: "E2" };
+        if (verdict.kind === "not_in_standing") return { ok: false, error: "E2", reason: verdict.reason };
         if (verdict.kind === "no_approver") return { ok: false, error: "no_approver" };
         /* G4–G7. */
         const check = auth.checkDraft(s0, d);
@@ -3305,13 +3333,18 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const g = s0.authorityGrants.find((x) => x.id === grantId);
         if (!g || g.status !== "AWAITING_LISTING") return;
         if (!confirmed) {
-          /* E3 after 24 hours: FAILED, nothing given; the listing is tried
+          /* E3 after 24 hours: FAILED, nothing given. The listing is the
+             organisation's, so every grant waiting on it ends with it
+             (EW-FLOW8-SD §4.2), each grantor told; the listing is tried
              again from scratch by the next grant. */
+          const waiting = (s: DemoState) => s.authorityGrants.filter((x) => x.orgId === g.orgId && x.status === "AWAITING_LISTING");
           setState((s) => ({
-            ...endGrant(s, grantId, "FAILED", auth.NOTICE_GRANT.listingFailed),
+            ...waiting(s).reduce((acc, w) => endGrant(acc, w.id, "FAILED", auth.NOTICE_GRANT.listingFailed), s),
             organizations: s.organizations.map((o) => (o.id === g.orgId && o.authorityListing?.status === "PENDING" ? { ...o, authorityListing: undefined } : o)),
           }));
-          toldAbout(s0, g, auth.NOTICE_GRANT.listingFailed, auth.NOTICE_GRANT.listingFailed).forEach((n) => log(n.text, n.orgId));
+          waiting(s0).forEach((w) =>
+            toldAbout(s0, w, auth.NOTICE_GRANT.listingFailed, auth.NOTICE_GRANT.listingFailed).forEach((n) => log(n.text, n.orgId)),
+          );
           return;
         }
         /* Step 6, A4: listed CURRENT for the Capability type only, and the
@@ -3410,7 +3443,22 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           if (mismatches >= auth.MAX_MISMATCHES) {
             /* E9, the third time: FAILED, the grantor and the Root told. */
             const text = auth.NOTICE_GRANT.someoneElse(name);
-            setState((s) => endGrant(s, g.id, "FAILED", text, { mismatches }));
+            setState((s) =>
+              endGrant(
+                {
+                  ...s,
+                  auditEntries: appendAudit(s, {
+                    operation: "authority:claim",
+                    summary: `Someone else tried to collect the authority for ${name} a third time — the grant ended`,
+                    actorId: g.grantedBy,
+                  }),
+                },
+                g.id,
+                "FAILED",
+                text,
+                { mismatches },
+              ),
+            );
             toldAbout(s0, g, text, text).forEach((n) => log(n.text, n.orgId));
             return { ok: false, error: "E9", ended: true };
           }
@@ -3433,7 +3481,21 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const problem = auth.recheck(s0, g);
         if (problem) {
           const text = auth.NOTICE_GRANT.couldNot(name, problem);
-          setState((s) => endGrant(s, g.id, "FAILED", text));
+          setState((s) =>
+            endGrant(
+              {
+                ...s,
+                auditEntries: appendAudit(s, {
+                  operation: "authority:claim",
+                  summary: `${citizen?.name ?? name} proved who they are, but the authority couldn't be given: ${problem}`,
+                  actorId: g.grantedBy,
+                }),
+              },
+              g.id,
+              "FAILED",
+              text,
+            ),
+          );
           toldAbout(s0, g, text, text).forEach((n) => log(n.text, n.orgId));
           return { ok: false, error: "E11" };
         }
@@ -6395,7 +6457,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => ({
           ...s,
           presentationRequests: s.presentationRequests.map((x) =>
-            x.id === requestId ? { ...x, status: "DECLINED" as const, decidedBy: me, decidedAt: today() } : x,
+            x.id === requestId ? { ...x, status: "DECLINED" as const, decidedBy: me, decidedAt: today(), failure: null } : x,
           ),
           auditEntries: appendAudit(s, {
             operation: "proof:present",

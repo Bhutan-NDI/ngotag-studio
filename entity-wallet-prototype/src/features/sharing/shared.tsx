@@ -165,9 +165,15 @@ export function CredentialsToShare({
                 <p className="m-0 text-[14px] font-medium text-strong">{credential.type}</p>
                 <p className="m-0 text-[12.5px] text-faint">From {credential.issuer} · received {formatDate(credential.receivedAt)}</p>
               </div>
-              {m.options.length > 1 ? (
+              {/* A4 — "We've chosen the newest" is said only while it is true: once the
+                  sharer picks an older one, and on SCR-PRS-04 where that one is
+                  what will be sent, it would tell the approver something false
+                  (SC 3.3.4). The select stays, so the first half still labels it. */}
+              {m.options.length > 1 && (onChoose || credential.id === m.options[0].id) ? (
                 <div className="flex flex-wrap items-center gap-2 text-[12.5px] text-muted">
-                  <span>You have more than one {credential.type}. We&rsquo;ve chosen the newest.</span>
+                  <span>
+                    You have more than one {credential.type}.{credential.id === m.options[0].id ? <> We&rsquo;ve chosen the newest.</> : null}
+                  </span>
                   {onChoose ? (
                     <label className="flex items-center gap-2">
                       <span className="sr-only">Change which {credential.type}</span>

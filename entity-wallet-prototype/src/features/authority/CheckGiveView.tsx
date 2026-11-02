@@ -39,7 +39,7 @@ type Face = "live" | "default_auto" | "default_approval" | "loading" | "error" |
 
 export function CheckGiveView() {
   const router = useRouter();
-  const { hydrated, authorityDraft, organizations, activeOrgId, personById, giveVerdict, giveAuthority } = useDemo();
+  const { hydrated, authorityDraft, organizations, activeOrgId, personById, giveVerdict, whoCanGive, giveAuthority } = useDemo();
   const forced = useScreenState("SCR-AUT-03", ["live", "default_auto", "default_approval", "loading", "error", "offline", "no_permission"]) as Face;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +86,18 @@ export function CheckGiveView() {
   );
 
   const approvers = verdict.kind === "may" ? verdict.approvers.map((id) => personById(id).name) : [];
+  /* E1 or E2, as SCR-AUT-01 and SCR-AUT-02 say it — which one is the
+     verdict's, read again here: standing or an approver can go between
+     the form and this screen. */
+  const blockedText =
+    verdict.kind === "not_in_standing"
+      ? `${orgName} can't give authority at the moment: ${verdict.reason}.`
+      : verdict.kind === "no_approver"
+        ? "Nobody else here can approve authority you give, so you can't give it yet."
+        : (() => {
+            const can = verdict.kind === "no_permission" ? verdict.can : whoCanGive();
+            return `You can't give authority for ${ending(orgName)}${can.length ? ` ${namesOf(can.map((id) => personById(id).name))} can.` : ""}`;
+          })();
   const natural: Face = busy
     ? "loading"
     : error
@@ -110,7 +122,7 @@ export function CheckGiveView() {
       }
       const copy: Record<typeof res.error, string> = {
         E1: `You can't give authority for ${ending(orgName)}`,
-        E2: `${orgName} can't give authority at the moment.`,
+        E2: `${orgName} can't give authority at the moment${res.reason ? `: ${res.reason}` : ""}.`,
         E5: `${organizations.find((o) => o.id === d.counterparty)?.name ?? "That organisation"} can't accept authority from the NDI Entity Wallet at the moment.`,
         E6: "Something on the form needs changing.",
         A3: `${name} already has authority for this. Go back to say whether to give another.`,
@@ -139,7 +151,7 @@ export function CheckGiveView() {
         ) : null}
         {face === "no_permission" ? (
           <Notice role="alert" tone="warning">
-            You can&rsquo;t give authority for {ending(orgName)}
+            {blockedText}
           </Notice>
         ) : null}
 

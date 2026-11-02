@@ -3,6 +3,7 @@ import { formatDate } from "@/features/controllership/scopeModel";
 import {
   PELDEN,
   keyedIdHash,
+  notCollectedCopy,
   type ApprovalPolicy,
   type AuthorityDraft,
   type AuthorityGrant,
@@ -474,7 +475,7 @@ export const NOTICE_GRANT = {
   /** A1 lapsed (§3.5). */
   nobodyApproved: (name: string, by: string) => `Nobody approved giving ${name} authority by ${formatDate(by)}. Nothing was given.`,
   /** E15 (§3.5). */
-  notCollected: (name: string, by: string) => `${name} didn't collect their authority by ${formatDate(by)}. Nothing was given.`,
+  notCollected: notCollectedCopy,
   /** E9 on FAILED — the grantor (§3.5). */
   someoneElse: (name: string) => `Someone else tried to collect the authority for ${name}. Nothing was given. Give it again with a new link if you still need to.`,
   /** E11 — the grantor (§3.5). */
