@@ -931,8 +931,10 @@ instead of the plain sign-in holds the request (E8): *We're checking Bank of
 Bhutan…*, and going back is pending; Sharing then lists it as *Checking Bank
 of Bhutan — you can't answer this yet* until **NDI's list answers**. Driving as Pema (no
 appointment) gives E4; removing the bank's address on **Verification →
-Return addresses** as Yeshey gives E15 (*Done. Go back to Bank of Bhutan's
-website to continue.*, no link).
+Return addresses** as Yeshey gives E15: whatever the request has reached is
+still said (*Bank of Bhutan doesn't have this yet…* after a share that needs
+approval), then *Done. Go back to Bank of Bhutan's website to continue.*, with
+no link.
 
 ### A controller shares, the owner approves — as Rinzin, then Dorji
 
