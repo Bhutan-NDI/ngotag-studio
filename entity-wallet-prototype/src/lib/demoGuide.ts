@@ -75,6 +75,11 @@ export interface GuideStep {
  * holds its registration and has people who can act for it is the one that
  * can be trusted with more.
  *
+ * Receiving a credential (Flow 6) is the last chapter because it's what all
+ * of it was for: a verified business, with someone who can act for it,
+ * using its registration to get the next credential — its taxpayer number —
+ * from an office that decides on what was proved, not on what NDI says.
+ *
  * Member onboarding is here because the first day is now genuinely empty.
  * When it still listed the seed's colleagues, the room's first question on
  * seeing them was "how did these people get here?" — and the answer, an
@@ -92,6 +97,8 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "Recognise Bank of Bhutan", shows: "NDI approves a bank already verifying — asking for less — and the bank accepts by name" },
   { title: "Pelden asks to verify customers", shows: "A verified business asks; one administrator reviews, a second decides" },
   { title: "Designate the ministry", shows: "A ministry becomes the authority for sole proprietorships, and agrees what people are asked" },
+  { title: "Pelden gets its TPN", shows: "Pelden asks the tax office, shares its registration, and accepts what comes back" },
+  { title: "The tax office's system answers", shows: "Deki connects the office's system, and Pelden's next request is answered without an officer" },
   { title: "Where to go next", shows: "The other routes, and what's simulated" },
 ];
 
@@ -721,12 +728,130 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/authority/stop",
   },
 
-  /* ---- 11 · Where to go next ---- */
+  /* ---- 11 · Pelden gets its TPN (FLOW-CRD-01, FLOW-CRD-03) ---- */
   {
     chapter: 11,
+    title: "What Pelden can get next",
+    happening:
+      "Credentials offices on NDI issue to businesses like Pelden. Each says what the office needs to see first — the taxpayer number needs Pelden's registration, which it holds; the bonded-warehouse authorisation needs the taxpayer number, which it doesn't yet.",
+    doThis: "On **Taxpayer Number (TPN)**, press **Ask for this**.",
+    route: "/wallet/get",
+    persona: "dorji",
+  },
+  {
+    chapter: 11,
+    title: "One consent, said in full",
+    happening:
+      "What Pelden shares and what it may receive, side by side. The tax office receives all of Pelden's registration — every item is listed, including the ones it doesn't use — because a credential like this can't be shared in part. And nothing is added until someone here accepts what comes back.",
+    doThis: "Press **Ask the Department of Revenue & Customs**.",
+    say: "The screen never claims only some of it is shared. That would read better, and it would be false.",
+    match: "^/wallet/get/off-tpn$",
+  },
+  {
+    chapter: 11,
+    title: "Who has it now",
+    happening:
+      "Pelden's wallet shares the registration, the office checks it, and the request says who has it and when to expect an answer — not a status code.",
+    doThis: "Wait until it says **Waiting for the Department of Revenue & Customs**, then press **Next** — the guide switches to Deki.",
+    match: "^/wallet/requests/crq-[^/]+$",
+  },
+  {
+    chapter: 11,
+    title: "The tax office's queue",
+    happening:
+      "Deki Yangzom answers taxpayer registrations at the Department of Revenue & Customs. Least time left comes first, led by the registration number Pelden proved — what Deki will look up in the office's own register.",
+    doThis: "Press **Open next**.",
+    route: "/issuer/requests",
+    persona: "deki",
+  },
+  {
+    chapter: 11,
+    title: "Decide on what was proved",
+    happening:
+      "Two panels: what Pelden proved, with the credential it came from, and — separately, below — the name and type NDI holds, which Deki hasn't verified. Deki enters the taxpayer number's details from the office's own register.",
+    doThis:
+      "Read the **Verified** panel. Fill in **Taxpayer number** (for example **TPN-114-8830**), **Tax office** and **Registered for** — each shows its format — then press **Issue**.",
+    say: "The failure this screen is built against isn't a system error. It's an officer issuing on the strength of a name NDI showed them.",
+    match: "^/issuer/requests/crq-[^/]+$",
+  },
+  {
+    chapter: 11,
+    title: "Sent",
+    happening: "Issued, and on its way to Pelden. It isn't Pelden's yet — Pelden decides whether to accept it.",
+    doThis: "Press **Next** — the guide switches to Dorji.",
+    match: "^/issuer/requests/crq-[^/]+$",
+  },
+  {
+    chapter: 11,
+    title: "Waiting for Pelden",
+    happening: "The office has replied. What needs someone at Pelden comes first, with the date the offer lapses.",
+    doThis: "Under **Waiting for you**, press **Review**.",
+    route: "/wallet/requests",
+    persona: "dorji",
+  },
+  {
+    chapter: 11,
+    title: "Check it, then accept",
+    happening:
+      "Every detail as offered, from an office on NDI's list of trusted organisations, in answer to Dorji's request. If something were wrong, the screen says to decline and contact the office.",
+    doThis: "Press **Accept**, then **Go to your credentials**.",
+    match: "^/wallet/requests/crq-[^/]+$",
+  },
+  {
+    chapter: 11,
+    title: "Held, and on the record",
+    happening:
+      "The taxpayer number sits beside the registration it was asked for with, and View details lists what it carries — the number, the tax office, what Pelden is registered for — with who issued it and how long it's valid. The Activity tab keeps the request — and an offer the wallet refused on its own, from a sender not on NDI's list, which nobody was notified about.",
+    doThis: "Press **View details** on the taxpayer number, then press **Activity**.",
+    route: "/wallet/credentials",
+  },
+
+  /* ---- 12 · The tax office's system answers (FLOW-CRD-03 Kind A) ---- */
+  {
+    chapter: 12,
+    title: "Connect the office's system",
+    happening:
+      "The bonded-warehouse authorisation is the one the tax office's own system answers — once the office has connected it. Until then those requests land on Deki's queue, like the taxpayer number's did. This is the one technical screen: the integration lead's, where webhook and secret are allowed words.",
+    doThis:
+      "Press **Set up**, type **https://drc.gov.bt/ndi/credential-requests** and press **Save**. Under **Answering clients** type **Taxpayer registration system** and press **Create a client**. Then press **Send a test event**.",
+    say: "Whether the Department answers its requests this way at all is still open with GovTech. The prototype shows the path; it doesn't decide it.",
+    route: "/issuer/integration",
+    persona: "deki",
+  },
+  {
+    chapter: 12,
+    title: "Ask for the bonded-warehouse authorisation",
+    happening:
+      "Pelden holds its taxpayer number now, which is what this one needs to see first. Asking is the same consent as before: the office receives the whole credential, every item listed.",
+    doThis: "On **Bonded Warehouse Authorisation**, press **Ask for this**, then **Ask the Department of Revenue & Customs**.",
+    route: "/wallet/get",
+    persona: "dorji",
+  },
+  {
+    chapter: 12,
+    title: "The system answers by itself",
+    happening:
+      "This time nobody at the office opens anything. The request is delivered to the office's system, which answers a few seconds later with the details it supplies. Pelden still decides: nothing is added until someone here accepts it.",
+    doThis: "Wait until the offer appears, check it, then press **Accept** and **Go to your credentials**.",
+    say: "Accepting automatically is a later option the owner would choose, and it isn't in the first release.",
+    match: "^/wallet/requests/crq-[^/]+$",
+  },
+  {
+    chapter: 12,
+    title: "What the office's system sees",
+    happening:
+      "The delivery log shows what the system received: the request when it arrived, and that it was issued once Pelden accepted. Requests to answer lists the answer as given by the system's client, not an officer. The dashed panel stands in for the system when it can't answer: it can refer a request to the queue with a note, or miss it. Either way the request lands on Requests to answer, and whichever answer comes first wins.",
+    doThis: "Read the **Delivery log**, then press **Next**.",
+    route: "/issuer/integration",
+    persona: "deki",
+  },
+
+  /* ---- 13 · Where to go next ---- */
+  {
+    chapter: 13,
     title: "That's the story",
     happening:
-      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; and a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name.",
+      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; and Pelden used its registration to get its taxpayer number, from an office that decided on what Pelden proved — then its bonded-warehouse authorisation, answered by the office's system.",
     doThis:
       "To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },

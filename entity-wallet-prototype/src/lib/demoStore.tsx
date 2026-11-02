@@ -13,6 +13,7 @@ import {
 
 import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
+import { SYSTEM_ANSWER_MS } from "./demoTiming";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import {
   NDI_ORG,
@@ -64,6 +65,19 @@ import {
   openObjectionFor,
   draftAsked,
   draftFor,
+  requestInFlight,
+  crdEnding,
+  inOfficerQueue,
+  systemConnected,
+  SAMPLE_REFERRAL_NOTE,
+  supersedes,
+  type CredentialOffering,
+  type CredentialRequest,
+  type IssuerIntegration,
+  type SystemRoute,
+  shortOrgName,
+  type CredentialAttribute,
+  type HeldCredential,
   NDI_SERVICE_PRINCIPAL,
   type Authorisation,
   ISSUER_ENTITLEMENTS,
@@ -154,29 +168,49 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       connected, and two new organisations (the CRA and MoICE) with
  *       Kesang as the ministry's officer. A version-15 save has none of it,
  *       so nothing would be connected at all.
- *  17 — Flow 4 simplified for the first release (EW-FLOW4-SD v0.2): no
+ *  17 — Flow 6: offerings, requests and the issuer's integration, the
+ *       Department of Revenue & Customs and Deki as its officer.
+ *  18 — Rinzin's credential:accept takes any type, as EW-FLOW3-SD §4.2
+ *       gives it. A version-17 save still carries the narrow grant, which
+ *       the stricter permission check would now refuse the TPN under.
+ *  19 — The Fleet Insurance offer is an ordinary offer, not refused by its
+ *       type. A version-18 save still carries it as out of scope.
+ *  20 — Flow 4 simplified for the first release (EW-FLOW4-SD v0.2): no
  *       SUPERSEDED, STOPPED or acceptance EXPIRED states, issue types without
  *       a basis each, and records that carry a legal basis, a replacement
- *       link, a request id and a withdrawal reason. A version-15 save would
+ *       link, a request id and a withdrawal reason. A version-19 save would
  *       hold rows in states no screen has words for any more.
- *  18 — Flow 5 follows FLOW-ORG-02 and FLOW-ORG-03 v0.3: no REFUSED state
+ *  21 — Flow 5 follows FLOW-ORG-02 and FLOW-ORG-03 v0.3: no REFUSED state
  *       (DECLINED and WITHDRAWN instead), designations carry NDI's grant,
  *       publishingDid and the withdrawal and lapse fields, and authorisation
- *       rows and draft revisions exist. A version-17 save holds designations
+ *       rows and draft revisions exist. A version-20 save holds designations
  *       with no grant — which P2 would now refuse — and objections that no
  *       longer hold anything.
- *  19 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
+ *  22 — Flow 3 follows FLOW-DEL-01 v0.8: an appointment that ends before
  *       acceptance is EXPIRED with a reason (declined, withdrawn, basis
- *       lost). A version-18 save records a decline as TERMINATED, which the
+ *       lost). A version-21 save records a decline as TERMINATED, which the
  *       screens no longer read as declined.
- *  20 — The high-value grant waiting for dual control no longer carries
- *       Dorji's own signature on his own request. A version-19 save would
+ *  23 — Flow 6 follows FLOW-CRD-01..03 and UX-EW-03 v0.4: an offer sent
+ *       unasked is an inbox item reviewed on SCR-CRD-04, with no approval
+ *       decision and no parked state, and the seeded credential:accept
+ *       approvals are gone; a request no longer carries `replaces`, because
+ *       superseding is read from the held credentials when one is stored. A
+ *       version-22 save holds an offer parked for an approver nobody can
+ *       give, and an approval that would accept it.
+ *  24 — The high-value grant waiting for dual control no longer carries
+ *       Dorji's own signature on his own request. A version-23 save would
  *       let one more approver complete it alone.
- *  21 — The ministry and the CRA are marked as constituted by statute, so
+ *  25 — The ministry and the CRA are marked as constituted by statute, so
  *       neither is offered business verification (EW-FLOW2-SD §2.2). A
- *       version-20 save has no flag and would still offer it.
+ *       version-24 save has no flag and would still offer it.
+ *  26 — Flow 6's Kind A path (FLOW-CRD-03 steps 5–7): the bonded-warehouse
+ *       authorisation is answered by the office's system, requests record
+ *       whether the system or an officer answered, and the integration
+ *       carries what the simulated system does next. A version-25 save has
+ *       that offering on the queue and an integration with no setting, so
+ *       connecting the system would change nothing.
  */
-const SEED_VERSION = 21;
+const SEED_VERSION = 26;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -229,56 +263,36 @@ function appendAudit(
 }
 
 /**
- * Accepting an offer, whether directly or because an approver released it.
+ * Storing a credential that was accepted, by either route — what arrived
+ * goes into the organisation's held credentials, and anything it supersedes
+ * is marked (EW-FLOW6-SD §4.5).
  *
- * Shared rather than duplicated because the two paths must produce the same
- * result: the same credential in the wallet, the same audit row, differing
- * only in whether an approver is named on it. Two copies of this drift, and
- * the drift shows up as an audit trail that records approved operations
- * differently from automatic ones.
+ * One rule for both routes, in one place: same type, same issuer DID, both
+ * kept, the earlier one gets `supersededBy`. A requested offer and an unasked
+ * one used to decide this differently — one by a link set when the request
+ * was made, the other not at all — and a renewal accepted from the inbox
+ * left two credentials that both looked current.
  */
-function applyOfferAcceptance(
-  state: DemoState,
-  offerId: string,
-  approverId: string | null,
-): DemoState {
-  const offer = state.offers.find((o) => o.id === offerId);
-  if (!offer) return state;
-
-  const relation = state.relations.find(
-    (r) => r.personId === state.harness.persona && r.state === "ACTIVE",
-  );
-
-  return {
-    ...state,
-    offers: state.offers.map((o) => (o.id === offerId ? { ...o, state: "accepted" } : o)),
-    heldCredentials: [
-      {
-        id: rid("hc"),
-        type: offer.type,
-        issuer: offer.issuer,
-        issuerDid: offer.issuerDid,
-        issuerTrusted: offer.issuerTrusted,
-        /* Straight from the offer payload. The credential type and its
-           attributes are what was actually offered, never anything a user
-           typed — see the note at the top of demoData.ts. */
-        attributes: offer.attributes,
-        isFoundational: false,
-        receivedAt: today(),
-        expiresAt: offer.attributes.find((a) => a.name === "valid_until")?.value ?? null,
-        status: "active",
-      },
-      ...state.heldCredentials,
-    ],
-    auditEntries: appendAudit(state, {
-      operation: "credential:accept",
-      summary: `Accepted ${offer.type} from ${offer.issuer}`,
-      actorId: relation?.personId ?? state.harness.persona,
-      relationId: relation?.id ?? null,
-      scopeVersion: relation?.scope.version ?? null,
-      approvedById: approverId,
-    }),
-  };
+function storeAccepted(
+  held: HeldCredential[],
+  incoming: Omit<HeldCredential, "id" | "isFoundational" | "receivedAt" | "status" | "issuerTrusted">,
+): HeldCredential[] {
+  const id = rid("hc");
+  const orgId = incoming.orgId ?? PELDEN;
+  const older = supersedes(held, orgId, incoming.type, incoming.issuerDid);
+  return [
+    {
+      ...incoming,
+      id,
+      orgId: orgId === PELDEN ? undefined : orgId,
+      /* C2 passed a moment ago, or this wouldn't be stored. */
+      issuerTrusted: true,
+      isFoundational: false,
+      receivedAt: today(),
+      status: "active",
+    },
+    ...held.map((c) => (c.id === older?.id ? { ...c, supersededBy: id } : c)),
+  ];
 }
 
 /**
@@ -428,6 +442,141 @@ function activationChecks(s: DemoState, d: Designation): ActivationCheck[] {
 }
 
 const inDays = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+
+/** One row on SCR-CRD-10's delivery log, newest first, kept to the twelve it shows. */
+function withLogRow(i: IssuerIntegration, event: string, status: number, attempt = 1): IssuerIntegration {
+  return {
+    ...i,
+    log: [{ id: rid("evt"), event, attempt, status, latencyMs: 90 + Math.floor(Math.random() * 150), at: today() }, ...i.log].slice(0, 12),
+  };
+}
+
+/**
+ * FLOW-CRD-03 step 5 — a request has reached the issuer. An offering the
+ * system answers goes to it only if the issuer has set it up (P3); until
+ * then it lands on the officers' queue, which is what SCR-CRD-10 says before
+ * anything is set up. Once set up, the event is delivered and the log says
+ * so — a 503 for the simulated miss (E6), which also raises the failing
+ * banner. `nextAnswer` is what the dashed stand-in chose, used once.
+ */
+function routeToIssuer(
+  integration: IssuerIntegration,
+  offering: CredentialOffering | undefined,
+  issuerOrgId: string,
+): { system: SystemRoute | null; integration: IssuerIntegration } {
+  if (offering?.answering !== "api" || integration.orgId !== issuerOrgId) return { system: null, integration };
+  if (!systemConnected(integration)) return { system: { state: "UNCONNECTED", plan: "answer", note: null }, integration };
+  const plan = integration.nextAnswer;
+  const used = { ...integration, nextAnswer: "answer" as const };
+  return {
+    system: { state: "WAITING", plan, note: null },
+    integration:
+      plan === "miss"
+        ? { ...withLogRow(used, "credential-request.received", 503), failingSince: used.failingSince ?? today(), lastError: "HTTP 503" }
+        : withLogRow(used, "credential-request.received", 200),
+  };
+}
+
+/**
+ * The issuer's system answering (FLOW-CRD-03 steps 6–7; A2, E6, E10).
+ *
+ * Run when the short delay after delivery ends, doing what the stand-in
+ * chose: offer the values the system supplies, refer with a note, or not pick
+ * the request up at all. `force` is the other stand-in — the system answering
+ * a request an officer already has open, which is how the first answer wins
+ * is shown. An offer is recorded against the first client the issuer created
+ * (Q1, Q4) and nothing about it is an officer's; the business still reviews
+ * and accepts by hand (D3). A request past `answerBy` is refused (410), and
+ * one an officer already answered is no longer `WITH_ISSUER` (409), so
+ * neither changes.
+ */
+function systemAnswers(s: DemoState, requestId: string, force = false): DemoState {
+  const r = s.credentialRequests.find((x) => x.id === requestId);
+  if (!r || r.state !== "WITH_ISSUER" || !r.system) return s;
+  if (!force && r.system.state !== "WAITING") return s;
+  if (r.answerBy && r.answerBy < today()) return s;
+  const offering = s.offerings.find((o) => o.id === r.offeringId);
+  const client = s.integration.clients[0];
+  const plan = force ? "answer" : r.system.plan;
+  const patch = (x: CredentialRequest, change: Partial<CredentialRequest>) => (x.id === requestId ? { ...x, ...change } : x);
+  const note = (text: string, orgId: string) => ({ id: rid("a"), text, at: today(), orgId });
+
+  if (plan === "refer")
+    return {
+      ...s,
+      credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "REFERRED", note: SAMPLE_REFERRAL_NOTE } })),
+      activity: [note(`Your system couldn't decide a request for ${r.credential}. It's on Requests to answer`, r.issuerOrgId), ...s.activity].slice(0, 20),
+    };
+  if (plan === "miss" || !client)
+    return { ...s, credentialRequests: s.credentialRequests.map((x) => patch(x, { system: { ...r.system!, state: "MISSED" } })) };
+
+  return {
+    ...s,
+    credentialRequests: s.credentialRequests.map((x) =>
+      patch(x, {
+        state: "OFFER_READY",
+        answeredBy: null,
+        answeredBySystem: { clientId: client.id, name: client.name },
+        answeredAt: today(),
+        /* The values the system supplies: the offering's examples, since no
+           register exists to look them up in. */
+        offer: {
+          attributes: (offering?.fields ?? []).map((f) => ({ name: f.name, value: f.example })),
+          validUntil: null,
+          offeredAt: today(),
+          expiresAt: inDays(30),
+        },
+      }),
+    ),
+    activity: [
+      note(`${r.issuerName} has replied — review it`, r.orgId),
+      note(`Your system answered a request for ${r.credential}`, r.issuerOrgId),
+      ...s.activity,
+    ].slice(0, 20),
+  };
+}
+
+/**
+ * Whether the person driving owns an issuing office — what changing its
+ * offerings and integration needs (SCR-CRD-07, SCR-CRD-10). Answering
+ * requests needs only membership (OrgRoles.ISSUER), checked where it's done.
+ */
+function issuerOwner(s: DemoState, orgId: string): boolean {
+  const org = s.organizations.find((o) => o.id === orgId);
+  return org?.roles?.[s.harness.persona] === "Owner";
+}
+
+/**
+ * Whether a person may run an operation for an organisation — read from
+ * their ACTIVE relation's scope, the way the server would (FLOW-CRD-01 P2).
+ * The screens ask this to grey a button with its reason; the store asks it
+ * again before doing anything, because the screen is not the boundary.
+ *
+ * The whole grant is read, not only its operation: the scope has to be in
+ * force today, and when a credential type is given the grant has to cover
+ * it. Every preset leaves accepting unfiltered (EW-FLOW3-SD §4.2), but a
+ * grant may still name types — Rinzin may present exactly one kind. A
+ * grant that needs an approver is not a yes here. No preset puts one on
+ * receiving or accepting, and parking one for an approver isn't
+ * built for credentials, so it's refused rather than waved through.
+ */
+function mayOperate(s: DemoState, personId: string, orgId: string, op: string, credentialType?: string): boolean {
+  const now = today();
+  return s.relations.some(
+    (r) =>
+      r.personId === personId &&
+      (r.orgId ?? PELDEN) === orgId &&
+      r.state === "ACTIVE" &&
+      r.scope.validFrom <= now &&
+      (r.scope.validUntil === null || r.scope.validUntil >= now) &&
+      r.scope.grants.some(
+        (g) =>
+          g.operation === op &&
+          g.approval === "AUTO" &&
+          (!credentialType || g.credentialTypes.mode === "any" || g.credentialTypes.values.includes(credentialType)),
+      ),
+  );
+}
 
 /**
  * A DID shaped like the method it claims to be.
@@ -868,14 +1017,8 @@ interface DemoActions {
   declineRelation: (id: string, reason: string) => void;
 
   /* ---- The holder's daily loop (Pattern A) ----
-     Accepting what the entity is offered, presenting what it is asked for,
-     and the approval gate that sits between the two. */
-
-  /** Takes an offered credential into the entity's wallet. */
-  acceptOffer: (id: string) => void;
-  declineOffer: (id: string) => void;
-  /** Sends an offer to the approval queue instead of accepting it outright. */
-  parkOffer: (id: string) => void;
+     Presenting what the entity is asked for, and the approval gate in front
+     of it. Accepting what it is offered is Flow 6's, below: it never parks. */
 
   /** Sends a presentation, disclosing exactly these attributes. */
   presentProof: (requestId: string, attributes: string[]) => void;
@@ -1260,6 +1403,61 @@ interface DemoActions {
   /** SCR-ADO-04 Option B — stop an entity type (A2): its adoption set and authorisation. Nothing is un-verified. */
   stopEntityType: (designationId: string, entityType: OrgKind) => { ok: true } | { ok: false; error: "not_owner" };
 
+  /* ---- Receiving a credential (Flow 6) ----
+     The holder's side (FLOW-CRD-01, -02) and the issuer's (FLOW-CRD-03).
+     Every precondition and who-may is decided here; the screens render. */
+
+  /** Whether the person driving may run an operation for an organisation (P2). */
+  mayOperate: (orgId: string, op: "credential:receive" | "credential:accept" | "credential:list", credentialType?: string) => boolean;
+  /** SCR-CRD-02 — one consent: share the prerequisite whole, and ask. P1–P5. */
+  askForCredential: (
+    offeringId: string,
+  ) => { ok: true; id: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E5" | "E5_held" | "not_eligible" };
+  /** The organisation's agent presents the prerequisite; the issuer verifies it (steps 4–8). Simulated. */
+  deliverPrerequisite: (requestId: string) => void;
+  /** Prototype — the issuer's proof request asks for more than the consent (A1). Only before anything is presented. */
+  simulateAskForMore: (requestId: string) => void;
+  /** SCR-CRD-06 — share the wider prerequisite too, or don't (and the request is withdrawn). */
+  answerAskForMore: (requestId: string, share: boolean) => void;
+  /** SCR-CRD-03 — withdraw before an offer arrives (A2). */
+  withdrawCredentialRequest: (requestId: string) => void;
+  /** SCR-CRD-09 — the issuer's officer issues. E10 if someone already answered. */
+  issueOnRequest: (
+    requestId: string,
+    attributes: CredentialAttribute[],
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
+  /** SCR-CRD-09 — decline, with a reason code and a message the business reads verbatim (A1). */
+  declineOnRequest: (
+    requestId: string,
+    code: string,
+    message: string,
+  ) => { ok: true } | { ok: false; error: "E7" | "E10" | "not_issuer" | "with_system" };
+  /**
+   * SCR-CRD-04 — accept what arrived: an offer answering a request
+   * (FLOW-CRD-01 step 11) or one sent unasked (FLOW-CRD-02 step 4), by the
+   * request's or the inbox item's id. C2 is run again first (E19 / E9).
+   */
+  acceptCredentialOffer: (
+    id: string,
+  ) => { ok: true } | { ok: false; error: "not_permitted" | "E13" | "E19_delisted" | "E19_unreachable" | "invalid" };
+  /** SCR-CRD-04 — decline it (FLOW-CRD-01 A3, FLOW-CRD-02 A1). Nothing is added. */
+  declineCredentialOffer: (id: string) => void;
+  /** Prototype — what re-running C2 at acceptance will find: the issuer delisted, or NDI's list out of reach (E19). */
+  simulateIssuerRecheck: (id: string, outcome: "delisted" | "unreachable") => void;
+  /** SCR-CRD-07 — pause, resume or retire an offering, or publish a new version of it. */
+  setOfferingStatus: (offeringId: string, status: "ACTIVE" | "PAUSED" | "RETIRED") => void;
+  publishOfferingVersion: (offeringId: string, changes: { uses: string[]; answerWindowDays: number; renewable: boolean }) => void;
+  /** SCR-CRD-10 — the integration lead's settings. */
+  setWebhook: (url: string) => void;
+  rotateSecret: () => void;
+  createClient: (name: string) => void;
+  setQueueFallback: (on: boolean) => void;
+  sendTestEvent: () => void;
+  /** Prototype — SCR-CRD-10's dashed stand-in: what the simulated system does with the next request (A2, E6). */
+  setSystemNextAnswer: (next: IssuerIntegration["nextAnswer"]) => void;
+  /** Prototype — SCR-CRD-09's dashed stand-in: the system answers a request an officer has open, so the first answer wins (E10). */
+  simulateSystemAnswer: (requestId: string) => void;
+
   /* ---- Demo harness ----
      Not product surface. These drive the persona switcher, the story runner
      and the state switcher, which are what make the demo runnable by someone
@@ -1396,6 +1594,34 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     });
   }, [state.designations, hydrated]);
 
+  /* FLOW-CRD-01 E10/E13, FLOW-CRD-03 E4 — a request whose date has passed
+     ends on that date (see crdEnding), for the lists, the inbox and the
+     store's own checks at once. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.credentialRequests.some((r) => crdEnding(r, now))) return;
+    setState((s) => ({
+      ...s,
+      credentialRequests: s.credentialRequests.map((r) => {
+        const ending = crdEnding(r, now);
+        return ending ? { ...r, state: ending.state, failReason: ending.failReason, consentBy: null } : r;
+      }),
+    }));
+  }, [state.credentialRequests, hydrated]);
+
+  /* FLOW-CRD-02 E4 — an offer sent unasked that nobody accepted in 30 days
+     lapses on its date, the same way. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.offers.some((o) => o.state === "pending" && o.expiresAt < now)) return;
+    setState((s) => ({
+      ...s,
+      offers: s.offers.map((o) => (o.state === "pending" && o.expiresAt < now ? { ...o, state: "expired" as const } : o)),
+    }));
+  }, [state.offers, hydrated]);
+
   useEffect(() => {
     if (!hydrated) return;
     try {
@@ -1404,6 +1630,23 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       /* Over quota or private mode — the demo still works for this session. */
     }
   }, [state, hydrated]);
+
+  /* FLOW-CRD-03 steps 5–7, Kind A: the issuer's system answers a delivered
+     request a moment later. There's no server to do it, so a timer does —
+     here rather than on a screen, because the system answers whoever is
+     looking and wherever they are. Simulated; on the what's-real page. */
+  const awaitingSystem = state.credentialRequests
+    .filter((r) => r.state === "WITH_ISSUER" && r.system?.state === "WAITING")
+    .map((r) => r.id)
+    .join("|");
+  useEffect(() => {
+    if (!hydrated || !awaitingSystem) return;
+    const t = window.setTimeout(
+      () => setState((s) => awaitingSystem.split("|").reduce((next, id) => systemAnswers(next, id), s)),
+      SYSTEM_ANSWER_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [awaitingSystem, hydrated]);
 
   /* Each entry belongs to the organisation it happened in — the one being
      worked in, unless the caller names another. The feed on a dashboard is
@@ -2002,51 +2245,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ),
         })),
 
-      acceptOffer: (id) =>
-        setState((s) => applyOfferAcceptance(s, id, null)),
-
-      declineOffer: (id) =>
-        setState((s) => ({
-          ...s,
-          offers: s.offers.map((o) => (o.id === id ? { ...o, state: "declined" } : o)),
-        })),
-
-      parkOffer: (id) =>
-        setState((s) => {
-          const offer = s.offers.find((o) => o.id === id);
-          if (!offer) return s;
-          const relation = s.relations.find(
-            (r) => r.personId === s.harness.persona && r.state === "ACTIVE",
-          );
-          return {
-            ...s,
-            offers: s.offers.map((o) => (o.id === id ? { ...o, state: "parked" } : o)),
-            parkedOperations: [
-              {
-                id: rid("park"),
-                operation: "credential:accept" as const,
-                summary: `Accept ${offer.type} from ${offer.issuer}`,
-                requestedBy: s.harness.persona,
-                relationId: relation?.id ?? "rel-rinzin",
-                scopeVersion: relation?.scope.version ?? 1,
-                targetId: offer.id,
-                targetRelyingParty: null,
-                payloadHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random()
-                  .toString(16)
-                  .slice(2, 10)}`,
-                policy: "SINGLE_APPROVER" as const,
-                requiredSignatures: 1,
-                signatures: [],
-                state: "parked" as const,
-                decisionReason: null,
-                createdAt: today(),
-                expiresAt: offer.expiresAt,
-              },
-              ...s.parkedOperations,
-            ],
-          };
-        }),
-
       presentProof: (requestId, attributes) =>
         setState((s) => applyPresentation(s, requestId, attributes, null)),
 
@@ -2151,9 +2349,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           }
 
           const approver = s.harness.persona;
-          if (operation.operation === "credential:accept" && operation.targetId) {
-            next = applyOfferAcceptance(next, operation.targetId, approver);
-          } else if (operation.operation === "proof:present" && operation.targetId) {
+          /* Only presentations park. Accepting an offer never does — every
+             preset carries credential:accept AUTO (EW-FLOW6-SD §5.3). */
+          if (operation.operation === "proof:present" && operation.targetId) {
             const request = next.verificationRequests.find(
               (v) => v.id === operation.targetId,
             );
@@ -2197,11 +2395,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             /* The held thing goes back to being undecided rather than
                vanishing: a rejected approval is the approver's answer, not
                the end of the relying party's request. */
-            offers: s.offers.map((o) =>
-              o.id === operation.targetId && o.state === "parked"
-                ? { ...o, state: "pending" }
-                : o,
-            ),
             verificationRequests: s.verificationRequests.map((v) =>
               v.id === operation.targetId && v.state === "parked"
                 ? { ...v, state: "ready" }
@@ -4417,6 +4610,413 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         log(`Adopted what people will be asked — version ${version}`, org.id);
         return { ok: true, version };
       },
+
+      mayOperate: (orgId, op, credentialType) => {
+        const s0 = stateRef.current;
+        return mayOperate(s0, s0.harness.persona, orgId, op, credentialType);
+      },
+
+      askForCredential: (offeringId) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const offering = s0.offerings.find((o) => o.id === offeringId);
+        /* P1 — a verified holder. The option is absent otherwise (E1). */
+        if (!org || !org.capabilities.includes("holder")) return { ok: false, error: "E1" };
+        /* P2 — the asker's preset carries credential:receive (E2). */
+        if (!mayOperate(s0, s0.harness.persona, org.id, "credential:receive", offering?.credential)) return { ok: false, error: "E2" };
+        /* P3 — still offered, and the issuer may still issue it (E3). */
+        if (!offering || offering.status !== "ACTIVE" || !offering.covered) return { ok: false, error: "E3" };
+        /* And offered to this kind of business. The catalogue only lists what
+           is, but a direct link reaches any offering, so it's checked here. */
+        if (!offering.eligibleKinds.includes(org.kind ?? "company")) return { ok: false, error: "not_eligible" };
+        /* Only what can be shared counts: a superseded credential is the
+           record, not something presented. */
+        const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active" && !c.supersededBy);
+        /* P4 — the prerequisite is held (E4). */
+        if (!held.some((c) => c.type === offering.prerequisite.credential)) return { ok: false, error: "E4" };
+        /* P5 — nothing in flight, and not held unless renewable (E5). The
+           two halves are told apart: one is "here's where it stands", the
+           other "your organisation already has this". */
+        if (s0.credentialRequests.some((r) => r.orgId === org.id && r.offeringId === offeringId && requestInFlight(r)))
+          return { ok: false, error: "E5" };
+        if (!offering.renewable && held.some((c) => c.type === offering.credential)) return { ok: false, error: "E5_held" };
+        const id = rid("crq");
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const isRoot = s0.relations.some(
+          (r) => r.personId === s0.harness.persona && (r.orgId ?? PELDEN) === org.id && r.isRootAuthority && r.state === "ACTIVE",
+        );
+        setState((s) => ({
+          ...s,
+          credentialRequests: [
+            {
+              id,
+              orgId: org.id,
+              offeringId,
+              offeringVersion: offering.version,
+              credential: offering.credential,
+              issuerName: offering.issuerName,
+              issuerOrgId: offering.issuerOrgId,
+              requestedBy: s.harness.persona,
+              requestedAt: today(),
+              state: "AWAITING_PROOF",
+              consented: offering.prerequisite,
+              askedMore: null,
+              consentBy: null,
+              answerBy: null,
+              declined: null,
+              offer: null,
+              answeredBy: null,
+              answeredAt: null,
+              failReason: null,
+            },
+            ...s.credentialRequests,
+          ],
+        }));
+        log(`Asked ${offering.issuerName} for ${offering.credential}`, org.id);
+        /* UXD-39 — a request made by anyone but the Root tells the Root at
+           once; it doesn't wait for the Root's approval. */
+        if (!isRoot)
+          log(
+            `${me?.name ?? "Someone"} asked ${offering.issuerName} for your ${offering.credential} and shared your ${offering.prerequisite.credential}`,
+            org.id,
+          );
+        return { ok: true, id };
+      },
+
+      deliverPrerequisite: (requestId) =>
+        setState((s) => {
+          const r = s.credentialRequests.find((x) => x.id === requestId);
+          const offering = s.offerings.find((o) => o.id === r?.offeringId);
+          if (!r || r.state !== "AWAITING_PROOF") return s;
+          /* E16 — the presentation runs on the requester's credential:receive,
+             re-checked as it runs (DA-CORE §5 step 3). If their relation has
+             ended, nothing is presented: the request is withdrawn and the
+             Root told. After this point nothing more runs on their authority. */
+          if (!mayOperate(s, r.requestedBy, r.orgId, "credential:receive", r.credential)) {
+            const who = s.people.find((p) => p.id === r.requestedBy)?.name ?? "The person who asked";
+            const org = s.organizations.find((o) => o.id === r.orgId);
+            const failReason = `This request was withdrawn because ${who} can no longer act for ${org ? shortOrgName(org.name) : "your organisation"}. Nothing was shared. You can ask again.`;
+            return {
+              ...s,
+              credentialRequests: s.credentialRequests.map((x) =>
+                x.id === requestId ? { ...x, state: "WITHDRAWN" as const, failCode: "REQUESTER_ENDED" as const, failReason } : x,
+              ),
+              activity: [{ id: rid("a"), text: failReason, at: today(), orgId: r.orgId }, ...s.activity].slice(0, 20),
+            };
+          }
+          /* Step 5 — an offering the system answers is delivered to it. */
+          const route = routeToIssuer(s.integration, offering, r.issuerOrgId);
+          return {
+            ...s,
+            integration: route.integration,
+            credentialRequests: s.credentialRequests.map((x) =>
+              x.id === requestId
+                ? { ...x, state: "WITH_ISSUER" as const, answerBy: inDays(offering?.answerWindowDays ?? 5), system: route.system }
+                : x,
+            ),
+          };
+        }),
+
+      /* NEEDS_CONSENT is reached only from AWAITING_PROOF, before anything
+         is presented (EW-FLOW6-SD §5.1, D10). Once the prerequisite has gone
+         the request's one use is spent: a later proof request isn't part of
+         it, so a request with the issuer can't be asked for more. */
+      simulateAskForMore: (requestId) =>
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId && x.state === "AWAITING_PROOF"
+              ? {
+                  ...x,
+                  state: "NEEDS_CONSENT" as const,
+                  askedMore: { credential: "Bank account", items: ["Account holder", "Account number", "Bank"] },
+                  consentBy: inDays(7),
+                }
+              : x,
+          ),
+        })),
+
+      answerAskForMore: (requestId, share) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        if (!r || r.state !== "NEEDS_CONSENT") return;
+        /* E4 — past the date the issuer stopped waiting, there's nothing left to answer. */
+        if (crdEnding(r, today())) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id !== requestId
+              ? x
+              : share
+                ? /* What was shared beyond the first consent is recorded with the
+                     request, so the record and the officer's panel both show it. */
+                  { ...x, state: "AWAITING_PROOF" as const, consentBy: null, alsoShared: x.askedMore }
+                : { ...x, state: "WITHDRAWN" as const, consentBy: null },
+          ),
+        }));
+        log(share ? `Agreed to share more with ${r.issuerName}` : `Withdrew the request to ${r.issuerName}`, r.orgId);
+      },
+
+      withdrawCredentialRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        /* A2 — whoever may ask may withdraw, until the issuer has replied. */
+        if (!r || !["AWAITING_PROOF", "NEEDS_CONSENT", "WITH_ISSUER"].includes(r.state)) return;
+        if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:receive", r.credential)) return;
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) => (x.id === requestId ? { ...x, state: "WITHDRAWN" as const } : x)),
+        }));
+        log(`Withdrew the request to ${r.issuerName} for ${r.credential}`, r.orgId);
+      },
+
+      issueOnRequest: (requestId, attributes) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        /* The OrgRoles.ISSUER user role in the issuer's own organisation. */
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        /* Not on the queue: the system has it, and an officer answers only
+           what the queue shows (E6 with fallback off). */
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
+        if (r.answerBy && r.answerBy < today()) return { ok: false, error: "E7" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? {
+                  ...x,
+                  state: "OFFER_READY" as const,
+                  answeredBy: s.harness.persona,
+                  answeredAt: today(),
+                  offer: { attributes, validUntil: null, offeredAt: today(), expiresAt: inDays(30) },
+                }
+              : x,
+          ),
+        }));
+        log(`Issued ${r.credential} on request`, issuer.id);
+        log(`${r.issuerName} has replied — review it`, r.orgId);
+        return { ok: true };
+      },
+
+      declineOnRequest: (requestId, code, message) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === requestId);
+        const issuer = s0.organizations.find((o) => o.id === r?.issuerOrgId);
+        if (!r || !issuer || !issuer.memberIds.includes(s0.harness.persona)) return { ok: false, error: "not_issuer" };
+        if (r.state !== "WITH_ISSUER") return { ok: false, error: "E10" };
+        if (!inOfficerQueue(r, s0.integration.queueFallback)) return { ok: false, error: "with_system" };
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === requestId
+              ? { ...x, state: "DECLINED_BY_ISSUER" as const, answeredBy: s.harness.persona, answeredAt: today(), declined: { code, message: message.trim() } }
+              : x,
+          ),
+        }));
+        log(`Declined a request for ${r.credential}`, issuer.id);
+        return { ok: true };
+      },
+
+      acceptCredentialOffer: (id) => {
+        const s0 = stateRef.current;
+        const now = today();
+        const r = s0.credentialRequests.find((x) => x.id === id);
+        const o = r ? undefined : s0.offers.find((x) => x.id === id);
+        /* The two routes differ only in where the offer is kept: a request
+           (FLOW-CRD-01) or the inbox (FLOW-CRD-02). Everything else — who
+           may accept, the expiry, C2 run again, storing and superseding,
+           the audit row — is the same, because SCR-CRD-04 is the same. */
+        const item = r
+          ? r.state === "OFFER_READY" && r.offer
+            ? { orgId: r.orgId, type: r.credential, issuer: r.issuerName, recheck: r.simulatedRecheck, expiresAt: r.offer.expiresAt }
+            : null
+          : o && o.state === "pending"
+            ? { orgId: o.orgId ?? PELDEN, type: o.type, issuer: o.issuer, recheck: o.simulatedRecheck, expiresAt: o.expiresAt }
+            : null;
+        if (!item) return { ok: false, error: "invalid" };
+        if (!mayOperate(s0, s0.harness.persona, item.orgId, "credential:accept", item.type)) return { ok: false, error: "not_permitted" };
+        const patch = (change: { state: string; failReason?: string | null; failCode?: string | null; simulatedRecheck?: null }) =>
+          setState((s) => ({
+            ...s,
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? ({ ...x, ...change } as typeof x) : x)),
+            offers: s.offers.map((x) => (x.id === id ? ({ ...x, ...change } as typeof x) : x)),
+          }));
+        /* E13 / FLOW-CRD-02 E4 — 30 days have passed. */
+        if (item.expiresAt < now) {
+          patch(
+            r
+              ? { state: "EXPIRED", failReason: `This offer from ${item.issuer} expired. You can ask again.` }
+              : { state: "expired" },
+          );
+          return { ok: false, error: "E13" };
+        }
+        /* C2 again, at the moment of accepting (FLOW-CRD-01 step 11, E19;
+           FLOW-CRD-02 step 4, E9). Unreachable is a pause: nothing is sent
+           and the offer waits. Delisted is a refusal: the offer is declined
+           and the issuer told. */
+        if (item.recheck === "unreachable") {
+          /* The list answers again next time — the prototype's way of
+             letting Try again succeed. */
+          patch({ state: r ? "OFFER_READY" : "pending", simulatedRecheck: null });
+          return { ok: false, error: "E19_unreachable" };
+        }
+        if (item.recheck === "delisted") {
+          const failReason = `${item.issuer} is no longer on NDI's list of trusted organisations, so this can't be added.`;
+          patch({ state: r ? "FAILED" : "failed", failReason, failCode: "ISSUER_NOT_TRUSTED", simulatedRecheck: null });
+          log(`${item.type} from ${item.issuer} wasn't added: ${item.issuer} is no longer on NDI's list of trusted organisations`, item.orgId);
+          return { ok: false, error: "E19_delisted" };
+        }
+        const issuerDid = r ? (s0.organizations.find((x) => x.id === r.issuerOrgId)?.publicDid ?? "") : (o?.issuerDid ?? "");
+        const attributes = r?.offer?.attributes ?? o?.attributes ?? [];
+        const validUntil = r ? (r.offer?.validUntil ?? null) : (o?.attributes.find((a) => a.name === "valid_until")?.value ?? null);
+        setState((s) => {
+          const relation = s.relations.find(
+            (x) => x.personId === s.harness.persona && (x.orgId ?? PELDEN) === item.orgId && x.state === "ACTIVE",
+          );
+          return {
+            ...s,
+            heldCredentials: storeAccepted(s.heldCredentials, {
+              orgId: item.orgId,
+              type: item.type,
+              issuer: item.issuer,
+              issuerDid,
+              attributes,
+              expiresAt: validUntil,
+            }),
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? { ...x, state: "ISSUED" as const } : x)),
+            /* Q2 — the inbox item is closed as accepted, with the accepter. */
+            offers: s.offers.map((x) =>
+              x.id === id ? { ...x, state: "accepted" as const, decidedBy: s.harness.persona, decidedAt: now } : x,
+            ),
+            /* Step 9 — the issuer's system is told what it answered was
+               issued (Q3). Only a system's answer: an officer's isn't
+               delivered to a webhook. */
+            integration: r?.answeredBySystem ? withLogRow(s.integration, "credential-request.issued", 200) : s.integration,
+            auditEntries: appendAudit(s, {
+              operation: "credential:accept",
+              summary: `Accepted ${item.type} from ${item.issuer}`,
+              actorId: s.harness.persona,
+              relationId: relation?.id ?? null,
+              scopeVersion: relation?.scope.version ?? null,
+            }),
+          };
+        });
+        log(`Added ${item.type} from ${item.issuer} to your credentials`, item.orgId);
+        return { ok: true };
+      },
+
+      declineCredentialOffer: (id) => {
+        const s0 = stateRef.current;
+        const r = s0.credentialRequests.find((x) => x.id === id);
+        const o = r ? undefined : s0.offers.find((x) => x.id === id);
+        if (r) {
+          if (r.state !== "OFFER_READY") return;
+          if (!mayOperate(s0, s0.harness.persona, r.orgId, "credential:accept", r.credential)) return;
+          setState((s) => ({
+            ...s,
+            credentialRequests: s.credentialRequests.map((x) => (x.id === id ? { ...x, state: "DECLINED_BY_HOLDER" as const } : x)),
+          }));
+          log(`Declined ${r.credential} from ${r.issuerName}. Nothing was added`, r.orgId);
+          return;
+        }
+        /* FLOW-CRD-02 A1 — declined with a problem report; the issuer is told. */
+        if (!o || o.state !== "pending") return;
+        const orgId = o.orgId ?? PELDEN;
+        if (!mayOperate(s0, s0.harness.persona, orgId, "credential:accept", o.type)) return;
+        setState((s) => ({
+          ...s,
+          offers: s.offers.map((x) => (x.id === id ? { ...x, state: "declined" as const, decidedBy: s.harness.persona, decidedAt: today() } : x)),
+        }));
+        log(`Declined ${o.type} from ${o.issuer}. Nothing was added`, orgId);
+      },
+
+      simulateIssuerRecheck: (id, outcome) =>
+        setState((s) => ({
+          ...s,
+          credentialRequests: s.credentialRequests.map((x) =>
+            x.id === id && x.state === "OFFER_READY" ? { ...x, simulatedRecheck: outcome } : x,
+          ),
+          offers: s.offers.map((x) => (x.id === id && x.state === "pending" ? { ...x, simulatedRecheck: outcome } : x)),
+        })),
+
+      setOfferingStatus: (offeringId, status) => {
+        const s0 = stateRef.current;
+        const o = s0.offerings.find((x) => x.id === offeringId);
+        if (!o || !issuerOwner(s0, o.issuerOrgId)) return;
+        setState((s) => ({ ...s, offerings: s.offerings.map((x) => (x.id === offeringId ? { ...x, status } : x)) }));
+        log(`${status === "PAUSED" ? "Paused" : status === "RETIRED" ? "Retired" : "Resumed"} ${o.credential}`, o.issuerOrgId);
+      },
+
+      publishOfferingVersion: (offeringId, changes) => {
+        const s0 = stateRef.current;
+        const o0 = s0.offerings.find((x) => x.id === offeringId);
+        if (!o0 || !issuerOwner(s0, o0.issuerOrgId)) return;
+        log(`Published version ${o0.version + 1} of ${o0.credential}`, o0.issuerOrgId);
+        setState((s) => ({
+          ...s,
+          offerings: s.offerings.map((o) =>
+            o.id === offeringId
+              ? {
+                  ...o,
+                  version: o.version + 1,
+                  answerWindowDays: changes.answerWindowDays,
+                  renewable: changes.renewable,
+                  prerequisite: { ...o.prerequisite, uses: changes.uses },
+                }
+              : o,
+          ),
+        }));
+      },
+
+      setWebhook: (url) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, webhookUrl: url.trim() || null, secretRotatedAt: s.integration.secretRotatedAt ?? today() } })),
+
+      rotateSecret: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, secretRotatedAt: today() } })),
+
+      createClient: (name) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({
+          ...s,
+          integration: { ...s.integration, clients: [...s.integration.clients, { id: rid("cli"), name: name.trim(), createdAt: today() }] },
+        })),
+
+      setQueueFallback: (on) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, queueFallback: on } })),
+
+      sendTestEvent: () =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => {
+          /* A delivery that works again hands over what it missed (E5, E6):
+             the system gets those requests now and answers them, unless an
+             officer got there first. */
+          const missed = s.integration.failingSince
+            ? s.credentialRequests.filter((x) => x.state === "WITH_ISSUER" && x.system?.state === "MISSED").map((x) => x.id)
+            : [];
+          let integration = withLogRow({ ...s.integration, failingSince: null, lastError: null }, "test.ping", 200);
+          missed.forEach(() => {
+            integration = withLogRow(integration, "credential-request.received", 200, 2);
+          });
+          return {
+            ...s,
+            integration,
+            credentialRequests: s.credentialRequests.map((x) =>
+              missed.includes(x.id) && x.system ? { ...x, system: { ...x.system, state: "WAITING" as const, plan: "answer" as const } } : x,
+            ),
+          };
+        }),
+
+      setSystemNextAnswer: (next) =>
+        issuerOwner(stateRef.current, stateRef.current.integration.orgId) &&
+        setState((s) => ({ ...s, integration: { ...s.integration, nextAnswer: next } })),
+
+      simulateSystemAnswer: (requestId) => setState((s) => (systemConnected(s.integration) ? systemAnswers(s, requestId, true) : s)),
 
       stopEntityType: (designationId, entityType) => {
         const s0 = stateRef.current;

@@ -72,3 +72,11 @@ export const SKIP_AFTER_MS = 900;
  * for anyone who does not want to wait, and for keyboard users.
  */
 export const AUTO_ADVANCE_MS = 2200;
+
+/**
+ * How long the issuer's own system takes to answer a request once it has been
+ * delivered (FLOW-CRD-03 Kind A). Longer than a round trip, because there's a
+ * lookup behind it, and short enough that someone waiting on the request page
+ * sees the answer arrive without wondering whether it will.
+ */
+export const SYSTEM_ANSWER_MS = 3000;

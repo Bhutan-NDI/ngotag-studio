@@ -1,14 +1,8 @@
-import type { Metadata } from "next";
+/* An offer's old page (B4). Its id is the inbox item's, which SCR-CRD-04
+   opens at the same address as a request (FLOW-CRD-02 step 4). */
+import { redirect } from "next/navigation";
 
-import { OfferDetailView } from "@/features/wallet/OfferDetailView";
-
-export const metadata: Metadata = { title: "Credential offer — NDI Studio" };
-
-export default async function OfferDetailPage({
-  params,
-}: {
-  params: Promise<{ offerId: string }>;
-}) {
+export default async function OfferRedirectPage({ params }: { params: Promise<{ offerId: string }> }): Promise<never> {
   const { offerId } = await params;
-  return <OfferDetailView offerId={decodeURIComponent(offerId)} />;
+  redirect(`/wallet/requests/${encodeURIComponent(decodeURIComponent(offerId))}`);
 }

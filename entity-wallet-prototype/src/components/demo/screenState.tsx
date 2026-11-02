@@ -63,7 +63,7 @@ export function useScreenRegistry(): RegistryValue {
  * Declare a screen's states and get the one to render.
  *
  * ```ts
- * const state = useScreenState("B4", ["reviewable", "out_of_scope", "parked", "accepted"]);
+ * const state = useScreenState("SCR-CRD-04", ["live", "default", "done", "no_permission"]);
  * ```
  *
  * The first entry is the screen's natural state — what it shows when nobody

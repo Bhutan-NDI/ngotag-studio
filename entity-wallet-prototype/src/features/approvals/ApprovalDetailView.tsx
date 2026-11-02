@@ -55,7 +55,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   const {
     parkedOperations,
     verificationRequests,
-    offers,
     relations,
     personById,
     harness,
@@ -110,9 +109,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
   /* Whatever this is holding back, so its substance can be shown. */
   const request = operation.targetId
     ? verificationRequests.find((v) => v.id === operation.targetId)
-    : undefined;
-  const offer = operation.targetId
-    ? offers.find((o) => o.id === operation.targetId)
     : undefined;
 
   const disclosing = request?.disclosing ?? request?.requiredAttributes ?? [];
@@ -300,34 +296,6 @@ export function ApprovalDetailView({ operationId }: { operationId: string }) {
               Struck through means it was asked for and withheld. You are
               approving the disclosure on the left, not the request.
             </p>
-          </Panel>
-        ) : null}
-
-        {offer ? (
-          <Panel>
-            <div className="relative z-[4] flex flex-col gap-1">
-              <h2 className="font-display text-[15px] font-semibold text-strong">
-                What would be accepted
-              </h2>
-              <p className="text-[12.5px] leading-[1.5] text-faint">
-                Offered by {offer.issuer}, read from the offer payload.
-              </p>
-            </div>
-            <ul className="relative z-[4] mt-3 flex flex-col">
-              {offer.attributes.map((attribute, i) => (
-                <li
-                  key={attribute.name}
-                  className={`grid gap-0.5 py-2 min-[521px]:grid-cols-[200px_1fr] min-[521px]:gap-6 ${
-                    i > 0 ? "border-t border-subtle" : ""
-                  }`}
-                >
-                  <span className="text-[12.5px] text-faint">
-                    {attribute.name.replace(/_/g, " ")}
-                  </span>
-                  <span className="text-[13px] text-body">{attribute.value}</span>
-                </li>
-              ))}
-            </ul>
           </Panel>
         ) : null}
 

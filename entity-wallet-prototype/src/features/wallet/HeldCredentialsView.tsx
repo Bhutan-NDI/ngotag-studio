@@ -1,13 +1,21 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
 import { CredentialCard } from "@/components/ui/CredentialCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GradientButton } from "@/components/ui/GradientButton";
+import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { inOrg } from "@/lib/demoData";
+import { Tabs } from "@/components/ui/Tabs";
+import { Icon } from "@/components/ui/icons";
+import { attrLabel, issuerInline, requestWords } from "@/features/receive/shared";
+import { inOrg, type CredentialOffer, type HeldCredential } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
 import { formatDate } from "@/features/controllership/scopeModel";
@@ -20,21 +28,170 @@ import { formatDate } from "@/features/controllership/scopeModel";
  * not one credential among several — it is the root every other credential
  * and every delegated authority chains back to, and burying it in a row
  * between a tax certificate and an insurance policy misstates what it is.
+ *
+ * SCR-CRD-05 (Flow 6) — WHAT'S HELD, AND WHAT HAPPENED
+ *
+ * Getting another credential is the page's primary action now that there
+ * is somewhere to get one. Two markers say what a list of cards can't: a
+ * credential replaced by a newer one is *Superseded* (kept — it's the
+ * record — but no longer shared), and one whose issuer has left NDI's list
+ * *Can't be shared right now* (FLOW-CRD-01 E15), which says what still
+ * holds rather than implying it's gone.
+ *
+ * The Activity tab keeps requests, offers sent unasked once someone has
+ * accepted or declined them (or they lapsed), and is the only place an
+ * offer the wallet refused on its own
+ * appears (FLOW-CRD-02 E1, UXD-36). Nobody is notified of those — a
+ * notification for every unlisted sender is how a wallet teaches people to
+ * click through warnings — but they're kept, with the reason, so the
+ * question "did anyone send us something?" has an answer.
+ *
+ * VIEW DETAILS (UX-EW-03 SCR-CRD-05's secondary action)
+ *
+ * A card is recognition, not disclosure (CredentialCard), so the values a
+ * credential carries sit beside it. The foundational credential lists them
+ * always; every other credential lists them on *View details*, closed to
+ * start with so a wall of cards still doesn't display the company's details
+ * to whoever is looking over a shoulder. Without it, once the taxpayer
+ * number was accepted there was nowhere to check the number, the tax office
+ * or what Pelden is registered for. Labels are the ones the offering gave
+ * the officer's fields, where there is an offering for it.
+ *
+ * Empty is unreachable after verification (the foundational credential is
+ * always held); the switcher keeps it because the screen predates that rule.
  */
-export function HeldCredentialsView() {
-  const { heldCredentials, activeOrgId, organizations } = useDemo();
-  const orgName = organizations.find((o) => o.id === activeOrgId)?.name.replace(/ Pvt\. Ltd\.$/, "") ?? "The organisation";
+type Face = "live" | "loading" | "error" | "offline" | "empty";
 
-  const variant = useScreenState("B3", ["populated", "empty"]);
+export function HeldCredentialsView() {
+  const router = useRouter();
+  const { heldCredentials, activeOrgId, organizations, credentialRequests, offers, refusedOffers, offerings, personById, mayOperate } = useDemo();
+  const orgName = organizations.find((o) => o.id === activeOrgId)?.name.replace(/ Pvt\. Ltd\.$/, "") ?? "The organisation";
+  const [tab, setTab] = useState<"credentials" | "activity">("credentials");
+  const [opened, setOpened] = useState<string[]>([]);
+
+  const face = useScreenState("SCR-CRD-05", ["live", "loading", "error", "offline", "empty"]) as Face;
+  const variant = face === "empty" ? "empty" : "populated";
   const all = variant === "empty" ? [] : heldCredentials.filter(inOrg(activeOrgId));
+  /* Superseded is what the store recorded when a newer one of the same type
+     from the same issuer was accepted, by either route (EW-FLOW6-SD §4.5) —
+     not a date comparison: a renewal and the original are often dated the
+     same day, and a strict "newer than" never marked either. */
+  const superseded = (c: HeldCredential) => Boolean(c.supersededBy);
 
   const foundational = all.find((c) => c.isFoundational);
   const rest = all.filter((c) => !c.isFoundational);
 
+  const header = (
+    <PageHeader
+      crumbs={[{ label: "Wallet" }, { label: "Held credentials" }]}
+      title="What we hold"
+      actions={
+        /* credential:list, as UX-EW-03 SCR-CRD-05 lists it. The catalogue
+           it opens handles someone without credential:receive itself (E2):
+           the list shows, and Ask is replaced by the reason and who can
+           change it. Hiding the way in would hide that answer too. */
+        mayOperate(activeOrgId, "credential:list") || face !== "live" ? (
+          <GradientButton onClick={() => router.push("/wallet/get")} disabled={face === "offline"}>
+            <Icon name="credentials" size={16} strokeWidth={2} />
+            Get another credential
+          </GradientButton>
+        ) : null
+      }
+    />
+  );
+
+  if (face === "loading") {
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          <div aria-hidden="true" className="h-72 animate-pulse rounded-[16px] border border-grid" />
+        </div>
+      </AppShell>
+    );
+  }
+  if (face === "error") {
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
+            We couldn&rsquo;t load your credentials. Nothing has changed.
+            <HairlineButton onClick={() => router.refresh()}>Retry</HairlineButton>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const activity = [
+    ...credentialRequests.filter(inOrg(activeOrgId)).map((r) => ({
+      id: r.id,
+      at: r.answeredAt ?? r.requestedAt,
+      text: `${r.credential} from ${r.issuerName} — asked by ${personById(r.requestedBy).name}`,
+      words: requestWords(r, offerings.find((o) => o.id === r.offeringId)?.answerWindowDays ?? 5),
+    })),
+    ...offers
+      .filter(inOrg(activeOrgId))
+      .filter((o) => o.state !== "pending")
+      .map((o) => ({
+        id: o.id,
+        at: o.decidedAt ?? (o.state === "expired" ? o.expiresAt : o.receivedAt),
+        text: `${o.type} from ${o.issuer} — sent unasked${o.decidedBy ? `, ${o.state === "accepted" ? "accepted" : "declined"} by ${personById(o.decidedBy).name}` : ""}`,
+        words: unaskedWords(o),
+      })),
+    ...refusedOffers.filter(inOrg(activeOrgId)).map((o) => ({
+      id: o.id,
+      at: o.at,
+      text: o.listed
+        ? `Offer from ${o.claimedIssuer} refused — ${o.reason}.`
+        : `Offer claiming to be from ${o.claimedIssuer} refused — ${o.reason}.`,
+      words: { status: "refused", label: "Refused automatically", sentence: `${o.credential}. Nobody was notified.` },
+    })),
+  ].sort((a, b) => (a.at < b.at ? 1 : -1));
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <PageHeader crumbs={[{ label: "Wallet" }, { label: "Held credentials" }]} title="What we hold" />
+        {header}
+        {face === "offline" ? (
+          <p role="status" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
+            You&rsquo;re offline. This is what was held when it was last loaded.
+          </p>
+        ) : null}
+        <div>
+          <Tabs
+            label="Credentials and activity"
+            active={tab}
+            onChange={(id) => setTab(id as "credentials" | "activity")}
+            tabs={[
+              { id: "credentials", label: "Credentials", icon: "credentials" },
+              { id: "activity", label: "Activity", icon: "fileText" },
+            ]}
+          />
+        </div>
+
+        {tab === "activity" ? (
+          <Panel padded={false}>
+            {activity.length ? (
+              <ul className="relative z-[4] m-0 flex list-none flex-col p-0">
+                {activity.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-subtle px-5 py-3.5 last:border-b-0">
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="text-[13.5px] text-body">{a.text}</span>
+                      <span className="text-[12.5px] text-muted">{a.words.sentence}</span>
+                      <span className="text-[12px] text-faint">{formatDate(a.at)}</span>
+                    </span>
+                    <StatusPill status={a.words.status} label={a.words.label} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState icon="fileText" title="No activity yet" message="Requests, offers and anything refused automatically show here." />
+            )}
+          </Panel>
+        ) : (
+          <>
 
         <p className="max-w-[68ch] text-[13.5px] leading-[1.65] text-muted">
           Credentials issued to {orgName} itself, held in the
@@ -72,10 +229,10 @@ export function HeldCredentialsView() {
                   to this. If it lapses, nothing below it verifies anywhere.
                 </p>
                 <dl className="m-0 grid gap-x-6 gap-y-2 min-[641px]:grid-cols-2">
-                  {foundational.attributes.map((attribute) => (
-                    <div key={attribute.name} className="flex flex-col gap-0.5">
-                      <dt className="text-[12px] text-faint">{attribute.name.replace(/_/g, " ")}</dt>
-                      <dd className="m-0 text-[13px] text-body">{attribute.value}</dd>
+                  {[...attributeRows(foundational, offerings), { term: "Valid", value: validity(foundational) }].map((row) => (
+                    <div key={row.term} className="flex flex-col gap-0.5">
+                      <dt className="text-[12px] text-faint">{row.term}</dt>
+                      <dd className="m-0 text-[13px] text-body">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -91,13 +248,48 @@ export function HeldCredentialsView() {
               Everything else it holds
             </h2>
             <ul className="m-0 grid list-none gap-5 p-0 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-              {rest.map((credential) => (
+              {[...rest].sort((a, b) => (a.receivedAt < b.receivedAt ? 1 : -1)).map((credential) => (
                 <li key={credential.id} className="flex flex-col gap-2">
                   <CredentialCard type={credential.type} issuer={credential.issuer} status={credential.status} />
                   <p className="m-0 text-[12.5px] leading-[1.5] text-faint">
-                    Received {formatDate(credential.receivedAt)}
-                    {credential.expiresAt ? ` · expires ${formatDate(credential.expiresAt)}` : ""}
+                    Issued {formatDate(credential.receivedAt)}
+                    {credential.expiresAt ? ` · valid until ${formatDate(credential.expiresAt)}` : ""}
                   </p>
+                  <button
+                    type="button"
+                    aria-expanded={opened.includes(credential.id)}
+                    aria-controls={`held-details-${credential.id}`}
+                    onClick={() => setOpened((o) => (o.includes(credential.id) ? o.filter((x) => x !== credential.id) : [...o, credential.id]))}
+                    className="ndi-plainlink inline-flex items-center gap-1.5 self-start text-[12.5px] font-medium text-muted"
+                  >
+                    {opened.includes(credential.id) ? "Hide details" : "View details"}
+                    <Icon name={opened.includes(credential.id) ? "chevronDown" : "chevronRight"} size={14} strokeWidth={2} />
+                  </button>
+                  {opened.includes(credential.id) ? (
+                    <dl id={`held-details-${credential.id}`} className="m-0 flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
+                      {[
+                        ...attributeRows(credential, offerings),
+                        { term: "Issued by", value: credential.issuer },
+                        { term: "Issued", value: formatDate(credential.receivedAt) },
+                        { term: "Valid", value: validity(credential) },
+                      ].map((row) => (
+                        <div key={row.term} className="flex flex-col gap-0.5">
+                          <dt className="text-[12px] text-faint">{row.term}</dt>
+                          <dd className="m-0 text-[13px] text-body">{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                  {superseded(credential) ? <StatusPill status="superseded" label="Superseded" /> : null}
+                  {!credential.issuerTrusted ? (
+                    <p className="m-0 flex flex-col gap-1">
+                      <StatusPill status="suspended" label="Can't be shared right now" />
+                      <span className="text-[12.5px] leading-[1.5] text-muted">
+                        {credential.issuer} is no longer on NDI&rsquo;s list of trusted organisations. You can&rsquo;t share this
+                        credential for now. It&rsquo;s still yours — contact NDI.
+                      </span>
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -107,11 +299,48 @@ export function HeldCredentialsView() {
             <EmptyState
               icon="credentials"
               title={variant === "empty" ? "The wallet is empty" : "Nothing else held yet"}
-              message="Credentials offered to the entity appear under Offers. Accepting one puts it here."
+              message="Ask an office for one, or accept one you're sent, and it shows here."
             />
           </Panel>
+        )}
+          </>
         )}
       </div>
     </AppShell>
   );
+}
+
+/**
+ * Each attribute of a held credential under the label the offering gave it —
+ * "Taxpayer number", not "tpn" — or the name set as words where no offering
+ * covers the type (a registration, a bank's credential).
+ */
+function attributeRows(credential: HeldCredential, offerings: { credential: string; fields: { name: string; label: string }[] }[]) {
+  const fields = offerings.find((o) => o.credential === credential.type)?.fields ?? [];
+  return credential.attributes.map((a) => ({ term: fields.find((f) => f.name === a.name)?.label ?? attrLabel(a.name), value: a.value }));
+}
+
+/** How long a held credential is valid, in the words SCR-CRD-04 uses for the offer. */
+function validity(credential: HeldCredential) {
+  if (credential.status === "revoked") return "Revoked";
+  if (!credential.expiresAt) return "Until it's revoked";
+  return credential.status === "expired" ? `Expired on ${formatDate(credential.expiresAt)}` : `Until ${formatDate(credential.expiresAt)}`;
+}
+
+/** An offer sent unasked, once it has ended, in the words §3.5 gives its endings. */
+function unaskedWords(o: CredentialOffer) {
+  switch (o.state) {
+    case "accepted":
+      return { status: "issued", label: "Added", sentence: "Added to your credentials" };
+    case "declined":
+      return { status: "withdrawn", label: "Declined", sentence: "You've declined this. Nothing has been added." };
+    case "expired":
+      return { status: "lapsed", label: "Expired", sentence: `This offer from ${issuerInline(o.issuer)} expired.` };
+    default:
+      return {
+        status: "failed",
+        label: "Didn't go through",
+        sentence: o.failReason ?? `Something went wrong receiving this from ${issuerInline(o.issuer)}. Nothing has been added.`,
+      };
+  }
 }

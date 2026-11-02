@@ -299,6 +299,60 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
+    area: "Receiving a credential",
+    icon: "credentials",
+    rows: [
+      {
+        shown: "Pelden shares its registration with the tax office, and the office checks it",
+        reality:
+          "A timer moves the request from sending to waiting. No proof is requested or presented, no signature is checked, and the office's \"Verified\" panel reads Pelden's registration straight from the demo data.",
+        needs: "The organisation's agent presenting the whole credential to the issuer's proof request, verified at the issuer before the request reaches anyone (FLOW-CRD-01 steps 4–8).",
+      },
+      {
+        shown: "The tax office issues, and Pelden accepts",
+        reality:
+          "Issuing writes an offer into your browser; accepting copies it into Pelden's held credentials. Nothing is signed, nothing is stored in a wallet, and the 30-day offer window is a date nothing enforces except the accept button.",
+        needs: "A credential offer over DIDComm to the organisation's agent, stored on acceptance, with the issuer's standing checked against NDI's list at that moment.",
+      },
+      {
+        shown: "\"Ask, and have it ask for a bank account too\"",
+        reality:
+          "A prototype control on the ask screen. No issuer system exists to ask for more; the button writes the wider ask into the request before anything is shared, so the consent screen can be shown.",
+        needs: "The issuer's proof request, compared with what the business agreed to before anything more is shared.",
+      },
+      {
+        shown: "\"Take it off the list\" and \"Make the list unreachable\"",
+        reality:
+          "Prototype controls on the review screen. Nothing checks NDI's list when Accept is pressed; these mark what the next check would find, so the delisted and can't-check messages can be shown.",
+        needs: "C2 run again against the Trust Registry at the moment of accepting (FLOW-CRD-01 E19, FLOW-CRD-02 E9).",
+      },
+      {
+        shown: "Offers sent without a request, and one replacing a credential already held",
+        reality:
+          "Seeded rows in your browser. No issuer sends anything; superseding is a field the demo store sets on the older credential when the newer one is accepted.",
+        needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "The tax office's system answers a request by itself",
+        reality:
+          "A timer in your browser. A few seconds after a request for the bonded-warehouse authorisation reaches the office, the demo writes the answer a system would send — the example values from the offering — recorded against the first client you created, and adds credential-request.received and credential-request.issued to the delivery log. No URL is called, no register is looked up and nothing is signed. \"Have it refer the next request\", \"Have it not pick up the next request\" and \"Have your system answer it now\" are prototype controls standing in for the system referring a request with a note, a webhook nobody answers, and the system and an officer answering at once, where the first answer wins. Whether the Department of Revenue & Customs answers this way at all is still open with GovTech (REQ-EW-01 item 23), so the taxpayer number stays with the officers' queue and the prototype shows the path without deciding it.",
+        needs: "The request service's outbox and signed delivery, the issuer request API with client credentials (offer, decline, refer), compare-and-set on the answer, and the one-hour check that puts a request nobody picked up in the queue (FLOW-CRD-03 steps 5–7, E6, E10, A2; EW-FLOW6-IIG).",
+      },
+      {
+        shown: "Integration settings — webhook, secret, clients, delivery log",
+        reality:
+          "Fields in your browser. No URL is called, no secret exists behind the mask, and the test event and its latency are made up on the spot.",
+        needs: "Signed webhook delivery from an outbox with retries, client credentials for the issuer's system, and the fallback to the officers' queue.",
+      },
+      {
+        shown: "Creating a new offering",
+        reality:
+          "Not built. Existing offerings can be paused, retired or given a new version; a new one needs a prerequisite chooser limited to the office's approval to verify, which the prototype doesn't model.",
+        needs: "SCR-CRD-07's composer, reading the issuer's verifier scope.",
+      },
+    ],
+  },
+  {
     area: "The record",
     icon: "fileText",
     rows: [

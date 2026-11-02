@@ -104,13 +104,11 @@ export function NeedsAttention({ allClear = false }: { allClear?: boolean } = {}
       key: offer.id,
       icon: "download",
       label: `${offer.issuer} has offered ${offer.type}`,
-      detail:
-        offer.decision === "out_of_scope"
-          ? "Not something your authority covers"
-          : offer.decision === "requires_approval"
-            ? "Accepting it needs an approver"
-            : "Within your authority",
-      href: `/wallet/offers/${offer.id}`,
+      /* Sent unasked (FLOW-CRD-02), and reviewed on SCR-CRD-04 like a
+         requested one. Accepting never needs an approver: credential:accept
+         is AUTO in every preset (EW-FLOW6-SD §5.3). */
+      detail: "Sent without a request — review it",
+      href: `/wallet/requests/${offer.id}`,
       expiresAt: offer.expiresAt,
     });
   }
