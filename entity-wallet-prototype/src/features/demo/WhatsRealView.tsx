@@ -268,13 +268,13 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "Pelden registering with the Single Window",
         reality:
-          "Flow 7's share from a website, with BNSW asking for the registration, the TPN and the business licence. The store writes BNSW's record when the share goes through, with Pelden's publishing DID when it is listed as able to give authority. The holder DID and revocation ids in it are strings made up from the credential ids.",
+          "Flow 7's share from a website, with BNSW asking for the registration, the TPN and the business licence. The store writes BNSW's record when the share goes through, with Pelden's publishing DID when it is listed as able to give authority. BNSW keeps every business licence the company holds (EW-FLOW9-SD §4.1), so the wallet's screen lists each one and says all of them go, instead of offering the newest to choose from as it does for a bank — a choice the specifications leave open. The holder DID and revocation ids in it are strings made up from the credential ids.",
         needs: "The registration result's holderPublishingDid (FLOW-AUT-02 P4), and revocation ids on MoICE's and DRC's credentials (P5).",
       },
       {
         shown: "Choices the specification leaves open, made here",
         reality:
-          "BNSW's sign-in lasts eight hours (§13 item 8 is open). When the revocation service doesn't know an authority at all, E12's reason is \"it can't be found at NDI\" — the list in E12 has none for that. The label Amend is the prototype's too. \"Checking…\" has a line under it saying what is being looked at. A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
+          "BNSW's sign-in lasts eight hours from the moment the person signs in, and an acting session never outlasts it (§13 item 8 is open). When the revocation service doesn't know an authority at all, E12's reason is \"it can't be found at NDI\" — the list in E12 has none for that. The label Amend is the prototype's too. \"Checking…\" has a line under it saying what is being looked at. A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
         needs: "The specification to settle each.",
       },
     ],

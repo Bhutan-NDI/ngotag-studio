@@ -19,6 +19,7 @@ import {
   REQUEST_MS,
   actingSentence,
   citizenOf,
+  draftFor,
   grouped,
   heldAuthorities,
   licenceStatus,
@@ -384,7 +385,8 @@ function liveModel(demo: ReturnType<typeof useDemo>, checking: boolean): Model {
     signedIn: citizen ? { cid: citizen.cid, name: citizen.name } : null,
     session,
     notice: b.notice,
-    draft: b.draft,
+    /* In a session, the draft for this delegate and this company; otherwise whether this person has one kept. */
+    draft: session ? draftFor(b.drafts, session.delegateCid, session.orgId) : (b.drafts.find((d) => d.cid === b.signedInCid) ?? null),
     requestId: b.request?.id ?? null,
     requestStartedAt: b.request?.startedAt ?? 0,
   };

@@ -1231,7 +1231,7 @@ registration carries the identity it gives authority from.
 | **NDI's revocation service can't be reached**, then submit | E7 — nothing submitted, the session kept (D18) |
 | **Amend** on a declaration | A3 — offered only because Pema's authority includes amending |
 | **Close BNSW and come back later** | A4 — resumed after B0, no new proof |
-| **BNSW's sign-in times out** | E14 — the draft kept |
+| **BNSW's sign-in times out** | E14 — the draft kept, and BNSW signs Pema out: she signs in again before she can act for a company. The session never outlasts the sign-in |
 | **Stop acting for Pelden Trading Pvt. Ltd.** | A5 — "You've stopped acting for … Your draft is saved." |
 | Sign in as **Kinley Wangdi**, **Act for a company**, then **Pema Choden scans the code and shares instead** | E15 — a relayed QR code: the authority shared isn't the signed-in person's (B0) |
 | **A copied authority, signed with another key** | E3 — V2, the holder binding |
@@ -1243,14 +1243,22 @@ BNSW's registration page is the bank's page again (FLOW-PRS-01): a reference,
 **Share from NDI Entity Wallet**, the wallet's consent with BNSW asking for
 the registration, the TPN and the business licence, and back. BNSW keeps
 what EW-FLOW9-SD §4.1 lists — with Pelden's publishing DID because Pelden is
-listed as able to give authority. A company that registered *before* its
+listed as able to give authority, and with **every** business licence Pelden
+holds: once Flow 6 has run that is BL-PLG-2025-00871 and BL-THI-2026-10442, the
+wallet's screen lists both and says both go (no picker, unlike the bank's),
+and BNSW's records panel shows both. Pema's authority then passes B3 for the
+licence it names, and one that names both is asked *Which licence is this
+declaration under?* (A2). A company that registered *before* its
 first grant has none, and its delegates get E8 until it registers again:
 the guided demo walks exactly that (Journey W), because in the story Pelden
 first registers with BNSW after Pema's first try.
 
 ### Choices the specification leaves open
 
-- **BNSW's sign-in length** (§13 item 8): eight hours.
+- **BNSW's sign-in length** (§13 item 8): eight hours, counted from signing in
+  to BNSW — not from the moment someone starts acting for a company.
+- **Which business licences BNSW registers**: all of the company's, where the
+  bank's account form takes the one the sharer picks (FLOW-PRS-01 A4).
 - **An authority the revocation service doesn't know**: E12's reason is "it
   can't be found at NDI" — FLOW-AUT-02's list of reasons has none for it.
 - **The label Amend**, and the line under "Checking…".

@@ -281,8 +281,13 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       BNSW records the sign-ins it refused (E8, E15). A version-31 save
  *       has a registration with no TPN to look up, which would refuse every
  *       sign-in as E11, and a portal with no list of attempts.
+ *  33 — Flow 9: BNSW's sign-in records when it began, so a session ends at
+ *       the sign-in's own length (D13), and the portal keeps drafts for each
+ *       delegate and company instead of one slot. A version-32 save has a
+ *       sign-in with no start, which would never time out, and a single
+ *       draft nothing reads.
  */
-const SEED_VERSION = 32;
+const SEED_VERSION = 33;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -393,14 +398,27 @@ function applyShare(
   if (!request) return state;
   const orgId = request.orgId ?? PELDEN;
   const relation = state.relations.find((r) => r.personId === sharer && (r.orgId ?? PELDEN) === orgId && r.state === "ACTIVE");
-  const credentials = Object.values(chosen)
-    .map((id) => state.heldCredentials.find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const matches = sharing.matchRequest(state, request);
+  const credentials = Object.entries(chosen).flatMap(([descriptorId, id]) => {
+    const match = matches.find((m) => m.descriptor.id === descriptorId);
+    /* Flow 9 — the Single Window keeps every Business Licence the company
+       holds (EW-FLOW9-SD §4.1), so the one chosen stands for all of them;
+       the screen lists them all (`everyOption`). Every other descriptor is
+       the one credential chosen, as in Flow 7. */
+    if (match && match.options.length && bnsw.registersEvery(request.verifierOrgId, match.descriptor)) return match.options;
+    const held = state.heldCredentials.find((c) => c.id === id);
+    return held ? [held] : [];
+  });
   const names = credentials.flatMap((c) => c.attributes.map((a) => a.name));
+  /* "Business Licence and Business Licence" reads as a mistake; two are "2 x Business Licence". */
+  const typeCounts = credentials.reduce((m, c) => m.set(c.type, (m.get(c.type) ?? 0) + 1), new Map<string, number>());
+  const sharedTypes = [...typeCounts].map(([type, n]) => (n > 1 ? `${n} x ${type}` : type)).join(" and ");
   /* Flow 9 — a share to the Single Window is the company registering with
      it (FLOW-PRS-01): BNSW's back end keeps what EW-FLOW9-SD §4.1 lists,
      with the platform's publishingDid where the company is listed as an
-     issuer of authority (D8). Registering again replaces the record. */
+     issuer of authority (D8). Registering again replaces the record, with
+     every Business Licence the company holds — not only the one a person
+     would have chosen (`registersEvery`). */
   const registrations =
     request.verifierOrgId === bnsw.BNSW
       ? [
@@ -435,7 +453,7 @@ function applyShare(
     ),
     auditEntries: appendAudit(state, {
       operation: "proof:present",
-      summary: `Shared ${credentials.map((c) => c.type).join(" and ")} with ${request.verifierName} — every attribute: ${names.join(", ")}`,
+      summary: `Shared ${sharedTypes} with ${request.verifierName} — every attribute: ${names.join(", ")}`,
       actorId: sharer,
       relationId: relation?.id ?? null,
       scopeVersion: relation?.scope.version ?? null,
@@ -1329,6 +1347,29 @@ const endWithE14 = (s: DemoState, session: AuthoritySession, endReason: NonNulla
 };
 
 /**
+ * BNSW's own sign-in has run its length (D13): any open session ends with
+ * E14, and the person is signed out — they sign in again before they can
+ * act for a company. Their drafts stay (UXD-54).
+ */
+const timeOutSignIn = (s: DemoState): DemoState => {
+  const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+  const next = open ? endWithE14(s, open, "timeout") : s;
+  return { ...next, bnsw: { ...next.bnsw, signedInCid: null, signedInAt: null, request: null, notice: open ? next.bnsw.notice : null } };
+};
+
+/**
+ * What the clock has already done at BNSW: the sign-in ran out (and with it
+ * any session), or the authority ended while the person stays signed in
+ * (E14). Returns the same state when neither has happened.
+ */
+const settleClock = (s: DemoState, now = Date.now()): DemoState => {
+  const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+  const reason = open ? bnsw.sessionEndReason(open, now) : null;
+  if (bnsw.signInTimedOut(s.bnsw, now) || reason === "timeout") return timeOutSignIn(s);
+  return open && reason ? endWithE14(s, open, reason) : s;
+};
+
+/**
  * A4 — an open session, resumed after B0 against whoever is signed in now
  * (D17, S9): no new proof. One that has run out ends instead (E14).
  */
@@ -1765,7 +1806,7 @@ interface DemoActions {
   bnswSignIn: (cid: string) => void;
   /** BNSW's sign-out — ends any session it held. */
   bnswSignOut: () => void;
-  /** Simulated — the person closes BNSW and comes back later: A4 resumes an open session after B0, or E14 if it has ended. */
+  /** Simulated — the person closes BNSW and comes back later: A4 resumes an open session after B0, or E14 if it has ended — and signs them out if BNSW's sign-in has. */
   bnswComeBack: () => void;
   /** SCR-AUT-07 *Act for a company* — steps 1–3: the proof request out to the app. */
   bnswActForCompany: () => void;
@@ -1776,7 +1817,7 @@ interface DemoActions {
    * steps 4–11. V1–V6, then B0–B4, then the session — or the refusal.
    */
   bnswAnswer: (answer: { kind: "share"; grantId: string; answeredBy: string; copied?: boolean } | { kind: "decline" | "timeout" }) => void;
-  /** BNSW's form, kept as the draft. */
+  /** BNSW's form, kept as the draft — for the delegate and the company of the open session. */
   bnswSaveDraft: (draft: DeclarationDraft | null) => void;
   /** Steps 12–15 — submit the draft (or amend, A3): B2, the status lookup, the limit. */
   bnswSubmit: () => void;
@@ -1784,9 +1825,9 @@ interface DemoActions {
   bnswStopActing: () => void;
   /** Clear the notice once read. */
   bnswDismissNotice: () => void;
-  /** Ends the request after five minutes (E2) and the session at its end (E14) — run on a timer by the page. */
+  /** Ends the request after five minutes (E2), the session at its end (E14), and BNSW's sign-in at its length — run on a timer by the page. */
   bnswTick: () => void;
-  /** Simulated — things outside the prototype: NDI's services down or back, a citizen ID suspended or restored, BNSW's sign-in timing out. */
+  /** Simulated — things outside the prototype: NDI's services down or back, a citizen ID suspended or restored, BNSW's sign-in timing out (which signs the person out). */
   bnswSimulate: (event: "services_down" | "services_up" | "citizen_suspended" | "citizen_restored" | "signin_timeout") => void;
   /**
    * Simulated — catalogue flow 11, which has no specification: the
@@ -3580,7 +3621,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
       bnswSignIn: (cid) =>
         setState((s) => {
-          const next = { ...s, bnsw: { ...s.bnsw, signedInCid: cid, request: null, notice: null } };
+          const next = { ...s, bnsw: { ...s.bnsw, signedInCid: cid, signedInAt: Date.now(), request: null, notice: null } };
           const open = openSessionOf(next, cid);
           return open ? resumeSession(next, open) : next;
         }),
@@ -3589,11 +3630,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => {
           const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
           const ended = open ? endSession(s, open.id, "signed_out") : s;
-          return { ...ended, bnsw: { ...ended.bnsw, signedInCid: null, request: null, notice: null } };
+          return { ...ended, bnsw: { ...ended.bnsw, signedInCid: null, signedInAt: null, request: null, notice: null } };
         }),
 
       bnswComeBack: () =>
         setState((s) => {
+          /* They may have been away past BNSW's sign-in: then it is over (D13). */
+          const settled = settleClock(s);
+          if (settled !== s) return settled;
           const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
           return open ? resumeSession(s, open) : { ...s, bnsw: { ...s.bnsw, notice: null } };
         }),
@@ -3640,21 +3684,32 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ...s.bnsw,
             request: null,
             notice: bnswNotice("opened", "", result.checks),
-            /* A draft kept from an earlier refusal comes back, under a licence this session can use. */
-            draft: s.bnsw.draft
-              ? { ...s.bnsw.draft, licence: session.licenceNumbers.includes(s.bnsw.draft.licence) ? s.bnsw.draft.licence : "" }
-              : null,
+            /* A draft kept from an earlier refusal comes back — this delegate's, for this
+               company's, and under a licence this session can use. Another's stays kept. */
+            drafts: s.bnsw.drafts.map((d) =>
+              d.cid === session.delegateCid && d.orgId === session.orgId
+                ? { ...d, licence: session.licenceNumbers.includes(d.licence) ? d.licence : "" }
+                : d,
+            ),
           },
         }));
       },
 
-      bnswSaveDraft: (draft) => setState((s) => ({ ...s, bnsw: { ...s.bnsw, draft } })),
+      bnswSaveDraft: (draft) =>
+        setState((s) => {
+          /* The form is only there in a session, and the draft is kept for
+             that delegate and that company (UXD-54, T7). */
+          const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+          if (!open) return s;
+          const others = s.bnsw.drafts.filter((d) => !(d.cid === open.delegateCid && d.orgId === open.orgId));
+          return { ...s, bnsw: { ...s.bnsw, drafts: draft ? [{ ...draft, cid: open.delegateCid, orgId: open.orgId }, ...others] : others } };
+        }),
 
       bnswSubmit: () => {
         const s0 = stateRef.current;
         const cid = s0.bnsw.signedInCid;
         const session = cid ? openSessionOf(s0, cid) : null;
-        const draft = s0.bnsw.draft;
+        const draft = session ? bnsw.draftFor(s0.bnsw.drafts, session.delegateCid, session.orgId) : null;
         if (!session || !draft) return;
         const kind = draft.amends ? ("amend" as const) : ("submit" as const);
         const original = draft.amends ? s0.counterpartyDeclarations.find((d) => d.id === draft.amends) : undefined;
@@ -3665,7 +3720,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const r = bnsw.checkDeclaration(s0, session, { kind, valueNu, licenceNumber });
         if (!r.ok) {
           setState((s) => {
-            const next = r.keep ? s : endSession(s, session.id, r.endReason);
+            /* E14 at BNSW's sign-in timeout also ends the sign-in (D13). */
+            const next = r.keep ? s : r.endReason === "timeout" ? timeOutSignIn(s) : endSession(s, session.id, r.endReason);
             return { ...next, bnsw: { ...next.bnsw, notice: bnswNotice(r.code, r.text) } };
           });
           return;
@@ -3698,7 +3754,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ],
           bnsw: {
             ...s.bnsw,
-            draft: null,
+            drafts: s.bnsw.drafts.filter((d) => !(d.cid === session.delegateCid && d.orgId === session.orgId)),
             notice: bnswNotice(
               "accepted",
               original ? `Amendment ${ref} to ${original.reference} accepted for processing.` : `Declaration ${ref} accepted for processing.`,
@@ -3724,10 +3780,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           if (s.bnsw.request && now - s.bnsw.request.startedAt >= bnsw.REQUEST_MS) {
             next = { ...next, bnsw: { ...next.bnsw, request: null, notice: bnswNotice("E2", bnsw.COPY.E2) } };
           }
-          const open = next.bnsw.signedInCid ? openSessionOf(next, next.bnsw.signedInCid) : null;
-          const reason = open ? bnsw.sessionEndReason(open, now) : null;
-          if (open && reason) next = endWithE14(next, open, reason);
-          return next;
+          return settleClock(next, now);
         }),
 
       bnswSimulate: (event) =>
@@ -3742,10 +3795,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               return { ...s, bnsw: { ...s.bnsw, suspendedCitizens: [...new Set([...s.bnsw.suspendedCitizens, who])] } };
             case "citizen_restored":
               return { ...s, bnsw: { ...s.bnsw, suspendedCitizens: s.bnsw.suspendedCitizens.filter((c) => c !== who) } };
-            case "signin_timeout": {
-              const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
-              return open ? endWithE14(s, open, "timeout") : s;
-            }
+            case "signin_timeout":
+              /* BNSW signs the person out, and with them any session (D13). */
+              return s.bnsw.signedInCid ? timeOutSignIn(s) : s;
           }
           return s;
         }),
@@ -6205,7 +6257,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       matchRequest: (requestId) => {
         const s0 = stateRef.current;
         const r = s0.presentationRequests.find((x) => x.id === requestId);
-        return r ? sharing.matchRequest(s0, r) : [];
+        /* Flow 9 — a share to the Single Window sends every Business Licence, so the screen is told to list them all. */
+        return r
+          ? sharing.matchRequest(s0, r).map((m) => (bnsw.registersEvery(r.verifierOrgId, m.descriptor) ? { ...m, everyOption: true } : m))
+          : [];
       },
 
       whoApproves: (requestId) => {

@@ -4,6 +4,7 @@ import { ending, keyedFor, licenceNumberOf, orgName, taskLabel, today } from "./
 import {
   PELDEN,
   SIM_CITIZENS,
+  type AskedDescriptor,
   type AuthorityGrant,
   type AuthoritySession,
   type BnswAttempt,
@@ -11,6 +12,7 @@ import {
   type CounterpartyRegistration,
   type DemoState,
   type HeldCredential,
+  type KeptDraft,
 } from "./demoData";
 import { namesOf } from "./sharing";
 
@@ -68,10 +70,22 @@ export const REQUEST_MS = 5 * 60_000;
 /**
  * BNSW's sign-in session. Its length is open (EW-FLOW9-SD §13 item 8,
  * FLOW-AUT-02 §12 item 3); the prototype assumes eight hours, a working
- * day, and says so on the what's-real page. The authority session ends at
- * this or at the authority's expirationDate, whichever is first (D13).
+ * day, and says so on the what's-real page. It runs from the moment the
+ * person signed in to BNSW, not from the moment an authority session
+ * opens. The authority session ends at this or at the authority's
+ * expirationDate, whichever is first (D13).
  */
 export const SIGN_IN_MS = 8 * 60 * 60_000;
+
+/** The last second of the authority's `validUntil` day, local time — it is still valid until then (D19). */
+export const endOfAuthorityOf = (validUntil: string) => new Date(`${validUntil}T23:59:59`).getTime();
+
+/** BNSW's sign-in has run its length. Nobody signed in has not. */
+export const signInTimedOut = (b: Pick<DemoState["bnsw"], "signedInCid" | "signedInAt">, now = Date.now()) =>
+  b.signedInCid !== null && b.signedInAt !== null && now >= b.signedInAt + SIGN_IN_MS;
+
+/** The draft BNSW kept for this delegate and this company, if there is one. */
+export const draftFor = (drafts: KeptDraft[], cid: string, orgId: string) => drafts.find((d) => d.cid === cid && d.orgId === orgId) ?? null;
 
 /* ------------------------------------------------------------------ */
 /* The copy — UX-EW-06 §3.5, word for word                              */
@@ -207,6 +221,9 @@ export const holderDidOf = (orgId: string) =>
  * What BNSW keeps when a company registers with it — FLOW-PRS-01's shared
  * result, read as EW-FLOW9-SD §4.1 and EW-FLOW9-CIG §3 say. Built by the
  * store when a share to BNSW goes through; registering again replaces it.
+ * `credentials` holds every Business Licence the company has then
+ * (`registersEvery`), so a licence it gained since is registered too and
+ * one the new record leaves out is gone.
  *
  * `publishingDid` is the platform's attestation (D8): filled only where the
  * organisation is CURRENT on NDI's list as an issuer of authority at the
@@ -413,7 +430,10 @@ export function checkSignIn(s: DemoState, signedInCid: string, p: Presentation, 
   pass("B4");
 
   const citizen = citizenOf(p.answeredBy);
-  const endOfAuthority = new Date(`${g.validUntil}T23:59:59`).getTime();
+  const endOfAuthority = endOfAuthorityOf(g.validUntil);
+  /* BNSW's sign-in length runs from the sign-in itself (D13), so acting
+     for a company at 16:00 after signing in at 09:00 leaves one hour. */
+  const signedInAt = s.bnsw.signedInAt ?? now;
   return {
     ok: true,
     checks: lines(),
@@ -435,7 +455,7 @@ export function checkSignIn(s: DemoState, signedInCid: string, p: Presentation, 
       authorityRevocationId: g.revocationId ?? "",
       citizenRevocationId: citizenRevocationIdOf(p.answeredBy),
       validUntil: g.validUntil,
-      endsAt: Math.min(now + SIGN_IN_MS, endOfAuthority),
+      endsAt: Math.min(signedInAt + SIGN_IN_MS, endOfAuthority),
       checkedAt: now,
     },
   };
@@ -459,8 +479,22 @@ export const endedTail = (session: AuthoritySession) =>
 export function sessionEndReason(session: AuthoritySession, now = Date.now()): AuthoritySession["endReason"] | null {
   if (session.status !== "OPEN") return session.endReason;
   if (now < session.endsAt) return null;
-  return session.validUntil <= today() ? "expired" : "timeout";
+  /* Told apart by the clock, not the date: on its last day the authority is
+     valid until 23:59:59, so a session that stopped earlier stopped at
+     BNSW's sign-in, and sharing again would work. */
+  return session.endsAt >= endOfAuthorityOf(session.validUntil) ? "expired" : "timeout";
 }
+
+/**
+ * Whether BNSW's registration keeps every one of the credentials that answer
+ * this asked-for type, not one (EW-FLOW9-SD §4.1: "each business licence
+ * number and its `revocation_id`" — B3 and B4 look up every licence an
+ * authority names, A2 chooses between them). So a share to BNSW sends every
+ * Business Licence the company holds, whichever one the sharer's screen
+ * would have preselected. The TPN stays one.
+ */
+export const registersEvery = (verifierOrgId: string | null | undefined, d: Pick<AskedDescriptor, "credentialType">) =>
+  verifierOrgId === BNSW && d.credentialType === "Business Licence";
 
 /**
  * FLOW-AUT-02 steps 13–15 — at every submission, before anything is

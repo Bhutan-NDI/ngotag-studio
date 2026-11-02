@@ -1104,7 +1104,8 @@ export const SIM_CITIZENS: { cid: string; name: string; personId: PersonId | nul
 /**
  * BNSW's record of a company's registration — kept from FLOW-PRS-01's
  * result when the company shares its registration, TPN and business
- * licence with BNSW (§4.1, EW-FLOW9-CIG §3). Registering again replaces it.
+ * licence with BNSW (§4.1, EW-FLOW9-CIG §3). Registering again replaces it,
+ * and keeps every business licence the company holds then.
  */
 export interface CounterpartyRegistration {
   id: string;
@@ -1164,7 +1165,7 @@ export interface AuthoritySession {
   citizenRevocationId: string;
   /** The authority's expirationDate (D19). */
   validUntil: string;
-  /** The earlier of BNSW's sign-in timeout and validUntil (D13), as epoch ms. */
+  /** The earlier of BNSW's sign-in timeout, counted from the sign-in and not from this session, and validUntil's last second (D13), as epoch ms. */
   endsAt: number;
   checkedAt: number;
   status: "OPEN" | "ENDED";
@@ -1204,6 +1205,17 @@ export interface DeclarationDraft {
   amends: string | null;
 }
 
+/**
+ * A draft as BNSW keeps it: for the delegate who wrote it, and for the
+ * company it was written for. It comes back only into a session that is
+ * both (UXD-54, T7 — declaring for the wrong company).
+ */
+export interface KeptDraft extends DeclarationDraft {
+  /** The delegate's citizen ID number. */
+  cid: string;
+  orgId: string;
+}
+
 /** One of V1–V6 or B0–B4, as the result reports it. */
 export interface BnswCheck {
   id: string;
@@ -1234,6 +1246,8 @@ export interface BnswAttempt {
  */
 export interface BnswState {
   signedInCid: string | null;
+  /** When they signed in to BNSW, as epoch ms — BNSW's sign-in timeout is counted from here (D13). */
+  signedInAt: number | null;
   servicesDown: boolean;
   suspendedCitizens: string[];
   /** Refused sign-ins BNSW records — E8 the issuer DID, E15 both identities' DIDs (FLOW-AUT-02 §6). */
@@ -1242,7 +1256,8 @@ export interface BnswState {
   request: { id: string; startedAt: number } | null;
   /** The last outcome to show, set by the store: a refusal, A4, an acceptance. */
   notice: { code: string; text: string; checks: BnswCheck[]; at: number } | null;
-  draft: DeclarationDraft | null;
+  /** Drafts kept through a refusal, one for each delegate and company. */
+  drafts: KeptDraft[];
 }
 
 /**
@@ -4322,7 +4337,7 @@ export const SEED: DemoState = {
       at: day(-2),
     },
   ],
-  bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
+  bnsw: { signedInCid: null, signedInAt: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, drafts: [] },
 
   auditEntries: [
     {
@@ -4822,7 +4837,7 @@ export function firstRunState(s: DemoState): DemoState {
     counterpartyRegistrations: [],
     authoritySessions: [],
     counterpartyDeclarations: [],
-    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
+    bnsw: { signedInCid: null, signedInAt: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, drafts: [] },
     auditEntries: [
       {
         id: "au-onb-2",
@@ -4915,7 +4930,7 @@ export function dayZeroState(seed: DemoState): DemoState {
     counterpartyRegistrations: [],
     authoritySessions: [],
     counterpartyDeclarations: [],
-    bnsw: { signedInCid: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, draft: null },
+    bnsw: { signedInCid: null, signedInAt: null, servicesDown: false, suspendedCitizens: [], attempts: [], request: null, notice: null, drafts: [] },
     auditEntries: [],
     appeals: [],
     signup: null,

@@ -1013,7 +1013,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 14,
     title: "Share with the Single Window",
     happening:
-      "All three credentials, whole, under the sentence saying BNSW receives every detail. Pelden is already on NDI's list as able to give authority, so the platform also tells BNSW which identity Pelden gives authority from.",
+      "Every credential BNSW asks for, whole — and each business licence Pelden holds, not one of them — under the sentence saying BNSW receives every detail. Pelden is already on NDI's list as able to give authority, so the platform also tells BNSW which identity Pelden gives authority from.",
     doThis: "Press **Share with Bhutan National Single Window**.",
     match: "^/wallet/sharing/pr-[^/]+$",
   },

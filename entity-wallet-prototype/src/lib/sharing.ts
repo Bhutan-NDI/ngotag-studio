@@ -84,6 +84,12 @@ export interface DescriptorMatch {
   descriptor: AskedDescriptor;
   /** Shareable credentials of the type, newest first — the first is preselected (D18). */
   options: HeldCredential[];
+  /**
+   * The verifier keeps every one of `options`, not one of them — set by the
+   * store, for the Single Window's business licences only (EW-FLOW9-SD
+   * §4.1). Nothing is chosen for it, and the screen lists them all.
+   */
+  everyOption?: boolean;
   /** Held, but not shareable — and why, in §3.5's words. Null when an option exists or nothing is held. */
   unshareable: { credential: HeldCredential; reason: string } | null;
 }

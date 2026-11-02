@@ -131,13 +131,20 @@ export function CredentialsToShare({
   /** Absent on the approver's screen, which shows what the sharer chose. */
   onChoose?: (descriptorId: string, credentialId: string) => void;
 }) {
+  /* Flow 9 — the Single Window keeps every Business Licence the company
+     holds (EW-FLOW9-SD §4.1), so none is chosen: each one is listed whole
+     as its own entry, and says that all of them go. Everything else is one
+     credential per descriptor, as before. */
+  const rows: (DescriptorMatch & { all?: number })[] = matches.flatMap((m) =>
+    m.everyOption && m.options.length > 1 ? m.options.map((c) => ({ ...m, options: [c], all: m.options.length })) : [m],
+  );
   return (
     <section aria-labelledby="prs-what" className="flex flex-col gap-3">
       <h2 id="prs-what" className="m-0 text-[14.5px] font-semibold leading-[1.5] text-strong">
         {verifier} will receive all of the details below — not only the ones it asked for.
       </h2>
       <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {matches.map((m) => {
+        {rows.map((m) => {
           const credential: HeldCredential | undefined =
             m.options.find((c) => c.id === chosen[m.descriptor.id]) ?? m.options[0];
           if (!credential) {
@@ -160,7 +167,7 @@ export function CredentialsToShare({
             );
           }
           return (
-            <li key={m.descriptor.id} className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
+            <li key={credential.id} className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="m-0 text-[14px] font-medium text-strong">{credential.type}</p>
                 <p className="m-0 text-[12.5px] text-faint">From {credential.issuer} · received {formatDate(credential.receivedAt)}</p>
@@ -191,6 +198,11 @@ export function CredentialsToShare({
                     </label>
                   ) : null}
                 </div>
+              ) : null}
+              {m.all ? (
+                <p className="m-0 text-[12.5px] text-muted">
+                  You have {m.all} {credential.type}s, and {verifier} keeps every one of them, so each one is shared.
+                </p>
               ) : null}
               <dl className="m-0 flex flex-col">
                 {credential.attributes.map((a, i) => {
