@@ -15,6 +15,8 @@
  * review flagged that method as wrong for the NDI.)
  */
 
+import { formatDate } from "@/features/controllership/scopeModel";
+
 import { SELF_SERVICE_SIGNUP_ENABLED } from "./deployment";
 
 export type LedgerKind = "AnonCreds" | "W3C";
@@ -2558,6 +2560,13 @@ const day = (offset: number): string =>
     .toISOString()
     .slice(0, 10);
 
+/**
+ * E15's sentence (UX-EW-05 §3.5), here so the seeded Ended row and one the
+ * demo lapses read alike; `NOTICE_GRANT.notCollected` is this. It lives
+ * with the seed because authority.ts imports this file, not the other way.
+ */
+export const notCollectedCopy = (name: string, by: string): string => `${name} didn't collect their authority by ${formatDate(by)}. Nothing was given.`;
+
 /** A timestamp, for audit rows that show a time as well as a date. */
 const at = (offset: number, time: string): string => `${day(offset)}T${time}:00+06:00`;
 
@@ -4031,7 +4040,7 @@ export const SEED: DemoState = {
       status: "LAPSED",
       submittedAt: day(-20),
       statusAt: day(-13),
-      endReason: "Tashi Dorji didn't collect their authority by the date the link expired. Nothing was given.",
+      endReason: notCollectedCopy("Tashi Dorji", day(-13)),
       mismatches: 0,
       offerExpiresAt: null,
       accepted: false,

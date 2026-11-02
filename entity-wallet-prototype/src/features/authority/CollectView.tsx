@@ -137,6 +137,8 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   const orgName = g ? orgNameOf({ organizations }, g.orgId) : look?.kind === "valid" ? look.orgName : "The organisation";
   const sample = authorityGrants.find((x) => x.status === "ACTIVE") ?? authorityGrants[0];
 
+  const identityLeft = askedAt ? IDENTITY_MS - (now - askedAt) : IDENTITY_MS;
+
   const natural: Face = (() => {
     if (!look) return "before";
     if (phase === "E8") return "error_no_app";
@@ -159,7 +161,9 @@ export function CollectView({ claimRef }: { claimRef: string }) {
       return "error_link";
     }
     if (look.kind === "invalid") return "error_link";
-    if (phase === "waiting_app") return "waiting_app";
+    /* E10 — the identity request ends after 5 minutes unanswered, as the
+       offer does after 30 (E13): read from the clock, not from a click. */
+    if (phase === "waiting_app") return identityLeft <= 0 ? "error_no_answer" : "waiting_app";
     return "before";
   })();
   const face: Face = forced === "live" ? natural : forced;
@@ -209,7 +213,6 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   const error = errors[face];
   const unnamed = face === "error_link" || face === "cancelled";
 
-  const identityLeft = askedAt ? IDENTITY_MS - (now - askedAt) : IDENTITY_MS;
   const offerLeft = shown?.offerExpiresAt ? shown.offerExpiresAt - now : 30 * 60_000;
 
   return (
