@@ -82,6 +82,8 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
     keepForLater,
     returnToVerifier,
     withdrawPresentationRequest,
+    presentationSessions,
+    returnAddresses,
   } = useDemo();
   const forced = useScreenState("SCR-PRS-02", [
     "live",
@@ -108,6 +110,12 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
   const verdict = r ? shareVerdict(r.id) : null;
   const matches = r ? matchRequest(r.id) : [];
   const fromWebsite = Boolean(r?.sessionId);
+  /* With no registered return address there is nowhere to go back to
+     (FLOW-PRS-01 E15), so the button is not offered. */
+  const session = presentationSessions.find((x) => x.id === r?.sessionId);
+  const canGoBack =
+    fromWebsite &&
+    Boolean(session && returnAddresses.some((a) => a.orgId === session.verifierOrgId && a.returnUrlId === session.returnUrlId && !a.removedAt));
 
   if (!hydrated) {
     return (
@@ -289,7 +297,7 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
               </p>
               <div className="flex flex-wrap gap-2.5">
                 {canApprove ? <GradientButton onClick={() => router.push(`/wallet/sharing/${r.id}/approve`)}>Approve</GradientButton> : null}
-                {fromWebsite && (face === "cancelled" || st === "FAILED") ? (
+                {canGoBack && (face === "cancelled" || st === "FAILED") ? (
                   <GradientButton onClick={goBack}>Go back to {v}</GradientButton>
                 ) : null}
                 <HairlineButton onClick={() => router.push("/wallet/sharing")}>Open history</HairlineButton>
@@ -325,7 +333,7 @@ export function ShareRequestView({ requestId }: { requestId: string }) {
         {face === "recheck_error" || error ? (
           <p role="alert" className="m-0 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
             {error ?? `${v} can't receive this any more. Nothing has been shared.`}
-            {fromWebsite ? <HairlineButton onClick={goBack}>Go back to {v}</HairlineButton> : null}
+            {canGoBack ? <HairlineButton onClick={goBack}>Go back to {v}</HairlineButton> : null}
           </p>
         ) : null}
         {r.failure && st === "OPEN" ? (
