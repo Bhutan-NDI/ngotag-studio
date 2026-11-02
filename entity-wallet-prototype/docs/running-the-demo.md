@@ -16,8 +16,8 @@ switches you to the right person when the story changes hands. **Next** and
 there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
-approval to verify or issue — eleven chapters, 53 steps, starting on the
-platform's day zero:
+approval to verify or issue, and designating an authority — twelve chapters, 69
+steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -82,7 +82,19 @@ platform's day zero:
    so Pelden never sees anyone's date of birth. Kinzang reviews and
    recommends approval without being able to edit it; Tshendu approves it as
    asked, and Pelden is listed.
-10. **Where to go next.**
+10. **Designate the ministry** (FLOW-ORG-02 Kind E, FLOW-ORG-03) — nobody
+    confirms sole proprietorships yet. Kinzang proposes the Ministry of
+    Industry, Commerce & Employment, already on the platform; Tshendu
+    approves. Kesang Wangmo, the ministry's director, reads what it is taking
+    on — including that NDI hosts its keys — and accepts, which is her adding
+    NDI's service account to the ministry. One activation check fails (an
+    entitlement NDI grants); Kinzang grants it and the checks run again.
+    Kesang reads what people will be asked and objects to the date of birth
+    the register doesn't need; adoption is on hold until NDI revises the
+    draft (a dashed stand-in), and she adopts the revised draft for sole
+    proprietorships. Then **Stop something** shows three different stops,
+    none pre-selected.
+11. **Where to go next.**
 
 Both appointments follow the same rule: **invite first, appoint second**, and
 identity is confirmed **at the appointment, not at the invitation**
@@ -352,11 +364,78 @@ sign-up detour), **expired**, **revoked**, **void** (the inviter lost their
 authority since sending — worded as a lapse, never a rejection),
 **already_accepted**, **declined** and **wrong_person**.
 
+### FLOW-ORG-02 · Designating an authority — `/admin/designations`, as Kinzang
+
+Starts on the platform with its two admins and no business. **Designations**
+lists who confirms what: the Corporate Regulatory Authority for companies,
+designated before the Entity Wallet opened. **Propose a designation**
+(SCR-DSG-01): the ministry, and the scope as entity type and credential
+pairs — sole proprietorships and partnerships, each with the Trade Licence —
+and a legal basis. The summary says what it will be able to do and nothing
+else, that the scope can't be edited once switched on, and that a different
+administrator has to approve it. A type another authority already confirms
+can't be ticked: "Replacing it isn't supported yet" (E5). **Propose**.
+
+**Waiting for approval** shows the days left before the proposal lapses
+(E13, 30 days) and, after 10 working days, that a reminder went to
+administrators. Kinzang opening it sees **Approve** disabled with the reason
+(E7), and can only withdraw it — with a reason; the row is kept as
+**Withdrawn**, never deleted (A3). As **Tshendu** (SCR-DSG-02), the lapse
+line reads "This proposal lapses in <n> days if no one approves it."
+**Ask for more information** records a question for Kinzang and changes
+nothing. **Refuse** needs a reason and ends it **Declined**, with "<Tshendu>
+declined this: <reason>." for the proposer (E12). **Approve** — the
+consequence is stated in the dialog. The root account can't: Designations
+isn't in its menu, and the store refuses it. The state switcher on SCR-DSG-02
+shows the **lapsed**, **declined** and **withdrawn** faces.
+
+As **Kesang**, the dashboard says NDI has proposed it, with the days left.
+**Review it** opens SCR-DSG-03: what the ministry would confirm, the legal
+basis, who proposed and approved, and NDI's access in the spec's words —
+"When you accept, you add it", and that NDI hosts the ministry's keys.
+**Accept**: this is Kesang granting NDI's service account its place in the
+ministry, in her own session (A2). Activation runs at once (SCR-DSG-04): P2
+needs both the acceptance and that grant (without the grant it is E1 and
+nothing is added — the switcher's **e1** face). One check fails — schema
+creation is missing — and says NDI grants it. As Kinzang, **Designations →
+Accepted — checks not passing yet**, **Grant them**: the checks run again,
+the service account accepts the grant and joins the ministry, and it's
+designated — recording the primary DID it was designated under — with
+nothing live yet. A pending or accepted designation can be withdrawn here or
+on SCR-DSG-02, with a reason the ministry is told; E5 offers **View the
+incumbent** and the withdrawal, and promises no replacement.
+
+As Kesang, **Authority** (SCR-DSG-05 and SCR-ADO-03, one page): the
+designation, NDI's access with **Remove NDI's access**, members including
+NDI's service account ("Can send your request"), and nothing live. **Members**
+lists the service account too, with **Remove** — the same control: either
+route removes the membership and withdraws every authorisation under the
+designation, and the console then reads "…unchanged, and you can turn it back
+on." **Turn NDI's access back on** is Kesang granting it again; a new
+authorisation is written for each live entity type and the withdrawn ones
+stay on record (A4). **Review and adopt** beside sole proprietorships
+(SCR-ADO-01): the date of birth is flagged as not needed. **Raise an
+objection** — against sole proprietorships, or the whole draft — and
+adoption of what it covers is on hold: "Your objection has gone to NDI.
+Adopting sole proprietorships is on hold until they revise the draft or you
+withdraw your objection." Only **Withdraw the objection** or the dashed
+**NDI revises the draft** releases it; NDI's revision is a new draft without
+the date of birth. **Continue to adopt** (SCR-ADO-02): three things as one
+act. Sole proprietorships are now live — and in Flow 2's first screen, sole
+proprietorship is no longer disabled. **Stop something** (SCR-ADO-04): pause
+NDI's access, stop an entity type, or change what people are asked — none
+pre-selected, and none un-verifies anyone.
+
+The console's dashed panel changes the ministry's primary DID to another
+did:ethr: the designation is suspended (E10), compared with the DID it was
+designated under, and **Restore the previous issuing identity** puts it back.
+
 ### Also built · Inviting an agency — as Kinzang, `/admin/invitations/new`
 
-Not in **Walk a flow**: bringing on a foundational issuer is Flow 5, which the
-catalogue has not designed yet. It is still reachable from NDI administration
-→ Invitations, and needs two NDI administrators.
+Not in **Walk a flow**: this is Kind N, a new authority invited to register,
+which the prototype doesn't walk past the invitation — Flow 5 walks Kind E, an
+organisation already on the platform, below. It is still reachable from NDI
+administration → Invitations, and needs two NDI administrators.
 
 1. As Kinzang, propose the agency. It waits in **Approvals**.
 2. Still as Kinzang, open **Approvals**: **Approve** is disabled with the

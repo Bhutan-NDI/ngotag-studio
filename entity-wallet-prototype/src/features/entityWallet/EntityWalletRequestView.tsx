@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
@@ -56,6 +57,12 @@ export function EntityWalletRequestView() {
       ? "in_progress"
       : "unverified";
   const face: Face = forced === "live" ? natural : (forced as Face);
+
+  /* A body constituted by statute is never a holder: there is nothing here
+     for it to verify (EW-FLOW2-SD §2.2, D4), so a direct link goes home. */
+  useEffect(() => {
+    if (forced === "live" && org?.statutory) router.replace("/dashboard");
+  }, [forced, org?.statutory, router]);
 
   return (
     <AppShell>

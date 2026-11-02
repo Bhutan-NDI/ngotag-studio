@@ -29,9 +29,11 @@ import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
  *   goes to the admin console — Bhutan NDI's own organisation — from here,
  *   not straight from the invitation (UX-EW-01 SCR-INV-05).
  * - An agency official lands on a task, with the steps ahead, because
- *   accepting is where their work starts rather than ends. Those steps are
- *   Flow 5, which this prototype has not built yet; the screen says so
- *   rather than leading into a page that pretends otherwise.
+ *   accepting is where their work starts rather than ends. Registering a
+ *   new authority (FLOW-ORG-02 Kind N) is the one part of Flow 5 this
+ *   prototype doesn't walk — it walks Kind E, a ministry already on the
+ *   platform — so the screen says so rather than leading into a page that
+ *   pretends otherwise.
  */
 export function InvitationAcceptedView({ id }: { id: string }) {
   const router = useRouter();
@@ -182,6 +184,9 @@ export function InvitationAcceptedView({ id }: { id: string }) {
               {[
                 ["Register the organisation", "Its name and legal identity, as the invitation gave them."],
                 ["Set up its identity on the platform", "Done by you, so the organisation's identity starts with it rather than with NDI."],
+                /* FLOW-ORG-02 step 2: NDI's service account joins only because
+                   the officer grants it — the service never adds itself (S5). */
+                ["Let NDI's service account ask in your name", "You add it to your organisation, and can remove it at any time without asking NDI."],
                 ["NDI activates the designation", "Until then it can register but cannot issue anything."],
               ].map(([title, body], i) => (
                 <li key={title} className="flex items-start gap-3 rounded-[12px] border border-grid px-3.5 py-3">
@@ -199,8 +204,8 @@ export function InvitationAcceptedView({ id }: { id: string }) {
               Register the organisation
             </GradientButton>
             <p id="flow5-note" className="m-0 text-center text-[12.5px] leading-[1.5] text-faint">
-              Prototype: registering a foundational issuer is Flow 5, which hasn&rsquo;t been built
-              yet.
+              Prototype: registering a new authority isn&rsquo;t walked here. Flow 5 shows a
+              ministry already on the platform being designated — as Kinzang, open Designations.
             </p>
           </div>
         </>
