@@ -2569,7 +2569,16 @@ export interface HarnessState {
    * loads — its harness simply has no guide running.
    */
   guideStep?: number | null;
+  /**
+   * Which script the guide reads: the whole story, or the shorter
+   * presentation (see demoPresentation.ts). Read as the whole story when
+   * missing, so a save from before the presentation still loads.
+   */
+  guide?: GuideId;
 }
+
+/** The guided demo's two scripts. */
+export type GuideId = "full" | "presentation";
 
 export interface DemoState {
   /** Which organization the workspace is currently showing. */

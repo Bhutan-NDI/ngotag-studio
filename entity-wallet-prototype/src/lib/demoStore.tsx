@@ -33,6 +33,7 @@ import {
   roleIn,
   type Attribute,
   type AuthorityDraft,
+  type GuideId,
   type AuthorityGrant,
   type GrantStatus,
   SIM_CITIZENS,
@@ -2236,8 +2237,9 @@ interface DemoActions {
   setStateOverride: (screen: string, state: string | null) => void;
   /** The deployment's self-service sign-up setting, switched for the demo. */
   setSelfServiceSignup: (on: boolean) => void;
-  /** Move the guided demo to a step, or stop it with null. */
-  setGuideStep: (step: number | null) => void;
+  /** Move the guided demo to a step, or stop it with null. A `guide`
+   *  switches which script it reads; left out, the script stays. */
+  setGuideStep: (step: number | null, guide?: GuideId) => void;
   clearStateOverrides: () => void;
 
   /** Back to the platform's day zero (see FRESH), and the saved demo cleared. */
@@ -4560,7 +4562,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { ok: false };
       },
 
-      startDayZero: () => setState((s) => ({ ...dayZeroState(SEED), harness: { ...SEED.harness, persona: "yeshey", guideStep: s.harness.guideStep } })),
+      startDayZero: () => setState((s) => ({ ...dayZeroState(SEED), harness: { ...SEED.harness, persona: "yeshey", guideStep: s.harness.guideStep, guide: s.harness.guide } })),
 
       /* Day zero with Pelden registered on it — exactly what the onboarding
          walk leaves behind, so walking the member invitations on their own
@@ -4569,14 +4571,14 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         setState((s) => ({
           ...platformReadyState(SEED),
           activeOrgId: NDI_ORG,
-          harness: { ...SEED.harness, persona: "root", guideStep: s.harness.guideStep },
+          harness: { ...SEED.harness, persona: "root", guideStep: s.harness.guideStep, guide: s.harness.guide },
         })),
 
       startFirstDay: () =>
         setState((s) => ({
           ...firstRunState(platformReadyState(SEED)),
           activeOrgId: PELDEN,
-          harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep },
+          harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep, guide: s.harness.guide },
         })),
 
       /* The first day, plus the invitation the guide sends in chapter 5,
@@ -4587,7 +4589,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           let next: DemoState = {
             ...firstRunState(platformReadyState(SEED)),
             activeOrgId: PELDEN,
-            harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep },
+            harness: { ...SEED.harness, persona: "dorji", guideStep: s.harness.guideStep, guide: s.harness.guide },
           };
           /* Ugyen only. Pema, the clearing agent, needs no account to act
              for Pelden — she receives authority from a link (EW-FLOW8-SD
@@ -6749,8 +6751,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       setRunnerOpen: (runnerOpen) =>
         setState((s) => ({ ...s, harness: { ...s.harness, runnerOpen } })),
 
-      setGuideStep: (guideStep) =>
-        setState((s) => ({ ...s, harness: { ...s.harness, guideStep } })),
+      setGuideStep: (guideStep, guide) =>
+        setState((s) => ({ ...s, harness: { ...s.harness, guideStep, ...(guide ? { guide } : {}) } })),
 
       setSelfServiceSignup: (selfServiceSignup) =>
         setState((s) => ({ ...s, harness: { ...s.harness, selfServiceSignup } })),

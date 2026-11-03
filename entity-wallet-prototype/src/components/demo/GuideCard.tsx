@@ -5,7 +5,8 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
-import { GUIDE_CHAPTERS, GUIDE_STEPS, onStepScreen } from "@/lib/demoGuide";
+import { onStepScreen } from "@/lib/demoGuide";
+import { guideScript } from "@/lib/demoPresentation";
 
 /**
  * The guided demo's card — the script, on the screen it is about.
@@ -17,21 +18,23 @@ import { GUIDE_CHAPTERS, GUIDE_STEPS, onStepScreen } from "@/lib/demoGuide";
  * moment the presenter will want it back.
  *
  * Drawn as scaffolding, like the rest of the harness: the warning dot the
- * prototype marker uses, and "Guided demo" in the eyebrow, so nobody in the
- * room mistakes it for onboarding help the product would ship.
+ * prototype marker uses, and the script's name — "Guided demo" or
+ * "Presentation" — in the eyebrow, so nobody in the room mistakes it for
+ * onboarding help the product would ship.
  */
 export function GuideCard() {
   const router = useRouter();
   const pathname = usePathname();
   const { harness, hydrated, setGuideStep, setPersona } = useDemo();
   const [minimised, setMinimised] = useState(false);
+  const { label, chapters, steps } = guideScript(harness.guide);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   const index = harness.guideStep ?? null;
-  const step = index !== null ? GUIDE_STEPS[index] : undefined;
+  const step = index !== null ? steps[index] : undefined;
 
   const enter = (next: number, navigate: boolean) => {
-    const target = GUIDE_STEPS[next];
+    const target = steps[next];
     if (!target) return;
     if (target.persona) setPersona(target.persona);
     setGuideStep(next);
@@ -43,7 +46,7 @@ export function GuideCard() {
      other page leaves the guide where it was. */
   useEffect(() => {
     if (index === null || !step) return;
-    const next = GUIDE_STEPS[index + 1];
+    const next = steps[index + 1];
     if (!next || (!next.route && !next.match)) return;
     if (onStepScreen(next, pathname) && !onStepScreen(step, pathname)) enter(index + 1, false);
     // Runs on navigation only; `enter` is recreated every render.
@@ -71,10 +74,10 @@ export function GuideCard() {
 
   if (!hydrated || index === null || !step) return null;
 
-  const chapter = GUIDE_CHAPTERS[step.chapter];
-  const last = index === GUIDE_STEPS.length - 1;
+  const chapter = chapters[step.chapter];
+  const last = index === steps.length - 1;
   const elsewhere = !onStepScreen(step, pathname);
-  const progress = ((index + 1) / GUIDE_STEPS.length) * 100;
+  const progress = ((index + 1) / steps.length) * 100;
 
   if (minimised) {
     return (
@@ -84,7 +87,7 @@ export function GuideCard() {
         className="ndi-hairline-btn pointer-events-auto fixed bottom-[68px] right-3 z-[72] inline-flex h-9 items-center gap-2 rounded-full border border-grid bg-[var(--chrome-fill-strong)] px-3.5 font-display text-[12.5px] font-medium backdrop-blur-[20px] min-[641px]:bottom-4 min-[641px]:right-4"
       >
         <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--ndi-warning)" }} />
-        Guide · step {index + 1} of {GUIDE_STEPS.length}
+        {label} · step {index + 1} of {steps.length}
         <Icon name="chevronDown" size={13} strokeWidth={2} style={{ transform: "rotate(180deg)" }} />
       </button>
     );
@@ -92,7 +95,7 @@ export function GuideCard() {
 
   return (
     <section
-      aria-label="Guided demo"
+      aria-label={label}
       className="pointer-events-auto fixed inset-x-3 bottom-[68px] z-[72] flex max-h-[46dvh] flex-col overflow-hidden rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%] min-[1100px]:inset-x-auto min-[1100px]:bottom-4 min-[1100px]:right-4 min-[1100px]:top-4 min-[1100px]:max-h-none min-[1100px]:w-[392px]"
     >
       {/* Progress through the whole story, not just this chapter. */}
@@ -104,7 +107,7 @@ export function GuideCard() {
         <p className="flex min-w-0 items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
           <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
           <span className="truncate">
-            Guided demo · {step.chapter + 1}/{GUIDE_CHAPTERS.length} {chapter.title}
+            {label} · {step.chapter + 1}/{chapters.length} {chapter.title}
           </span>
         </p>
         <div className="-mr-1.5 -mt-1 flex flex-none items-center">
@@ -180,7 +183,7 @@ export function GuideCard() {
           Back
         </button>
         <span className="font-mono text-[11px] text-faint">
-          {index + 1} / {GUIDE_STEPS.length}
+          {index + 1} / {steps.length}
         </span>
         <button
           type="button"

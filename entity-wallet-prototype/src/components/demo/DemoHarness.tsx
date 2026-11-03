@@ -51,10 +51,23 @@ export function DemoHarness() {
   const startGuide = () => {
     resetDemo();
     startDayZero();
-    setGuideStep(0);
+    setGuideStep(0, "full");
     setOpen(false);
   };
+  /* The presentation starts where a company comes on: NDI's administrators
+     are already set up, and nobody from Pelden has an account yet. It is for
+     a first audience, so it skips the platform's own setup (see
+     demoPresentation.ts). */
+  const startPresentation = () => {
+    resetDemo();
+    startPlatformReady();
+    setSelfServiceSignup(true);
+    setGuideStep(0, "presentation");
+    setOpen(false);
+    router.push("/sign-up");
+  };
   const guiding = (harness.guideStep ?? null) !== null;
+  const presenting = guiding && harness.guide === "presentation";
   const { registered } = useScreenRegistry();
   const [open, setOpen] = useState(false);
 
@@ -139,7 +152,24 @@ export function DemoHarness() {
               className="inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] px-3.5 font-display text-[13px] font-semibold"
               style={{ background: "var(--grad-mint)", color: "var(--text-on-mint)" }}
             >
-              {guiding ? "Restart the guide" : "Start the guide"}
+              {guiding && !presenting ? "Restart the guide" : "Start the guide"}
+            </button>
+          </div>
+
+          {/* ---- The presentation ---- */}
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-3.5 py-3">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <p className="font-display text-[13.5px] font-semibold text-body">Showing it to someone new?</p>
+              <p className="text-[12.5px] leading-[1.5] text-muted">
+                The presentation walks seven flows, from a person signing up to acting at the Single Window, and says why each matters.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={startPresentation}
+              className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] px-3.5 font-display text-[13px] font-semibold"
+            >
+              {presenting ? "Restart the presentation" : "Start the presentation"}
             </button>
           </div>
 
@@ -331,6 +361,21 @@ export function DemoHarness() {
               <path d="M2 1l7 4-7 4z" />
             </svg>
             Guided demo
+          </button>
+        ) : null}
+
+        {/* The shorter story, for a first audience. Outlined rather than
+            filled, so the two ways in don't read as the same button. */}
+        {hydrated && !guiding ? (
+          <button
+            type="button"
+            onClick={startPresentation}
+            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 font-display text-[12px] font-semibold"
+          >
+            <svg aria-hidden="true" viewBox="0 0 10 10" className="h-2.5 w-2.5" style={{ fill: "currentColor" }}>
+              <path d="M2 1l7 4-7 4z" />
+            </svg>
+            Presentation
           </button>
         ) : null}
 
