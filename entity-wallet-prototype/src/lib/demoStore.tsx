@@ -15,6 +15,8 @@ import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
 import { SYSTEM_ANSWER_MS } from "./demoTiming";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
+import * as sharing from "./sharing";
+import { NOTICE, namesOf, typesOf } from "./sharing";
 import {
   NDI_ORG,
   PELDEN,
@@ -55,6 +57,9 @@ import {
   type AppointmentDocument,
   type PresetId,
   type ShareReach,
+  type ParkedOperation,
+  type PresentationRequest,
+  type PresentationSession,
   appointmentHeld,
   REGISTER_RECORDS,
   OBSERVED_OPERATORS,
@@ -209,8 +214,18 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       carries what the simulated system does next. A version-25 save has
  *       that offering on the queue and an integration with no setting, so
  *       connecting the system would change nothing.
+ *  27 — Flow 7 (EW-FLOW7-SD, FLOW-PRS-01/02): verification requests with
+ *       a chosen disclosure are replaced by presentation requests that
+ *       share whole credentials, presentation sessions and return
+ *       addresses. A version-26 save holds `verificationRequests` nothing
+ *       reads and parked shares pointing at requests that no longer exist.
+ *  28 — Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02 v0.3 and UX-EW-04 v0.3:
+ *       a session records when it was redeemed (EW-FLOW7-SD v0.3 §4.2), and
+ *       a request records who opened it from a website and when the people
+ *       who may answer were told it was left undecided (A3). A version-27
+ *       save holds sessions with no redemption time.
  */
-const SEED_VERSION = 26;
+const SEED_VERSION = 28;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -296,42 +311,248 @@ function storeAccepted(
 }
 
 /**
- * Sending a presentation, whether directly or on approval.
+ * Sending a share, at once (AUTO) or on approval (SINGLE_APPROVER) —
+ * FLOW-PRS-01 step 9, FLOW-PRS-02 step 7.
  *
- * The audit row keeps a digest of what was disclosed and never the values.
- * That is the whole discipline of the trail: it has to prove what happened
- * without becoming a second copy of the data it was protecting.
+ * Shared by both paths so they cannot drift: the same request record, the
+ * same audit row, differing only in whether an approver is named on it.
+ *
+ * WHAT THE AUDIT ROW KEEPS
+ *
+ * Credential types and attribute *names*, the verifier, who shared and who
+ * approved — and a digest, never the values (FLOW-PRS-02 §10, S9). Every
+ * attribute name is listed because every attribute went (D4): a row that
+ * named only the asked-for fields would be the audit trail repeating the
+ * promise the consent screen refuses to make.
  */
-function applyPresentation(
+function applyShare(
   state: DemoState,
   requestId: string,
-  attributes: string[],
-  approverId: string | null,
+  chosen: Record<string, string>,
+  sharer: PersonId,
+  approverId: PersonId | null,
 ): DemoState {
-  const request = state.verificationRequests.find((v) => v.id === requestId);
+  const request = state.presentationRequests.find((r) => r.id === requestId);
   if (!request) return state;
-
-  const relation = state.relations.find(
-    (r) => r.personId === state.harness.persona && r.state === "ACTIVE",
-  );
-
+  const orgId = request.orgId ?? PELDEN;
+  const relation = state.relations.find((r) => r.personId === sharer && (r.orgId ?? PELDEN) === orgId && r.state === "ACTIVE");
+  const credentials = Object.values(chosen)
+    .map((id) => state.heldCredentials.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const names = credentials.flatMap((c) => c.attributes.map((a) => a.name));
   return {
     ...state,
-    verificationRequests: state.verificationRequests.map((v) =>
-      v.id === requestId ? { ...v, state: "presented", disclosing: attributes } : v,
+    presentationRequests: state.presentationRequests.map((r) =>
+      r.id === requestId
+        ? {
+            ...r,
+            status: "SHARED" as const,
+            chosen,
+            decidedBy: sharer,
+            decidedAt: today(),
+            approvedBy: approverId,
+            /* Whoever shares is the one whose consent this carries
+               (FLOW-PRS-02 Q2) — never an earlier attempt's sharer. The
+               approval path passes the sharer who chose, so that holds
+               there too. Their date stays only while it is theirs. */
+            initiatedBy: sharer,
+            initiatedAt: r.initiatedBy === sharer ? (r.initiatedAt ?? today()) : today(),
+            rejection: null,
+            /* An answer ends any earlier V7 notice; History reads the
+               outcome from the status, not from a stale failure. */
+            failure: null,
+          }
+        : r,
     ),
     auditEntries: appendAudit(state, {
       operation: "proof:present",
-      summary: `Presented ${request.credentialType} to ${request.relyingParty} — ${
-        attributes.length
-      } ${attributes.length === 1 ? "attribute" : "attributes"} disclosed`,
-      actorId: relation?.personId ?? state.harness.persona,
+      summary: `Shared ${credentials.map((c) => c.type).join(" and ")} with ${request.verifierName} — every attribute: ${names.join(", ")}`,
+      actorId: sharer,
       relationId: relation?.id ?? null,
       scopeVersion: relation?.scope.version ?? null,
       approvedById: approverId,
-      relyingPartyDid: request.relyingPartyDid,
+      relyingPartyDid: request.verifierDid,
       disclosedDigest: `sha256:${Math.random().toString(16).slice(2, 10)}`,
     }),
+  };
+}
+
+/** A person's name for a notice, or a placeholder that still reads. */
+const nameOf = (s: DemoState, id: PersonId | null | undefined) => s.people.find((p) => p.id === id)?.name ?? "Someone";
+const namesFor = (s: DemoState, ids: PersonId[]) => namesOf(ids.map((id) => nameOf(s, id)));
+
+/** A notice for the activity feed, saying who it goes to. */
+type Note = { text: string; orgId: string };
+const noteTo = (s: DemoState, to: PersonId[], text: string, orgId: string): Note[] =>
+  to.length ? [{ text: `To ${namesFor(s, to)}: ${text}`, orgId }] : [];
+
+/** The organisation's name as the notices write it — "Pelden Trading". */
+const orgNameOf = (s: Pick<DemoState, "organizations">, orgId: string) =>
+  shortOrgName(s.organizations.find((o) => o.id === orgId)?.name ?? "your organisation");
+
+/**
+ * A share or an approval the store refused, on the record (FLOW-PRS-01 v0.2
+ * and FLOW-PRS-02 v0.3 §10): the relation, the request, the operation and
+ * the reason — never an attribute value. A refusal with no trace would
+ * leave unrecorded the one attempt an investigation most wants to see.
+ */
+function refusedOnRecord(s: DemoState, actor: PersonId, r: PresentationRequest, reason: string, relationId?: string): DemoState {
+  const orgId = r.orgId ?? PELDEN;
+  const relation = relationId
+    ? s.relations.find((x) => x.id === relationId)
+    : s.relations.find((x) => x.personId === actor && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
+  return {
+    ...s,
+    auditEntries: appendAudit(s, {
+      operation: /^(approving|deciding)/.test(reason) ? "approval:decide" : "proof:present",
+      summary: `Refused ${reason}: ${r.verifierName}'s request for ${typesOf(r)}`,
+      actorId: actor,
+      relationId: relation?.id ?? null,
+      scopeVersion: relation?.scope.version ?? null,
+      relyingPartyDid: r.verifierDid,
+    }),
+  };
+}
+
+/**
+ * SCR-PRS-04's *Approve and share with <verifier>* — FLOW-PRS-01 A1,
+ * FLOW-PRS-02 A1. Pure, so the store can run it inside setState and read
+ * the notes it produces from the state the click was made against.
+ *
+ * WHAT IS CHECKED AGAIN, IN WHAT ORDER
+ *
+ * 1. The approver: holds approval:decide here, and is not the sharer —
+ *    never one's own (SAD-EW-01 §8.4), the rule approveOperation always
+ *    kept and still does.
+ * 2. The sharer's standing (E16/E11): their relation still ACTIVE and still
+ *    permitting this share, reach included. An approval confirms a
+ *    colleague's decision; it doesn't stand in for a permission that has
+ *    lapsed. Nothing is sent and the request goes back to OPEN for someone
+ *    who may answer it — not FAILED, because the bank's request is still
+ *    perfectly answerable.
+ * 3. V1/V2: the verifier still listed. If not, FAILED.
+ * 4. V7: the credentials chosen still shareable. If not, back to OPEN with
+ *    the change shown.
+ *
+ * Only then does the share run, with the approver on the record.
+ */
+function approveShare(s: DemoState, id: string, approver: PersonId, method: "web" | "wallet"): { next: DemoState; notes: Note[] } {
+  const none = { next: s, notes: [] as Note[] };
+  const op = s.parkedOperations.find((p) => p.id === id);
+  if (!op || op.state !== "parked" || !op.targetId) return none;
+  const r = s.presentationRequests.find((x) => x.id === op.targetId);
+  if (!r || sharing.statusOf(r) !== "AWAITING_APPROVAL" || r.approvalId !== id) return none;
+  const orgId = r.orgId ?? PELDEN;
+  /* Never one's own, and only someone holding approval:decide. Refused —
+     and the refusal is on the record (FLOW-PRS-01/02 §10, AC-03). */
+  if (op.requestedBy === approver) return { next: refusedOnRecord(s, approver, r, "approving their own share"), notes: [] };
+  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver))
+    return { next: refusedOnRecord(s, approver, r, "approving without approval:decide"), notes: [] };
+
+  const signature = { personId: approver, at: today(), method };
+  const ops = (patch: Partial<ParkedOperation>) =>
+    s.parkedOperations.map((p) => (p.id === id ? { ...p, signatures: [...p.signatures, signature], ...patch } : p));
+  const reqs = (patch: Partial<PresentationRequest>) => s.presentationRequests.map((x) => (x.id === r.id ? { ...x, ...patch } : x));
+  const sharerName = nameOf(s, op.requestedBy);
+
+  const relation = s.relations.find((x) => x.id === op.relationId);
+  if (!relation || relation.state !== "ACTIVE" || !sharing.mayShare(s, op.requestedBy, r)) {
+    const lapsed = {
+      ...s,
+      parkedOperations: ops({ state: "stale", invalidatedReason: `${sharerName} can no longer share this, so it hasn't been sent.` }),
+      presentationRequests: reqs({ status: "OPEN", approvalId: null, lapsedSharer: op.requestedBy, initiatedBy: null, initiatedAt: null }),
+    };
+    return {
+      /* E16/E11 on the record: the share the sharer's standing no longer
+         covers, refused at approval (§10). */
+      next: refusedOnRecord(lapsed, op.requestedBy, r, `sharing, at approval — ${sharerName} can no longer share this`, op.relationId),
+      notes: noteTo(
+        s,
+        sharing.answerersFor(s, r).filter((x) => x !== op.requestedBy),
+        NOTICE.reopened(r.verifierName, sharerName, r.expiresAt),
+        orgId,
+      ),
+    };
+  }
+
+  if (!sharing.listedVerifier(s, r.verifierOrgId)) {
+    const failure = `${r.verifierName} can't receive this any more. Nothing has been shared.`;
+    return {
+      next: { ...s, parkedOperations: ops({ state: "stale", invalidatedReason: failure }), presentationRequests: reqs({ status: "FAILED", failure }) },
+      notes: noteTo(s, [op.requestedBy], failure, orgId),
+    };
+  }
+
+  const changed = sharing.matchRequest(s, r).find((m) => !m.options.some((c) => c.id === r.chosen?.[m.descriptor.id]));
+  if (changed) {
+    const held = s.heldCredentials.find((c) => c.id === r.chosen?.[changed.descriptor.id]);
+    const reason = `${changed.descriptor.credentialType} can't be shared any more: ${(held && sharing.whyUnshareable(held)) ?? "it is no longer in your wallet"}.`;
+    /* Open again for anyone who may share it: the failed attempt's sharer
+       goes with it, as on the E16 path above, and the reason stays so the
+       next person is told why (V7). */
+    return {
+      next: {
+        ...s,
+        parkedOperations: ops({ state: "stale", invalidatedReason: reason }),
+        presentationRequests: reqs({ status: "OPEN", approvalId: null, failure: reason, initiatedBy: null, initiatedAt: null }),
+      },
+      notes: noteTo(s, [op.requestedBy], reason, orgId),
+    };
+  }
+
+  const next = applyShare({ ...s, parkedOperations: ops({ state: "approved" }) }, r.id, r.chosen ?? {}, op.requestedBy, approver);
+  const root = sharing.rootOf(s, orgId);
+  const approverName = nameOf(s, approver);
+  return {
+    next,
+    notes: [
+      ...noteTo(s, [op.requestedBy], NOTICE.approved(approverName, typesOf(r), r.verifierName), orgId),
+      /* D20 — the Root is told whenever anyone else shares, on approval
+         too; not when the Root is the one who just approved it. */
+      ...(root && root !== approver && root !== op.requestedBy
+        ? noteTo(s, [root], NOTICE.rootTold(sharerName, orgNameOf(s, orgId), typesOf(r), r.verifierName, approverName), orgId)
+        : []),
+    ],
+  };
+}
+
+/**
+ * SCR-PRS-04's *Don't approve* (D15). The request goes back to OPEN — the
+ * approver decided this person shouldn't share this now, not that the
+ * organisation refuses the bank — and the sharer is told, with the note.
+ */
+function rejectShare(s: DemoState, id: string, approver: PersonId, note: string): { next: DemoState; notes: Note[] } {
+  const none = { next: s, notes: [] as Note[] };
+  const op = s.parkedOperations.find((p) => p.id === id);
+  if (!op || op.state !== "parked" || !op.targetId) return none;
+  const r = s.presentationRequests.find((x) => x.id === op.targetId);
+  if (!r || sharing.statusOf(r) !== "AWAITING_APPROVAL" || r.approvalId !== id) return none;
+  const orgId = r.orgId ?? PELDEN;
+  if (op.requestedBy === approver) return { next: refusedOnRecord(s, approver, r, "deciding their own share"), notes: [] };
+  if (!sharing.approversFor(s, orgId, op.requestedBy).includes(approver))
+    return { next: refusedOnRecord(s, approver, r, "deciding a share without approval:decide"), notes: [] };
+  const relation = s.relations.find((x) => x.personId === approver && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
+  return {
+    next: {
+      ...s,
+      parkedOperations: s.parkedOperations.map((p) => (p.id === id ? { ...p, state: "rejected", decisionReason: note || null } : p)),
+      presentationRequests: s.presentationRequests.map((x) =>
+        /* Open again with no sharer: whoever answers next is the one whose
+           consent it carries, and the rejection says who declined this one. */
+        x.id === r.id
+          ? { ...x, status: "OPEN" as const, approvalId: null, initiatedBy: null, initiatedAt: null, failure: null, rejection: { by: approver, note, at: today() } }
+          : x,
+      ),
+      auditEntries: appendAudit(s, {
+        operation: "approval:decide",
+        summary: `Didn't approve ${nameOf(s, op.requestedBy)} sharing ${typesOf(r)} with ${r.verifierName}`,
+        actorId: approver,
+        relationId: relation?.id ?? null,
+        scopeVersion: relation?.scope.version ?? null,
+        relyingPartyDid: r.verifierDid,
+      }),
+    },
+    notes: noteTo(s, [op.requestedBy], NOTICE.rejected(nameOf(s, approver), r.verifierName, Boolean(note.trim())), orgId),
   };
 }
 
@@ -901,6 +1122,13 @@ function markRefused(s: DemoState, id: string, refusal: string): DemoState {
   };
 }
 
+/** What a session link is when it loads (SCR-PRS-01). */
+export type SessionLook =
+  | { kind: "unknown" }
+  | { kind: "expired"; verifierName: string; sessionId: string }
+  | { kind: "used"; verifierName: string; requestId: string | null; sessionId: string }
+  | { kind: "ready"; verifierName: string; displayReference: string; sessionId: string };
+
 interface DemoActions {
   addSchema: (input: {
     name: string;
@@ -1020,11 +1248,59 @@ interface DemoActions {
      Presenting what the entity is asked for, and the approval gate in front
      of it. Accepting what it is offered is Flow 6's, below: it never parks. */
 
-  /** Sends a presentation, disclosing exactly these attributes. */
-  presentProof: (requestId: string, attributes: string[]) => void;
-  /** Parks a presentation, recording what it would disclose. */
-  parkPresentation: (requestId: string, attributes: string[]) => void;
-  declineVerificationRequest: (requestId: string) => void;
+  /* ---- Presenting a credential (Flow 7) ----
+     FLOW-PRS-01 (from a verifier's website) and FLOW-PRS-02 (in the
+     wallet). Who may share, who must agree and what answers a request are
+     decided here, from lib/sharing.ts; the screens render the answers. */
+
+  /** §5.3 — what *Share* would do for the person driving, or null if there's no such request. */
+  shareVerdict: (requestId: string) => sharing.ShareVerdict | null;
+  /** V7 — which held credential answers each descriptor, newest first. */
+  matchRequest: (requestId: string) => sharing.DescriptorMatch[];
+  /** The verified holders the person driving acts for — SCR-PRS-01's choice. */
+  sharingOrgs: () => Organization[];
+  /** Who may approve this share — everyone holding approval:decide except whoever chose it. */
+  whoApproves: (requestId: string) => PersonId[];
+  /** SCR-PRS-06 — the verifier organisation's OWNER, of an organisation approved to verify. */
+  canManageReturnAddresses: () => boolean;
+  /** Simulated — the verifier's back end creates a session when its button is pressed (§7.1). */
+  startPresentationSession: (verifierOrgId: string, displayReference: string) => string | null;
+  /** SCR-PRS-01 — the link loads. Records the first load (D16) and says what the link is now. */
+  openPresentationSession: (sessionId: string) => SessionLook;
+  /** SCR-PRS-01 → step 4 — redeem for the chosen organisation; the request arrives and is checked. */
+  redeemPresentationSession: (
+    sessionId: string,
+    orgId: string,
+    /** Simulated — NDI's list can't be reached when the request arrives (FLOW-PRS-01 E8). */
+    opts?: { registryDown?: boolean },
+  ) => { ok: true; requestId: string } | { ok: false; error: "E1" | "E2" | "E3" | "E4" | "E7" | "E8"; requestId?: string | null };
+  /** SCR-PRS-02 — *Share*. AUTO sends; SINGLE_APPROVER asks someone else. */
+  shareRequest: (
+    requestId: string,
+    chosen: Record<string, string>,
+  ) =>
+    | { ok: true; status: "SHARED" }
+    | { ok: true; status: "AWAITING_APPROVAL"; approvers: PersonId[] }
+    | { ok: false; error: "E3" | "E4" | "E5" | "E8" | "E10" | "E13" };
+  /** SCR-PRS-02 — *Decline* (A2). Needs proof:present for this verifier, as sharing does. */
+  declineRequest: (requestId: string) => { ok: true } | { ok: false; error: "E4" | "E5" | "E10" };
+  /** SCR-PRS-02 — *Pass to someone who can* (A4, D13). Needs only credential:list. */
+  passRequest: (requestId: string) => { ok: true; to: PersonId[] } | { ok: false; error: "E10" | "not_permitted" };
+  /** SCR-PRS-02 — *Keep for later* (FLOW-PRS-01 A3): open for 7 days, people who may answer told. */
+  keepForLater: (requestId: string) => void;
+  /** Simulated — a website request has sat OPEN ten minutes with no decision (FLOW-PRS-01 A3). Told once. */
+  remindUndecided: (requestId: string) => void;
+  /** SCR-PRS-03 — back to the verifier's registered address, or null when it's gone (E15). */
+  returnToVerifier: (sessionId: string) => { url: string | null; status: string };
+  /** Simulated — the verifier cancels (FLOW-PRS-01 E14, FLOW-PRS-02 E7). */
+  withdrawPresentationRequest: (requestId: string) => void;
+  /** Simulated — a request arrives on an existing connection (FLOW-PRS-02's trigger). */
+  simulateIncomingRequest: (kind: "bank_recheck" | "untrusted" | "registry_down") => string;
+  /** Simulated — NDI's list answers for a request held RECEIVED (E2/E8). */
+  resolveRegistryCheck: (requestId: string) => void;
+  /** SCR-PRS-06 — the verifier's OWNER registers or removes a return address. */
+  addReturnAddress: (url: string) => { ok: true } | { ok: false; error: "not_https" | "wildcard" | "not_full" | "duplicate" | "not_owner" };
+  removeReturnAddress: (id: string) => void;
 
   /**
    * Records one approver's decision.
@@ -1610,6 +1886,27 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     }));
   }, [state.credentialRequests, hydrated]);
 
+  /* FLOW-PRS-02 E6 — a request nobody decided within its seven days
+     expires on its date, for every list and every check at once; a share
+     still waiting for an approver lapses with it. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const now = today();
+    if (!state.presentationRequests.some((r) => sharing.statusOf(r, now) !== r.status)) return;
+    setState((s) => {
+      const ending = new Set(s.presentationRequests.filter((r) => sharing.statusOf(r, now) !== r.status).map((r) => r.id));
+      return {
+        ...s,
+        presentationRequests: s.presentationRequests.map((r) => (ending.has(r.id) ? { ...r, status: "EXPIRED" as const } : r)),
+        parkedOperations: s.parkedOperations.map((p) =>
+          p.operation === "proof:present" && p.state === "parked" && p.targetId && ending.has(p.targetId)
+            ? { ...p, state: "expired" as const, decisionReason: "Nobody decided this before it expired." }
+            : p,
+        ),
+      };
+    });
+  }, [state.presentationRequests, hydrated]);
+
   /* FLOW-CRD-02 E4 — an offer sent unasked that nobody accepted in 30 days
      lapses on its date, the same way. */
   useEffect(() => {
@@ -1659,6 +1956,27 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         activity: [{ id: rid("a"), text, at: today(), orgId: orgId ?? s.activeOrgId }, ...s.activity].slice(0, 20),
       })),
     [],
+  );
+
+  /* FLOW-PRS-01 A3 — a website request left undecided: on *Keep for later*,
+     or after ten minutes OPEN. Those who may answer are told once, except
+     the person who started on it (UX-EW-04 §3.5). */
+  const tellUndecided = useCallback(
+    (s0: DemoState, r: PresentationRequest, starter: PersonId | null) => {
+      const orgId = r.orgId ?? PELDEN;
+      const to = sharing.answerersFor(s0, r).filter((id) => id !== starter);
+      setState((s) => ({
+        ...s,
+        presentationRequests: s.presentationRequests.map((x) => (x.id === r.id ? { ...x, undecidedToldAt: x.undecidedToldAt ?? today() } : x)),
+      }));
+      if (!to.length || r.undecidedToldAt) return;
+      const name = s0.people.find((p) => p.id === starter)?.name ?? "Someone";
+      log(
+        `To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.undecided(r.verifierName, orgNameOf(s0, orgId), name, r.expiresAt)}`,
+        orgId,
+      );
+    },
+    [log],
   );
 
   const actions = useMemo<DemoActions>(
@@ -2245,56 +2563,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           ),
         })),
 
-      presentProof: (requestId, attributes) =>
-        setState((s) => applyPresentation(s, requestId, attributes, null)),
-
-      parkPresentation: (requestId, attributes) =>
-        setState((s) => {
-          const request = s.verificationRequests.find((v) => v.id === requestId);
-          if (!request) return s;
-          const relation = s.relations.find(
-            (r) => r.personId === s.harness.persona && r.state === "ACTIVE",
-          );
-          return {
-            ...s,
-            verificationRequests: s.verificationRequests.map((v) =>
-              v.id === requestId ? { ...v, state: "parked", disclosing: attributes } : v,
-            ),
-            parkedOperations: [
-              {
-                id: rid("park"),
-                operation: "proof:present" as const,
-                summary: `Present ${request.credentialType} to ${request.relyingParty}`,
-                requestedBy: s.harness.persona,
-                relationId: relation?.id ?? "rel-rinzin",
-                scopeVersion: relation?.scope.version ?? 1,
-                targetId: request.id,
-                targetRelyingParty: request.relyingParty,
-                payloadHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random()
-                  .toString(16)
-                  .slice(2, 10)}`,
-                policy: "SINGLE_APPROVER" as const,
-                requiredSignatures: 1,
-                signatures: [],
-                state: "parked" as const,
-                decisionReason: null,
-                createdAt: today(),
-                expiresAt: request.expiresAt,
-              },
-              ...s.parkedOperations,
-            ],
-          };
-        }),
-
-      declineVerificationRequest: (requestId) =>
-        setState((s) => ({
-          ...s,
-          verificationRequests: s.verificationRequests.map((v) =>
-            v.id === requestId ? { ...v, state: "declined" } : v,
-          ),
-        })),
-
-      approveOperation: (id, method) =>
+      approveOperation: (id, method) => {
+        const s0 = stateRef.current;
+        /* A share is approved on SCR-PRS-04, with its own re-checks and
+           outcomes (approveShare). Everything else parks as it always did. */
+        if (s0.parkedOperations.find((p) => p.id === id)?.operation === "proof:present") {
+          const persona = s0.harness.persona;
+          setState((s) => approveShare(s, id, persona, method).next);
+          approveShare(s0, id, persona, method).notes.forEach((n) => log(n.text, n.orgId));
+          return;
+        }
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
@@ -2348,20 +2626,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             };
           }
 
-          const approver = s.harness.persona;
-          /* Only presentations park. Accepting an offer never does — every
-             preset carries credential:accept AUTO (EW-FLOW6-SD §5.3). */
-          if (operation.operation === "proof:present" && operation.targetId) {
-            const request = next.verificationRequests.find(
-              (v) => v.id === operation.targetId,
-            );
-            next = applyPresentation(
-              next,
-              operation.targetId,
-              request?.disclosing ?? request?.requiredAttributes ?? [],
-              approver,
-            );
-          } else if (operation.operation === "authority:issue" && operation.heldAuthority) {
+          /* Shares were handed to approveShare above, and accepting an offer
+             never parks — every preset carries credential:accept AUTO
+             (EW-FLOW6-SD §5.3). What is left is a held grant. */
+          if (operation.operation === "authority:issue" && operation.heldAuthority) {
             const authority = { ...operation.heldAuthority, issuedAt: today() };
             next = {
               ...next,
@@ -2379,9 +2647,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           }
 
           return next;
-        }),
+        });
+      },
 
-      rejectOperation: (id, reason) =>
+      rejectOperation: (id, reason) => {
+        const s0 = stateRef.current;
+        if (s0.parkedOperations.find((p) => p.id === id)?.operation === "proof:present") {
+          const persona = s0.harness.persona;
+          setState((s) => rejectShare(s, id, persona, reason).next);
+          rejectShare(s0, id, persona, reason).notes.forEach((n) => log(n.text, n.orgId));
+          return;
+        }
         setState((s) => {
           const operation = s.parkedOperations.find((p) => p.id === id);
           if (!operation) return s;
@@ -2392,16 +2668,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             parkedOperations: s.parkedOperations.map((p) =>
               p.id === id ? { ...p, state: "rejected", decisionReason: reason } : p,
             ),
-            /* The held thing goes back to being undecided rather than
-               vanishing: a rejected approval is the approver's answer, not
-               the end of the relying party's request. */
-            verificationRequests: s.verificationRequests.map((v) =>
-              v.id === operation.targetId && v.state === "parked"
-                ? { ...v, state: "ready" }
-                : v,
-            ),
+            /* A held grant simply never goes out; there is nothing
+               else to put back. */
           };
-        }),
+        });
+      },
 
       issueAuthority: (input) => {
         /* Only someone whose own appointment carries authority:issue may
@@ -5042,6 +5313,489 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       },
 
+      /* ---- Presenting a credential (Flow 7) ---- */
+
+      shareVerdict: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        return r ? sharing.shareVerdict(s0, s0.harness.persona, r) : null;
+      },
+
+      matchRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        return r ? sharing.matchRequest(s0, r) : [];
+      },
+
+      whoApproves: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r) return [];
+        return sharing.approversFor(s0, r.orgId ?? PELDEN, r.initiatedBy ?? s0.harness.persona);
+      },
+
+      canManageReturnAddresses: () => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        return Boolean(org && sharing.listedVerifier(s0, org.id) && roleIn(org, me) === "Owner");
+      },
+
+      sharingOrgs: () => {
+        const s0 = stateRef.current;
+        return sharing.holdersActedFor(s0, s0.harness.persona);
+      },
+
+      startPresentationSession: (verifierOrgId, displayReference) => {
+        const s0 = stateRef.current;
+        /* The capability gate on the verifier's side (§7.1 step 1): only an
+           organisation with an ACTIVE VERIFIER source gets a link at all. */
+        if (!sharing.listedVerifier(s0, verifierOrgId)) return null;
+        const id = `ps_${Math.random().toString(36).slice(2, 12)}`;
+        const session: PresentationSession = {
+          id,
+          verifierOrgId,
+          asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
+          purpose: "To open a business current account we check your company's registration against the Registrar's record.",
+          returnUrlId: "ekyb-return",
+          state: `app_${Math.random().toString(36).slice(2, 10)}`,
+          displayReference,
+          status: "CREATED",
+          createdAt: Date.now(),
+          firstLoadedAt: null,
+          redeemedAt: null,
+          boundOrgId: null,
+          requestId: null,
+        };
+        setState((s) => ({ ...s, presentationSessions: [session, ...s.presentationSessions] }));
+        return id;
+      },
+
+      openPresentationSession: (sessionId) => {
+        const s0 = stateRef.current;
+        const session = s0.presentationSessions.find((x) => x.id === sessionId);
+        /* E1 — no session: nothing is known, so no return is offered. */
+        if (!session) return { kind: "unknown" };
+        /* The name NDI lists, read from the platform's record — never from
+           the link (UXD-41, §8 "where the name comes from before V1"). */
+        const verifierName = s0.organizations.find((o) => o.id === session.verifierOrgId)?.name ?? "the website you came from";
+        /* E3 — already redeemed. Its status to the organisation it's bound
+           to, nothing to anyone else (S7). */
+        if (session.boundOrgId) {
+          const bound = sharing.holdersActedFor(s0, s0.harness.persona).some((o) => o.id === session.boundOrgId);
+          return { kind: "used", verifierName, requestId: bound ? session.requestId : null, sessionId };
+        }
+        if (session.status === "DECLINED" || session.status === "FAILED") return { kind: "used", verifierName, requestId: null, sessionId };
+        /* E2 — past either window. */
+        if (session.status === "EXPIRED" || sharing.sessionLapsed(session)) {
+          if (session.status !== "EXPIRED")
+            setState((s) => ({ ...s, presentationSessions: s.presentationSessions.map((x) => (x.id === sessionId ? { ...x, status: "EXPIRED" as const } : x)) }));
+          return { kind: "expired", verifierName, sessionId };
+        }
+        /* The first load starts the 30 minutes; a reload during sign-in is
+           not a second use (P1). */
+        if (session.firstLoadedAt === null)
+          setState((s) => ({
+            ...s,
+            presentationSessions: s.presentationSessions.map((x) => (x.id === sessionId && x.firstLoadedAt === null ? { ...x, firstLoadedAt: Date.now() } : x)),
+          }));
+        return { kind: "ready", verifierName, displayReference: session.displayReference, sessionId };
+      },
+
+      redeemPresentationSession: (sessionId, orgId, opts) => {
+        const s0 = stateRef.current;
+        const session = s0.presentationSessions.find((x) => x.id === sessionId);
+        if (!session) return { ok: false, error: "E1" };
+        if (session.boundOrgId) return { ok: false, error: "E3", requestId: session.boundOrgId === orgId ? session.requestId : null };
+        const setSession = (patch: Partial<PresentationSession>) =>
+          setState((s) => ({ ...s, presentationSessions: s.presentationSessions.map((x) => (x.id === sessionId ? { ...x, ...patch } : x)) }));
+        if (session.status === "EXPIRED" || sharing.sessionLapsed(session)) {
+          setSession({ status: "EXPIRED" });
+          return { ok: false, error: "E2" };
+        }
+        /* P2/E4 — only an organisation this person acts for, verified and
+           holding. A direct call naming another is refused like the list. */
+        if (!sharing.holdersActedFor(s0, s0.harness.persona).some((o) => o.id === orgId)) {
+          setSession({ status: "DECLINED" });
+          return { ok: false, error: "E4" };
+        }
+        /* Steps 4–6. The invitation is received, the request arrives on it,
+           and V1 reads the verifier from the session — never from the
+           request (§6). A verifier no longer listed is BLOCKED (E7). */
+        const verifier = sharing.listedVerifier(s0, session.verifierOrgId);
+        const listed = s0.organizations.find((o) => o.id === session.verifierOrgId);
+        /* E8 — NDI's list can't be reached at V1: held RECEIVED and checked
+           again, never passed unchecked. The person may go back pending, and
+           finds it on Waiting as "Checking …" (UX-EW-04 v0.3). */
+        const held = Boolean(opts?.registryDown);
+        const id = rid("pr");
+        const request: PresentationRequest = {
+          id,
+          orgId,
+          verifierOrgId: session.verifierOrgId,
+          verifierName: listed?.name ?? "Unknown",
+          verifierDid: listed ? sharing.verifierDidOf(listed) : "",
+          purpose: session.purpose,
+          asked: session.asked,
+          sessionId,
+          displayReference: session.displayReference,
+          status: held ? "RECEIVED" : verifier ? "OPEN" : "BLOCKED",
+          blockedReason: held || verifier ? null : "VERIFIER_NOT_TRUSTED",
+          openedBy: s0.harness.persona,
+          receivedAt: today(),
+          expiresAt: sharing.expiresFromToday(),
+        };
+        setState((s) => ({
+          ...s,
+          presentationRequests: [request, ...s.presentationRequests],
+          presentationSessions: s.presentationSessions.map((x) =>
+            x.id === sessionId ? { ...x, boundOrgId: orgId, redeemedAt: Date.now(), requestId: id, status: "OPENED" as const } : x,
+          ),
+        }));
+        if (held) return { ok: false, error: "E8", requestId: id };
+        return verifier ? { ok: true, requestId: id } : { ok: false, error: "E7", requestId: id };
+      },
+
+      shareRequest: (requestId, chosen) => {
+        const s0 = stateRef.current;
+        const me = s0.harness.persona;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        /* Compare-and-set on OPEN: two people sharing at once send once, and
+           the second sees who answered (E10, AC-09). */
+        if (!r || sharing.statusOf(r) !== "OPEN") return { ok: false, error: "E10" };
+        const verdict = sharing.shareVerdict(s0, me, r);
+        /* Refused through the API as well as on the screen, and recorded
+           (§10): no proof:present (E4/E10), or outside the reach (E5). */
+        if (verdict.kind === "no_permission" || verdict.kind === "outside_reach") {
+          setState((s) => refusedOnRecord(s, me, r, verdict.kind === "no_permission" ? "sharing without Share" : "sharing outside the reach the Root set"));
+          return { ok: false, error: verdict.kind === "no_permission" ? "E4" : "E5" };
+        }
+        if (verdict.kind === "no_approver") return { ok: false, error: "E13" };
+        const matches = sharing.matchRequest(s0, r);
+        if (!sharing.satisfiable(matches)) return { ok: false, error: "E3" };
+        /* D18 — the newest valid credential unless the person chose another
+           that still answers the descriptor. */
+        const pick: Record<string, string> = {};
+        for (const m of matches) {
+          const wanted = chosen[m.descriptor.id];
+          pick[m.descriptor.id] = m.options.some((c) => c.id === wanted) ? wanted : m.options[0].id;
+        }
+        const orgId = r.orgId ?? PELDEN;
+        const myName = s0.people.find((p) => p.id === me)?.name ?? "Someone";
+        const types = typesOf(r);
+
+        if (verdict.kind === "auto") {
+          /* V1/V2 again, immediately before sending (§6). */
+          if (!sharing.listedVerifier(s0, r.verifierOrgId)) {
+            const failure = `${r.verifierName} can't receive this any more. Nothing has been shared.`;
+            setState((s) => ({ ...s, presentationRequests: s.presentationRequests.map((x) => (x.id === requestId ? { ...x, status: "FAILED" as const, failure } : x)) }));
+            return { ok: false, error: "E8" };
+          }
+          setState((s) => applyShare(s, requestId, pick, me, null));
+          /* D20 — someone other than the Root shared: the Root is told at once. */
+          const root = sharing.rootOf(s0, orgId);
+          if (root && root !== me) {
+            const rootName = s0.people.find((p) => p.id === root)?.name ?? "The representative";
+            log(`To ${rootName}: ${NOTICE.rootTold(myName, orgNameOf(s0, orgId), types, r.verifierName, null)}`, orgId);
+          }
+          return { ok: true, status: "SHARED" };
+        }
+
+        /* SINGLE_APPROVER (A1). The share waits as a parked operation, so it
+           sits in the Approvals queue beside everything else that waits, and
+           approveOperation — which never lets anyone approve their own — is
+           the one way it runs. */
+        const relation = s0.relations.find((x) => x.personId === me && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
+        const opId = rid("park");
+        setState((s) => ({
+          ...s,
+          presentationRequests: s.presentationRequests.map((x) =>
+            x.id === requestId
+              ? {
+                  ...x,
+                  status: "AWAITING_APPROVAL" as const,
+                  chosen: pick,
+                  initiatedBy: me,
+                  initiatedAt: today(),
+                  approvalId: opId,
+                  rejection: null,
+                  lapsedSharer: null,
+                  failure: null,
+                }
+              : x,
+          ),
+          parkedOperations: [
+            {
+              id: opId,
+              orgId: r.orgId,
+              operation: "proof:present" as const,
+              summary: `Share ${types} with ${r.verifierName}`,
+              requestedBy: me,
+              relationId: relation?.id ?? "",
+              scopeVersion: relation?.scope.version ?? 1,
+              targetId: requestId,
+              targetRelyingParty: r.verifierName,
+              payloadHash: `sha256:${Math.random().toString(16).slice(2, 10)}${Math.random().toString(16).slice(2, 10)}`,
+              policy: "SINGLE_APPROVER" as const,
+              requiredSignatures: 1,
+              signatures: [],
+              state: "parked" as const,
+              decisionReason: null,
+              createdAt: today(),
+              expiresAt: r.expiresAt,
+            },
+            ...s.parkedOperations,
+          ],
+          auditEntries: appendAudit(s, {
+            operation: "proof:present",
+            summary: `Chose to share ${types} with ${r.verifierName} — sent for approval`,
+            actorId: me,
+            relationId: relation?.id ?? null,
+            scopeVersion: relation?.scope.version ?? null,
+            relyingPartyDid: r.verifierDid,
+          }),
+        }));
+        log(`To ${namesOf(verdict.approvers.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.approve(myName, types, r.verifierName)}`, orgId);
+        return { ok: true, status: "AWAITING_APPROVAL", approvers: verdict.approvers };
+      },
+
+      declineRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const me = s0.harness.persona;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || sharing.statusOf(r) !== "OPEN") return { ok: false, error: "E10" };
+        /* Declining answers the bank, so it needs what sharing needs —
+           proof:present for this verifier (FLOW-PRS-02 §7.2). It doesn't
+           need an approver: refusing sends nothing. */
+        const verdict = sharing.shareVerdict(s0, me, r);
+        if (verdict.kind === "no_permission") return { ok: false, error: "E4" };
+        if (verdict.kind === "outside_reach") return { ok: false, error: "E5" };
+        const relation = s0.relations.find((x) => x.personId === me && (x.orgId ?? PELDEN) === (r.orgId ?? PELDEN) && x.state === "ACTIVE");
+        setState((s) => ({
+          ...s,
+          presentationRequests: s.presentationRequests.map((x) =>
+            x.id === requestId ? { ...x, status: "DECLINED" as const, decidedBy: me, decidedAt: today(), failure: null } : x,
+          ),
+          auditEntries: appendAudit(s, {
+            operation: "proof:present",
+            summary: `Declined ${r.verifierName}'s request for ${typesOf(r)}`,
+            actorId: me,
+            relationId: relation?.id ?? null,
+            scopeVersion: relation?.scope.version ?? null,
+            relyingPartyDid: r.verifierDid,
+          }),
+        }));
+        return { ok: true };
+      },
+
+      passRequest: (requestId) => {
+        const s0 = stateRef.current;
+        const me = s0.harness.persona;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || sharing.statusOf(r) !== "OPEN") return { ok: false, error: "E10" };
+        const orgId = r.orgId ?? PELDEN;
+        if (!mayOperate(s0, me, orgId, "credential:list")) return { ok: false, error: "not_permitted" };
+        const to = sharing.whoCanShare(s0, r, me);
+        const myName = s0.people.find((p) => p.id === me)?.name ?? "Someone";
+        const relation = s0.relations.find((x) => x.personId === me && (x.orgId ?? PELDEN) === orgId && x.state === "ACTIVE");
+        setState((s) => ({
+          ...s,
+          presentationRequests: s.presentationRequests.map((x) =>
+            x.id === requestId ? { ...x, passedBy: [...(x.passedBy ?? []).filter((p) => p !== me), me] } : x,
+          ),
+          /* A pass is on the record like consent and decline (§10). */
+          auditEntries: appendAudit(s, {
+            operation: "credential:list",
+            summary: `Passed ${r.verifierName}'s request for ${typesOf(r)} to ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id)) || "nobody"}`,
+            actorId: me,
+            relationId: relation?.id ?? null,
+            scopeVersion: relation?.scope.version ?? null,
+            relyingPartyDid: r.verifierDid,
+          }),
+        }));
+        if (to.length)
+          log(`To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.passed(myName, r.verifierName, r.expiresAt)}`, orgId);
+        return { ok: true, to };
+      },
+
+      keepForLater: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || sharing.statusOf(r) !== "OPEN") return;
+        setState((s) => ({
+          ...s,
+          presentationSessions: s.presentationSessions.map((x) => (x.id === r.sessionId ? { ...x, returnedPending: true } : x)),
+        }));
+        /* A3 — kept, so the people who may answer are told now rather than
+           after ten undecided minutes. */
+        tellUndecided(s0, r, s0.harness.persona);
+      },
+
+      remindUndecided: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || !r.sessionId || sharing.statusOf(r) !== "OPEN" || r.undecidedToldAt) return;
+        tellUndecided(s0, r, r.openedBy ?? null);
+      },
+
+      returnToVerifier: (sessionId) => {
+        const s0 = stateRef.current;
+        const session = s0.presentationSessions.find((x) => x.id === sessionId);
+        if (!session) return { url: null, status: "failed" };
+        const request = s0.presentationRequests.find((x) => x.id === session.requestId);
+        /* Going back without a final answer is what makes the session
+           PENDING (§5.1) — the verifier's page must not say it has it. */
+        const pending = request ? sharing.isLive(sharing.statusOf(request)) : false;
+        if (pending && !session.returnedPending)
+          setState((s) => ({ ...s, presentationSessions: s.presentationSessions.map((x) => (x.id === sessionId ? { ...x, returnedPending: true } : x)) }));
+        const status = sharing.sessionStatusOf({ ...session, returnedPending: session.returnedPending || pending }, request).toLowerCase();
+        /* Only a registered address, matched by identifier (D9). One that
+           has been removed means no link at all (E15). */
+        const address = s0.returnAddresses.find((a) => a.orgId === session.verifierOrgId && a.returnUrlId === session.returnUrlId && !a.removedAt);
+        if (!address) return { url: null, status };
+        return { url: `/simulated/bank/return?session=${session.id}&state=${session.state}&status=${status}`, status };
+      },
+
+      withdrawPresentationRequest: (requestId) =>
+        setState((s) => {
+          const r = s.presentationRequests.find((x) => x.id === requestId);
+          if (!r || !sharing.isLive(sharing.statusOf(r))) return s;
+          return {
+            ...s,
+            presentationRequests: s.presentationRequests.map((x) => (x.id === requestId ? { ...x, status: "WITHDRAWN" as const } : x)),
+            /* E7 — approvers' pending items are removed, not left to be decided. */
+            parkedOperations: s.parkedOperations.filter((p) => p.id !== r.approvalId),
+          };
+        }),
+
+      simulateIncomingRequest: (kind) => {
+        const s0 = stateRef.current;
+        const active = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const orgId = active?.capabilities.includes("holder") ? active.id : PELDEN;
+        const bob = s0.organizations.find((o) => o.id === "org-bob");
+        const id = rid("pr");
+        const base = {
+          id,
+          orgId,
+          sessionId: null,
+          displayReference: null,
+          receivedAt: today(),
+          expiresAt: sharing.expiresFromToday(),
+        };
+        let request: PresentationRequest;
+        if (kind === "untrusted") {
+          /* E1 — the sender isn't on the platform, so the name is only what
+             it claimed. BLOCKED, on Refused, and nobody is told. */
+          request = {
+            ...base,
+            verifierOrgId: null,
+            verifierName: "Druk Express Finance",
+            verifierDid: "did:polygon:0x5e1b0c77d9a34f2c8e60b1d47a29f3c58e0d6b12",
+            purpose: "Pre-approved business loan — confirm your details.",
+            asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
+            status: "BLOCKED",
+            blockedReason: "VERIFIER_NOT_TRUSTED",
+          };
+        } else {
+          const asked = [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "status"] }];
+          const purpose = kind === "bank_recheck" ? "Annual re-check that a business customer is registered and active." : "Updating a business customer's registered details.";
+          /* E12 — identical to one already OPEN: its own request, marked. */
+          const repeat = s0.presentationRequests.find(
+            (x) =>
+              (x.orgId ?? PELDEN) === orgId &&
+              x.verifierOrgId === "org-bob" &&
+              x.purpose === purpose &&
+              sharing.statusOf(x) === "OPEN",
+          );
+          request = {
+            ...base,
+            verifierOrgId: "org-bob",
+            verifierName: bob?.name ?? "Bank of Bhutan",
+            verifierDid: bob ? sharing.verifierDidOf(bob) : "",
+            purpose,
+            asked,
+            /* E2 — NDI's list can't be reached: held RECEIVED, never passed
+               unchecked, and nobody is told until it passes. */
+            status: kind === "registry_down" ? "RECEIVED" : "OPEN",
+            repeatOf: repeat?.id ?? null,
+          };
+        }
+        setState((s) => ({ ...s, presentationRequests: [request, ...s.presentationRequests] }));
+        if (request.status === "OPEN") {
+          const to = sharing.answerersFor(s0, request);
+          if (to.length)
+            log(
+              `To ${namesOf(to.map((pid) => s0.people.find((p) => p.id === pid)?.name ?? pid))}: ${NOTICE.ready(request.verifierName, orgNameOf(s0, orgId), request.purpose, request.expiresAt)}`,
+              orgId,
+            );
+        }
+        return id;
+      },
+
+      resolveRegistryCheck: (requestId) => {
+        const s0 = stateRef.current;
+        const r = s0.presentationRequests.find((x) => x.id === requestId);
+        if (!r || sharing.statusOf(r) !== "RECEIVED") return;
+        const passes = Boolean(sharing.listedVerifier(s0, r.verifierOrgId));
+        setState((s) => ({
+          ...s,
+          presentationRequests: s.presentationRequests.map((x) =>
+            x.id === requestId ? { ...x, status: passes ? ("OPEN" as const) : ("BLOCKED" as const), blockedReason: passes ? null : "VERIFIER_NOT_TRUSTED" } : x,
+          ),
+        }));
+        if (passes) {
+          const to = sharing.answerersFor(s0, r);
+          if (to.length)
+            log(
+              `To ${namesOf(to.map((id) => s0.people.find((p) => p.id === id)?.name ?? id))}: ${NOTICE.ready(r.verifierName, orgNameOf(s0, r.orgId ?? PELDEN), r.purpose, r.expiresAt)}`,
+              r.orgId ?? PELDEN,
+            );
+        }
+      },
+
+      addReturnAddress: (url) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        /* The verifier's OWNER, of an organisation approved to verify (SCR-PRS-06). */
+        if (!org || !sharing.listedVerifier(s0, org.id) || roleIn(org, me) !== "Owner") return { ok: false, error: "not_owner" };
+        const value = url.trim();
+        if (!value.toLowerCase().startsWith("https://")) return { ok: false, error: "not_https" };
+        if (value.includes("*")) return { ok: false, error: "wildcard" };
+        let parsed: URL;
+        try {
+          parsed = new URL(value);
+        } catch {
+          return { ok: false, error: "not_full" };
+        }
+        if (!parsed.hostname.includes(".") || parsed.pathname === "/" || /\s/.test(value)) return { ok: false, error: "not_full" };
+        if (s0.returnAddresses.some((a) => a.orgId === org.id && a.url === value && !a.removedAt)) return { ok: false, error: "duplicate" };
+        const slug = parsed.pathname.split("/").filter(Boolean).join("-").replace(/[^a-z0-9-]/gi, "").toLowerCase() || "return";
+        setState((s) => ({
+          ...s,
+          returnAddresses: [
+            ...s.returnAddresses,
+            { id: rid("ra"), orgId: org.id, returnUrlId: `${slug}-${Math.random().toString(36).slice(2, 6)}`, url: value, addedBy: s.harness.persona, addedAt: today() },
+          ],
+        }));
+        /* §7.3 — every change goes to all of the verifier's owners and to NDI at once. */
+        log(`Return address added: ${value}. Sent to every owner and to NDI`, org.id);
+        return { ok: true };
+      },
+
+      removeReturnAddress: (id) => {
+        const s0 = stateRef.current;
+        const org = s0.organizations.find((o) => o.id === s0.activeOrgId);
+        const me = s0.people.find((p) => p.id === s0.harness.persona);
+        const address = s0.returnAddresses.find((a) => a.id === id);
+        if (!org || !address || address.orgId !== org.id || roleIn(org, me) !== "Owner") return;
+        setState((s) => ({
+          ...s,
+          returnAddresses: s.returnAddresses.map((a) => (a.id === id ? { ...a, removedAt: today(), removedBy: s.harness.persona } : a)),
+        }));
+        log(`Return address removed: ${address.url}. Sent to every owner and to NDI`, org.id);
+      },
+
       setPersona: (persona) =>
         setState((s) => {
           /* Driving as someone puts you in their organisation — Yeshey's
@@ -5084,7 +5838,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         }
       },
     }),
-    [hydrated, log],
+    [hydrated, log, tellUndecided],
   );
 
   /**

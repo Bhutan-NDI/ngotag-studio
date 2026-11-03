@@ -126,6 +126,14 @@ const STATUS_TONE: Record<string, Tone> = {
   ready: "pending",
   signing: "pending",
   presented: "positive",
+  /* Flow 7 — a request to share. Waiting for an approver is the healthy
+     state of a share that needs one, so it is pending, as parked is;
+     checking is a request held until NDI's list answers; refused is a
+     request the checks blocked. */
+  received: "pending",
+  awaiting_approval: "pending",
+  shared: "positive",
+  blocked: "negative",
 };
 
 /**

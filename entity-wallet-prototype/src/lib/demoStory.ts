@@ -100,7 +100,7 @@ export const actByNumber = (n: number): Act | undefined => ACTS.find((a) => a.nu
  * setting the entry needs, applied when it is chosen, so neither route can
  * be started in a deployment where it would not exist.
  */
-export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive";
+export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "accredit" | "designate" | "receive" | "share";
 
 /**
  * The flows the demo controls offer — the onboardings the prototype is
@@ -133,6 +133,12 @@ export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "
  * Dorji as its representative: a business needs a registration to share
  * before it can ask for anything. The tax office's side is reached from
  * the request, by switching to Deki — its queue is empty until Pelden asks.
+ *
+ * Flow 7 has two entries. Sharing from the bank's website starts from the
+ * team-ready state: Pelden verified, Dorji its representative, and the bank
+ * able to verify. The approval path starts three months on, where Rinzin
+ * is appointed with *Share* to the bank and needs an approver — the state
+ * the onboarding story never reaches.
  */
 export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "root", code: "FLOW-ONB-02", title: "Root admin onboarding" },
@@ -143,6 +149,7 @@ export const FLOW_GROUPS: { id: FlowGroup; code: string; title: string }[] = [
   { id: "accredit", code: "Flow 4", title: "Approval to verify or issue" },
   { id: "designate", code: "Flow 5", title: "Designating an authority" },
   { id: "receive", code: "Flow 6", title: "Receiving a credential" },
+  { id: "share", code: "Flow 7", title: "Presenting a credential" },
 ];
 
 export interface FlowEntry {
@@ -185,4 +192,6 @@ export const FLOW_ENTRIES: FlowEntry[] = [
   { group: "accredit", label: "A business asks to verify", persona: "dorji", route: "/organisation", start: "teamReady" },
   { group: "designate", label: "Designate the ministry for sole proprietorships", persona: "tshering", route: "/admin/designations", start: "platformReady" },
   { group: "receive", label: "Pelden asks for its TPN", persona: "dorji", route: "/wallet/get", start: "teamReady" },
+  { group: "share", label: "Share from Bank of Bhutan's website", persona: "dorji", route: "/simulated/bank", start: "teamReady" },
+  { group: "share", label: "A controller shares, the owner approves", persona: "rinzin", route: "/wallet/sharing", start: "livedIn" },
 ];

@@ -353,6 +353,70 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     ],
   },
   {
+    area: "Presenting a credential",
+    icon: "send",
+    rows: [
+      {
+        shown: "Bank of Bhutan's website, its application number and its return page",
+        reality:
+          "A dashed stand-in at /simulated/bank, drawn to the verifier integration guide's §5. Pressing its button creates a session in your browser; its return page reads the session back from the demo store and shows what the fetched status means. No bank system exists, and nothing leaves the browser.",
+        needs: "A first bank's eKYB journey changed to start a session, redirect, park a pending application and fetch the result from its back end (EW-FLOW7-SD §13 item 4).",
+      },
+      {
+        shown: "Signing in with Bhutan NDI when the link opens",
+        reality:
+          "The dashed step signs in as whoever the demo is driven as. The 15- and 30-minute windows are real timestamps in your browser; nothing about the session survives on a server.",
+        needs: "Studio keeping the session reference through the existing Bhutan NDI sign-in, and the presentation-session routes (§7.1).",
+      },
+      {
+        shown: "The proof request arriving, the checks, and the share being sent",
+        reality:
+          "No invitation is received, no DIDComm request arrives and nothing is presented or signed. V1/V2 read whether the organisation has the verifier capability; V7 reads the held credentials. The bank's verified result is the demo's own data.",
+        needs: "Organisation-level presentation in the agent (shared with Flow 6), the holder-side request record and checks V1–V7, and the issuer check in verification (D5).",
+      },
+      {
+        shown: "Requests arriving with nobody at a website, a refused sender, and NDI's list being unreachable",
+        reality: "Dashed buttons on Sharing that add requests to the demo store, and one that makes NDI's list answer.",
+        needs: "A verifier sending a proof request on an existing connection, the connection counterparty record (§6), and Trust Registry re-checks with back-off.",
+      },
+      {
+        shown: "A bank cancelling a request",
+        reality: "A dashed button that marks the request cancelled and removes any approval waiting on it.",
+        needs: "The verifier's DELETE on its session, or a problem report on the exchange.",
+      },
+      {
+        shown: "Who is told — a request waiting, one left undecided, passed on, approvers asked, a share approved or not, the representative told of a share, a request open again",
+        reality:
+          "The wording is UX-EW-04 §3.5's notification table, word for word, and each is written to the organisation's activity feed, saying who it goes to. Nothing is emailed. Ten minutes passing with a website request undecided is a dashed button on Sharing; keeping it for later sends the same notice at once. An approver's note is never in the notice, only in the wallet.",
+        needs: "In-app and email delivery, with the link opening the right screen after sign-in.",
+      },
+      {
+        shown: "A request held while NDI's list is checked",
+        reality:
+          "A dashed sign-in on the wallet's page, and a dashed button on Sharing, stand in for NDI's list being out of reach. As UX-EW-04 v0.3 says, a request held this way from a website is listed on Waiting as \"Checking <organisation> — you can't answer this yet\", with no Answer; one that arrived on a connection isn't listed at all until it passes. Nobody is told until it does.",
+        needs: "Trust Registry re-checks with back-off, and the RECEIVED state on the holder-side request record.",
+      },
+      {
+        shown: "Where NDI sends people back to",
+        reality:
+          "Return addresses are kept in your browser; the fresh Bhutan NDI sign-in for each change is a dashed step, and \"sent to every owner and to NDI\" is a line in the activity feed.",
+        needs: "SCR-PRS-06's registration with exact matching, step-up sign-in, audit and notification.",
+      },
+      {
+        shown: "Refused shares and approvals on the record",
+        reality:
+          "A share refused for want of Share or outside its reach, an approval of one's own share, and a sharer whose standing lapsed before approval each add a row to the audit trail in your browser, with the relation, the request and the reason (FLOW-PRS-01/02 §10). The screens never offer the first two, so they are reached only by calling the store.",
+        needs: "The same rows written by the presentation-request routes when they refuse, in the append-only store.",
+      },
+      {
+        shown: "A sharer whose appointment ends while their share waits for approval",
+        reality:
+          "The store checks for it when the share is approved (FLOW-PRS-02 E11), but nothing in the prototype ends an appointment, so it is shown through the state switcher on the approval screen.",
+        needs: "Ending or suspending an appointment (catalogue flow 11).",
+      },
+    ],
+  },
+  {
     area: "The record",
     icon: "fileText",
     rows: [
