@@ -35,7 +35,7 @@ import { formatDate } from "./scopeModel";
  * There is no trust-registry row: an entity is not listed on the trust registry.
  */
 export function EntityProfileView() {
-  const { organizations, activeOrgId, heldCredentials, relations, delegatedAuthorities } =
+  const { organizations, activeOrgId, heldCredentials, relations, authorityGrants } =
     useDemo();
 
   const screenState = useScreenState("C7", [
@@ -51,7 +51,7 @@ export function EntityProfileView() {
   const certificationPending = screenState === "certification_pending";
 
   const activeRelations = relations.filter((r) => r.state === "ACTIVE").length;
-  const liveAuthorities = delegatedAuthorities.filter((a) => a.status === "ACTIVE").length;
+  const liveAuthorities = authorityGrants.filter((g) => g.orgId === activeOrgId && g.status === "ACTIVE").length;
 
   /* The registered facts are what the rest of the page is about, so they
      read better as a card you keep in view than as the first thing you
@@ -229,15 +229,15 @@ export function EntityProfileView() {
             </Link>
 
             <Link
-              href="/delegated-authority"
+              href="/authority-to-act"
               className="ndi-navrow flex items-center justify-between gap-3 rounded-[11px] border border-grid px-3.5 py-3"
               data-active="0"
             >
               <span className="flex flex-col">
                 <span className="font-display text-[13.5px] font-medium text-body">
-                  {liveAuthorities} live delegated authorit{liveAuthorities === 1 ? "y" : "ies"}
+                  {liveAuthorities} {liveAuthorities === 1 ? "person holds" : "people hold"} authority to act
                 </span>
-                <span className="text-[12px] text-faint">In other people&rsquo;s wallets</span>
+                <span className="text-[12px] text-faint">In their own Bhutan NDI app</span>
               </span>
               <Icon name="arrowRight" size={14} strokeWidth={2} className="flex-none" />
             </Link>

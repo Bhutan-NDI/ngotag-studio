@@ -47,7 +47,7 @@ import { PendingInvitations } from "./PendingInvitations";
  * — one control, one end state (EW-FLOW5-SD §4.4, E8).
  */
 export function MembersView() {
-  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson, delegatedAuthorities, designations, personById, setNdiAccess } =
+  const { people, relations, orgInvitations, organizations, activeOrgId, currentPerson, designations, personById, setNdiAccess } =
     useDemo();
   const [removing, setRemoving] = useState(false);
   const [removed, setRemoved] = useState(false);
@@ -97,20 +97,15 @@ export function MembersView() {
     forced === "empty" ? [] : forced === "delivery_failed" && !live.some((i) => i.delivery === "failed") ? [bounced, ...live] : live;
 
   /* Membership and authority side by side: what each person may do for the
-     organisation, by whichever route it was granted — a controllership they
-     accepted, or a role or capability in their own wallet — and an
-     appointment still waiting on them, so the owner can see it is not yet in
-     force. */
+     organisation — an appointment they accepted — and an appointment still
+     waiting on them, so the owner can see it is not yet in force. Authority
+     given to act from someone's own Bhutan NDI app isn't listed here: that
+     person needs no account and isn't a member (EW-FLOW8-SD D10); it is on
+     the Authority page. */
   const authorityOf = (personId: string) => {
     const r = relations.find((rel) => rel.personId === personId && rel.state === "ACTIVE");
     if (r) return r.isRootAuthority ? "Representative" : `Can act · ${presetsOf(r).map((id) => presetOf(id)?.label).join(", ") || "set individually"}`;
-    const held = delegatedAuthorities.filter(
-      (a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "accepted",
-    );
-    if (held.length) return `Role in their wallet · ${held.map((a) => a.title).join(", ")}`;
-    const waiting =
-      relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE") ||
-      delegatedAuthorities.some((a) => a.recipientId === personId && a.status === "ACTIVE" && a.acceptance === "sent");
+    const waiting = relations.some((rel) => rel.personId === personId && rel.state === "PENDING_ACCEPTANCE");
     return waiting ? "Appointed — waiting for them to accept" : null;
   };
 
@@ -162,7 +157,7 @@ export function MembersView() {
                     <td>
                       {authority ? (
                         <Link
-                          href={authority.startsWith("Role in") ? "/delegated-authority" : "/people-who-can-act"}
+                          href="/people-who-can-act"
                           className="ndi-plainlink text-body"
                         >
                           {authority}
