@@ -229,12 +229,53 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         reality: "The form offers nothing else and every authority is written per declaration (EW-FLOW8-SD D25). Nothing adds up what has been declared in total.",
         needs: "A running total, which the specification marks as later (EW-FLOW9-SD §8.2).",
       },
+    ],
+  },
+  {
+    area: "Acting for a company at the Single Window",
+    icon: "shieldCheck",
+    rows: [
       {
-        /* The one row here about a counterparty rather than about NDI. */
-        shown: "The Bhutan National Single Window checking an authority",
+        shown: "The Bhutan National Single Window's website",
         reality:
-          "Flow 9's page, still ahead of its specification: it sends each declaration to the agent's wallet and to an NDI verification API, which EW-FLOW9-SD replaces. The Single Window is not live yet. It now reads Flow 8's grants, with no role chain and no grantor's relation in what it checks.",
-        needs: "Flow 9 itself (EW-FLOW9-SD), and BNSW's integration.",
+          "A dashed stand-in at /simulated/bnsw — the whole site inside one dashed frame, because SCR-AUT-07 is BNSW's screen, not NDI's. Signing in to it picks one of four invented citizens. Its records panel shows what BNSW's back end would keep; all of it is in your browser.",
+        needs: "BNSW building SCR-AUT-07, B0–B4, the authority session, the per-declaration check and the limit against EW-FLOW9-CIG (FLOW-AUT-02 P6).",
+      },
+      {
+        shown: "Pema sharing her citizen ID and her authority from her app",
+        reality:
+          "A dashed panel standing in for the app's own screen (SCR-AUT-08). Which authorities her app holds is read from the grants the story made. No proof request is sent, nothing is presented over DIDComm, and nothing is signed. \"A copied authority, signed with another key\" is how V2's failure is reached.",
+        needs: "client-service's proof request with two descriptors, and the app rendering a Capability credential and offering a choice between companies (§13 item 7).",
+      },
+      {
+        shown: "The checks at sign-in — NDI's V1–V6, then BNSW's B0–B4",
+        reality:
+          "lib/bnsw.ts reads the demo state in the order the solution design gives, stopping at the first failure, and reads Flow 8's own grant: its publishing DID, revocation id, licences and limit. Nothing cryptographic happens: V1 and V6 always pass for a grant the story made. B4 looks up the TPN and every registered licence the authority names. The result lists each check's outcome, which client-service doesn't forward yet — a failed check is still reported as validated today (R11).",
+        needs: "client-service forwarding the true outcome, V2–V6, the per-credential result fields and POST /status (FLOW-AUT-02 P3).",
+      },
+      {
+        shown: "A withdrawal reaching BNSW",
+        reality:
+          "Withdrawing, pausing and resuming are dashed steps standing in for catalogue flow 11, which has no specification. The status changes at once, and BNSW sees it on its next check — the next declaration. DA-CORE's target is within 60 seconds of the action; the prototype shows it as immediate.",
+        needs: "Flow 11, revocation for platform-issued credentials, and the 60-second propagation DA-CORE sets.",
+      },
+      {
+        shown: "The tax office revoking a TPN, and the ministry suspending a licence",
+        reality:
+          "Dashed steps under the Single Window's page. Each flips the held credential's status in your browser; nothing in the Entity Wallet does this. BNSW looks the TPN and the licences up at B4 when a session opens (E11), and again at each declaration (E12, which ends the session and keeps the draft). A licence the ministry suspends can't be reinstated here; the tax office's TPN can.",
+        needs: "DRC and MoICE issuing revocable credentials (FLOW-AUT-02 P5), and client-service's POST /status answering for their revocation ids (P3).",
+      },
+      {
+        shown: "Pelden registering with the Single Window",
+        reality:
+          "Flow 7's share from a website, with BNSW asking for the registration, the TPN and the business licence. The store writes BNSW's record when the share goes through, with Pelden's publishing DID when it is listed as able to give authority. BNSW keeps every business licence the company holds (EW-FLOW9-SD §4.1), so the wallet's screen lists each one and says all of them go, instead of offering the newest to choose from as it does for a bank — a choice the specifications leave open. The holder DID and revocation ids in it are strings made up from the credential ids.",
+        needs: "The registration result's holderPublishingDid (FLOW-AUT-02 P4), and revocation ids on MoICE's and DRC's credentials (P5).",
+      },
+      {
+        shown: "Choices the specification leaves open, made here",
+        reality:
+          "BNSW's sign-in lasts eight hours from the moment the person signs in, and an acting session never outlasts it (§13 item 8 is open). When the revocation service doesn't know an authority at all, E12's reason is \"it can't be found at NDI\" — the list in E12 has none for that. The label Amend is the prototype's too. \"Checking…\" has a line under it saying what is being looked at. A company that registered before its first grant fails B1 until it registers again: that is the specification's own answer (§7, R5, E8 and the first-grant notice), not something the prototype adds.",
+        needs: "The specification to settle each.",
       },
     ],
   },
@@ -574,7 +615,7 @@ export function WhatsRealView() {
             </h2>
             <p className="max-w-[64ch] text-[13.5px] leading-[1.65] text-body">
               There is no server, no database, no register integration, no
-              Authority Verification API and no wallet. There is no network layer at
+              verification service and no wallet. There is no network layer at
               all — the application makes no requests. Every organisation,
               person, credential, approval and decision you see lives in your
               browser&rsquo;s local storage and can be wiped with one button.

@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { VerifierView } from "@/features/verifier/VerifierView";
-
-export const metadata: Metadata = {
-  /* Titled as the counterparty, not as the Studio. The browser tab is part of
-     the illusion that this is somebody else's website — because it is. */
-  title: "Customs declaration — Bhutan National Single Window",
-};
-
-export default function VerifierPage() {
-  return <VerifierView />;
+/* The pre-spec counterparty page — a wallet hop per declaration and a signed
+   PASS/FAIL from an "Authority Verification API" — replaced by Flow 9's
+   simulated Single Window (FLOW-AUT-02, UX-EW-06 SCR-AUT-07). Kept as a
+   redirect so an old link still lands. */
+export default function Page() {
+  redirect("/simulated/bnsw");
 }

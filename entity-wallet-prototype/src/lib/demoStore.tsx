@@ -11,13 +11,13 @@ import {
   type ReactNode,
 } from "react";
 
-import { verifyAuthority, type VerificationRequestInput } from "./avs";
 import { INVITATION_DAYS } from "./deployment";
 import { SYSTEM_ANSWER_MS } from "./demoTiming";
 import { scopeFor, shareTargets } from "@/features/appointment/presets";
 import * as sharing from "./sharing";
 import { NOTICE, namesOf, typesOf } from "./sharing";
 import * as auth from "./authority";
+import * as bnsw from "./bnsw";
 import { formatDate } from "@/features/controllership/scopeModel";
 import {
   NDI_ORG,
@@ -96,10 +96,42 @@ import {
   type AccRequestInput,
   type Accreditation,
   type Verification,
-  type VerificationDecision,
+  type AuthoritySession,
+  type CounterpartyDeclaration,
+  type DeclarationDraft,
+  type AskedDescriptor,
+  type BnswCheck,
 } from "./demoData";
 
 const STORAGE_KEY = "ndi-studio-demo";
+
+/**
+ * The simulated verifier websites FLOW-PRS-01 starts from, and what each
+ * asks for (EW-FLOW7-VIG §4). Bank of Bhutan's account form asks for the
+ * registration; the Single Window's company registration asks for the
+ * registration, the TPN and the business licence — what EW-FLOW9-SD §4.1
+ * says BNSW keeps, and what a delegate's authority is later matched to.
+ * `returnPath` is where the registered address leads in the prototype.
+ */
+const VERIFIER_SITES: Record<string, { asked: AskedDescriptor[]; purpose: string; returnUrlId: string; returnPath: string }> = {
+  "org-bob": {
+    asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
+    purpose: "To open a business current account we check your company's registration against the Registrar's record.",
+    returnUrlId: "ekyb-return",
+    returnPath: "/simulated/bank/return",
+  },
+  "org-bnsw": {
+    asked: [
+      { id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] },
+      { id: "tpn", credentialType: "Taxpayer Number (TPN)", fields: ["tpn"] },
+      { id: "licence", credentialType: "Business Licence", fields: ["licence_number"] },
+    ],
+    purpose:
+      "To register your company for customs declarations we keep its registered name, TPN and business licence, and check once that they belong together. Anyone you give authority to declares under them.",
+    returnUrlId: "bnsw-register-return",
+    returnPath: "/simulated/bnsw/register/return",
+  },
+};
 
 /**
  * What a browser that has never run the demo sees, and what Reset returns
@@ -237,8 +269,25 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       as FLOW-AUT-01 E15 does ("<Name> didn't collect their authority by
  *       <date>. Nothing was given."), as one the demo lapses does. A
  *       version-29 save keeps the old sentence on that row.
+ *  31 — Flow 9 (EW-FLOW9-SD, FLOW-AUT-02): the pre-spec signed
+ *       `decisions` of an "Authority Verification API" removed; BNSW's
+ *       registration records, authority sessions, declarations and its
+ *       simulated portal added, with Pelden's TPN credential and the
+ *       Single Window's return address. A version-30 save holds decisions
+ *       nothing reads and no registration for Pema's authority to match.
+ *  32 — Flow 9 follows FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3 and UX-EW-06
+ *       v0.3: BNSW looks up the company's TPN as well as its licences, so a
+ *       registration records which held credential its TPN stands for, and
+ *       BNSW records the sign-ins it refused (E8, E15). A version-31 save
+ *       has a registration with no TPN to look up, which would refuse every
+ *       sign-in as E11, and a portal with no list of attempts.
+ *  33 — Flow 9: BNSW's sign-in records when it began, so a session ends at
+ *       the sign-in's own length (D13), and the portal keeps drafts for each
+ *       delegate and company instead of one slot. A version-32 save has a
+ *       sign-in with no start, which would never time out, and a single
+ *       draft nothing reads.
  */
-const SEED_VERSION = 30;
+const SEED_VERSION = 33;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -349,12 +398,37 @@ function applyShare(
   if (!request) return state;
   const orgId = request.orgId ?? PELDEN;
   const relation = state.relations.find((r) => r.personId === sharer && (r.orgId ?? PELDEN) === orgId && r.state === "ACTIVE");
-  const credentials = Object.values(chosen)
-    .map((id) => state.heldCredentials.find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const matches = sharing.matchRequest(state, request);
+  const credentials = Object.entries(chosen).flatMap(([descriptorId, id]) => {
+    const match = matches.find((m) => m.descriptor.id === descriptorId);
+    /* Flow 9 — the Single Window keeps every Business Licence the company
+       holds (EW-FLOW9-SD §4.1), so the one chosen stands for all of them;
+       the screen lists them all (`everyOption`). Every other descriptor is
+       the one credential chosen, as in Flow 7. */
+    if (match && match.options.length && bnsw.registersEvery(request.verifierOrgId, match.descriptor)) return match.options;
+    const held = state.heldCredentials.find((c) => c.id === id);
+    return held ? [held] : [];
+  });
   const names = credentials.flatMap((c) => c.attributes.map((a) => a.name));
+  /* "Business Licence and Business Licence" reads as a mistake; two are "2 x Business Licence". */
+  const typeCounts = credentials.reduce((m, c) => m.set(c.type, (m.get(c.type) ?? 0) + 1), new Map<string, number>());
+  const sharedTypes = [...typeCounts].map(([type, n]) => (n > 1 ? `${n} x ${type}` : type)).join(" and ");
+  /* Flow 9 — a share to the Single Window is the company registering with
+     it (FLOW-PRS-01): BNSW's back end keeps what EW-FLOW9-SD §4.1 lists,
+     with the platform's publishingDid where the company is listed as an
+     issuer of authority (D8). Registering again replaces the record, with
+     every Business Licence the company holds — not only the one a person
+     would have chosen (`registersEvery`). */
+  const registrations =
+    request.verifierOrgId === bnsw.BNSW
+      ? [
+          bnsw.registrationFrom(state, orgId, credentials, requestId),
+          ...state.counterpartyRegistrations.filter((r) => !(r.orgId === orgId && r.counterpartyId === bnsw.BNSW)),
+        ]
+      : state.counterpartyRegistrations;
   return {
     ...state,
+    counterpartyRegistrations: registrations,
     presentationRequests: state.presentationRequests.map((r) =>
       r.id === requestId
         ? {
@@ -379,7 +453,7 @@ function applyShare(
     ),
     auditEntries: appendAudit(state, {
       operation: "proof:present",
-      summary: `Shared ${credentials.map((c) => c.type).join(" and ")} with ${request.verifierName} — every attribute: ${names.join(", ")}`,
+      summary: `Shared ${sharedTypes} with ${request.verifierName} — every attribute: ${names.join(", ")}`,
       actorId: sharer,
       relationId: relation?.id ?? null,
       scopeVersion: relation?.scope.version ?? null,
@@ -821,7 +895,11 @@ function activate(s: DemoState, id: string): GrantStep {
   const name = auth.delegateNameOf(g);
   const first = !s.authorityGrants.some((x) => x.orgId === g.orgId && x.id !== id && x.credentialRef);
   const cp = g.counterparties[0];
-  const sharedBefore = s.presentationRequests.some((r) => (r.orgId ?? PELDEN) === g.orgId && r.verifierOrgId === cp && r.status === "SHARED");
+  /* "Registered with that counterparty" is the counterparty's own record —
+     BNSW's, from the company's registration (EW-FLOW9-SD §4.1). One made
+     before this first grant carries no publishing DID, so the notice asks
+     the organisation to register again (§7, R5). */
+  const sharedBefore = s.counterpartyRegistrations.some((r) => r.orgId === g.orgId && r.counterpartyId === cp);
   let next = patchGrant(s, id, { status: "ACTIVE", statusAt: today(), accepted: true, offerExpiresAt: null, credentialRef: `urn:uuid:${uuidish()}` });
   if (first && sharedBefore) {
     next = {
@@ -1246,6 +1324,62 @@ function runActivation(
 
 const rid = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}`;
 
+/* ---- Flow 9 — BNSW's sessions (FLOW-AUT-02) ---- */
+
+const bnswNotice = (code: string, text: string, checks: BnswCheck[] = []) => ({ code, text, checks, at: Date.now() });
+
+/** The signed-in person's open authority session at BNSW, if any. */
+const openSessionOf = (s: DemoState, cid: string): AuthoritySession | null =>
+  s.authoritySessions.find((x) => x.status === "OPEN" && x.signedInCid === cid && x.counterpartyId === bnsw.BNSW) ?? null;
+
+const endSession = (s: DemoState, id: string, endReason: AuthoritySession["endReason"]): DemoState => ({
+  ...s,
+  authoritySessions: s.authoritySessions.map((x) =>
+    x.id === id && x.status === "OPEN" ? { ...x, status: "ENDED" as const, endedAt: Date.now(), endReason } : x,
+  ),
+});
+
+/** E14 — the session reached BNSW's sign-in timeout or the authority's end. The draft stays (UXD-54). */
+const endWithE14 = (s: DemoState, session: AuthoritySession, endReason: NonNullable<AuthoritySession["endReason"]>): DemoState => {
+  const next = endSession(s, session.id, endReason);
+  const text = bnsw.COPY.E14(auth.orgName(s, session.orgId), bnsw.endedTail({ ...session, endReason }));
+  return { ...next, bnsw: { ...next.bnsw, notice: bnswNotice("E14", text) } };
+};
+
+/**
+ * BNSW's own sign-in has run its length (D13): any open session ends with
+ * E14, and the person is signed out — they sign in again before they can
+ * act for a company. Their drafts stay (UXD-54).
+ */
+const timeOutSignIn = (s: DemoState): DemoState => {
+  const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+  const next = open ? endWithE14(s, open, "timeout") : s;
+  return { ...next, bnsw: { ...next.bnsw, signedInCid: null, signedInAt: null, request: null, notice: open ? next.bnsw.notice : null } };
+};
+
+/**
+ * What the clock has already done at BNSW: the sign-in ran out (and with it
+ * any session), or the authority ended while the person stays signed in
+ * (E14). Returns the same state when neither has happened.
+ */
+const settleClock = (s: DemoState, now = Date.now()): DemoState => {
+  const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+  const reason = open ? bnsw.sessionEndReason(open, now) : null;
+  if (bnsw.signInTimedOut(s.bnsw, now) || reason === "timeout") return timeOutSignIn(s);
+  return open && reason ? endWithE14(s, open, reason) : s;
+};
+
+/**
+ * A4 — an open session, resumed after B0 against whoever is signed in now
+ * (D17, S9): no new proof. One that has run out ends instead (E14).
+ */
+const resumeSession = (s: DemoState, session: AuthoritySession): DemoState => {
+  if (session.delegateCid !== s.bnsw.signedInCid) return s;
+  const reason = bnsw.sessionEndReason(session);
+  if (reason) return endWithE14(s, session, reason);
+  return { ...s, bnsw: { ...s.bnsw, notice: bnswNotice("A4", bnsw.COPY.A4(auth.orgName(s, session.orgId), bnsw.timeOf(session.endsAt))) } };
+};
+
 /**
  * FLOW-ONB-02 P7 — the named platform admins who are active: an account that
  * exists and is not locked or suspended. One definition, used wherever the
@@ -1634,6 +1768,13 @@ interface DemoActions {
   simulateLicenceIssued: () => void;
   /** Simulated — the ministry revokes a licence a waiting grant names (AC-06 → E11 at claim). */
   simulateLicenceRevoked: (licenceNumber: string) => void;
+  /**
+   * Simulated — the Department of Revenue & Customs revokes a TPN, or
+   * reinstates it (FLOW-AUT-02 AC-17, AC-19). Nothing in the Entity Wallet
+   * does this; the credential's status changes at DRC's revocation service
+   * and BNSW looks it up at B4 and at each declaration.
+   */
+  simulateTpnStatus: (credentialId: string, status: "REVOKED" | "ACTIVE") => void;
   /** SCR-AUT-01 — the first-grant notice, once read. */
   dismissFirstGrantNotice: () => void;
   /** SCR-AUT-05 step 9 — what the link may show before identity: the organisation's name, or nothing (S3, E7). */
@@ -1657,14 +1798,43 @@ interface DemoActions {
   /** SCR-AUT-05 E17 — the revocation id finally registers. */
   finishRegistration: (grantId: string) => void;
 
+  /* ---- Acting for an organisation at BNSW (Flow 9, FLOW-AUT-02) ----
+     BNSW's side and NDI's client-service, both simulated: the checks are
+     `lib/bnsw.ts`'s, run here; the dashed BNSW page renders the answers. */
+
+  /** BNSW's own sign-in with Bhutan NDI, as one of the simulated citizens. Resumes an open session (A4) after B0. */
+  bnswSignIn: (cid: string) => void;
+  /** BNSW's sign-out — ends any session it held. */
+  bnswSignOut: () => void;
+  /** Simulated — the person closes BNSW and comes back later: A4 resumes an open session after B0, or E14 if it has ended — and signs them out if BNSW's sign-in has. */
+  bnswComeBack: () => void;
+  /** SCR-AUT-07 *Act for a company* — steps 1–3: the proof request out to the app. */
+  bnswActForCompany: () => void;
+  /** SCR-AUT-07 *Cancel* while waiting for the app. */
+  bnswCancelRequest: () => void;
   /**
-   * Runs a verification and keeps the decision.
-   *
-   * The decision comes from the stand-in verification service in `avs.ts`,
-   * never from a component — see the long note in that file for why that
-   * boundary matters and where it would be a real network call.
+   * Simulated — the app answers (SCR-AUT-08), declines or never answers;
+   * steps 4–11. V1–V6, then B0–B4, then the session — or the refusal.
    */
-  runVerification: (input: VerificationRequestInput) => VerificationDecision;
+  bnswAnswer: (answer: { kind: "share"; grantId: string; answeredBy: string; copied?: boolean } | { kind: "decline" | "timeout" }) => void;
+  /** BNSW's form, kept as the draft — for the delegate and the company of the open session. */
+  bnswSaveDraft: (draft: DeclarationDraft | null) => void;
+  /** Steps 12–15 — submit the draft (or amend, A3): B2, the status lookup, the limit. */
+  bnswSubmit: () => void;
+  /** SCR-AUT-07 *Stop acting for <company>*. */
+  bnswStopActing: () => void;
+  /** Clear the notice once read. */
+  bnswDismissNotice: () => void;
+  /** Ends the request after five minutes (E2), the session at its end (E14), and BNSW's sign-in at its length — run on a timer by the page. */
+  bnswTick: () => void;
+  /** Simulated — things outside the prototype: NDI's services down or back, a citizen ID suspended or restored, BNSW's sign-in timing out (which signs the person out). */
+  bnswSimulate: (event: "services_down" | "services_up" | "citizen_suspended" | "citizen_restored" | "signin_timeout") => void;
+  /**
+   * Simulated — catalogue flow 11, which has no specification: the
+   * organisation withdraws or pauses an authority. Its status at NDI's
+   * revocation service changes at once; BNSW sees it on its next check.
+   */
+  simulateAuthorityStatus: (grantId: string, status: "REVOKED" | "SUSPENDED" | "ACTIVE") => void;
 
   /* ---- Appeals ---- */
 
@@ -3270,6 +3440,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         log(`Ministry of Industry, Commerce & Employment revoked business licence ${licenceNumber}`);
       },
 
+      simulateTpnStatus: (credentialId, status) => {
+        const c = stateRef.current.heldCredentials.find((x) => x.id === credentialId);
+        if (!c || c.status === "expired" || (status === "REVOKED" ? c.status === "revoked" : c.status === "active")) return;
+        setState((s) => ({
+          ...s,
+          heldCredentials: s.heldCredentials.map((x) => (x.id === credentialId ? { ...x, status: status === "REVOKED" ? ("revoked" as const) : ("active" as const) } : x)),
+        }));
+        const org = c.orgId ?? PELDEN;
+        log(`${c.issuer} ${status === "REVOKED" ? "revoked" : "reinstated"} ${auth.orgName(stateRef.current, org)}'s TPN`, org);
+      },
+
       dismissFirstGrantNotice: () =>
         setState((s) => ({
           ...s,
@@ -3433,14 +3614,218 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         step.notes.forEach((n) => log(n.text, n.orgId));
       },
 
-      runVerification: (input) => {
-        /* Derived from state at the moment of asking, which is the whole
-           point of the act: revoking a role a second earlier changes the
-           answer. Derived outside the updater, so the same decision is both
-           returned and stored exactly once. */
-        const decision: VerificationDecision = verifyAuthority(stateRef.current, input);
-        setState((s) => ({ ...s, decisions: [decision, ...s.decisions] }));
-        return decision;
+      /* ---- Flow 9 — BNSW (FLOW-AUT-02) ----
+         Nothing here writes to the organisation's activity or audit: the
+         company is told nothing about its delegate's sessions or
+         declarations (EW-FLOW9-SD D7, AC-13). What BNSW keeps is BNSW's. */
+
+      bnswSignIn: (cid) =>
+        setState((s) => {
+          const next = { ...s, bnsw: { ...s.bnsw, signedInCid: cid, signedInAt: Date.now(), request: null, notice: null } };
+          const open = openSessionOf(next, cid);
+          return open ? resumeSession(next, open) : next;
+        }),
+
+      bnswSignOut: () =>
+        setState((s) => {
+          const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+          const ended = open ? endSession(s, open.id, "signed_out") : s;
+          return { ...ended, bnsw: { ...ended.bnsw, signedInCid: null, signedInAt: null, request: null, notice: null } };
+        }),
+
+      bnswComeBack: () =>
+        setState((s) => {
+          /* They may have been away past BNSW's sign-in: then it is over (D13). */
+          const settled = settleClock(s);
+          if (settled !== s) return settled;
+          const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+          return open ? resumeSession(s, open) : { ...s, bnsw: { ...s.bnsw, notice: null } };
+        }),
+
+      bnswActForCompany: () =>
+        setState((s) => {
+          if (!s.bnsw.signedInCid || openSessionOf(s, s.bnsw.signedInCid)) return s;
+          return { ...s, bnsw: { ...s.bnsw, request: { id: rid("pr"), startedAt: Date.now() }, notice: null } };
+        }),
+
+      bnswCancelRequest: () => setState((s) => ({ ...s, bnsw: { ...s.bnsw, request: null } })),
+
+      bnswAnswer: (answer) => {
+        const s0 = stateRef.current;
+        const cid = s0.bnsw.signedInCid;
+        if (!s0.bnsw.request || !cid) return;
+        if (answer.kind !== "share") {
+          /* E2 — declined, or five minutes with no answer. E1 (nothing to
+             share) looks the same from BNSW's side, so it reads as E2. */
+          setState((s) => ({ ...s, bnsw: { ...s.bnsw, request: null, notice: bnswNotice("E2", bnsw.COPY.E2) } }));
+          return;
+        }
+        const presentation = { grantId: answer.grantId, answeredBy: answer.answeredBy, copied: answer.copied };
+        const result = bnsw.checkSignIn(s0, cid, presentation);
+        if (!result.ok) {
+          /* E8 and E15 are also written down at BNSW, as DIDs (FLOW-AUT-02 §6). */
+          const attempt = bnsw.attemptOf(s0, result.code, cid, presentation);
+          setState((s) => ({
+            ...s,
+            bnsw: {
+              ...s.bnsw,
+              request: null,
+              notice: bnswNotice(result.code, result.text, result.checks),
+              attempts: attempt ? [{ ...attempt, id: rid("att"), at: Date.now() }, ...s.bnsw.attempts] : s.bnsw.attempts,
+            },
+          }));
+          return;
+        }
+        const session: AuthoritySession = { ...result.session, id: rid("as"), status: "OPEN", endedAt: null, endReason: null };
+        setState((s) => ({
+          ...s,
+          authoritySessions: [session, ...s.authoritySessions],
+          bnsw: {
+            ...s.bnsw,
+            request: null,
+            notice: bnswNotice("opened", "", result.checks),
+            /* A draft kept from an earlier refusal comes back — this delegate's, for this
+               company's, and under a licence this session can use. Another's stays kept. */
+            drafts: s.bnsw.drafts.map((d) =>
+              d.cid === session.delegateCid && d.orgId === session.orgId
+                ? { ...d, licence: session.licenceNumbers.includes(d.licence) ? d.licence : "" }
+                : d,
+            ),
+          },
+        }));
+      },
+
+      bnswSaveDraft: (draft) =>
+        setState((s) => {
+          /* The form is only there in a session, and the draft is kept for
+             that delegate and that company (UXD-54, T7). */
+          const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+          if (!open) return s;
+          const others = s.bnsw.drafts.filter((d) => !(d.cid === open.delegateCid && d.orgId === open.orgId));
+          return { ...s, bnsw: { ...s.bnsw, drafts: draft ? [{ ...draft, cid: open.delegateCid, orgId: open.orgId }, ...others] : others } };
+        }),
+
+      bnswSubmit: () => {
+        const s0 = stateRef.current;
+        const cid = s0.bnsw.signedInCid;
+        const session = cid ? openSessionOf(s0, cid) : null;
+        const draft = session ? bnsw.draftFor(s0.bnsw.drafts, session.delegateCid, session.orgId) : null;
+        if (!session || !draft) return;
+        const kind = draft.amends ? ("amend" as const) : ("submit" as const);
+        const original = draft.amends ? s0.counterpartyDeclarations.find((d) => d.id === draft.amends) : undefined;
+        if (draft.amends && (!original || original.amendedBy || original.orgId !== session.orgId)) return;
+        const valueNu = Number(auth.digitsOnly(draft.value));
+        /* With one licence there is nothing to choose; with several, A2's answer. */
+        const licenceNumber = session.licenceNumbers.length === 1 ? session.licenceNumbers[0] : draft.licence;
+        const r = bnsw.checkDeclaration(s0, session, { kind, valueNu, licenceNumber });
+        if (!r.ok) {
+          setState((s) => {
+            /* E14 at BNSW's sign-in timeout also ends the sign-in (D13). */
+            const next = r.keep ? s : r.endReason === "timeout" ? timeOutSignIn(s) : endSession(s, session.id, r.endReason);
+            return { ...next, bnsw: { ...next.bnsw, notice: bnswNotice(r.code, r.text) } };
+          });
+          return;
+        }
+        const ref = `BNSW-DEC-${new Date().getFullYear()}-${Math.floor(84200 + Math.random() * 15000)}`;
+        const declaration: CounterpartyDeclaration = {
+          id: rid("dcl"),
+          reference: ref,
+          counterpartyId: bnsw.BNSW,
+          orgId: session.orgId,
+          sessionId: session.id,
+          kind,
+          amends: original?.id ?? null,
+          amendedBy: null,
+          goods: draft.goods.trim() || (original?.goods ?? "Goods as declared"),
+          valueNu,
+          licenceNumber,
+          relationId: session.relationId,
+          authorityRevocationId: session.authorityRevocationId,
+          delegateName: session.delegateName,
+          delegateCid: session.delegateCid,
+          statusResult: r.statusResult,
+          at: today(),
+        };
+        setState((s) => ({
+          ...s,
+          counterpartyDeclarations: [
+            declaration,
+            ...s.counterpartyDeclarations.map((d) => (d.id === original?.id ? { ...d, amendedBy: declaration.id } : d)),
+          ],
+          bnsw: {
+            ...s.bnsw,
+            drafts: s.bnsw.drafts.filter((d) => !(d.cid === session.delegateCid && d.orgId === session.orgId)),
+            notice: bnswNotice(
+              "accepted",
+              original ? `Amendment ${ref} to ${original.reference} accepted for processing.` : `Declaration ${ref} accepted for processing.`,
+            ),
+          },
+        }));
+      },
+
+      bnswStopActing: () =>
+        setState((s) => {
+          const open = s.bnsw.signedInCid ? openSessionOf(s, s.bnsw.signedInCid) : null;
+          if (!open) return s;
+          const next = endSession(s, open.id, "stopped");
+          return { ...next, bnsw: { ...next.bnsw, notice: bnswNotice("stopped", bnsw.COPY.stopped(auth.orgName(s, open.orgId))) } };
+        }),
+
+      bnswDismissNotice: () => setState((s) => (s.bnsw.notice ? { ...s, bnsw: { ...s.bnsw, notice: null } } : s)),
+
+      bnswTick: () =>
+        setState((s) => {
+          const now = Date.now();
+          let next = s;
+          if (s.bnsw.request && now - s.bnsw.request.startedAt >= bnsw.REQUEST_MS) {
+            next = { ...next, bnsw: { ...next.bnsw, request: null, notice: bnswNotice("E2", bnsw.COPY.E2) } };
+          }
+          return settleClock(next, now);
+        }),
+
+      bnswSimulate: (event) =>
+        setState((s) => {
+          const who = s.bnsw.signedInCid ?? "11512002960";
+          switch (event) {
+            case "services_down":
+              return { ...s, bnsw: { ...s.bnsw, servicesDown: true } };
+            case "services_up":
+              return { ...s, bnsw: { ...s.bnsw, servicesDown: false } };
+            case "citizen_suspended":
+              return { ...s, bnsw: { ...s.bnsw, suspendedCitizens: [...new Set([...s.bnsw.suspendedCitizens, who])] } };
+            case "citizen_restored":
+              return { ...s, bnsw: { ...s.bnsw, suspendedCitizens: s.bnsw.suspendedCitizens.filter((c) => c !== who) } };
+            case "signin_timeout":
+              /* BNSW signs the person out, and with them any session (D13). */
+              return s.bnsw.signedInCid ? timeOutSignIn(s) : s;
+          }
+          return s;
+        }),
+
+      simulateAuthorityStatus: (grantId, status) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        if (!g) return;
+        /* Withdraw from ACTIVE or paused; pause from ACTIVE; resume a pause only. */
+        const allowed =
+          status === "ACTIVE" ? g.status === "SUSPENDED" : status === "SUSPENDED" ? g.status === "ACTIVE" : g.status === "ACTIVE" || g.status === "SUSPENDED";
+        if (!allowed) return;
+        const org = auth.orgName(s0, g.orgId);
+        const name = auth.delegateNameOf(g);
+        setState((s) =>
+          status === "REVOKED"
+            ? /* An end: the ID number's hash goes with it (S4); the revocation id stays registered, now REVOKED. */
+              patchGrant(s, grantId, { status, statusAt: today(), endReason: `${org} withdrew it.`, delegateIdKeyed: null })
+            : patchGrant(s, grantId, { status, statusAt: today(), endReason: null }),
+        );
+        log(
+          status === "REVOKED"
+            ? `${org} withdrew ${name}'s authority to act for it`
+            : status === "SUSPENDED"
+              ? `${org} paused ${name}'s authority to act for it`
+              : `${org} resumed ${name}'s authority to act for it`,
+          g.orgId,
+        );
       },
 
       submitAppeal: (id, submission) =>
@@ -5872,7 +6257,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       matchRequest: (requestId) => {
         const s0 = stateRef.current;
         const r = s0.presentationRequests.find((x) => x.id === requestId);
-        return r ? sharing.matchRequest(s0, r) : [];
+        /* Flow 9 — a share to the Single Window sends every Business Licence, so the screen is told to list them all. */
+        return r
+          ? sharing.matchRequest(s0, r).map((m) => (bnsw.registersEvery(r.verifierOrgId, m.descriptor) ? { ...m, everyOption: true } : m))
+          : [];
       },
 
       whoApproves: (requestId) => {
@@ -5899,13 +6287,15 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* The capability gate on the verifier's side (§7.1 step 1): only an
            organisation with an ACTIVE VERIFIER source gets a link at all. */
         if (!sharing.listedVerifier(s0, verifierOrgId)) return null;
+        const site = VERIFIER_SITES[verifierOrgId];
+        if (!site) return null;
         const id = `ps_${Math.random().toString(36).slice(2, 12)}`;
         const session: PresentationSession = {
           id,
           verifierOrgId,
-          asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
-          purpose: "To open a business current account we check your company's registration against the Registrar's record.",
-          returnUrlId: "ekyb-return",
+          asked: site.asked,
+          purpose: site.purpose,
+          returnUrlId: site.returnUrlId,
           state: `app_${Math.random().toString(36).slice(2, 10)}`,
           displayReference,
           status: "CREATED",
@@ -6201,7 +6591,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            has been removed means no link at all (E15). */
         const address = s0.returnAddresses.find((a) => a.orgId === session.verifierOrgId && a.returnUrlId === session.returnUrlId && !a.removedAt);
         if (!address) return { url: null, status };
-        return { url: `/simulated/bank/return?session=${session.id}&state=${session.state}&status=${status}`, status };
+        const back = VERIFIER_SITES[session.verifierOrgId]?.returnPath ?? "/simulated/bank/return";
+        return { url: `${back}?session=${session.id}&state=${session.state}&status=${status}`, status };
       },
 
       withdrawPresentationRequest: (requestId) =>

@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
-import { AuthorityChain } from "@/components/ui/AuthorityChain";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Countdown } from "@/components/ui/Countdown";
 import { DateRangeField } from "@/components/ui/DateRangeField";
@@ -48,7 +47,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 }
 
 export function KitchenSinkView() {
-  const { relations, decisions, auditEntries, personById } = useDemo();
+  const { relations, auditEntries, personById } = useDemo();
 
   /* The page declares its own states, so the state switcher has something to
      do here too — and so this page proves the mechanism works before any real
@@ -65,8 +64,6 @@ export function KitchenSinkView() {
 
   const rinzin = relations.find((r) => r.id === "rel-rinzin");
   const root = relations.filter(inOrg(PELDEN)).find((r) => r.isRootAuthority);
-  const pass = decisions.find((d) => d.outcome === "PASS");
-  const fail = decisions.find((d) => d.outcome === "FAIL");
   const auditRow = auditEntries.find((e) => e.approvedById);
 
   /* Every status the pill knows, so a tone change can be judged at a glance
@@ -202,20 +199,6 @@ export function KitchenSinkView() {
               one bad row, not take the trail down.
             </p>
           </div>
-        </Section>
-
-        <Section
-          title="Authority chain"
-          note="Whole, then broken. The severed link is marked by its pill, its icon and its connector — never by colour alone."
-        >
-          <div className="grid gap-6 min-[901px]:grid-cols-2">
-            {pass ? <AuthorityChain chain={pass.chain} /> : null}
-            {fail ? <AuthorityChain chain={fail.chain} /> : null}
-          </div>
-        </Section>
-
-        <Section title="Authority chain — nothing walked" note="Fail closed, and say why.">
-          <AuthorityChain chain={[]} />
         </Section>
 
         <Section

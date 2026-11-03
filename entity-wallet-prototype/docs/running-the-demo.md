@@ -17,8 +17,9 @@ there** brings you back if you wander off, and the chevron minimises it.
 
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential,
-sharing one and giving a clearing agent authority to act — fourteen chapters,
-92 steps, starting on the platform's day zero:
+sharing one, giving a clearing agent authority to act and her using it at the
+Single Window — fifteen chapters, 105 steps, starting on the platform's day
+zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -119,21 +120,36 @@ sharing one and giving a clearing agent authority to act — fourteen chapters,
     list (dashed), then Dorji sends the link himself; Pema opens it, proves
     who she is with Bhutan NDI (dashed), sees the full authority and accepts
     it in the app (dashed). She is listed under *Active*.
-14. **Where to go next.**
+14. **Pema declares for Pelden** (FLOW-AUT-02, Journey W) — on the Single
+    Window's site (dashed), Pema signs in as herself, chooses **Act for a
+    company** and shares her citizen ID and authority from her app (dashed),
+    once. NDI's checks pass, but BNSW has no registration from Pelden: E8,
+    saying who can fix it. Dorji registers Pelden from BNSW's site — the
+    bank's flow again, sharing the registration, TPN and licence. Pema tries
+    again and is *acting for* Pelden: the sentence with licence, limit and
+    end time, the TPN and name shown from the registration. One declaration
+    is accepted, one above the limit is refused with the draft kept; the
+    Department of Revenue & Customs revokes the TPN (dashed) and the next
+    declaration is refused and the session ends, and acting again is refused
+    at the start, naming the TPN; with the TPN reinstated, and after Pelden
+    withdraws the authority (dashed — flow 11), the next declaration is
+    refused and the session ends.
+15. **Where to go next.**
 
 Appointing follows the rule **invite first, appoint second**, and identity
 is confirmed **at the appointment, not at the invitation** (FLOW-ONB-02
 §7.3); it follows FLOW-DEL-01. Giving a clearing agent authority is Flow 8 —
 FLOW-AUT-01, EW-FLOW8-SD and UX-EW-05 SCR-AUT-01 to 06 — where the agent is
-never invited and is identified when she collects it. Flow 4 follows FLOW-ACC-01
+never invited and is identified when she collects it. Using it at the Single
+Window is Flow 9 — FLOW-AUT-02, EW-FLOW9-SD, EW-FLOW9-CIG and UX-EW-06
+SCR-AUT-07, on BNSW's simulated site. Flow 4 follows FLOW-ACC-01
 v0.2, FLOW-ACC-02 v0.4 and UX-EW-02 v0.5 SCR-ACC-01 to 06 — the first-release
 simplification of EW-FLOW4-SD v0.2 (D20–D24). Flow 6 follows FLOW-CRD-01 to 03
 and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02
 v0.3 and EW-FLOW7-SD v0.3, with UX-EW-04 v0.3 SCR-PRS-01 to 06; the approval path —
 a Controller shares, the Root approves — is a Walk a flow entry, because the
 onboarding story never appoints anyone with *Share*. The screens for what
-comes after — verification at the Single Window (Flow 9, ahead of its
-specification), appeals, and Bank of Bhutan being verified — still exist and
+comes after — appeals, and Bank of Bhutan being verified — still exist and
 are described further down, but the guide and the demo controls no longer
 walk them.
 
@@ -1167,26 +1183,85 @@ Point at the disclosed line:
 
 ---
 
-## The Single Window page — Flow 9, ahead of its specification
+## Flow 9 — acting for a company at the Single Window
 
-`/verifier/bnsw` stands in for the Bhutan National Single Window's own
-website, where Pema declares under the authority Flow 8 gave her. It
-predates EW-FLOW9-SD and says so in its footer: it still sends each
-declaration to her wallet and to an NDI verification API, which the
-specification replaces with one sign-in and `client-service` checks. Flow 9
-is rebuilt next. It now reads Flow 8's grants — no role chain, and no
-grantor's relation in what it checks.
+Built to FLOW-AUT-02 v0.3, EW-FLOW9-SD v0.3, the counterparty integration
+guide (EW-FLOW9-CIG v0.3) and UX-EW-06 v0.3 SCR-AUT-07. Pema, holding the
+authority Flow 8 gave her, signs in to the Bhutan National Single Window as
+herself, chooses **Act for a company**, and shares her citizen ID and her
+authority from her Bhutan NDI app **once**. NDI's `client-service` checks
+V1–V6, BNSW checks B0–B4 — B4 looks up the company's TPN and the licences
+her authority names — and an *authority session* opens: "You're acting for
+<company> under licence <number>, up to Nu <limit> per declaration, until
+<time>." After that each declaration is checked at submission — the
+authority's, her citizen ID's, the TPN's, the licence's and the listing's
+status, then the limit — with no further trip to the app. What the checks
+read is Flow 8's own grant. The old `/verifier/bnsw` page (a wallet hop per
+declaration and a signed PASS/FAIL) now redirects.
+
+Everything at `/simulated/bnsw` is **BNSW's**, not NDI's, so the whole site
+sits inside one dashed frame, with no Studio chrome. Below the site, three
+dashed panels: Pema's app (SCR-AUT-08 is the app team's screen), things that
+happen elsewhere (the company withdrawing — catalogue flow 11, unspecified —
+the ministry suspending a licence, the tax office revoking the TPN, NDI's
+services down, BNSW's sign-in timing out), and **BNSW's records** — the
+registration with each status as it is now, the session, the sign-ins BNSW
+refused and what it keeps with each declaration. Point at the last one: BNSW does see Pema's
+name and citizen ID number (EW-FLOW9-SD §4.2), and Pelden is told nothing
+(D7).
 
 **Say plainly that BNSW is not live yet** if anyone from customs, trade or
 GovTech is in the room. Its main system is still being procured; customs
 today runs on DRC's eCMS.
 
+### A clearing agent declares — **A clearing agent declares for Pelden**
+
+Three months in. Pelden registered with BNSW after its first grant, so its
+registration carries the identity it gives authority from.
+
 | Try | What it demonstrates |
 |---|---|
-| Value `420000`, **Submit declaration** | PASS: the checks, each naming what it looked at |
-| Value `1200000` | The limit refusing it, per declaration |
-| **Submit with the service unreachable** | Fails closed |
-| The **fail** state in the switcher | A withdrawn authority (withdrawing is flow 11, not built) |
+| **Sign in as Pema Choden**, **Act for a company**, **Share** | *Checking…*, then *Acting for* with the company's name, TPN and licence from the registration — never typed |
+| Value `420000`, **Submit declaration** | Accepted, and what BNSW keeps: `relationId`, the revocation id, licence, name and citizen ID |
+| Value `1200000` | E13 — above the limit; the draft stays, the session goes on |
+| **Pelden Trading withdraws the authority**, then submit | E12 — nothing submitted, the session ended, the draft kept. The withdrawal reached BNSW at the next check (DA-CORE's target is within 60 seconds; the prototype shows it as immediate) |
+| **The ministry suspends licence …**, then submit | E12 with the licence as the reason (AC-05) |
+| **The Department of Revenue & Customs revokes TPN …**, then submit | E12 with the TPN as the reason, the session ended, the draft kept (AC-17) |
+| With the TPN revoked, **Act for a company** and **Share** | E11 naming the TPN, before any session opens (AC-19). **… reinstates TPN …** puts it back |
+| **NDI's revocation service can't be reached**, then submit | E7 — nothing submitted, the session kept (D18) |
+| **Amend** on a declaration | A3 — offered only because Pema's authority includes amending |
+| **Close BNSW and come back later** | A4 — resumed after B0, no new proof |
+| **BNSW's sign-in times out** | E14 — the draft kept, and BNSW signs Pema out: she signs in again before she can act for a company. The session never outlasts the sign-in |
+| **Stop acting for Pelden Trading Pvt. Ltd.** | A5 — "You've stopped acting for … Your draft is saved." |
+| Sign in as **Kinley Wangdi**, **Act for a company**, then **Pema Choden scans the code and shares instead** | E15 — a relayed QR code: the authority shared isn't the signed-in person's (B0) |
+| **A copied authority, signed with another key** | E3 — V2, the holder binding |
+| Withdraw it, then **Act for a company** again | E5 at sign-in (AC-03) |
+
+### Registering again — **Pelden registers with BNSW again**, as Dorji
+
+BNSW's registration page is the bank's page again (FLOW-PRS-01): a reference,
+**Share from NDI Entity Wallet**, the wallet's consent with BNSW asking for
+the registration, the TPN and the business licence, and back. BNSW keeps
+what EW-FLOW9-SD §4.1 lists — with Pelden's publishing DID because Pelden is
+listed as able to give authority, and with **every** business licence Pelden
+holds: once Flow 6 has run that is BL-PLG-2025-00871 and BL-THI-2026-10442, the
+wallet's screen lists both and says both go (no picker, unlike the bank's),
+and BNSW's records panel shows both. Pema's authority then passes B3 for the
+licence it names, and one that names both is asked *Which licence is this
+declaration under?* (A2). A company that registered *before* its
+first grant has none, and its delegates get E8 until it registers again:
+the guided demo walks exactly that (Journey W), because in the story Pelden
+first registers with BNSW after Pema's first try.
+
+### Choices the specification leaves open
+
+- **BNSW's sign-in length** (§13 item 8): eight hours, counted from signing in
+  to BNSW — not from the moment someone starts acting for a company.
+- **Which business licences BNSW registers**: all of the company's, where the
+  bank's account form takes the one the sharer picks (FLOW-PRS-01 A4).
+- **An authority the revocation service doesn't know**: E12's reason is "it
+  can't be found at NDI" — FLOW-AUT-02's list of reasons has none for it.
+- **The label Amend**, and the line under "Checking…".
 
 ---
 
@@ -1208,7 +1283,7 @@ Worth showing:
 | `/appointments/.../confirm` | **same_device**, **declined**, **could_not_confirm**, **no_wallet** | SCR-DEL-04's E6, E7, E11 |
 | `/people-who-can-act` | **only_you**, **pending**, **accepted**, **declined**, **expired**, **withdrawn** | SCR-DEL-05, including a verified name that differs from the account |
 | `/onboarding/foundational` | **not_yet_accepted**, **declined**, **declined_accredited**, **sole_proprietorship** | Verified but not usable yet (DEL-02/E2, with its accredited wording); no appointing prompt for a proprietor, who can still appoint from who can act (UXD-24) |
-| `/verifier/bnsw` | **pass**, **fail**, **service_unreachable** | All three outcomes, no setup needed |
+| `/simulated/bnsw` | **signed_out**, **waiting**, **checking**, **acting**, **choose_licence**, **resumed**, **refused_E2**…**refused_E15** (**refused_E11_tpn** for the TPN), **not_submitted_E7/E9/E12/E13** (**not_submitted_E12_tpn**), **ended_E14**, **stopped_A5**, **offline** | SCR-AUT-07: every state in UX-EW-06's table, with §3.5's copy |
 | `/authority-to-act` | **empty**, **no_permission**, **not_in_standing**, **first_grant**, **offline** | SCR-AUT-01: E1 and E2 in place of *Give authority*, and the first-grant notice |
 | `/authority-to-act/give` | **licence_unavailable**, **counterparty_unavailable**, **field_error**, **duplicate**, **no_permission** | SCR-AUT-02's E4, E5, E6 and A3 |
 | `/authority-to-act/give/check` | **default_auto**, **default_approval**, **error** | SCR-AUT-03 with and without an approver |
@@ -1326,7 +1401,7 @@ only long one is the register lookup in act 1, and that length is the point.
 Be straightforward. The honest version lands better than a hedge:
 
 > "The screens are real and the model behind them is real. Nothing underneath
-> is — no register integration, no Authority Verification API, no server enforcing
+> is — no register integration, no `client-service` checks, no server enforcing
 > any of this. It is a frontend prototype whose job is to make us agree on what
 > the product should be before anyone builds it."
 
