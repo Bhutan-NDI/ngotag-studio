@@ -167,7 +167,7 @@ export function DemoHarness() {
             <button
               type="button"
               onClick={startPresentation}
-              className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] px-3.5 font-display text-[13px] font-semibold"
+              className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] border border-[var(--ndi-mint-40)] px-3.5 font-display text-[13px] font-semibold text-accent"
             >
               {presenting ? "Restart the presentation" : "Start the presentation"}
             </button>
@@ -370,7 +370,7 @@ export function DemoHarness() {
           <button
             type="button"
             onClick={startPresentation}
-            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full px-3.5 font-display text-[12px] font-semibold"
+            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ndi-mint-40)] bg-[var(--chrome-fill-strong)] px-3.5 font-display text-[12px] font-semibold text-accent backdrop-blur-[20px]"
           >
             <svg aria-hidden="true" viewBox="0 0 10 10" className="h-2.5 w-2.5" style={{ fill: "currentColor" }}>
               <path d="M2 1l7 4-7 4z" />
