@@ -145,36 +145,55 @@ export function AccountSetupForm({
         </p>
       ) : intro}
 
-      <div className={FIELD_BLOCK_CLASS}>
-        <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
-          Your name
-        </label>
-        <input
-          id={`${idPrefix}-name`}
-          name="name"
-          autoComplete="name"
-          placeholder="As it appears on your citizenship ID"
-          value={verifiedName ?? name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setNameError(null);
-          }}
-          readOnly={Boolean(verifiedName)}
-          disabled={busy}
-          aria-invalid={nameError ? true : undefined}
-          aria-describedby={
-            nameError ? `${idPrefix}-name-error` : verifiedName ? `${idPrefix}-name-source` : undefined
-          }
-          className={`${FIELD_CLASS} h-12 ${verifiedName ? "cursor-not-allowed opacity-80" : ""}`}
-        />
-        {verifiedName ? (
+      {verifiedName ? (
+        /* From the proof, so not a field at all: a field that can't be typed
+           in but looks like one invites the attempt. Drawn flat, tinted and
+           locked, with where it came from. */
+        <div className={FIELD_BLOCK_CLASS}>
+          <span id={`${idPrefix}-name-label`} className={LABEL_CLASS}>
+            Your name
+          </span>
+          <div
+            role="group"
+            aria-labelledby={`${idPrefix}-name-label`}
+            aria-describedby={`${idPrefix}-name-source`}
+            className="flex h-12 items-center justify-between gap-3 rounded-[12px] border border-dashed border-grid px-4"
+            style={{ background: "rgb(var(--tint) / 0.05)" }}
+          >
+            <span className="truncate font-display text-[14.5px] font-medium text-strong">{verifiedName}</span>
+            <span className="inline-flex flex-none items-center gap-1.5 text-[12px] font-medium text-faint">
+              <Icon name="lock" size={13} strokeWidth={2} />
+              Locked
+            </span>
+          </div>
           <span id={`${idPrefix}-name-source`} className="inline-flex items-center gap-1.5 text-[12.5px] leading-[1.5] text-faint">
             <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
-            From your Bhutan NDI Wallet, as it is on your citizen ID
+            From your Bhutan NDI Wallet, as it is on your citizen ID. It can&rsquo;t be changed here.
           </span>
-        ) : null}
-        {nameError ? <FieldError id={`${idPrefix}-name-error`} message={nameError} /> : null}
-      </div>
+        </div>
+      ) : (
+        <div className={FIELD_BLOCK_CLASS}>
+          <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
+            Your name
+          </label>
+          <input
+            id={`${idPrefix}-name`}
+            name="name"
+            autoComplete="name"
+            placeholder="As it appears on your citizenship ID"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameError(null);
+            }}
+            disabled={busy}
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? `${idPrefix}-name-error` : undefined}
+            className={`${FIELD_CLASS} h-12`}
+          />
+          {nameError ? <FieldError id={`${idPrefix}-name-error`} message={nameError} /> : null}
+        </div>
+      )}
 
       <div className={FIELD_BLOCK_CLASS}>
         <label htmlFor={`${idPrefix}-password`} className={LABEL_CLASS}>

@@ -44,6 +44,7 @@ export function IdentityScan({
   onWithout,
   withoutLabel = "Continue without it",
   cancelLabel,
+  cardVerb = "Sign up",
   onCancel,
 }: {
   /** Who the wallet answers as. The prototype has no phone, so the story says. */
@@ -59,6 +60,8 @@ export function IdentityScan({
   withoutLabel?: string;
   cancelLabel?: string;
   onCancel?: () => void;
+  /** The card heading: "Sign up with Bhutan NDI Wallet" while setting up. */
+  cardVerb?: string;
 }) {
   const [stage, setStage] = useState<IdentityScanStage>("idle");
   const [skippable, setSkippable] = useState(false);
@@ -154,7 +157,7 @@ export function IdentityScan({
       {shown !== "no_wallet" ? (
         <WalletHandoff
           value="ndi-account-identity-anchor"
-          cardVerb="Confirm"
+          cardVerb={cardVerb}
           title="Bhutan NDI is asking who you are"
           purpose="We keep your name and a protected reference to your citizenship ID, so this account can only ever be yours."
           sharing={["Your full name, as it is on your citizen ID", "Your citizenship ID number"]}

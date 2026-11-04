@@ -91,7 +91,10 @@ export function SetPasswordView() {
       }
       lead="A passphrase you won't reuse is stronger than a short password full of symbols — and this one will one day guard what your organisation holds."
     >
-      <AuthCardHeader title="Set your password" subtitle="Your name and a password" />
+      <AuthCardHeader
+        title="Set your password"
+        subtitle={signup?.anchoredName ? "Your name came from your NDI wallet" : "Your name and a password"}
+      />
 
       {noVerification && !loading ? (
         /* Arriving here without a confirmed address — a bookmark, a back
