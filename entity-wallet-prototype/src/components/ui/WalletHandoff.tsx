@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { QrPlaceholder } from "./QrPlaceholder";
 import { Icon } from "./icons";
@@ -305,12 +305,24 @@ export function WalletHandoff({
  * the app cannot be launched from a prototype — so it goes through the same
  * simulate handler and says so.
  */
+/**
+ * The NDI cards are drawn in NDI mint (#5AC994) in both themes, as the NDI
+ * integration specification draws them: the heading's "Bhutan NDI", the
+ * links, icons, borders and buttons. The light theme's deeper reading green,
+ * and any site palette around the card (BNSW), stop at its edge.
+ */
+const NDI_CARD = {
+  background: "var(--scan-card)",
+  "--ndi-mint": "#5ac994",
+  "--accent": "#5ac994",
+} as CSSProperties;
+
 function OpenWalletCard({ closed, onOpen }: { closed: boolean; onOpen?: () => void }) {
   return (
     <section
       aria-label="Open Bhutan NDI Wallet"
       className="flex flex-col items-center gap-4 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
-      style={{ background: "var(--scan-card)" }}
+      style={NDI_CARD}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
         Open <span className="text-accent">Bhutan NDI</span> Wallet
@@ -372,7 +384,7 @@ function ScanCard({
     <section
       aria-label="Bhutan NDI Wallet"
       className="flex flex-col items-center gap-5 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
-      style={{ background: "var(--scan-card)" }}
+      style={NDI_CARD}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
         <span className="min-[641px]:hidden">{verb}</span>
