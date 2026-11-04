@@ -386,6 +386,33 @@ export const inOrg =
  */
 export const shortOrgName = (name: string) => name.replace(/ (Pvt\. )?Ltd\.$/, "");
 
+/**
+ * The address an invitation goes to, for the story's own people.
+ *
+ * Each person in the story has one address, and the rest of the demo finds
+ * them by it — their inbox, their invitation, who they are once they join.
+ * Typed slightly differently (ugyen@…, ugyen.p@…) it used to reach a
+ * stranger instead, who joined as a second "Ugyen" beside the real one. So
+ * an address whose name part starts with a story person's first name goes
+ * to that person's own address — at their domain, or for someone with no
+ * account yet at any. Anything else is used as typed.
+ */
+export function storyAddress(typed: string, people: Pick<Person, "id" | "name" | "email" | "hasAccount">[]): string {
+  const address = typed.trim();
+  const lower = address.toLowerCase();
+  if (people.some((p) => p.email.toLowerCase() === lower)) return address;
+  const [local = "", domain = ""] = lower.split("@");
+  const first = local.split(/[._-]+/)[0];
+  if (!first) return address;
+  const matches = people.filter(
+    (p) =>
+      (PERSONAS as string[]).includes(p.id) &&
+      p.name.split(/\s+/)[0].toLowerCase() === first &&
+      (p.email.toLowerCase().endsWith(`@${domain}`) || p.hasAccount === false),
+  );
+  return matches.length === 1 ? matches[0].email : address;
+}
+
 /** A person's role in one organisation, or undefined if they do not belong to it. */
 export const roleIn = (
   org: Pick<Organization, "id" | "memberIds" | "roles"> | undefined,

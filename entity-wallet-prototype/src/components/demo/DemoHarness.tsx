@@ -53,6 +53,7 @@ export function DemoHarness() {
     startPlatformReady,
     startFirstDay,
     startTeamReady,
+    appointUgyenToReceive,
     setActiveOrg,
     organizations,
     relations,
@@ -137,6 +138,10 @@ export function DemoHarness() {
     else if (f.start === "platformReady") startPlatformReady();
     else if (f.start === "firstDay") startFirstDay();
     else if (f.start === "teamReady") startTeamReady();
+    else if (f.start === "controllerReady") {
+      startTeamReady();
+      appointUgyenToReceive();
+    }
     else restoreStoryState();
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);

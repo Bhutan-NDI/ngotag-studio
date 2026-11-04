@@ -178,8 +178,10 @@ story through seven parts, in this order:
    confirms Pelden, and Dorji invites Ugyen.
 3. **Appointing a controller** (Flow 3). Dorji chooses what Ugyen can do, and
    Ugyen accepts in the Bhutan NDI app.
-4. **Receiving credentials** (Flow 6). Pelden asks the Department of Revenue
-   & Customs for its TPN, and accepts it.
+4. **Receiving credentials** (Flow 6). Ugyen — appointed to receive
+   credentials — asks the Department of Revenue & Customs for Pelden's TPN,
+   Deki issues it, and Ugyen accepts it. The part starts with his
+   appointment already accepted.
 5. **Presenting credentials** (Flow 7). Pelden shares with Bank of Bhutan,
    from the bank's website and in the wallet.
 6. **Issuing authority credentials** (Flow 8). Dorji gives Pema, the clearing
@@ -212,10 +214,10 @@ It comes two ways:
   and Deki for the TPN), or everyone the presentation uses when no part is
   on. Switch any time and nothing resets — an appointment, a request or an
   authority sent stays waiting. Someone who hasn't joined yet shows greyed
-  as *not joined yet*, with the address to invite them at — type it
-  exactly (Ugyen is **ugyen.phuntsho@peldentrading.bt**): any other address
-  is a new person, not Ugyen, and isn't listed. Once invited they become
-  *invited*, and pressing it opens their invitation. Everyone else is still
+  as *not joined yet*, with their address. You needn't type it exactly:
+  an address starting with their first name (**ugyen@…**, **ugyen.p@…**)
+  reaches them, so it's the same Ugyen everywhere after. Once invited they
+  become *invited*, and pressing it opens their invitation. Everyone else is still
   in Demo controls.
   In the product itself, the **bell** at the top shows the same list for
   whoever is signed in, and **My authority** offers **Review and accept**

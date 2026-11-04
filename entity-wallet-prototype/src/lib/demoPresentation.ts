@@ -267,14 +267,14 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Receiving credentials",
-    shows: "Pelden Trading asks the tax office for its TPN and accepts it",
-    persona: "dorji",
+    shows: "Ugyen, appointed to receive credentials, asks the tax office for the TPN and accepts it",
+    persona: "ugyen",
     route: "/wallet/get",
-    start: "teamReady",
-    cast: ["dorji", "deki"],
+    start: "controllerReady",
+    cast: ["ugyen", "deki"],
     switchTo: [
       { label: "Deki · tax office", persona: "deki", route: "/issuer/requests" },
-      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/requests" },
+      { label: "Ugyen · Pelden Trading", persona: "ugyen", route: "/wallet/requests" },
     ],
   },
   {

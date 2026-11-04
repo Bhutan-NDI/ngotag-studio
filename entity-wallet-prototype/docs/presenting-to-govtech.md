@@ -241,16 +241,20 @@ acceptance someone else makes isn't worth recording.
 ### Flow 6: receiving a credential
 
 **What happens:**
-1. Pelden asks the tax office for its TPN. It shares its registration as
-   proof, and the screen says exactly what will be shared.
+1. **Ugyen** asks the tax office for Pelden's TPN, using the *Receive
+   credentials* power Dorji gave him in Flow 3. He shares Pelden's
+   registration as proof, and the screen shows both cards — the
+   registration going out, the TPN coming back — and exactly what will be
+   shared.
 2. **Deki**, the tax officer, sees what Pelden *proved*, and separately the
    name NDI shows, which isn't proof. She issues the TPN from the office's
    own records.
-3. Back at Pelden, Dorji checks the offer and accepts it. The TPN is now
+3. Back at Pelden, Ugyen checks the offer and accepts it. The TPN is now
    held, and it's on the activity record.
 
-**Say:** "Each office issues what it's responsible for. The wallet is where
-it all comes together, under the company's control."
+**Say:** "Ugyen isn't the owner — Dorji appointed him to do exactly this.
+Each office issues what it's responsible for. The wallet is where it all
+comes together, under the company's control."
 
 **Why it matters:** an office can issue to a business digitally and know
 exactly which verified company it's issuing to.

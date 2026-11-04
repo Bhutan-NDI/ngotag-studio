@@ -723,10 +723,10 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 10,
     title: "What Pelden Trading can get next",
     happening:
-      "Credentials offices on NDI issue to businesses like Pelden Trading. Each says what the office needs to see first — the taxpayer number needs Pelden Trading's registration, which it holds; the bonded-warehouse authorisation needs the taxpayer number, which it doesn't yet.",
+      "Ugyen asks this time: Dorji appointed him to receive credentials, and this is that power in use. Credentials offices on NDI issue to businesses like Pelden Trading. Each says what the office needs to see first — the taxpayer number needs Pelden Trading's registration, which it holds; the bonded-warehouse authorisation needs the taxpayer number, which it doesn't yet.",
     doThis: "On **Taxpayer Number (TPN)**, press **Ask for this**.",
     route: "/wallet/get",
-    persona: "dorji",
+    persona: "ugyen",
   },
   {
     chapter: 10,
@@ -768,7 +768,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 10,
     title: "Sent",
     happening: "Issued, and on its way to Pelden Trading. It isn't Pelden Trading's yet — Pelden Trading decides whether to accept it.",
-    doThis: "Press **Next** — the guide switches to Dorji.",
+    doThis: "Press **Next** — the guide switches to Ugyen.",
     match: "^/issuer/requests/crq-[^/]+$",
   },
   {
@@ -777,13 +777,13 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening: "The office has replied. What needs someone at Pelden Trading comes first, with the date the offer lapses.",
     doThis: "Under **Waiting for you**, press **Review**.",
     route: "/wallet/requests",
-    persona: "dorji",
+    persona: "ugyen",
   },
   {
     chapter: 10,
     title: "Check it, then accept",
     happening:
-      "Every detail as offered, from an office on NDI's list of trusted organisations, in answer to Dorji's request. If something were wrong, the screen says to decline and contact the office.",
+      "Every detail as offered, from an office on NDI's list of trusted organisations, in answer to Ugyen's request. If something were wrong, the screen says to decline and contact the office.",
     doThis: "Press **Accept**, then **Go to your credentials**.",
     match: "^/wallet/requests/crq-[^/]+$",
   },

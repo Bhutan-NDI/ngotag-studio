@@ -165,7 +165,7 @@ export function InviteView({ kind }: { kind: "M" | "O" }) {
           }
           return;
         }
-        setSent({ kind: "sent", email: email.trim(), id: result.id });
+        setSent({ kind: "sent", email: result.email, id: result.id });
       } else {
         const needsSecondApproval = purpose === "foundational";
         const proposed = proposeOrganisation({

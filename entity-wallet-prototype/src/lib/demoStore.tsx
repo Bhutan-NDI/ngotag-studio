@@ -20,6 +20,7 @@ import * as auth from "./authority";
 import * as bnsw from "./bnsw";
 import { formatDate } from "@/features/controllership/scopeModel";
 import {
+  storyAddress,
   NDI_ORG,
   PELDEN,
   PERSONAS,
@@ -1894,7 +1895,9 @@ interface DemoActions {
    *  Not the inherited `inviteMember`, which belongs to the Studio users page
    *  and adds a row with no invitation behind it. */
   inviteToOrganisation: (input: { email: string; role: "Member" | "Admin" }) =>
-    | { ok: true; id: string }
+    /* `email` is the address it went to, which may be the story's own for
+       the person named (storyAddress). */
+    | { ok: true; id: string; email: string }
     /* E3 split in two, because the spec's copy differs: "{Name} is already a
        member", or an invitation to that address is already waiting. `member`
        is a name from this organisation only — nothing about accounts
@@ -1999,6 +2002,14 @@ interface DemoActions {
    * when walked on its own, and where Flow 8's first grant starts.
    */
   startTeamReady: () => void;
+  /**
+   * The team's first day, with Ugyen appointed to receive credentials and
+   * his acceptance signed — the appointment of Flow 3 put to use, so the
+   * presentation can have him ask for the TPN himself (FLOW-CRD-01: a
+   * Controller whose preset carries credential:receive). Call after
+   * startTeamReady.
+   */
+  appointUgyenToReceive: () => void;
   /**
    * Sign in with an address. Resolves it to a person with an account and
    * drives the console as them; a stand-in for the server's answer, so the
@@ -4007,7 +4018,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (!inviter || (inviterRole !== "Owner" && inviterRole !== "Admin")) {
           return { ok: false, error: "E1" };
         }
-        const address = email.trim().toLowerCase();
+        /* The story's people have one address each; an address that starts
+           with one of their names reaches them (storyAddress), so the
+           presenter needn't type it exactly. */
+        const sentTo = storyAddress(email.trim(), s0.people);
+        const address = sentTo.toLowerCase();
         /* E3 — already a member of *this* organisation, or already invited to
            it and not yet answered. A second live invitation to the same
            address would leave two links that each grant membership. Only
@@ -4034,7 +4049,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             {
               id,
               kind: "M",
-              email: email.trim(),
+              email: sentTo,
               orgId: s.activeOrgId,
               role,
               legalName: null,
@@ -4054,8 +4069,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             ...s.orgInvitations,
           ],
         }));
-        log(`Invitation sent to ${email.trim()} (member)`);
-        return { ok: true, id };
+        log(`Invitation sent to ${sentTo} (member)`);
+        return { ok: true, id, email: sentTo };
       },
 
       proposeOrganisation: ({ email, legalName, legalIdentity, purpose, needsSecondApproval }) => {
@@ -4655,6 +4670,41 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           return next;
         }),
 
+
+      appointUgyenToReceive: () =>
+        setState((s) => {
+          const now = today();
+          const scope = scopeFor(
+            { presets: ["receive"], shareReach: "named", shareWith: [], shareNeedsApproval: false, issueNeedsApproval: false },
+            now,
+            null,
+          );
+          const ugyen = s.people.find((p) => p.id === "ugyen");
+          return {
+            ...s,
+            relations: [
+              {
+                id: "rel-ugyen-receive",
+                orgId: PELDEN,
+                personId: "ugyen",
+                legalBasis: "entity_consent",
+                instrument: null,
+                scope,
+                state: "ACTIVE",
+                isRootAuthority: false,
+                createdAt: now,
+                acceptedAt: now,
+                activatedAt: now,
+                presets: ["receive"],
+                attestation: { attestedBy: "dorji", attestedAt: now },
+                document: null,
+                expiresAt: null,
+                verifiedName: ugyen?.name ?? "Ugyen Phuntsho",
+              },
+              ...s.relations.filter((r) => !(r.personId === "ugyen" && inOrg(PELDEN)(r))),
+            ],
+          };
+        }),
 
       invitePlatformAdmin: (emailIn, root) => {
         const s0 = stateRef.current;

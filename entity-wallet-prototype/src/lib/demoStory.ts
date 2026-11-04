@@ -108,7 +108,7 @@ export interface FlowEntry {
    *   yet: where appointing starts, and Flow 8's first grant.
    * - `livedIn` — the story three months in, for the acts beyond onboarding.
    */
-  start: "dayZero" | "platformReady" | "firstDay" | "teamReady" | "livedIn";
+  start: "dayZero" | "platformReady" | "firstDay" | "teamReady" | "controllerReady" | "livedIn";
 }
 
 export const FLOW_ENTRIES: FlowEntry[] = [
