@@ -121,10 +121,12 @@ Saying this early stops people asking "is this connected to the real CRA?"
 
 ### Flow 1: a person gets an account
 
-**What happens:** Dorji signs up with an email address, confirms it, and sets
-a name and password. Then he scans one Bhutan NDI QR code with his own
-wallet, sharing only his name and citizenship ID number. The account is now
-tied to him. He has an account, but no company.
+**What happens:** Dorji signs up with an email address and confirms it. Then
+he scans one Bhutan NDI QR code with his own wallet (or, on a phone, presses
+**Open Bhutan NDI Wallet**), sharing only his name and citizenship ID number.
+His name comes back from the wallet and is filled in for him, exactly as it
+is on his citizen ID; he only chooses a password. The account is now tied to
+him. He has an account, but no company.
 
 **Say:** "Nobody signs up *as* a company. The account belongs to a real
 person, and one scan of their NDI wallet proves which person. Many people

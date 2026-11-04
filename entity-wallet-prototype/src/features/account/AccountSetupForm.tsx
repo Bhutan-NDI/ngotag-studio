@@ -62,6 +62,7 @@ export function AccountSetupForm({
   idPrefix,
   intro,
   forcedPasswordError,
+  verifiedName,
 }: {
   /** The invited address, shown so the person can see whose account this is. */
   email: string;
@@ -84,8 +85,14 @@ export function AccountSetupForm({
   intro?: React.ReactNode | null;
   /** A password-rule miss to show at the field — the state switcher's E8. */
   forcedPasswordError?: string | null;
+  /**
+   * The name the set-up scan returned (ADR-001). When given, it fills the
+   * field and can't be changed: it is the name on the citizen ID, not one
+   * typed. Without the scan the person types their own.
+   */
+  verifiedName?: string | null;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(verifiedName ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [revealed, setRevealed] = useState(false);
@@ -105,7 +112,8 @@ export function AccountSetupForm({
     setNameError(null);
     setPasswordError(null);
     setConfirmMissing(false);
-    if (!name.trim()) {
+    const given = (verifiedName ?? name).trim();
+    if (!given) {
       setNameError("Enter your name.");
       return focus(`${idPrefix}-name`);
     }
@@ -121,7 +129,7 @@ export function AccountSetupForm({
     /* A mismatch is already said beside the field as it is typed; sending
        the form only moves focus there. */
     if (confirm !== password) return focus(`${idPrefix}-confirm-input`);
-    onSubmit(name.trim());
+    onSubmit(given);
   };
 
   return (
@@ -146,16 +154,25 @@ export function AccountSetupForm({
           name="name"
           autoComplete="name"
           placeholder="As it appears on your citizenship ID"
-          value={name}
+          value={verifiedName ?? name}
           onChange={(e) => {
             setName(e.target.value);
             setNameError(null);
           }}
+          readOnly={Boolean(verifiedName)}
           disabled={busy}
           aria-invalid={nameError ? true : undefined}
-          aria-describedby={nameError ? `${idPrefix}-name-error` : undefined}
-          className={`${FIELD_CLASS} h-12`}
+          aria-describedby={
+            nameError ? `${idPrefix}-name-error` : verifiedName ? `${idPrefix}-name-source` : undefined
+          }
+          className={`${FIELD_CLASS} h-12 ${verifiedName ? "cursor-not-allowed opacity-80" : ""}`}
         />
+        {verifiedName ? (
+          <span id={`${idPrefix}-name-source`} className="inline-flex items-center gap-1.5 text-[12.5px] leading-[1.5] text-faint">
+            <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
+            From your Bhutan NDI Wallet, as it is on your citizen ID
+          </span>
+        ) : null}
         {nameError ? <FieldError id={`${idPrefix}-name-error`} message={nameError} /> : null}
       </div>
 

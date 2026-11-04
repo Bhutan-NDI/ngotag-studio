@@ -154,6 +154,7 @@ export function IdentityScan({
       {shown !== "no_wallet" ? (
         <WalletHandoff
           value="ndi-account-identity-anchor"
+          cardVerb="Confirm"
           title="Bhutan NDI is asking who you are"
           purpose="We keep your name and a protected reference to your citizenship ID, so this account can only ever be yours."
           sharing={["Your full name, as it is on your citizen ID", "Your citizenship ID number"]}
