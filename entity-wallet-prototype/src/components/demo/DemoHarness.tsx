@@ -223,6 +223,23 @@ export function DemoHarness() {
               </li>
             ))}
           </ol>
+          {/* Practising belongs beside the list it rehearses, not only in
+              the demo controls where nobody preparing would look. */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-dashed border-grid px-3.5 py-3">
+            <p className="min-w-0 flex-1 text-[12.5px] leading-[1.5] text-muted">
+              Preparing? The guide walks the same parts and says what to press and what to say.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                startPresentation();
+                setPanel(null);
+              }}
+              className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] border border-[var(--ndi-mint-40)] px-3.5 font-display text-[13px] font-semibold text-accent"
+            >
+              Practise with the guide
+            </button>
+          </div>
         </div>
       ) : null}
 
