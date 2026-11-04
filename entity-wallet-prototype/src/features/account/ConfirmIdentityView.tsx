@@ -150,6 +150,7 @@ export function AccountConfirmIdentityView() {
                     confirmIdentity(currentPerson.id);
                   }}
                   onContinue={() => router.push("/profile")}
+                  cardVerb="Confirm"
                   cancelLabel="Not now"
                   onCancel={() => router.push("/profile")}
                 />

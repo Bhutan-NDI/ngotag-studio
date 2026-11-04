@@ -373,7 +373,8 @@ function ScanCard({
           onClick={onOpen}
           disabled={dimmed || !onOpen}
           className="inline-flex h-12 w-full max-w-[280px] items-center justify-center rounded-[8px] font-display text-[14px] font-semibold shadow-[0_4px_12px_rgb(0_0_0/0.18)] disabled:opacity-40"
-          style={{ background: "var(--ndi-mint)", color: "var(--text-on-mint)" }}
+          /* White on mint, as the integration specification draws it. */
+          style={{ background: "var(--ndi-mint)", color: "#ffffff" }}
         >
           Open Bhutan NDI Wallet
         </button>
