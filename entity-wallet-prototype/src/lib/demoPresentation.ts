@@ -1,4 +1,4 @@
-import type { GuideId } from "./demoData";
+import type { GuideId, PersonaId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
 import type { FlowEntry } from "./demoStory";
 
@@ -220,6 +220,13 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
   title: string;
   /** One line under the title, in the audience's words. */
   shows: string;
+  /**
+   * The hand-overs in the part, in the order they happen: the person to
+   * switch to, and the screen they pick it up on. Switching never resets.
+   * Anyone who answers in a dashed panel (their phone, their app, their
+   * inbox) needs no entry: they act on the screen already open.
+   */
+  switchTo?: { label: string; persona?: PersonaId; route: string }[];
 }
 
 export const PRESENTATION_PARTS: PresentationPart[] = [
@@ -238,6 +245,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/onboarding",
     selfService: true,
     start: "platformReady",
+    switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/members" }],
   },
   {
     title: "Appointing a controller",
@@ -252,6 +260,10 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/wallet/get",
     start: "teamReady",
+    switchTo: [
+      { label: "Deki · tax office", persona: "deki", route: "/issuer/requests" },
+      { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/requests" },
+    ],
   },
   {
     title: "Presenting credentials",
@@ -259,6 +271,10 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/simulated/bank",
     start: "teamReady",
+    switchTo: [
+      { label: "Ugyen · Pelden", persona: "ugyen", route: "/wallet/sharing" },
+      { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/sharing" },
+    ],
   },
   {
     title: "Issuing authority credentials",
@@ -266,6 +282,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/authority-to-act",
     start: "teamReady",
+    switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/authority-to-act" }],
   },
   {
     title: "Acting at BNSW",
@@ -273,8 +290,41 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: null,
     route: "/simulated/bnsw",
     start: "livedIn",
+    switchTo: [
+      { label: "Dorji · Pelden", persona: "dorji", route: "/simulated/bnsw/register" },
+      { label: "Pema · BNSW", route: "/simulated/bnsw" },
+    ],
   },
 ];
+
+/** Who is acting on screen, as the handover card names them. */
+export interface Actor {
+  key: string;
+  name: string;
+  role: string;
+}
+
+/**
+ * Who the room is watching. Mostly the person being driven as, but three
+ * screens belong to someone the switcher doesn't drive: Pema on her own
+ * phone and at the Single Window's site, and whoever opens a member
+ * invitation. Without them on the card, the room would read the whole
+ * story as one person clicking.
+ */
+export const presentationActor = (
+  pathname: string,
+  signedOut: boolean,
+  person: { id: string; name: string; title: string } | undefined,
+): Actor | null => {
+  if (pathname.startsWith("/authority/claim/"))
+    return { key: "pema-phone", name: "Pema Choden", role: "Clearing agent · on her own phone" };
+  if (pathname.startsWith("/simulated/bnsw") && !pathname.startsWith("/simulated/bnsw/register"))
+    return { key: "pema-bnsw", name: "Pema Choden", role: "Clearing agent · at the Bhutan National Single Window" };
+  if (pathname.startsWith("/invitation/"))
+    return { key: "invitee", name: "The colleague Dorji invited", role: "Opening the invitation from their email" };
+  if (signedOut || !person) return null;
+  return { key: person.id, name: person.name, role: person.title };
+};
 
 /** The script the guide is reading; the full story when none is set. */
 export const guideScript = (id: GuideId | undefined): GuideScript => (id === "presentation" ? PRESENTATION : FULL_GUIDE);

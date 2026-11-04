@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
 import { FLOW_ENTRIES, FLOW_GROUPS, type FlowEntry } from "@/lib/demoStory";
-import { PERSONAS } from "@/lib/demoData";
-import { PRESENTATION_PARTS } from "@/lib/demoPresentation";
+import { PERSONAS, type PersonaId } from "@/lib/demoData";
+import { PRESENTATION_PARTS, presentationActor, type Actor } from "@/lib/demoPresentation";
 
 import { GuideCard } from "./GuideCard";
 import { useScreenRegistry } from "./screenState";
@@ -54,6 +54,7 @@ export function DemoHarness() {
     startDayZero();
     setGuideStep(0, "full");
     setOpen(false);
+    setPart(null);
   };
   /* The presentation guide, for practising, starts where a company comes
      on: NDI's administrators are already set up, and nobody from Pelden has
@@ -65,6 +66,7 @@ export function DemoHarness() {
     setSelfServiceSignup(true);
     setGuideStep(0, "presentation");
     setOpen(false);
+    setPart(null);
     router.push("/sign-up");
   };
   const guiding = (harness.guideStep ?? null) !== null;
@@ -119,6 +121,7 @@ export function DemoHarness() {
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
     setOpen(false);
+    setPart(null);
     router.push(f.route);
   };
 
@@ -128,8 +131,36 @@ export function DemoHarness() {
     walk(PRESENTATION_PARTS[i]);
     setGuideStep(null);
     setPart(i);
+    setSeenActor(null);
     setPanel(null);
   };
+  /* A hand-over within a part: a new person picks it up where it is. */
+  const handOver = (s: { persona?: PersonaId; route: string }) => {
+    if (s.persona) setPersona(s.persona);
+    setPanel(null);
+    router.push(s.route);
+  };
+
+  /* While a part is on screen, a change of who is acting is announced to
+     the room for a few seconds. Without it a client watches one cursor do
+     everything and reads it as one person — the opposite of the point.
+     Adjusted during render rather than in an effect, so the card and the
+     new screen arrive together. */
+  const actor =
+    part !== null && hydrated
+      ? presentationActor(pathname, onAuthScreen, people.find((p) => p.id === harness.persona))
+      : null;
+  const [seenActor, setSeenActor] = useState<string | null>(null);
+  const [handover, setHandover] = useState<Actor | null>(null);
+  if (actor && actor.key !== seenActor) {
+    setSeenActor(actor.key);
+    setHandover(actor);
+  }
+  useEffect(() => {
+    if (!handover) return;
+    const t = setTimeout(() => setHandover(null), 3500);
+    return () => clearTimeout(t);
+  }, [handover]);
 
   /* The marker renders on the server along with everything else, and is not
      gated on hydration. It is a disclosure rather than a control: a claim
@@ -174,9 +205,36 @@ export function DemoHarness() {
                   </span>
                   <Icon name="arrowRight" size={14} strokeWidth={2} className="flex-none opacity-60" />
                 </button>
+                {part === i && p.switchTo ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-3">
+                    <span className="text-[12px] text-faint">Switch to</span>
+                    {p.switchTo.map((s) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        onClick={() => handOver(s)}
+                        className="ndi-hairline-btn rounded-[9px] border border-grid px-2.5 py-1.5 font-display text-[12.5px] font-medium"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ol>
+        </div>
+      ) : null}
+
+      {/* ---- Who is acting now, for the room ---- */}
+      {handover ? (
+        <div
+          role="status"
+          className="pointer-events-none fixed left-1/2 top-5 z-[80] w-max max-w-[calc(100vw-32px)] -translate-x-1/2 rounded-2xl border border-[var(--ndi-mint-40)] bg-[var(--chrome-fill-strong)] px-5 py-3 text-center shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]"
+        >
+          <p className="font-display text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">Now acting</p>
+          <p className="mt-0.5 font-display text-[18px] font-semibold text-body">{handover.name}</p>
+          <p className="text-[13px] leading-[1.45] text-muted">{handover.role}</p>
         </div>
       ) : null}
       {open && hydrated ? (
@@ -354,6 +412,7 @@ export function DemoHarness() {
                 /* Day zero starts where the story does: root signing in. */
                 resetDemo();
                 setOpen(false);
+                setPart(null);
                 router.push("/sign-in");
               }}
               className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] px-3 font-display text-[13px] font-medium"

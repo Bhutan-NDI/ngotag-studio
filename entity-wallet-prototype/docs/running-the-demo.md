@@ -196,6 +196,12 @@ It comes two ways:
   needs and opens its first screen, with no guide card, so the room sees
   only the product. The part on screen is highlighted. Close the list and
   drive the screens yourself, then open it again for the next part.
+  Where another person picks the part up, the highlighted part has a
+  **Switch to** row (Deki at the tax office, Ugyen, Dorji, Pema at BNSW).
+  Switching never resets. Whenever the person acting changes, a **Now
+  acting** card names them and their role at the top of the screen for a
+  few seconds, so the room sees the hand-over. Anyone who answers in a
+  dashed panel, such as Ugyen accepting in his app, needs no switch.
 - **To practise: the presentation guide.** **Demo controls → Practise with
   the guide** runs the same seven parts as a guided demo, with the same card,
   **Next** and **Back**. It opens with three steps on what the Entity Wallet

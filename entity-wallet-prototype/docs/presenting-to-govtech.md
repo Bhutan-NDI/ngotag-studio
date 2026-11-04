@@ -351,6 +351,9 @@ you'll follow up.** Don't fill gaps on the spot.
   have to reset by hand.
 - [ ] Zoom the browser to 110–125% if the room is large.
 - [ ] Close the list while you talk; the client should see only the product.
+- [ ] When the story moves to another person, use **Switch to** under the
+  part, and pause on the **Now acting** card: "Now we're the tax office."
+  It's the clearest way to show this is several people, not one.
 - [ ] If something goes wrong in a part, choose that part again from the
   list. It starts it fresh.
 - [ ] Have a backup: screenshots or a screen recording of a good run, in case
