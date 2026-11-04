@@ -141,13 +141,25 @@ export function WalletHandoff({
   const settled = status === "confirmed" || status === "expired" || status === "failed";
   const bad = status === "expired" || status === "failed";
 
+  /* The layout. Side by side when there is room: the card on the left, the
+     explanation on the right in its own order. Stacked — a sign-up card, a
+     phone — the card comes straight after the one-line purpose, with the
+     status and the simulated scan under it, and what is shared below: the
+     code was below the fold, and the wallet itself shows what is asked for
+     before anyone approves. On the wide layout each item says where it goes
+     (`col-start-2`, `order`), so one list of blocks serves both. */
+  const side = "@min-[720px]:col-start-2";
   return (
     <div className="@container relative z-[4]">
-      <div className="grid gap-6 @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:items-start">
-        {/* Side by side when there is room. Stacked, what will be shared
-            comes first: the page says what the scan is for before the code
-            asks anyone to scan it. */}
-        <div className="order-2 @min-[720px]:order-1">
+      <div className="flex flex-col gap-4 @min-[720px]:grid @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[720px]:items-start @min-[720px]:gap-x-6 @min-[720px]:gap-y-4">
+        {/* ---- Who is asking, and why ---- */}
+        <div className={`flex flex-col gap-1 ${side} @min-[720px]:order-1`}>
+          <h3 className="font-display text-[15px] font-semibold leading-[1.3] text-strong">{title}</h3>
+          <p className="max-w-[52ch] text-[13px] leading-[1.6] text-muted">{purpose}</p>
+        </div>
+
+        {/* ---- The card ---- */}
+        <div className="@min-[720px]:col-start-1 @min-[720px]:row-span-5 @min-[720px]:row-start-1">
           {sameDevice ? (
             <OpenWalletCard closed={settled} onOpen={onSimulateScan} />
           ) : (
@@ -160,138 +172,131 @@ export function WalletHandoff({
           )}
         </div>
 
-        {/* ---- What is happening, and what it costs you ---- */}
-        <div className="order-1 flex min-w-0 flex-col gap-4 @min-[720px]:order-2">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-display text-[15px] font-semibold leading-[1.3] text-strong">{title}</h3>
-            <p className="max-w-[52ch] text-[13px] leading-[1.6] text-muted">{purpose}</p>
-          </div>
-
-          <div className="rounded-[12px] border border-grid px-3.5 py-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">What you will share</p>
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {sharing.map((item) => (
-                <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-body">
-                  <Icon name="arrowRight" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-            {notSharing?.length ? (
-              <>
-                <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Not shared</p>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {notSharing.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-muted">
-                      <Icon name="close" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-            <p className="mt-2.5 text-[12px] leading-[1.5] text-faint">
-              Your wallet proves who you are. It never receives the organisation&rsquo;s keys or
-              credentials.
-            </p>
-          </div>
-
-          {/* ---- Live status ---- */}
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-start gap-2.5 rounded-[12px] border px-3.5 py-3"
-            style={{
-              borderColor: bad ? "color-mix(in srgb, var(--ndi-danger) 35%, transparent)" : "var(--border-grid)",
-              background: bad
-                ? "color-mix(in srgb, var(--ndi-danger) 7%, transparent)"
-                : status === "confirmed"
-                  ? "var(--ndi-mint-08)"
-                  : "rgb(var(--tint) / 0.04)",
-            }}
-          >
-            {status === "verifying" || status === "waiting" ? (
-              <Icon name="refresh" size={15} strokeWidth={2} className="mt-px flex-none animate-spin text-accent" />
-            ) : (
-              <Icon
-                name={status === "confirmed" ? "check" : bad ? "close" : "info"}
-                size={15}
-                strokeWidth={2.2}
-                className="mt-px flex-none"
-                style={{
-                  color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-faint)",
-                }}
-              />
-            )}
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <p
-                className="font-display text-[13px] font-medium leading-[1.4]"
-                style={{
-                  color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-body)",
-                }}
-              >
-                {copy.label}
-              </p>
-              <p className="text-[12.5px] leading-[1.5] text-muted">{statusDetail ?? copy.detail}</p>
-            </div>
-          </div>
-
-          {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
-            <div
-              className="flex flex-col gap-2.5 rounded-[12px] border border-dashed px-3.5 py-3"
-              style={{ borderColor: "var(--border-strong)", background: "rgb(var(--tint) / 0.03)" }}
+        {/* ---- Live status ---- */}
+        <div
+          role="status"
+          aria-live="polite"
+          className={`flex items-start gap-2.5 rounded-[12px] border px-3.5 py-3 ${side} @min-[720px]:order-3`}
+          style={{
+            borderColor: bad ? "color-mix(in srgb, var(--ndi-danger) 35%, transparent)" : "var(--border-grid)",
+            background: bad
+              ? "color-mix(in srgb, var(--ndi-danger) 7%, transparent)"
+              : status === "confirmed"
+                ? "var(--ndi-mint-08)"
+                : "rgb(var(--tint) / 0.04)",
+          }}
+        >
+          {status === "verifying" || status === "waiting" ? (
+            <Icon name="refresh" size={15} strokeWidth={2} className="mt-px flex-none animate-spin text-accent" />
+          ) : (
+            <Icon
+              name={status === "confirmed" ? "check" : bad ? "close" : "info"}
+              size={15}
+              strokeWidth={2.2}
+              className="mt-px flex-none"
+              style={{
+                color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-faint)",
+              }}
+            />
+          )}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p
+              className="font-display text-[13px] font-medium leading-[1.4]"
+              style={{
+                color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-body)",
+              }}
             >
-              <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-                <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
-                Prototype · stands in for {sameDevice ? "answering in the wallet app" : "scanning with your phone"}
-              </p>
-              <div>
-                <button
-                  type="button"
-                  onClick={onSimulateScan}
-                  className="ndi-hairline-btn inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 font-display text-[13px] font-medium"
-                >
-                  <Icon name="scan" size={14} strokeWidth={2} />
-                  {sameDevice ? "Simulate answering" : "Simulate the scan"}
-                </button>
-              </div>
-            </div>
-          ) : null}
+              {copy.label}
+            </p>
+            <p className="text-[12.5px] leading-[1.5] text-muted">{statusDetail ?? copy.detail}</p>
+          </div>
+        </div>
 
-          {/* ---- Ways out ---- */}
-          {(onRetry && bad) || (onCancel && !settled) || (onSkip && !settled) || (onResend && !settled) ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              {onRetry && bad ? (
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="ndi-hairline-btn inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-grid px-3.5 font-display text-[12.5px] font-medium"
-                >
-                  <Icon name="refresh" size={13} strokeWidth={2} />
-                  Try again
-                </button>
-              ) : null}
-              {onResend && !settled ? (
-                <button type="button" onClick={onResend} className="ndi-plainlink text-[12.5px] font-medium text-muted">
-                  Send again
-                </button>
-              ) : null}
-              {onCancel && !settled ? (
-                <button type="button" onClick={onCancel} className="ndi-plainlink text-[12.5px] font-medium text-muted">
-                  Cancel
-                </button>
-              ) : null}
-              {onSkip && !settled ? (
-                <button type="button" onClick={onSkip} className="ndi-plainlink ml-auto text-[12.5px] font-medium text-faint">
-                  Skip the wait
-                </button>
-              ) : null}
+        {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
+          <div
+            className={`flex flex-col gap-2.5 rounded-[12px] border border-dashed px-3.5 py-3 ${side} @min-[720px]:order-4`}
+            style={{ borderColor: "var(--border-strong)", background: "rgb(var(--tint) / 0.03)" }}
+          >
+            <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+              <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
+              Prototype · stands in for {sameDevice ? "answering in the wallet app" : "scanning with your phone"}
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={onSimulateScan}
+                className="ndi-hairline-btn inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 font-display text-[13px] font-medium"
+              >
+                <Icon name="scan" size={14} strokeWidth={2} />
+                {sameDevice ? "Simulate answering" : "Simulate the scan"}
+              </button>
             </div>
+          </div>
+        ) : null}
+
+        {/* ---- Ways out ---- */}
+        {(onRetry && bad) || (onCancel && !settled) || (onSkip && !settled) || (onResend && !settled) ? (
+          <div className={`flex flex-wrap items-center gap-2.5 ${side} @min-[720px]:order-5`}>
+            {onRetry && bad ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="ndi-hairline-btn inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-grid px-3.5 font-display text-[12.5px] font-medium"
+              >
+                <Icon name="refresh" size={13} strokeWidth={2} />
+                Try again
+              </button>
+            ) : null}
+            {onResend && !settled ? (
+              <button type="button" onClick={onResend} className="ndi-plainlink text-[12.5px] font-medium text-muted">
+                Send again
+              </button>
+            ) : null}
+            {onCancel && !settled ? (
+              <button type="button" onClick={onCancel} className="ndi-plainlink text-[12.5px] font-medium text-muted">
+                Cancel
+              </button>
+            ) : null}
+            {onSkip && !settled ? (
+              <button type="button" onClick={onSkip} className="ndi-plainlink ml-auto text-[12.5px] font-medium text-faint">
+                Skip the wait
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* ---- What it costs you ---- */}
+        <div className={`rounded-[12px] border border-grid px-3.5 py-3 ${side} @min-[720px]:order-2`}>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">What you will share</p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {sharing.map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-body">
+                <Icon name="arrowRight" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          {notSharing?.length ? (
+            <>
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Not shared</p>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {notSharing.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-muted">
+                    <Icon name="close" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : null}
+          <p className="mt-2.5 text-[12px] leading-[1.5] text-faint">
+            Your wallet proves who you are. It never receives the organisation&rsquo;s keys or
+            credentials.
+          </p>
         </div>
       </div>
     </div>
-  );
+  );
 }
 
 /**
