@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
+import { CredentialCard } from "@/components/ui/CredentialCard";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -212,6 +213,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
   if (!offering) return null;
   const readOnly = face === "no_permission";
+  const sharedCard = holder.held.find((c) => c.type === offering.prerequisite.credential);
 
   return (
     <AppShell>
@@ -239,15 +241,16 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                 labels. Stacked on a phone, share still comes first. */}
             <div className="grid items-stretch gap-3 min-[761px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
               <section aria-labelledby="ask-share" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
-                <div className="flex items-center gap-3">
-                  <CredentialTile tone="sky" />
-                  <div className="min-w-0">
-                    <h2 id="ask-share" className={LABEL_CLASS}>
-                      You share
-                    </h2>
-                    <p className="m-0 font-display text-[15px] font-semibold text-strong">{offering.prerequisite.credential}</p>
-                  </div>
-                </div>
+                <h2 id="ask-share" className={LABEL_CLASS}>
+                  You share
+                </h2>
+                {/* The card Pelden Trading holds, as Held credentials draws it,
+                    so "which one goes" is recognised rather than read. */}
+                <CredentialCard
+                  type={offering.prerequisite.credential}
+                  issuer={sharedCard?.issuer ?? offering.prerequisite.issuer}
+                  foundational={Boolean(sharedCard?.isFoundational)}
+                />
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">
                   They see all {offering.prerequisite.attributes.length} details in it:
                 </p>
@@ -302,15 +305,11 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </div>
 
               <section aria-labelledby="ask-receive" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
-                <div className="flex items-center gap-3">
-                  <CredentialTile tone="mint" />
-                  <div className="min-w-0">
-                    <h2 id="ask-receive" className={LABEL_CLASS}>
-                      You may receive
-                    </h2>
-                    <p className="m-0 font-display text-[15px] font-semibold text-strong">{offering.credential}</p>
-                  </div>
-                </div>
+                <h2 id="ask-receive" className={LABEL_CLASS}>
+                  You may receive
+                </h2>
+                {/* Marked as an offer: not held, and not until someone accepts. */}
+                <CredentialCard type={offering.credential} issuer={issuer} status="offered" />
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">From {issuerInline(issuer)}, with:</p>
                 <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
                   {offering.fields.map((f) => (
@@ -407,20 +406,3 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
  *  where the full name has already been said in the heading. */
 const issuerShort = (name: string) =>
   /^Department/.test(name) ? "The department" : /^Ministry/.test(name) ? "The ministry" : name;
-
-/** A small credential card, so the two sides of the exchange read as things. */
-function CredentialTile({ tone }: { tone: "sky" | "mint" }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px]"
-      style={{
-        background: `linear-gradient(140deg, var(--cred-${tone}-from) 0%, var(--cred-${tone}-to) 100%)`,
-        color: "var(--cred-ink)",
-        border: "1px solid var(--border-subtle)",
-      }}
-    >
-      <Icon name="certificate" size={20} strokeWidth={1.8} />
-    </span>
-  );
-}
