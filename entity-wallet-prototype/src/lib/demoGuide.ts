@@ -1010,7 +1010,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Dorji registers Pelden",
     happening:
       "BNSW's registration page, the same shape as the bank's: a reference on the page and a button that leaves for the Entity Wallet. BNSW asks for the registration, the TPN and the business licence.",
-    doThis: "Press **Share from NDI Entity Wallet** (dashed).",
+    doThis: "Press **Share from NDI Entity Wallet** on the Single Window's page.",
     route: "/simulated/bnsw/register",
     persona: "dorji",
   },

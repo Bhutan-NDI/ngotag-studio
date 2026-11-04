@@ -387,6 +387,68 @@
 }
 
 /* ============================================================ */
+/* Another organisation's site: the Bhutan National Single Window.
+   The simulated BNSW pages are drawn in BNSW's own palette, not the
+   wallet's, so an audience can see they have left the Entity Wallet.
+   The tokens are redefined on the page's root, so every utility and
+   shared control inside it (the theme bridge below is inline, so it reads them per element)
+   takes the Single Window's colours whatever the wallet's theme:
+   white and pale grey, government navy, and saffron from GovTech's mark. */
+
+.bnsw-site {
+  color-scheme: light;
+  --tint: 12 27 51;
+  --shade: 12 27 51;
+
+  --bnsw-navy: #0f2c57;
+  --bnsw-blue: #1d4f91;
+  --bnsw-saffron: #f39a1e;
+
+  --ndi-mint: #1d4f91;
+  --ndi-mint-04: rgba(29, 79, 145, 0.05);
+  --ndi-mint-08: rgba(29, 79, 145, 0.08);
+  --ndi-mint-12: rgba(29, 79, 145, 0.12);
+  --ndi-mint-15: rgba(29, 79, 145, 0.18);
+  --ndi-mint-25: rgba(29, 79, 145, 0.28);
+  --ndi-mint-40: rgba(29, 79, 145, 0.42);
+
+  --surface-sunken: #eef2f7;
+  --surface-canvas: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-card: #ffffff;
+  --surface-hover: #e6edf6;
+  --scan-card: #f4f6f9;
+  --fill-panel: #ffffff;
+  --fill-card: #ffffff;
+  --shadow-card: 0 1px 3px rgba(12, 27, 51, 0.08);
+
+  --text-strong: #0b1b33;
+  --text-body: #22324a;
+  --text-muted: #4a5a72;
+  --text-faint: #5a687c;
+  --text-accent: #1d4f91;
+  --text-on-mint: #ffffff;
+
+  --border-grid: rgba(29, 79, 145, 0.2);
+  --border-subtle: rgba(12, 27, 51, 0.1);
+  --border-strong: rgba(29, 79, 145, 0.38);
+  --border-divider: #d3dce8;
+
+  --accent: #1d4f91;
+  --accent-hover: #173f74;
+  --accent-press: #12325c;
+  --focus-ring: rgba(29, 79, 145, 0.28);
+
+  --glow-sm: 0 0 0 1px rgba(29, 79, 145, 0.3);
+  --glow-md: none;
+  --grad-mint: linear-gradient(180deg, #245ca6 0%, #1d4f91 100%);
+  --grad-cta: linear-gradient(180deg, #245ca6 0%, #1d4f91 100%);
+
+  background: var(--surface-sunken);
+  color: var(--text-body);
+}
+
+/* ============================================================ */
 /* Tailwind theme bridge — exposes the tokens above as utilities
    (bg-canvas, text-muted, border-grid, font-display, …). */
 

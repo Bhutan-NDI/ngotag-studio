@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { BNSW } from "@/lib/bnsw";
 import { useDemo } from "@/lib/demoStore";
 import { sessionStatusOf } from "@/lib/sharing";
@@ -86,13 +85,23 @@ export function RegisterCompanyView({ mode, session: returnedSession, state: ret
           <p className="m-0 text-[13.5px] leading-[1.6] text-body">
             Registration number <span className="font-mono font-semibold text-strong">{reference}</span>.
           </p>
-          <SimulatedStep
-            standsFor="BNSW's button — the company's representative leaves to share from the NDI Entity Wallet"
-            action={<SimulatedAction onClick={start}>Share from NDI Entity Wallet</SimulatedAction>}
-          >
+          <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-body">
             Share your company&rsquo;s registration, TPN and business licence from its NDI Entity Wallet. You&rsquo;ll leave our site to sign in
             with Bhutan NDI, and come back here. The wallet will show this registration number — check it matches.
-          </SimulatedStep>
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={start}
+              className="inline-flex h-12 items-center gap-2.5 rounded-[6px] px-5 text-[14.5px] font-semibold text-white"
+              style={{ background: "var(--bnsw-navy)", boxShadow: "inset 0 -3px 0 var(--bnsw-saffron)" }}
+            >
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white">
+                <img src="/media/logos/ndi-mark-mint.png" alt="" width={16} height={16} className="h-4 w-4" />
+              </span>
+              Share from NDI Entity Wallet
+            </button>
+          </div>
         </>
       ) : !hydrated ? null : !session || !matches ? (
         <BnswMessage tone="warning" role="alert">
