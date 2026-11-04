@@ -2265,6 +2265,9 @@ export interface OfferField {
   name: string;
   label: string;
   example: string;
+  /** A fixed list to choose from, where the issuer's values are a known set
+   *  (its offices, its tax types). Free text when absent. */
+  options?: string[];
 }
 
 /**
@@ -2501,8 +2504,26 @@ export const SEED_OFFERINGS: CredentialOffering[] = [
     version: 1,
     fields: [
       { name: "tpn", label: "Taxpayer number", example: "TPN-114-8830" },
-      { name: "tax_office", label: "Tax office", example: "Thimphu Regional Revenue & Customs Office" },
-      { name: "registered_for", label: "Registered for", example: "Business income tax, GST" },
+      {
+        name: "tax_office",
+        label: "Tax office",
+        example: "Thimphu Regional Revenue & Customs Office",
+        options: [
+          "Thimphu Regional Revenue & Customs Office",
+          "Phuentsholing Regional Revenue & Customs Office",
+          "Paro Regional Revenue & Customs Office",
+          "Gelephu Regional Revenue & Customs Office",
+          "Samdrup Jongkhar Regional Revenue & Customs Office",
+          "Mongar Regional Revenue & Customs Office",
+          "Bumthang Regional Revenue & Customs Office",
+        ],
+      },
+      {
+        name: "registered_for",
+        label: "Registered for",
+        example: "Business income tax, GST",
+        options: ["Business income tax, GST", "Business income tax", "GST", "Corporate income tax, GST", "Corporate income tax"],
+      },
     ],
     covered: true,
   },

@@ -287,8 +287,11 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       delegate and company instead of one slot. A version-32 save has a
  *       sign-in with no start, which would never time out, and a single
  *       draft nothing reads.
+ *  34 — The TPN offering's tax office and tax types are fixed lists the
+ *       officer chooses from (OfferField.options). A version-33 save holds
+ *       the offering without them, so the officer would still type.
  */
-const SEED_VERSION = 33;
+const SEED_VERSION = 34;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
