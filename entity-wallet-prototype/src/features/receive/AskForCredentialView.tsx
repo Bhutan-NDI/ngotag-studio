@@ -230,59 +230,144 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
         ) : null}
 
         <Panel>
-          <div className="relative z-[4] flex flex-col gap-5">
-            {/* The share-and-receive summary (§3.4): what goes, to whom, beside
-                what comes back. Two columns from tablet width; stacked, the
-                order still reads share first. */}
-            <div className="grid gap-4 min-[761px]:grid-cols-2">
-              <section aria-labelledby="ask-share" className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
-                <h2 id="ask-share" className={LABEL_CLASS}>
-                  You share
-                </h2>
-                <p className="m-0 text-[13.5px] leading-[1.6] text-body">
-                  To decide, {issuerInline(issuer)} needs to see your {offering.prerequisite.credential}. It will
-                  receive all of it:
+          <div className="relative z-[4] flex flex-col gap-6">
+            {/* ---- The exchange, as a picture: what goes, what comes back ----
+                One credential out, one in. Every detail of the one going out
+                is shown (EW-FLOW6-SD/D20 — all of it is shared), sorted into
+                what the issuer says it uses and what goes along anyway, so
+                the "used / not used" reading is a glance, not a column of
+                labels. Stacked on a phone, share still comes first. */}
+            <div className="grid items-stretch gap-3 min-[761px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+              <section aria-labelledby="ask-share" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
+                <div className="flex items-center gap-3">
+                  <CredentialTile tone="sky" />
+                  <div className="min-w-0">
+                    <h2 id="ask-share" className={LABEL_CLASS}>
+                      You share
+                    </h2>
+                    <p className="m-0 font-display text-[15px] font-semibold text-strong">{offering.prerequisite.credential}</p>
+                  </div>
+                </div>
+                <p className="m-0 text-[13px] leading-[1.5] text-muted">
+                  They see all {offering.prerequisite.attributes.length} details in it:
                 </p>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
-                  {offering.prerequisite.attributes.map((a) => {
-                    const used = offering.prerequisite.uses.includes(a);
-                    return (
-                      <li key={a} className="flex items-baseline justify-between gap-3 text-[13px] text-body">
-                        <span>{a}</span>
-                        <span className="text-[12px] text-faint">{used ? "Used" : "Shared, not used"}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className="m-0 text-[13px] leading-[1.6] text-muted">
-                  {issuer} says it uses: {offering.prerequisite.uses.join(", ")}. None of your other credentials is
-                  shared.
+                <div className="flex flex-col gap-1.5">
+                  <p className="m-0 text-[11.5px] font-medium text-faint">{issuerShort(issuer)} says it uses</p>
+                  <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                    {offering.prerequisite.attributes
+                      .filter((a) => offering.prerequisite.uses.includes(a))
+                      .map((a) => (
+                        <li
+                          key={a}
+                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] text-body"
+                          style={{ background: "var(--ndi-mint-12)", border: "1px solid var(--ndi-mint-25)" }}
+                        >
+                          <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
+                          {a}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <p className="m-0 text-[11.5px] font-medium text-faint">Also included, not used</p>
+                  <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                    {offering.prerequisite.attributes
+                      .filter((a) => !offering.prerequisite.uses.includes(a))
+                      .map((a) => (
+                        <li
+                          key={a}
+                          className="inline-flex items-center rounded-full border border-grid px-2.5 py-1 text-[12.5px] text-muted"
+                          style={{ background: "rgb(var(--tint) / 0.04)" }}
+                        >
+                          {a}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+                <p className="m-0 mt-auto flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
+                  <Icon name="shieldCheck" size={14} strokeWidth={2} className="flex-none text-accent" />
+                  None of your other credentials is shared.
                 </p>
               </section>
-              <section aria-labelledby="ask-receive" className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
-                <h2 id="ask-receive" className={LABEL_CLASS}>
-                  You may receive
-                </h2>
-                <p className="m-0 text-[14px] font-medium text-strong">{offering.credential}</p>
-                <p className="m-0 text-[13px] text-muted">From {issuer}</p>
-                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+
+              {/* The swap between them. */}
+              <div aria-hidden="true" className="flex items-center justify-center">
+                <span
+                  className="flex h-10 w-10 rotate-90 flex-col items-center justify-center rounded-full border border-grid min-[761px]:rotate-0"
+                  style={{ background: "var(--surface-raised)" }}
+                >
+                  <Icon name="arrowRight" size={13} strokeWidth={2.2} className="text-accent" />
+                  <Icon name="arrowLeft" size={13} strokeWidth={2.2} className="-mt-0.5 text-muted" />
+                </span>
+              </div>
+
+              <section aria-labelledby="ask-receive" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
+                <div className="flex items-center gap-3">
+                  <CredentialTile tone="mint" />
+                  <div className="min-w-0">
+                    <h2 id="ask-receive" className={LABEL_CLASS}>
+                      You may receive
+                    </h2>
+                    <p className="m-0 font-display text-[15px] font-semibold text-strong">{offering.credential}</p>
+                  </div>
+                </div>
+                <p className="m-0 text-[13px] leading-[1.5] text-muted">From {issuerInline(issuer)}, with:</p>
+                <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
                   {offering.fields.map((f) => (
-                    <li key={f.name} className="text-[13px] text-body">
+                    <li
+                      key={f.name}
+                      className="inline-flex items-center rounded-full border border-grid px-2.5 py-1 text-[12.5px] text-body"
+                    >
                       {f.label}
                     </li>
                   ))}
                 </ul>
+                <p className="m-0 mt-auto flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
+                  <Icon name="info" size={14} strokeWidth={2} className="flex-none text-accent" />
+                  Arrives as an offer — you choose whether to accept it.
+                </p>
               </section>
             </div>
 
-            <div className="flex flex-col gap-1.5 rounded-[12px] border border-grid px-4 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
-              <p className={LABEL_CLASS}>What happens next</p>
-              <p className="m-0 text-[13.5px] leading-[1.6] text-body">
-                {issuer} will check and reply, usually within {offering.answerWindowDays} days. It may decline. You&rsquo;ll
-                choose whether to accept what they send — nothing is added to your credentials until someone here
-                accepts it.
-              </p>
-            </div>
+            {/* ---- What happens next, as three steps ----
+                The second decision named at the first (UN-37, UC-27). */}
+            <section aria-labelledby="ask-next" className="flex flex-col gap-3">
+              <h2 id="ask-next" className={LABEL_CLASS}>
+                What happens next
+              </h2>
+              <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3">
+                {[
+                  { icon: "send" as const, title: "You ask", note: `Your ${offering.prerequisite.credential} goes to them.` },
+                  {
+                    icon: "refresh" as const,
+                    title: "They check",
+                    note: `Usually within ${offering.answerWindowDays} days. They may decline.`,
+                  },
+                  {
+                    icon: "check" as const,
+                    title: "You decide",
+                    note: "Nothing is added until someone here accepts it.",
+                  },
+                ].map((step, i) => (
+                  <li key={step.title} className="flex items-start gap-3 rounded-[12px] border border-grid px-3.5 py-3">
+                    <span
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
+                      style={
+                        i === 0
+                          ? { background: "var(--grad-cta)", color: "var(--text-on-mint)" }
+                          : { background: "rgb(var(--tint) / 0.06)", color: "var(--text-muted)" }
+                      }
+                    >
+                      <Icon name={step.icon} size={14} strokeWidth={2.2} />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-display text-[13.5px] font-semibold text-strong">{step.title}</span>
+                      <span className="text-[12.5px] leading-[1.45] text-muted">{step.note}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </section>
 
             <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
               <GradientButton onClick={() => ask()} disabled={readOnly || face === "loading"}>
@@ -293,18 +378,49 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
           </div>
         </Panel>
 
+        {/* A reviewer's what-if, folded away so it doesn't add to the page. */}
         {forced === "live" && !readOnly ? (
-          <SimulatedStep
-            standsFor={`${issuer}'s system asking for more than the request said`}
-            action={
-              <SimulatedAction onClick={() => ask(true)}>Ask, and have it ask for a bank account too</SimulatedAction>
-            }
-          >
-            An issuer&rsquo;s proof request can ask for more than the business agreed to share. That can only happen
-            before anything is shared, and when it does, nothing is sent until someone here answers.
-          </SimulatedStep>
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 font-display text-[12px] font-medium text-faint">
+              <Icon name="chevronRight" size={12} strokeWidth={2.2} className="transition-transform duration-200 group-open:rotate-90" />
+              Prototype: what if they ask for more?
+            </summary>
+            <div className="mt-2">
+              <SimulatedStep
+                standsFor={`${issuer}'s system asking for more than the request said`}
+                action={
+                  <SimulatedAction onClick={() => ask(true)}>Ask, and have it ask for a bank account too</SimulatedAction>
+                }
+              >
+                An issuer&rsquo;s proof request can ask for more than the business agreed to share. That can only happen
+                before anything is shared, and when it does, nothing is sent until someone here answers.
+              </SimulatedStep>
+            </div>
+          </details>
         ) : null}
       </div>
     </AppShell>
+  );
+}
+
+/** "Department of Revenue & Customs" → "The department", for running text
+ *  where the full name has already been said in the heading. */
+const issuerShort = (name: string) =>
+  /^Department/.test(name) ? "The department" : /^Ministry/.test(name) ? "The ministry" : name;
+
+/** A small credential card, so the two sides of the exchange read as things. */
+function CredentialTile({ tone }: { tone: "sky" | "mint" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-11 w-11 flex-none items-center justify-center rounded-[11px]"
+      style={{
+        background: `linear-gradient(140deg, var(--cred-${tone}-from) 0%, var(--cred-${tone}-to) 100%)`,
+        color: "var(--cred-ink)",
+        border: "1px solid var(--border-subtle)",
+      }}
+    >
+      <Icon name="certificate" size={20} strokeWidth={1.8} />
+    </span>
   );
 }

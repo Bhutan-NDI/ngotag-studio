@@ -894,14 +894,16 @@ is verified, with Dorji as its representative.
 **Get a credential** (SCR-CRD-01) lists what offices issue to a company, each
 with what the office needs to see first. The bonded-warehouse authorisation
 is badged *Needs Taxpayer Number (TPN) first*. On the TPN, **Ask for this**
-(SCR-CRD-02): what Pelden shares, with every attribute of its registration —
-the ones the office doesn't use marked as shared, not used — beside what it
-may receive, and that nothing is added until someone accepts it. **Ask the
+(SCR-CRD-02) reads as an exchange: the registration going out on the left,
+every one of its details shown as a chip — the ones the office uses ticked,
+the rest under *Also included, not used* — and the TPN coming back on the
+right. Below, three steps: *You ask*, *They check* (usually within 5 days,
+may decline), *You decide* (nothing is added until someone accepts). **Ask the
 Department of Revenue & Customs**. The request page says who has it:
 sending, then waiting for the office, usually within 5 days.
 
-The dashed **Ask, and have it ask for a bank account too** on the same
-screen stands in for an issuer asking for more than was agreed. It is
+Under **Prototype: what if they ask for more?** (folded, below the card),
+the dashed **Ask, and have it ask for a bank account too** stands in for an issuer asking for more than was agreed. It is
 offered at asking time because that is the only time it can happen: a
 request reaches *your answer needed* only before anything has been shared
 (EW-FLOW6-SD §5.1). **Answer** opens SCR-CRD-06, with what was agreed and
