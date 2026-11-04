@@ -202,6 +202,15 @@ It comes two ways:
   acting** card names them and their role at the top of the screen for a
   few seconds, so the room sees the hand-over. Anyone who answers in a
   dashed panel, such as Ugyen accepting in his app, needs no switch.
+  For a question from the room, the top of the list has **Driving as**, the
+  same people as Demo controls: switch to anyone, any time, and nothing
+  resets — an appointment, a request or an authority sent stays waiting.
+  Under it, **Waiting for <person>** lists what is waiting for whoever you
+  are driving as, each one click from its screen: Ugyen's appointment to
+  accept or decline, Deki's request to answer, Dorji's approvals and
+  offers, a request still sending. **No account — opened from a link**
+  lists authority waiting to be collected, such as Pema's, since she has
+  no account to switch to.
 - **To practise: the presentation guide.** **Demo controls → Practise with
   the guide** runs the same seven parts as a guided demo, with the same card,
   **Next** and **Back**. It opens with three steps on what the Entity Wallet

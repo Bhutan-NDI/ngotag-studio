@@ -1,4 +1,4 @@
-import type { GuideId, PersonaId } from "./demoData";
+import { inOrg, PELDEN, type DemoState, type GuideId, type PersonaId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
 import type { FlowEntry } from "./demoStory";
 
@@ -328,3 +328,117 @@ export const presentationActor = (
 
 /** The script the guide is reading; the full story when none is set. */
 export const guideScript = (id: GuideId | undefined): GuideScript => (id === "presentation" ? PRESENTATION : FULL_GUIDE);
+
+/**
+ * What is waiting for one person, for the Presentation panel.
+ *
+ * WHY THE PANEL NEEDS ITS OWN LIST
+ *
+ * In front of a client the presenter switches people whenever a question
+ * asks for it, and comes back later. Switching never resets anything, but
+ * some of what waits for a person has no way back once they leave it: an
+ * appointee reaches their appointment only from the representative's
+ * "open it as …" (it stands in for a notification), and a clearing agent
+ * reaches her authority only from the link Dorji copied. So the panel lists,
+ * for whoever is being driven as, what is waiting for them and where it is
+ * answered. The wallet's own "Needs you" rules are followed for approvals,
+ * requests and offers (NeedsAttention); appointments, authority to collect
+ * and the issuer's queue are added, because those have no dashboard entry.
+ */
+export interface WaitingItem {
+  key: string;
+  label: string;
+  href: string;
+  /** The organisation the screen belongs to, made active before going. */
+  orgId?: string;
+}
+
+type WaitingState = Pick<
+  DemoState,
+  | "people"
+  | "organizations"
+  | "relations"
+  | "parkedOperations"
+  | "presentationRequests"
+  | "offers"
+  | "credentialRequests"
+  | "authorityGrants"
+>;
+
+export function waitingFor(s: WaitingState, personId: string): WaitingItem[] {
+  const person = s.people.find((p) => p.id === personId);
+  if (!person) return [];
+  const today = new Date().toISOString().slice(0, 10);
+  const orgsOf = s.organizations.filter((o) => o.memberIds.includes(personId)).map((o) => o.id);
+  const orgName = (id?: string) => s.organizations.find((o) => o.id === (id ?? PELDEN))?.name ?? "the organisation";
+  const items: WaitingItem[] = [];
+
+  /* An appointment to accept or decline (SCR-DEL-03). */
+  for (const r of s.relations.filter((x) => x.personId === personId && x.state === "PENDING_ACCEPTANCE")) {
+    items.push({
+      key: r.id,
+      label: `Accept or decline the appointment to act for ${orgName(r.orgId)}`,
+      href: `/appointments/${r.id}`,
+      orgId: r.orgId ?? PELDEN,
+    });
+  }
+
+  for (const orgId of orgsOf) {
+    const here = inOrg(orgId);
+    const canDecide = s.relations
+      .filter(here)
+      .some((r) => r.personId === personId && r.state === "ACTIVE" && r.scope.grants.some((g) => g.operation === "approval:decide"));
+    /* Somebody else is waiting on a decision — never one's own. */
+    if (canDecide) {
+      for (const op of s.parkedOperations.filter(here).filter((p) => p.state === "parked" && p.requestedBy !== personId)) {
+        const share = op.operation === "proof:present" && op.targetId;
+        items.push({
+          key: op.id,
+          label: `Approve or refuse: ${op.summary}`,
+          href: share ? `/wallet/sharing/${op.targetId}/approve` : `/approvals/${op.id}`,
+          orgId,
+        });
+      }
+    }
+    /* An organisation is asking for credentials (Flow 7). */
+    for (const v of s.presentationRequests.filter(here).filter((v) => v.status === "OPEN" && v.expiresAt >= today)) {
+      items.push({ key: v.id, label: `Answer ${v.verifierName}'s request`, href: `/wallet/sharing/${v.id}`, orgId });
+    }
+    /* A credential offered, or one this organisation asked for that is ready. */
+    for (const o of s.offers.filter(here).filter((o) => o.state === "pending")) {
+      items.push({ key: o.id, label: `Review ${o.type} from ${o.issuer}`, href: `/wallet/requests/${o.id}`, orgId });
+    }
+    for (const c of s.credentialRequests.filter((c) => c.orgId === orgId && (c.state === "OFFER_READY" || c.state === "NEEDS_CONSENT"))) {
+      items.push({ key: c.id, label: `Review what ${c.issuerName} sent`, href: "/wallet/requests", orgId });
+    }
+    /* A request still being sent: the prototype moves it on only while its
+       page is open (useSimulatedDelivery), so switching away too soon leaves
+       it here until someone looks again. */
+    for (const c of s.credentialRequests.filter((c) => c.orgId === orgId && c.state === "AWAITING_PROOF")) {
+      items.push({ key: c.id, label: `Finish sending the request to ${c.issuerName}`, href: `/wallet/requests/${c.id}`, orgId });
+    }
+    /* The issuer's queue (Deki at the tax office). */
+    for (const c of s.credentialRequests.filter((c) => c.issuerOrgId === orgId && c.state === "WITH_ISSUER")) {
+      items.push({ key: c.id, label: `Answer ${orgName(c.orgId)}'s request`, href: `/issuer/requests/${c.id}`, orgId });
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Authority waiting to be collected from a link (Flow 8). The delegate —
+ * Pema, a clearing agent — has no account and isn't someone the panel can
+ * drive as, so these are listed for everyone: the link is the only way to
+ * her side, and once Dorji's screen is left it is otherwise lost.
+ */
+export function waitingToCollect(s: Pick<WaitingState, "organizations" | "authorityGrants">): WaitingItem[] {
+  const orgName = (id: string) => s.organizations.find((o) => o.id === id)?.name ?? "the organisation";
+  return s.authorityGrants
+    .filter((g) => g.claimRef && (g.status === "CLAIMABLE" || g.status === "ISSUING"))
+    .map((g) => ({
+      key: g.id,
+      label: `${g.delegateName ?? g.name}: collect authority to act for ${orgName(g.orgId)}`,
+      href: `/authority/claim/${g.claimRef}`,
+    }));
+}

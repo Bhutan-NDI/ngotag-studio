@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
 import { FLOW_ENTRIES, FLOW_GROUPS, type FlowEntry } from "@/lib/demoStory";
 import { PERSONAS, type PersonaId } from "@/lib/demoData";
-import { PRESENTATION_PARTS, presentationActor, type Actor } from "@/lib/demoPresentation";
+import { PRESENTATION_PARTS, presentationActor, waitingFor, waitingToCollect, type Actor, type WaitingItem } from "@/lib/demoPresentation";
 
 import { GuideCard } from "./GuideCard";
 import { useScreenRegistry } from "./screenState";
@@ -43,6 +43,14 @@ export function DemoHarness() {
     startPlatformReady,
     startFirstDay,
     startTeamReady,
+    setActiveOrg,
+    organizations,
+    relations,
+    parkedOperations,
+    presentationRequests,
+    offers,
+    credentialRequests,
+    authorityGrants,
     hydrated,
   } = useDemo();
 
@@ -134,6 +142,18 @@ export function DemoHarness() {
     setSeenActor(null);
     setPanel(null);
   };
+  /* What waits for whoever is being driven as, and the way to it. */
+  const waiting = waitingFor(
+    { people, organizations, relations, parkedOperations, presentationRequests, offers, credentialRequests, authorityGrants },
+    harness.persona,
+  );
+  const toCollect = waitingToCollect({ organizations, authorityGrants });
+  const currentName = people.find((p) => p.id === harness.persona)?.name ?? "them";
+  const openWaiting = (w: WaitingItem) => {
+    if (w.orgId) setActiveOrg(w.orgId);
+    setPanel(null);
+    router.push(w.href);
+  };
   /* A hand-over within a part: a new person picks it up where it is. */
   const handOver = (s: { persona?: PersonaId; route: string }) => {
     if (s.persona) setPersona(s.persona);
@@ -185,6 +205,73 @@ export function DemoHarness() {
       <GuideCard />
       {panel === "presentation" && hydrated ? (
         <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[440px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
+          {/* ---- Who you are driving as, and what waits for them ----
+              Switching never resets: whatever was sent is still waiting,
+              however often the presenter switches. And what waits for a
+              person is listed, because some of it — an appointment, an
+              authority to collect — has no way back once you've left it. */}
+          {!onAuthScreen ? (
+            <div className="mb-3 flex flex-col gap-2 rounded-[12px] border border-grid px-3 py-2.5">
+              <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">Driving as</p>
+              <div className="flex flex-wrap gap-1.5">
+                {personas.map(({ id, person }) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setPersona(id)}
+                    aria-pressed={harness.persona === id}
+                    title={person.title}
+                    className="ndi-navrow rounded-[9px] px-2.5 py-1.5 font-display text-[12.5px] font-medium"
+                    data-active={harness.persona === id ? "1" : "0"}
+                  >
+                    {person.name}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+                Waiting for {currentName}
+              </p>
+              {waiting.length ? (
+                <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                  {waiting.map((w) => (
+                    <li key={w.key}>
+                      <button
+                        type="button"
+                        onClick={() => openWaiting(w)}
+                        className="ndi-plainlink inline-flex items-start gap-1.5 text-left text-[12.5px] font-medium leading-[1.45] text-accent"
+                      >
+                        <Icon name="arrowRight" size={12} strokeWidth={2.2} className="mt-[3px] flex-none" />
+                        {w.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="m-0 text-[12.5px] leading-[1.45] text-muted">Nothing is waiting for them right now.</p>
+              )}
+              {toCollect.length ? (
+                <>
+                  <p className="mt-1 font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+                    No account — opened from a link
+                  </p>
+                  <ul className="m-0 flex list-none flex-col gap-1 p-0">
+                    {toCollect.map((w) => (
+                      <li key={w.key}>
+                        <button
+                          type="button"
+                          onClick={() => openWaiting(w)}
+                          className="ndi-plainlink inline-flex items-start gap-1.5 text-left text-[12.5px] font-medium leading-[1.45] text-accent"
+                        >
+                          <Icon name="arrowRight" size={12} strokeWidth={2.2} className="mt-[3px] flex-none" />
+                          {w.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">Presentation</p>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
             Each one starts fresh on its first screen. Show them in this order.
