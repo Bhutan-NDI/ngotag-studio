@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
@@ -219,6 +219,26 @@ export function DemoHarness() {
      been read. The one thing worth waiting for is the act summary, which
      would otherwise show act 1 as Dorji for a frame before swapping to
      whichever act the story was left on. */
+  /* A choice made, or a click anywhere else, closes whichever panel is
+     open — the presenter shouldn't have to close it by hand after every
+     pick. Escape closes it too. */
+  const harnessRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!panel) return;
+    const away = (e: MouseEvent) => {
+      if (harnessRef.current && !harnessRef.current.contains(e.target as Node)) setPanel(null);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanel(null);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [panel]);
+
   return (
     /* `ndi-demo-harness` insets the bar past the sidebar on desktop. The bar
        is fixed to the viewport, so without it the marker and the panel sat on
@@ -228,7 +248,7 @@ export function DemoHarness() {
        onboarding and the what's-real page all render without one), so the
        rule keys off the shell's own presence in the document rather than a
        list of routes that would rot. */
-    <div className="ndi-demo-harness pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-start gap-2 p-3 min-[641px]:p-4">
+    <div ref={harnessRef} className="ndi-demo-harness pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-start gap-2 p-3 min-[641px]:p-4">
       <GuideCard />
       {panel === "presentation" && hydrated ? (
         <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[440px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
@@ -267,7 +287,10 @@ export function DemoHarness() {
                       <button
                         key={c.key}
                         type="button"
-                        onClick={() => setPersona(c.persona as PersonaId)}
+                        onClick={() => {
+                          setPersona(c.persona as PersonaId);
+                          setPanel(null);
+                        }}
                         aria-pressed={harness.persona === c.persona}
                         className="ndi-navrow flex w-full rounded-[9px] px-2.5 py-1.5 text-left"
                         data-active={harness.persona === c.persona ? "1" : "0"}
@@ -488,7 +511,10 @@ export function DemoHarness() {
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setPersona(id)}
+                    onClick={() => {
+                      setPersona(id);
+                      setOpen(false);
+                    }}
                     aria-pressed={harness.persona === id}
                     /* Names only, with the role on hover: eight two-line
                        cards took more room than the rest of the panel. */
@@ -557,7 +583,10 @@ export function DemoHarness() {
                     type="button"
                     /* The first entry is the natural state, so choosing it
                        removes the override rather than pinning it. */
-                    onClick={() => setStateOverride(registered.screen, i === 0 ? null : s)}
+                    onClick={() => {
+                      setStateOverride(registered.screen, i === 0 ? null : s);
+                      setOpen(false);
+                    }}
                     aria-pressed={active}
                     className="ndi-navrow rounded-[9px] px-2.5 py-1.5 font-display text-[12.5px] font-medium"
                     data-active={active ? "1" : "0"}

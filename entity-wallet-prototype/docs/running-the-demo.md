@@ -194,8 +194,9 @@ It comes two ways:
   the outlined button beside **Guided demo**. It opens a list of the seven
   parts, without flow numbers. Each one resets the demo to what that part
   needs and opens its first screen, with no guide card, so the room sees
-  only the product. The part on screen is highlighted. Close the list and
-  drive the screens yourself, then open it again for the next part.
+  only the product. The part on screen is highlighted. The list closes by
+  itself once you pick something (or click away, or press Esc); drive the
+  screens yourself, then open it again for the next part.
   Where another person picks the part up, the highlighted part has a
   **Switch to** row (Deki at the tax office, Ugyen, Dorji, Pema at BNSW).
   Switching never resets. Whenever the person acting changes, a **Now
