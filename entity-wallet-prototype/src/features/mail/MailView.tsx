@@ -37,6 +37,11 @@ const INK = "#1f1f1f";
 const MUTED = "#5f6368";
 const LINE = "#e3e3e3";
 const ACTIVE = "#d3e3fd";
+/* The Entity Wallet's dark theme: its deep teal-green, falling to ink, with
+   the mint kept for the mark only. */
+const DEEP = "#124143";
+const DEEP_SOFT = "#1a585b";
+const DEEP_BAND = "linear-gradient(135deg, #163a3c 0%, #124143 45%, #141b29 100%)";
 const MINT = "#5ac994";
 const FONT = "Roboto, 'Segoe UI', Arial, sans-serif";
 
@@ -75,7 +80,7 @@ function Inbox({ mail }: { mail: MailMessage | null }) {
         <div className="flex items-center gap-2 pr-2">
           <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden="true">
             <rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="#ffffff" stroke={MUTED} strokeWidth="1.4" />
-            <path d="m3.5 6.5 8.5 6.5 8.5-6.5" fill="none" stroke={MINT} strokeWidth="2" strokeLinejoin="round" />
+            <path d="m3.5 6.5 8.5 6.5 8.5-6.5" fill="none" stroke={DEEP_SOFT} strokeWidth="2" strokeLinejoin="round" />
           </svg>
           <span className="text-[21px] tracking-[-0.01em]" style={{ color: MUTED }}>
             Mail
@@ -174,7 +179,7 @@ function Message({ mail }: { mail: MailMessage }) {
       <div className="flex items-start gap-3">
         <span
           className="flex h-10 w-10 flex-none items-center justify-center rounded-full"
-          style={{ background: "#0f2a22" }}
+          style={{ background: DEEP }}
           aria-hidden="true"
         >
           <img src="/media/logos/ndi-mark-mint.png" alt="" width={24} height={24} className="h-6 w-6" />
@@ -200,9 +205,12 @@ function Message({ mail }: { mail: MailMessage }) {
           className="mx-auto max-w-[600px] overflow-hidden rounded-xl"
           style={{ background: "#ffffff", border: `1px solid ${LINE}` }}
         >
-          <div className="flex items-center gap-2 px-6 py-5 sm:px-8" style={{ background: MINT, color: "#ffffff" }}>
+          <div className="flex items-center gap-2 px-6 py-5 sm:px-8" style={{ background: DEEP_BAND, color: "#ffffff" }}>
+            <img src="/media/logos/ndi-mark-mint.png" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
             <span className="text-[19px] font-bold">Bhutan NDI</span>
-            <span className="text-[14px] opacity-90">· Entity Wallet</span>
+            <span className="text-[14px]" style={{ color: MINT }}>
+              · Entity Wallet
+            </span>
           </div>
           <div className="flex flex-col gap-4 px-6 py-6 text-[15px] leading-[1.6] sm:px-8" style={{ color: "#3c4043" }}>
             {mail.kind === "verify" ? (
@@ -230,11 +238,11 @@ function Message({ mail }: { mail: MailMessage }) {
                 </p>
                 <span
                   className="inline-flex w-fit rounded-full px-3.5 py-1 text-[14px] font-semibold"
-                  style={{ background: "#e6f6ee", color: "#1d7d57" }}
+                  style={{ background: "#e3eeee", color: DEEP }}
                 >
                   Role: {mail.invitation.role ?? "Member"}
                 </span>
-                <div className="rounded-lg px-5 py-4" style={{ border: `1px solid ${LINE}`, borderLeft: `4px solid ${MINT}` }}>
+                <div className="rounded-lg px-5 py-4" style={{ border: `1px solid ${LINE}`, borderLeft: `4px solid ${DEEP}` }}>
                   <p className="text-[11.5px] uppercase tracking-[0.08em]" style={{ color: MUTED }}>
                     Invited by
                   </p>
@@ -252,7 +260,7 @@ function Message({ mail }: { mail: MailMessage }) {
                     What joining does
                   </p>
                   <p className="flex gap-2">
-                    <span style={{ color: "#1d7d57" }}>✓</span> You can sign in and see {mail.orgName}&rsquo;s information.
+                    <span style={{ color: DEEP_SOFT }}>✓</span> You can sign in and see {mail.orgName}&rsquo;s information.
                   </p>
                   <p className="flex gap-2">
                     <span style={{ color: MUTED }}>✕</span> It doesn&rsquo;t let you act for {mail.orgName}. If that&rsquo;s
@@ -306,8 +314,8 @@ function MailButton({ onClick, children }: { onClick: () => void; children: Reac
     <button
       type="button"
       onClick={onClick}
-      className="my-1 inline-flex h-12 w-fit items-center rounded-lg px-7 text-[15px] font-semibold shadow-[0_2px_6px_rgb(0_0_0/0.15)]"
-      style={{ background: MINT, color: "#ffffff" }}
+      className="my-1 inline-flex h-12 w-fit items-center rounded-lg px-7 text-[15px] font-semibold shadow-[0_2px_6px_rgb(0_0_0/0.18)]"
+      style={{ background: DEEP, color: "#ffffff" }}
     >
       {children}
     </button>
