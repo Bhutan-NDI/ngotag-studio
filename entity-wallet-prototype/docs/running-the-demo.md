@@ -211,8 +211,11 @@ It comes two ways:
   and Deki for the TPN), or everyone the presentation uses when no part is
   on. Switch any time and nothing resets — an appointment, a request or an
   authority sent stays waiting. Someone who hasn't joined yet shows greyed
-  as *not joined yet*; once invited they become *invited*, and pressing it
-  opens their invitation. Everyone else is still in Demo controls.
+  as *not joined yet*, with the address to invite them at — type it
+  exactly (Ugyen is **ugyen.phuntsho@peldentrading.bt**): any other address
+  is a new person, not Ugyen, and isn't listed. Once invited they become
+  *invited*, and pressing it opens their invitation. Everyone else is still
+  in Demo controls.
   Under it, **Waiting for <person>** lists what is waiting for whoever you
   are driving as, each one click from its screen: Ugyen's appointment to
   accept or decline, Deki's request to answer, Dorji's approvals and
