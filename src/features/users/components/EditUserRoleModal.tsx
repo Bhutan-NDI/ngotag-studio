@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import React, { useCallback, useEffect, useState } from 'react'
+import { RoleI, applyMemberRule, toggleRole } from '../roleSelection'
 import { RoleNames, apiStatusCodes } from '@/config/CommonConstant'
 import {
   Tooltip,
@@ -26,17 +27,9 @@ import { AxiosResponse } from 'axios'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { MOBILE_VERIFIER_ROLES } from '@/lib/useOrgRoleAccess'
 import { TextTitlecase } from '@/utils/TextTransform'
 import { User } from './users-interface'
 import { useAppSelector } from '@/lib/hooks'
-
-interface RoleI {
-  id: string
-  name: string
-  checked: boolean
-  disabled: boolean
-}
 
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
   ALLOW_PROOF_TEMPLATE: 'Create Proof Templates',
@@ -45,27 +38,6 @@ const ROLE_DISPLAY_LABELS: Record<string, string> = {
 
 const getRoleLabel = (name: string): string =>
   ROLE_DISPLAY_LABELS[name] ?? TextTitlecase(name)
-
-const isChecked = (roles: RoleI[], name: string): boolean =>
-  roles.some((r) => r.name === name && r.checked)
-
-// A mobile verifier (Manage Mobile Verifier, no Issuer/Verifier) is either an
-// admin or a member of it, never both: Admin and Member become an either/or.
-// Studio users keep Member ticked and locked.
-const isMobileVerifierChoice = (roles: RoleI[]): boolean =>
-  isChecked(roles, MOBILE_VERIFIER_ROLES.VERIFIER) &&
-  !isChecked(roles, 'issuer') &&
-  !isChecked(roles, 'verifier')
-
-const applyMemberRule = (roles: RoleI[]): RoleI[] => {
-  const memberOff = isMobileVerifierChoice(roles) && isChecked(roles, 'admin')
-  return roles.map((r) => {
-    if (r.name !== RoleNames.MEMBER) {
-      return r
-    }
-    return { ...r, checked: !memberOff, disabled: !memberOff }
-  })
-}
 
 interface EditUserRoleModalProps {
   openModal: boolean
@@ -124,60 +96,8 @@ const EditUserRoleModal = ({
     }
   }, [openModal, user, getRoles])
 
-  const handleIssuerOrVerifier = (
-    role: RoleI,
-    checked: boolean,
-  ): RoleI[] | null =>
-    roles?.map((r) => {
-      if (r.id === role.id) {
-        return { ...r, checked }
-      }
-      if (['verifier', 'issuer', 'member'].includes(r.name)) {
-        return { ...r, checked: true }
-      }
-      return { ...r, checked: false }
-    }) ?? null
-
-  const handleAdmin = (role: RoleI, checked: boolean): RoleI[] | null =>
-    roles?.map((r) => {
-      if (r.id === role.id) {
-        return { ...r, checked }
-      }
-      if (r.name === 'member') {
-        return { ...r, checked: true }
-      }
-      return { ...r, checked: false }
-    }) ?? null
-
-  const handleDefault = (role: RoleI, checked: boolean): RoleI[] | null =>
-    roles?.map((r) => (r.id === role.id ? { ...r, checked } : r)) ?? null
-
-  // Mobile verifier: ticking Member switches from admin to member (Admin is
-  // unticked, applyMemberRule ticks Member). Ticking Admin needs no handler:
-  // applyMemberRule unticks Member.
-  const handleMobileVerifierMember = (): RoleI[] | null =>
-    roles?.map((r) => {
-      if (r.name === 'admin') {
-        return { ...r, checked: false }
-      }
-      return r
-    }) ?? null
-
   const handleRoleChange = (checked: boolean, role: RoleI): void => {
-    let updatedRoles: RoleI[] | null = null
-    const mobileVerifier = roles ? isMobileVerifierChoice(roles) : false
-
-    if (['issuer', 'verifier'].includes(role.name) && checked) {
-      updatedRoles = handleIssuerOrVerifier(role, checked)
-    } else if (mobileVerifier && role.name === RoleNames.MEMBER && checked) {
-      updatedRoles = handleMobileVerifierMember()
-    } else if (role.name === 'admin' && checked && !mobileVerifier) {
-      updatedRoles = handleAdmin(role, checked)
-    } else {
-      updatedRoles = handleDefault(role, checked)
-    }
-
-    setRoles(updatedRoles && applyMemberRule(updatedRoles))
+    setRoles(roles && toggleRole(roles, role, checked))
   }
 
   const getCheckboxClass = (role: RoleI): string => {
