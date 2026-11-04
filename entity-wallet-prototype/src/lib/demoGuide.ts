@@ -233,9 +233,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 3,
     title: "Confirm it's you",
     happening:
-      "One scan of Dorji's Bhutan NDI Wallet ties the account to him. It asks only for his name and citizenship ID number. The platform keeps his name and a protected reference to the ID, never the number itself, so one citizen can hold only one account, and nobody can set one up in his name. On a phone, **Open Bhutan NDI Wallet** does the same without a scan.",
+      "One scan of Dorji's Bhutan NDI Wallet ties the account to him. It asks only for his name and citizenship ID number. The platform keeps his name and a protected reference to the ID, never the number itself, so one citizen can hold only one account, and nobody can set one up in his name. On a phone the card offers **Open Bhutan NDI Wallet** instead of a scan.",
     doThis:
-      "Press **Simulate the scan** (dashed), or **Open Bhutan NDI Wallet** on the card — both stand in for Dorji's phone. It moves on by itself.",
+      "Press **Simulate the scan** (dashed — it stands in for Dorji's phone). It moves on by itself. On a phone, press **Open Bhutan NDI Wallet** on the card instead.",
     say: "Many people in Bhutan share a name. Nobody shares a citizenship ID. From here on, every time Dorji proves who he is, it's checked against this.",
     route: "/sign-up/confirm-identity",
   },
@@ -831,8 +831,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "Opening an account at the bank",
     happening:
-      "Bank of Bhutan's own website — dashed, because it's another organisation's system. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
-    doThis: "Press **Share from NDI Entity Wallet** (dashed).",
+      "Bank of Bhutan's own website — in the bank's colours and logo, not the wallet's, because it's another organisation's system; the strip across the top says it's a stand-in. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
+    doThis: "Press **Share from NDI Entity Wallet** on the bank's page.",
     route: "/simulated/bank",
     persona: "dorji",
   },

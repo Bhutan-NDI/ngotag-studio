@@ -146,25 +146,26 @@ export function AccountSetupForm({
       ) : intro}
 
       {verifiedName ? (
-        /* From the proof, so not a field at all: a field that can't be typed
-           in but looks like one invites the attempt. Drawn flat, tinted and
-           locked, with where it came from. */
+        /* From the proof, so it can't be edited — and has to look it at a
+           glance. A disabled field, greyed out, is the one control everyone
+           already reads as "can't change this"; the lock and the line under
+           it say why. */
         <div className={FIELD_BLOCK_CLASS}>
-          <span id={`${idPrefix}-name-label`} className={LABEL_CLASS}>
+          <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
             Your name
-          </span>
-          <div
-            role="group"
-            aria-labelledby={`${idPrefix}-name-label`}
-            aria-describedby={`${idPrefix}-name-source`}
-            className="flex h-12 items-center justify-between gap-3 rounded-[12px] border border-dashed border-grid px-4"
-            style={{ background: "rgb(var(--tint) / 0.05)" }}
-          >
-            <span className="truncate font-display text-[14.5px] font-medium text-strong">{verifiedName}</span>
-            <span className="inline-flex flex-none items-center gap-1.5 text-[12px] font-medium text-faint">
-              <Icon name="lock" size={13} strokeWidth={2} />
-              Locked
-            </span>
+          </label>
+          <div className="relative flex items-center">
+            <input
+              id={`${idPrefix}-name`}
+              name="name"
+              value={verifiedName}
+              disabled
+              readOnly
+              aria-describedby={`${idPrefix}-name-source`}
+              className="h-12 w-full cursor-not-allowed rounded-[12px] border border-transparent px-4 pr-11 font-display text-[14.5px] text-muted"
+              style={{ background: "rgb(var(--tint) / 0.09)", WebkitTextFillColor: "var(--text-muted)", opacity: 1 }}
+            />
+            <Icon name="lock" size={15} strokeWidth={2} className="pointer-events-none absolute right-4 text-faint" />
           </div>
           <span id={`${idPrefix}-name-source`} className="inline-flex items-center gap-1.5 text-[12.5px] leading-[1.5] text-faint">
             <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
