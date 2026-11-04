@@ -411,10 +411,11 @@ function MailButton({ onClick, children }: { onClick: () => void; children: Reac
       onClick={onClick}
       className="inline-flex h-[52px] w-fit items-center gap-2.5 rounded-xl px-7 text-[15px] font-semibold transition-transform hover:-translate-y-px"
       style={{
-        background: CTA,
-        color: "#06241a",
+        /* Solid, in the wallet's deep green, like the hero above it. */
+        background: DEEP,
+        color: "#ffffff",
         fontFamily: DISPLAY,
-        boxShadow: "0 10px 26px -10px rgba(47,161,137,0.7), inset 0 1px 0 rgba(255,255,255,0.45)",
+        boxShadow: "0 8px 20px -10px rgba(18,65,67,0.6)",
       }}
     >
       {children}
