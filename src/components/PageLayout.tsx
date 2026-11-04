@@ -8,6 +8,7 @@ import { BhutanndiAppShell } from './bhutanndi/layout/BhutanndiAppShell'
 import { BhutanndiBareShell } from './bhutanndi/layout/BhutanndiBareShell'
 import Header from './layout/header'
 import KBar from './kbar'
+import { MobileVerifierRouteGuard } from './MobileVerifierRouteGuard'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { usePathname } from 'next/navigation'
 
@@ -47,7 +48,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
   if (isBhutanndiTheme()) {
     return (
       <KBar>
-        <BhutanndiAppShell>{children}</BhutanndiAppShell>
+        <BhutanndiAppShell>
+          <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
+        </BhutanndiAppShell>
       </KBar>
     )
   }
@@ -58,7 +61,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
         <AppSidebar />
         <SidebarInset>
           <Header />
-          {children}
+          <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
         </SidebarInset>
       </SidebarProvider>
     </KBar>
