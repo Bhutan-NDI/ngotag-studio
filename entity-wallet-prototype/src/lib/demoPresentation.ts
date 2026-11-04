@@ -1,5 +1,6 @@
 import type { GuideId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
+import type { FlowEntry } from "./demoStory";
 
 /**
  * The presentation: the guided demo, cut to the seven flows that explain
@@ -193,7 +194,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
 
 export const PRESENTATION: GuideScript = {
   id: "presentation",
-  label: "Presentation",
+  label: "Presentation guide",
   chapters: PRESENTATION_CHAPTERS,
   steps: PRESENTATION_STEPS,
 };
@@ -204,6 +205,76 @@ export const FULL_GUIDE: GuideScript = {
   chapters: GUIDE_CHAPTERS,
   steps: GUIDE_STEPS,
 };
+
+/**
+ * The presentation as it is shown to a client: the same seven flows, in the
+ * same order, as jumps in a panel of their own.
+ *
+ * The guide above is for practising — its card says what to press and what
+ * to say, which is the presenter's business, not the room's. In front of a
+ * client the presenter picks the next part from this list, each one starting
+ * from a clean state on its first screen, and no card is shown. No flow
+ * numbers: they mean something to the team, not to the audience.
+ */
+export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | "selfService" | "start"> {
+  title: string;
+  /** One line under the title, in the audience's words. */
+  shows: string;
+}
+
+export const PRESENTATION_PARTS: PresentationPart[] = [
+  {
+    title: "Entity Wallet user onboarding",
+    shows: "Dorji gets an account as a person, with no company yet",
+    persona: null,
+    route: "/sign-up",
+    selfService: true,
+    start: "platformReady",
+  },
+  {
+    title: "Entity onboarding",
+    shows: "The registrar confirms Pelden, and Dorji invites a colleague",
+    persona: "dorji",
+    route: "/onboarding",
+    selfService: true,
+    start: "platformReady",
+  },
+  {
+    title: "Appointing a controller",
+    shows: "Dorji chooses what Ugyen can do; Ugyen accepts in the Bhutan NDI app",
+    persona: "dorji",
+    route: "/people-who-can-act/appoint",
+    start: "teamReady",
+  },
+  {
+    title: "Receiving credentials",
+    shows: "Pelden asks the tax office for its TPN and accepts it",
+    persona: "dorji",
+    route: "/wallet/get",
+    start: "teamReady",
+  },
+  {
+    title: "Presenting credentials",
+    shows: "Pelden shares its credentials with Bank of Bhutan",
+    persona: "dorji",
+    route: "/simulated/bank",
+    start: "teamReady",
+  },
+  {
+    title: "Issuing authority credentials",
+    shows: "Dorji gives the clearing agent authority; she collects it in her own app",
+    persona: "dorji",
+    route: "/authority-to-act",
+    start: "teamReady",
+  },
+  {
+    title: "Acting at BNSW",
+    shows: "The clearing agent declares for Pelden, and each declaration is checked",
+    persona: null,
+    route: "/simulated/bnsw",
+    start: "livedIn",
+  },
+];
 
 /** The script the guide is reading; the full story when none is set. */
 export const guideScript = (id: GuideId | undefined): GuideScript => (id === "presentation" ? PRESENTATION : FULL_GUIDE);

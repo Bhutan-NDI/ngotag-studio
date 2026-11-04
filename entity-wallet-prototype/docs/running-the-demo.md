@@ -168,40 +168,49 @@ and when, and nothing from NDI's side of the platform.
 
 ## For a first audience: the presentation
 
-Press **Presentation**, the outlined button beside **Guided demo**, or
-**Demo controls → Start the presentation**. It works like the guided demo,
-with the same card, the same **Next** and **Back**, and the same steps. It is
-for people seeing the Entity Wallet for the first time, such as a client, so
-it leaves out the platform's own setup and walks one company's story through
-seven flows, in this order:
+For people seeing the Entity Wallet for the first time, such as a client,
+the presentation leaves out the platform's own setup and walks one company's
+story through seven parts, in this order:
 
-1. **A person gets an account** (Flow 1). Dorji signs up as a person, with no
-   company yet.
-2. **The company comes on** (Flow 2). The Corporate Regulatory Authority
+1. **Entity Wallet user onboarding** (Flow 1). Dorji signs up as a person,
+   with no company yet.
+2. **Entity onboarding** (Flow 2). The Corporate Regulatory Authority
    confirms Pelden, and Dorji invites Ugyen.
-3. **Appointing someone to act** (Flow 3). Dorji chooses what Ugyen can do,
-   and Ugyen accepts in the Bhutan NDI app.
-4. **Receiving a credential** (Flow 6). Pelden asks the Department of Revenue
+3. **Appointing a controller** (Flow 3). Dorji chooses what Ugyen can do, and
+   Ugyen accepts in the Bhutan NDI app.
+4. **Receiving credentials** (Flow 6). Pelden asks the Department of Revenue
    & Customs for its TPN, and accepts it.
-5. **Presenting a credential** (Flow 7). Pelden shares with Bank of Bhutan,
+5. **Presenting credentials** (Flow 7). Pelden shares with Bank of Bhutan,
    from the bank's website and in the wallet.
-6. **Giving authority to act** (Flow 8). Dorji gives Pema, the clearing agent,
-   authority, and she collects it in her own app.
-7. **Acting at the Single Window** (Flow 9). Pema declares for Pelden, and is
-   refused when she goes over her limit, when the TPN is revoked, and once
-   the authority is withdrawn.
+6. **Issuing authority credentials** (Flow 8). Dorji gives Pema, the clearing
+   agent, authority, and she collects it in her own app.
+7. **Acting at BNSW** (Flow 9). Pema declares for Pelden, and is refused when
+   she goes over her limit, when the TPN is revoked, and once the authority
+   is withdrawn.
 
-It opens with three steps on what the Entity Wallet is, and each flow opens
-with one step on why it matters, with a line to say. It ends by naming what
-wasn't shown. It starts with NDI's two administrators already set up, so it
-skips root and platform-admin onboarding. It also skips approval to verify or
-issue (Flow 4), designating an authority (Flow 5), and the tax office's system
-answering by itself. The flows it does walk don't depend on any of these. It
-is 71 steps against the guided demo's 105.
+It comes two ways:
 
-The steps after each flow's opener are the guided demo's own steps
-(`src/lib/demoPresentation.ts`), so a change to a screen's guide step shows up
-in both.
+- **In front of the client: the Presentation list.** Press **Presentation**,
+  the outlined button beside **Guided demo**. It opens a list of the seven
+  parts, without flow numbers. Each one resets the demo to what that part
+  needs and opens its first screen, with no guide card, so the room sees
+  only the product. The part on screen is highlighted. Close the list and
+  drive the screens yourself, then open it again for the next part.
+- **To practise: the presentation guide.** **Demo controls → Practise with
+  the guide** runs the same seven parts as a guided demo, with the same card,
+  **Next** and **Back**. It opens with three steps on what the Entity Wallet
+  is, gives each part one step on why it matters with a line to say, and
+  ends by naming what wasn't shown. It is 71 steps against the guided demo's
+  105.
+
+Both start with NDI's two administrators already set up, so they skip root
+and platform-admin onboarding. They also skip approval to verify or issue
+(Flow 4), designating an authority (Flow 5), and the tax office's system
+answering by itself. The parts they do walk don't depend on any of these.
+
+The list's parts and the guide's steps are in `src/lib/demoPresentation.ts`.
+The guide's steps after each opener are the guided demo's own, so a change
+to a screen's guide step shows up in both.
 
 ---
 

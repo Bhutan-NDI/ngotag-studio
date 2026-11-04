@@ -1,7 +1,8 @@
 # Presenting the Entity Wallet to GovTech
 
-A presenter's brief. Read it once start to finish, then rehearse with the
-**Presentation** button. The aim isn't for GovTech to remember every screen.
+A presenter's brief. Read it once start to finish, then rehearse with
+**Demo controls → Practise with the guide**. In the room, use the
+**Presentation** list instead. The aim isn't for GovTech to remember every screen.
 It's for them to leave understanding one idea: **a company can now prove who
 it is, and who may act for it, the same way a citizen does with Bhutan NDI.**
 
@@ -101,8 +102,12 @@ with it.
 
 ## 6. Walking the seven flows
 
-The presentation card tells you what to press at every step. This section
-is the *why*, plus the questions each part tends to raise.
+In the room, press **Presentation** and pick each part from the list, in
+order: Entity Wallet user onboarding, Entity onboarding, Appointing a
+controller, Receiving credentials, Presenting credentials, Issuing authority
+credentials, Acting at BNSW. Each one opens its first screen with no card,
+so the clicks are yours to know; the practice guide teaches them. This
+section is the *why*, plus the questions each part tends to raise.
 
 Allow **35–45 minutes** for the full walk, plus questions. If time is
 short, the strongest parts are Flows 2, 7, 8 and 9.
@@ -337,18 +342,16 @@ you'll follow up.** Don't fill gaps on the spot.
 
 - [ ] Pull the branch and run it from `entity-wallet-prototype/`
   (`npm install`, then `npm run dev`), not from the repo root.
-- [ ] Do one **full rehearsal** of the presentation the day before.
-- [ ] Just before starting, press **Presentation**. It resets everything
-  itself.
-- [ ] Use a browser window at least 1100 px wide, so the guide card sits on
-  the right instead of covering the page. Zoom the browser to 110–125% if
-  the room is large.
-- [ ] Use the **chevron** on the card to minimise it while you talk, and
-  bring it back for the next instruction.
-- [ ] Don't use **Demo controls → Walk a flow** in the middle of the
-  presentation. It resets the story.
-- [ ] If something goes wrong, press **Back** on the card, or **Take me
-  there** to return to the right screen. Last resort: press **Presentation**
-  again to restart.
+- [ ] Do one **full rehearsal** the day before with **Demo controls →
+  Practise with the guide**, so you know every click without the card.
+- [ ] Then rehearse once more from the **Presentation** list, the way you'll
+  show it.
+- [ ] In the room, open **Presentation** and choose **Entity Wallet user
+  onboarding**. Each part resets everything it needs itself, so you never
+  have to reset by hand.
+- [ ] Zoom the browser to 110–125% if the room is large.
+- [ ] Close the list while you talk; the client should see only the product.
+- [ ] If something goes wrong in a part, choose that part again from the
+  list. It starts it fresh.
 - [ ] Have a backup: screenshots or a screen recording of a good run, in case
   the laptop or the dev server fails.

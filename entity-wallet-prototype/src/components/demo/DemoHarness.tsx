@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
 import { FLOW_ENTRIES, FLOW_GROUPS, type FlowEntry } from "@/lib/demoStory";
 import { PERSONAS } from "@/lib/demoData";
+import { PRESENTATION_PARTS } from "@/lib/demoPresentation";
 
 import { GuideCard } from "./GuideCard";
 import { useScreenRegistry } from "./screenState";
@@ -54,9 +55,9 @@ export function DemoHarness() {
     setGuideStep(0, "full");
     setOpen(false);
   };
-  /* The presentation starts where a company comes on: NDI's administrators
-     are already set up, and nobody from Pelden has an account yet. It is for
-     a first audience, so it skips the platform's own setup (see
+  /* The presentation guide, for practising, starts where a company comes
+     on: NDI's administrators are already set up, and nobody from Pelden has
+     an account yet. It skips the platform's own setup (see
      demoPresentation.ts). */
   const startPresentation = () => {
     resetDemo();
@@ -69,7 +70,13 @@ export function DemoHarness() {
   const guiding = (harness.guideStep ?? null) !== null;
   const presenting = guiding && harness.guide === "presentation";
   const { registered } = useScreenRegistry();
-  const [open, setOpen] = useState(false);
+  /* One panel at a time: the demo controls, or the presentation's list. */
+  const [panel, setPanel] = useState<"controls" | "presentation" | null>(null);
+  const open = panel === "controls";
+  const setOpen = (o: boolean) => setPanel(o ? "controls" : null);
+  /* Which part of the presentation is on screen, so the list shows where
+     the presenter is. Not persisted: a reload is a new run. */
+  const [part, setPart] = useState<number | null>(null);
 
   /* The auth screens are pre-sign-in and have no persona. Showing a switcher
      there would suggest the choice matters before anyone is signed in.
@@ -102,7 +109,7 @@ export function DemoHarness() {
       .map((person) => ({ id: person.id, person })),
   ];
 
-  const walk = (f: FlowEntry) => {
+  const walk = (f: Pick<FlowEntry, "persona" | "route" | "selfService" | "start">) => {
     resetDemo();
     if (f.start === "dayZero") startDayZero();
     else if (f.start === "platformReady") startPlatformReady();
@@ -113,6 +120,15 @@ export function DemoHarness() {
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
     setOpen(false);
     router.push(f.route);
+  };
+
+  /* A part of the presentation is a jump like any other, with no guide card:
+     the client sees the product, not the presenter's notes. */
+  const present = (i: number) => {
+    walk(PRESENTATION_PARTS[i]);
+    setGuideStep(null);
+    setPart(i);
+    setPanel(null);
   };
 
   /* The marker renders on the server along with everything else, and is not
@@ -136,6 +152,33 @@ export function DemoHarness() {
        list of routes that would rot. */
     <div className="ndi-demo-harness pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-start gap-2 p-3 min-[641px]:p-4">
       <GuideCard />
+      {panel === "presentation" && hydrated ? (
+        <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[440px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
+          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">Presentation</p>
+          <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
+            Each one starts fresh on its first screen. Show them in this order.
+          </p>
+          <ol className="mt-2.5 flex flex-col gap-1.5">
+            {PRESENTATION_PARTS.map((p, i) => (
+              <li key={p.title}>
+                <button
+                  type="button"
+                  onClick={() => present(i)}
+                  aria-current={part === i ? "step" : undefined}
+                  className="ndi-navrow flex w-full items-center justify-between gap-3 rounded-[10px] border border-grid px-3 py-2.5 text-left"
+                  data-active={part === i ? "1" : "0"}
+                >
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="font-display text-[13.5px] font-semibold text-body">{p.title}</span>
+                    <span className="text-[12px] leading-[1.45] text-muted">{p.shows}</span>
+                  </span>
+                  <Icon name="arrowRight" size={14} strokeWidth={2} className="flex-none opacity-60" />
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
       {open && hydrated ? (
         <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[560px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
           {/* ---- Guided demo ---- */}
@@ -159,9 +202,9 @@ export function DemoHarness() {
           {/* ---- The presentation ---- */}
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-3.5 py-3">
             <div className="flex min-w-0 flex-col gap-0.5">
-              <p className="font-display text-[13.5px] font-semibold text-body">Showing it to someone new?</p>
+              <p className="font-display text-[13.5px] font-semibold text-body">Practising the presentation?</p>
               <p className="text-[12.5px] leading-[1.5] text-muted">
-                The presentation walks seven flows, from a person signing up to acting at the Single Window, and says why each matters.
+                The same seven parts as the Presentation list, with a card saying what to press and what to say.
               </p>
             </div>
             <button
@@ -169,7 +212,7 @@ export function DemoHarness() {
               onClick={startPresentation}
               className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] border border-[var(--ndi-mint-40)] px-3.5 font-display text-[13px] font-semibold text-accent"
             >
-              {presenting ? "Restart the presentation" : "Start the presentation"}
+              {presenting ? "Restart the practice" : "Practise with the guide"}
             </button>
           </div>
 
@@ -364,24 +407,29 @@ export function DemoHarness() {
           </button>
         ) : null}
 
-        {/* The shorter story, for a first audience. Outlined rather than
-            filled, so the two ways in don't read as the same button. */}
-        {hydrated && !guiding ? (
+        {/* The presentation's list, for showing a client. Outlined rather
+            than filled, so it doesn't read as the guided demo's button. */}
+        {hydrated ? (
           <button
             type="button"
-            onClick={startPresentation}
+            onClick={() => setPanel((p) => (p === "presentation" ? null : "presentation"))}
+            aria-expanded={panel === "presentation"}
             className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ndi-mint-40)] bg-[var(--chrome-fill-strong)] px-3.5 font-display text-[12px] font-semibold text-accent backdrop-blur-[20px]"
           >
-            <svg aria-hidden="true" viewBox="0 0 10 10" className="h-2.5 w-2.5" style={{ fill: "currentColor" }}>
-              <path d="M2 1l7 4-7 4z" />
-            </svg>
-            Presentation
+            {panel === "presentation" ? "Hide" : "Presentation"}
+            <Icon
+              name="chevronDown"
+              size={13}
+              strokeWidth={2}
+              className="transition-transform duration-200 ease-ndi"
+              style={{ transform: `rotate(${panel === "presentation" ? 0 : 180}deg)` }}
+            />
           </button>
         ) : null}
 
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => setOpen(!open)}
           aria-expanded={open}
           className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full px-3 font-display text-[12px] font-medium"
         >
