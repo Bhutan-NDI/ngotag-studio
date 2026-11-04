@@ -405,23 +405,30 @@ function Empty() {
 }
 
 function MailButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  /* The wallet's own primary button, as it is drawn in the light theme —
+     its mint gradient, dark text and sweep — with the values written out,
+     since this page keeps its own light palette whatever the app's theme. */
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-[52px] w-fit items-center gap-2.5 rounded-xl px-7 text-[15px] font-semibold transition-transform hover:-translate-y-px"
+      className="ndi-sweepbtn relative inline-flex h-12 w-fit cursor-pointer items-center justify-center gap-2.5 overflow-hidden rounded-xl px-6 text-[14.5px] font-semibold"
       style={{
-        /* Solid, in the wallet's deep green, like the hero above it. */
-        background: DEEP,
-        color: "#ffffff",
+        background: "linear-gradient(115deg, #63d6a2 0%, #4cbf8c 55%, #38a97d 100%)",
+        color: "#06241a",
         fontFamily: DISPLAY,
-        boxShadow: "0 8px 20px -10px rgba(18,65,67,0.6)",
+        border: "1px solid rgba(29,125,87,0.25)",
+        boxShadow: "0 0 0 1px rgba(29,125,87,0.12), 0 0 16px rgba(29,125,87,0.18)",
       }}
     >
-      {children}
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M5 12h14M12 5l7 7-7 7" />
-      </svg>
+      <span className="ndi-store-sweep" />
+      <span className="ndi-store-glow" />
+      <span className="relative z-[1] inline-flex items-center gap-2.5">
+        {children}
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
+      </span>
     </button>
   );
 }
