@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
+import { CredentialCard } from "@/components/ui/CredentialCard";
 import { Dialog } from "@/components/ui/Dialog";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
@@ -293,7 +294,8 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
 
   return (
     <AppShell>
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
+      {/* Wider than a reading page: the card sits beside the details. */}
+      <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
         {header}
         {face === "offline" ? (
           <p role="alert" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
@@ -313,7 +315,18 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
         ) : null}
 
         <Panel>
-          <div className="relative z-[4] flex flex-col gap-5">
+          <div className="relative z-[4] grid gap-6 @min-[900px]/page:grid-cols-[minmax(0,360px)_minmax(0,1fr)] @min-[900px]/page:gap-8">
+          {/* The credential being offered, drawn as the card it will be once
+              accepted — so what the organisation is getting is recognised at
+              a glance, before the details are read. */}
+          <div className="flex flex-col gap-2.5">
+            <CredentialCard type={credential} issuer={issuer} status="offered" formats={[]} size="lg" />
+            <p className="m-0 flex items-center gap-1.5 text-[12.5px] text-muted">
+              <Icon name="download" size={13} strokeWidth={2} className="flex-none text-accent" />
+              Offered to {holder.name}
+            </p>
+          </div>
+          <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-1">
               <p className="m-0 text-[14px] text-body">
                 From <span className="font-medium text-strong">{issuer}</span>
@@ -356,6 +369,7 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
                 Decline
               </HairlineButton>
             </div>
+          </div>
           </div>
         </Panel>
 
