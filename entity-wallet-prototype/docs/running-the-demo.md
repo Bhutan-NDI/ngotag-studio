@@ -102,7 +102,7 @@ zero:
     by itself a few seconds later. Dorji still reviews and accepts by hand;
     Deki's delivery log shows the request received and then issued.
 12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
-    Bhutan's website (dashed), Dorji presses **Share from NDI Entity Wallet**,
+    Bhutan's website (its own page, in the bank's logo and colours), Dorji presses **Share from NDI Entity Wallet**,
     checks the bank's reference on the wallet's page, signs in, and reads
     every detail of the registration under *Bank of Bhutan will receive all
     of the details below — not only the ones it asked for.* He shares and is

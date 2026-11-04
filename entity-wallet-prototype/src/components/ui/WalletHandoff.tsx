@@ -100,8 +100,10 @@ export function WalletHandoff({
   cardVerb = "Continue",
 }: {
   /**
-   * The card's heading verb, as the NDI integration page words it per use:
-   * "Login with Bhutan NDI Wallet", "Confirm with …". Defaults to Continue.
+   * The card's heading verb on a phone, as the NDI integration page words
+   * it per use: "Sign up with Bhutan NDI Wallet" while setting up an
+   * account, "Login with …" for a login. On a wider screen the card always
+   * reads "Scan with Bhutan NDI Wallet". Defaults to Continue.
    */
   cardVerb?: string;
   /** What the code encodes. Only has to be distinctive, not resolvable. */
@@ -330,18 +332,23 @@ function OpenWalletCard({ closed, onOpen }: { closed: boolean; onOpen?: () => vo
  * The integration page's card, as NDI's UI specification for integration
  * draws it: the heading, an **Open Bhutan NDI Wallet** button, "OR", then
  * the code, the two steps, the video guide, the store badges and support.
+ *
+ * PHONE AND WEB DIFFER
+ *
+ * On a phone the card leads with the deeplink and names the action — "Sign
+ * up with", "Login with". On the web there is a phone in the person's hand
+ * and a code on the screen, so the card is "Scan with Bhutan NDI Wallet"
+ * everywhere and the deeplink and its "OR" are left out. The break is the
+ * console's own phone width (641px).
  * Everything on it is what the real one carries; the things a prototype
  * cannot honestly do are said on the card itself — the code does not scan,
  * the button cannot launch an app, and there is no video to watch.
  *
  * THE DEEPLINK, BACK
  *
- * This card once dropped the "open the wallet" link, on the grounds that at
- * a desk it leads nowhere. The integration specification keeps it on every
- * card, above the code: on a phone it is the only way in, and a card that
- * differs from the one people meet on other services is the unfamiliarity
- * this component exists to avoid. So it is back, first, as the spec has it.
- * In the prototype it answers the request, like the simulated scan.
+ * On a phone the deeplink is the only way in, and the integration
+ * specification puts it first, above the code. In the prototype it answers
+ * the request, like the simulated scan.
  */
 function ScanCard({
   value,
@@ -358,16 +365,17 @@ function ScanCard({
 
   return (
     <section
-      aria-label={`${verb} with Bhutan NDI Wallet`}
+      aria-label="Bhutan NDI Wallet"
       className="flex flex-col items-center gap-5 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
       style={{ background: "var(--scan-card)" }}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
-        {verb} with <span className="text-accent">Bhutan NDI</span> Wallet
+        <span className="min-[641px]:hidden">{verb}</span>
+        <span className="hidden min-[641px]:inline">Scan</span> with <span className="text-accent">Bhutan NDI</span> Wallet
       </p>
 
-      {/* ---- The deeplink, then OR ---- */}
-      <div className="flex w-full flex-col items-center gap-1.5">
+      {/* ---- The deeplink, then OR: phones only ---- */}
+      <div className="flex w-full flex-col items-center gap-1.5 min-[641px]:hidden">
         <button
           type="button"
           onClick={onOpen}
@@ -380,7 +388,7 @@ function ScanCard({
         </button>
         <p className="text-[11.5px] leading-[1.4] text-faint">Prototype — opening it answers the request</p>
       </div>
-      <div aria-hidden="true" className="flex w-full items-center gap-3">
+      <div aria-hidden="true" className="flex w-full items-center gap-3 min-[641px]:hidden">
         <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
         <span className="font-display text-[13px] font-semibold text-muted">OR</span>
         <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
