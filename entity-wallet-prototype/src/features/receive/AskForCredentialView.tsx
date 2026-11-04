@@ -217,7 +217,9 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
   return (
     <AppShell>
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
+      {/* Wider than the app's reading pages: this is a comparison, two cards
+          side by side, and on a wide screen the decision sits beside them. */}
+      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-5">
         {header}
         {face === "offline" ? (
           <p role="alert" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
@@ -232,7 +234,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
         ) : null}
 
         <Panel>
-          <div className="relative z-[4] flex flex-col gap-6">
+          <div className="relative z-[4] grid gap-6 @min-[1100px]/page:grid-cols-[minmax(0,1fr)_300px] @min-[1100px]/page:gap-8">
             {/* ---- The exchange, as a picture: what goes, what comes back ----
                 One credential out, one in. Every detail of the one going out
                 is shown (EW-FLOW6-SD/D20 — all of it is shared), sorted into
@@ -250,6 +252,8 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                   type={offering.prerequisite.credential}
                   issuer={sharedCard?.issuer ?? offering.prerequisite.issuer}
                   foundational={Boolean(sharedCard?.isFoundational)}
+                  /* No format pill: "W3C VC" means nothing to the person deciding. */
+                  formats={[]}
                 />
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">
                   They see all {offering.prerequisite.attributes.length} details in it:
@@ -309,7 +313,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                   You may receive
                 </h2>
                 {/* Marked as an offer: not held, and not until someone accepts. */}
-                <CredentialCard type={offering.credential} issuer={issuer} status="offered" />
+                <CredentialCard type={offering.credential} issuer={issuer} status="offered" formats={[]} />
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">From {issuerInline(issuer)}, with:</p>
                 <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
                   {offering.fields.map((f) => (
@@ -328,13 +332,17 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </section>
             </div>
 
+            {/* ---- The decision: what happens next, and the buttons ----
+                Beside the cards on a wide screen, so asking is in view without
+                scrolling; below them otherwise. */}
+            <aside className="flex flex-col gap-5 @min-[1100px]/page:border-l @min-[1100px]/page:border-subtle @min-[1100px]/page:pl-8">
             {/* ---- What happens next, as three steps ----
                 The second decision named at the first (UN-37, UC-27). */}
             <section aria-labelledby="ask-next" className="flex flex-col gap-3">
               <h2 id="ask-next" className={LABEL_CLASS}>
                 What happens next
               </h2>
-              <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3">
+              <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3 @min-[1100px]/page:grid-cols-1">
                 {[
                   { icon: "send" as const, title: "You ask", note: `Your ${offering.prerequisite.credential} goes to them.` },
                   {
@@ -368,12 +376,19 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </ol>
             </section>
 
-            <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
-              <GradientButton onClick={() => ask()} disabled={readOnly || face === "loading"}>
+            <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4 @min-[1100px]/page:mt-auto @min-[1100px]/page:flex-col">
+              <GradientButton
+                onClick={() => ask()}
+                disabled={readOnly || face === "loading"}
+                className="@min-[1100px]/page:h-auto @min-[1100px]/page:min-h-12 @min-[1100px]/page:w-full @min-[1100px]/page:py-2.5 @min-[1100px]/page:text-center"
+              >
                 {face === "loading" ? "Asking…" : `Ask ${issuerInline(issuer)}`}
               </GradientButton>
-              <HairlineButton onClick={() => router.push("/wallet/get")}>Cancel</HairlineButton>
+              <HairlineButton onClick={() => router.push("/wallet/get")} className="@min-[1100px]/page:w-full @min-[1100px]/page:justify-center">
+                Cancel
+              </HairlineButton>
             </div>
+            </aside>
           </div>
         </Panel>
 
