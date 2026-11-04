@@ -53,7 +53,12 @@ export function DataTable({ columns, children, empty }: DataTableProps) {
         <div className="relative z-[4] flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-4">
           <Icon name={empty.icon} size={16} strokeWidth={1.8} className="flex-none text-accent" />
           <p className="m-0 min-w-0 flex-1 text-[13px] leading-[1.55] text-muted">
-            <span className="font-medium text-body">{empty.title}.</span> {empty.message}
+            {/* The title runs into the message as a sentence, so it gets a full
+                stop — unless it already ends in one. */}
+            <span className="font-medium text-body">
+              {/[.!?]$/.test(empty.title) ? empty.title : `${empty.title}.`}
+            </span>{" "}
+            {empty.message}
           </p>
           {empty.action}
         </div>
