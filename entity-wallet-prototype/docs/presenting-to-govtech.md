@@ -180,6 +180,39 @@ the offices that own them. NDI doesn't copy or take over the CRA's data.
   CRA issued.
 - *"What if the director leaves the company?"* That's Flow 12 (changing who
   controls a company), which is still being designed.
+- *"Who do I invite as Admin, and who as Member? HR as Admin and junior
+  staff as Members?"* Close, but it isn't about seniority. The role answers
+  one question: **can this person manage who's on the team?**
+  - **Admin** helps run the team: adds and removes people, so the Owner
+    isn't the only one who can. Usually an office manager or HR person who
+    handles joiners and leavers, the IT person who sets up accounts, or a
+    co-director as a second pair of hands.
+  - **Member** is everyone else who needs to be in the wallet. They sign in
+    and see the company but can't change who's on the team: an accounts
+    clerk, a manager who'll be appointed later, even a senior finance
+    director.
+  - A senior person can be a plain Member, and a junior office assistant can
+    be an Admin if joiners and leavers are their job.
+  - **Neither role lets anyone act for the company.** That's always a
+    separate appointment (Flow 3, next).
+
+  A typical setup at Pelden:
+
+  | Person | Role | Appointed to act? |
+  | --- | --- | --- |
+  | Dorji, managing director | Owner | Yes, as representative |
+  | HR or office manager | Admin | No, only manages the team |
+  | Ugyen, accounts manager | Member | Yes, appointed by Dorji |
+  | Accounts clerk | Member | No, only views |
+
+  **Say:** "Keep Admins few. Adding people is the gate into the company's
+  wallet, so only people you'd trust with that gate should hold it."
+
+  *For you, not the room:* the flow docs say an invitation names a role and
+  that only Owners and Admins can invite. Which roles the invite form offers,
+  and that Admins can also remove people, is the prototype's reading and
+  isn't yet written into SCR-INV-01. If pressed on detail, say it's being
+  confirmed.
 
 ### Flow 3: appointing someone to act
 
@@ -350,6 +383,7 @@ shown, so nobody assumes it's finished:
 | What if a phone is lost? | Key loss and recovery is Flow 13, planned and not yet designed. Don't improvise an answer; say it's on the roadmap. |
 | What if a director resigns or a company closes? | Flow 12, still being designed. |
 | What about two-director approvals? | A company can already require a second person to approve shares and grants. Full multi-signatory rules are Flow 10, still being designed. |
+| What's the difference between Admin and Member? | Admins can manage who's on the team; Members can only sign in and see the company. It's not about seniority, and neither role can act for the company. That's a separate appointment. See Flow 2's questions. |
 | Can one person act for several companies? | Yes. The account is the person's, and each company is separate. |
 | What does an agency need to do to accept this? | Be on NDI's list, and ask for credentials the same way the bank and BNSW do in the demo. The integration details are a technical conversation for a follow-up. |
 | What does it cost / when is it live? | Don't answer from the demo. Take it as a follow-up. |
