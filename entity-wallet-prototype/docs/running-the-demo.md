@@ -18,7 +18,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential,
 sharing one, giving a clearing agent authority to act and her using it at the
-Single Window — fifteen chapters, 105 steps, starting on the platform's day
+Single Window — fifteen chapters, 106 steps, starting on the platform's day
 zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
@@ -206,8 +206,8 @@ It comes two ways:
   the guide** runs the same seven parts as a guided demo, with the same card,
   **Next** and **Back**. It opens with three steps on what the Entity Wallet
   is, gives each part one step on why it matters with a line to say, and
-  ends by naming what wasn't shown. It is 71 steps against the guided demo's
-  105.
+  ends by naming what wasn't shown. It is 72 steps against the guided demo's
+  106.
 
 Both start with NDI's two administrators already set up, so they skip root
 and platform-admin onboarding. They also skip approval to verify or issue

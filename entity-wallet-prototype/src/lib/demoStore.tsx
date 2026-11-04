@@ -1442,40 +1442,47 @@ function anchored(p: Person): Person {
  * version wrote every member into one shared "invitee" slot, so inviting a
  * second colleague quietly replaced the first on the Members page.
  *
- * WHAT JOINING DOES NOT DO
+ * WHO THEY ARE
  *
- * It confirms nothing about who they are. Nobody has asked the register, and
- * nothing here should: identity is anchored when someone takes on authority
- * to act, not when they join (FLOW-ONB-02 §7.3). So a person joining from no
- * account is recorded as not confirmed, whatever the story's later acts say
- * about them; someone who already had an account elsewhere keeps what that
- * account says (AC-10 — one account, several organisations).
+ * Nobody asks the register here. Since ADR-001 the account is anchored to
+ * its citizen at set-up, with one NDI-wallet scan, so `anchor` says whether
+ * that scan happened: a person joining from no account is confirmed if it
+ * did, and joins as a member not yet appointable if they went on without
+ * it. Someone who already had an account elsewhere keeps what that account
+ * says (AC-10 — one account, several organisations).
  *
  * The role goes on the organisation (`roles`), not on the person. Someone who
  * already has an account keeps their name and their role everywhere else:
  * the first version overwrote both, so inviting Bank of Bhutan's owner into
  * Pelden as an admin also made them an admin of the bank.
  */
-function joinOrganisation(s: DemoState, inv: OrgInvitation, name: string, personId: PersonId): DemoState {
+function joinOrganisation(
+  s: DemoState,
+  inv: OrgInvitation,
+  name: string,
+  personId: PersonId,
+  anchor = false,
+): DemoState {
   const orgId = inv.orgId as string;
   const role = inv.role ?? "Member";
   const known = s.people.find((p) => p.id === personId);
   /* An existing account is named as it already is, not as typed here. */
   const shownName = known && known.hasAccount !== false ? known.name : name;
+  /* The CID only ever comes from their own wallet proof: none without it. */
+  const confirm = (p: Person): Person => (anchor ? anchored(p) : p);
   const people: Person[] = known
     ? s.people.map((p) =>
         p.id !== personId
           ? p
           : p.hasAccount === false
-            ? /* New to the platform: the story knows them, the platform does
-                 not yet — no confirmed identity, so no CID either (that only
-                 ever comes from their own wallet proof). */
-              { ...p, name, memberRole: role, hasAccount: true, cidVerified: false, cid: "—", joinedBy: inv.id }
+            ? /* New to the platform: the story knows them, the platform
+                 knows only what their set-up scan proved. */
+              confirm({ ...p, name, memberRole: role, hasAccount: true, cidVerified: false, cid: "—", joinedBy: inv.id })
             : p,
       )
     : [
         ...s.people,
-        {
+        confirm({
           id: personId,
           name,
           cid: "—",
@@ -1485,7 +1492,7 @@ function joinOrganisation(s: DemoState, inv: OrgInvitation, name: string, person
           memberRole: role,
           hasAccount: true,
           joinedBy: inv.id,
-        },
+        }),
       ];
   return {
     ...s,
@@ -1641,7 +1648,7 @@ interface DemoActions {
     issueNeedsApproval: boolean;
     validUntil: string | null;
     document: AppointmentDocument | null;
-  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E12" | "E13" | "E14" | "E16" };
+  }) => { ok: true; id: string } | { ok: false; error: "E1" | "E3" | "E11" | "E12" | "E13" | "E14" | "E16" };
   /**
    * SCR-DEL-04 — the appointee's one wallet approval, which both confirms
    * who they are and records their acceptance (EW-FLOW3-SD/D7). `answeredAs`
@@ -1857,6 +1864,13 @@ interface DemoActions {
   consumeSignupLink: () => boolean;
   /** Steps 6–8: name and password set, account created, session issued. */
   completeSignup: (name: string) => void;
+  /**
+   * ADR-001's set-up scan, for a self-service account: the verified name
+   * the wallet returned, or null when the person goes on without it (no
+   * wallet, or later). Either way the account exists; only an anchored one
+   * can verify an organisation or be appointed.
+   */
+  anchorSignup: (verifiedName: string | null) => void;
   /** Adds an organisation to the signing-up account. Flow 2 and Kind M call it. */
   addSignupMembership: (orgId: string, role: "Owner" | "Admin" | "Member") => void;
   /** Where to go once the account exists — set by an invitation link (A1).
@@ -1919,6 +1933,8 @@ interface DemoActions {
   setUpMember: (
     invitationId: string,
     name: string,
+    /** Whether the set-up scan confirmed who they are (ADR-001). */
+    anchor?: boolean,
   ) => { ok: true; personId: PersonId } | { ok: false; error: "E4" | "E5" | "E6" | "E7" | "invalid" | "has_account" };
   /** A2 — the invitee declines. */
   declineInvitation: (id: string) => void;
@@ -2905,6 +2921,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            E3 if they can already act, E14 if one is waiting for them. */
         const held = appointmentHeld(s0.relations, orgId, personId, today());
         if (held) return { ok: false, error: held };
+        /* ADR-001 Decision 5: an account not anchored to its citizen can't be
+           appointed — E11, moved from acceptance to here. The screen lists
+           them as not yet appointable; this is the boundary. */
+        if (!s0.people.find((p) => p.id === personId)?.cidVerified) return { ok: false, error: "E11" };
         /* DEL-01/E16: an end date has to be after today. The date picker
            offers nothing earlier; this is the boundary for a direct call. */
         if (validUntil !== null && validUntil <= today()) return { ok: false, error: "E16" };
@@ -3934,6 +3954,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         log("Account created (self-service)");
       },
 
+      anchorSignup: (verifiedName) => {
+        setState((s) =>
+          s.signup
+            ? { ...s, signup: { ...s.signup, anchoredName: verifiedName, anchorSkipped: verifiedName === null } }
+            : s,
+        );
+        /* Logged without the CID or the anchor, which no record carries. */
+        if (verifiedName) log("Account identity confirmed at set-up");
+      },
+
       addSignupMembership: (orgId, role) =>
         setState((s) =>
           s.signup && !s.signup.memberships.some((m) => m.orgId === orgId)
@@ -4291,7 +4321,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const memberId = account && !invitee ? rid("person") : (invitee?.id ?? rid("person"));
         const orgId = inv.orgId;
         setState((s) => {
-          const joined = joinOrganisation(s, inv, name, memberId);
+          /* An account made through sign-up carries its set-up scan. */
+          const joined = joinOrganisation(s, inv, name, memberId, Boolean(account && s.signup?.anchoredName));
           return {
             ...joined,
             signup: joined.signup
@@ -4307,7 +4338,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         return { ok: true };
       },
 
-      setUpMember: (invitationId, nameIn) => {
+      setUpMember: (invitationId, nameIn, anchor = false) => {
         const s0 = stateRef.current;
         const inv = s0.orgInvitations.find((i) => i.id === invitationId);
         const name = nameIn.trim();
@@ -4326,7 +4357,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         if (known && known.hasAccount !== false) return { ok: false, error: "has_account" };
         const personId = known?.id ?? rid("person");
         setState((s) => ({
-          ...joinOrganisation(s, inv, name, personId),
+          ...joinOrganisation(s, inv, name, personId, anchor),
           activeOrgId: inv.orgId as string,
           harness: { ...s.harness, persona: personId },
         }));
@@ -4615,7 +4646,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               decidedAt: null,
               acceptedName: null,
             };
-            next = joinOrganisation({ ...next, orgInvitations: [inv, ...next.orgInvitations] }, inv, name, personId);
+            /* Ugyen scanned at set-up (ADR-001), so he can be appointed. */
+            next = joinOrganisation({ ...next, orgInvitations: [inv, ...next.orgInvitations] }, inv, name, personId, true);
           }
           return next;
         }),

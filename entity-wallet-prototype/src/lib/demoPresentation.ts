@@ -95,9 +95,9 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 1,
     title: "Flow 1 · The person comes first",
     happening:
-      "Everyone who uses the Entity Wallet starts as a person with their own account. The company comes later, and separately: one account can act for several organisations, and creating an account says nothing about any company.",
+      "Everyone who uses the Entity Wallet starts as a person with their own account, tied to them with one scan of their Bhutan NDI Wallet. The company comes later, and separately: one account can act for several organisations, and creating an account says nothing about any company.",
     doThis: "Press **Next**.",
-    say: "Nobody signs up \"as\" a company. The person comes first, and the company is proved on its own.",
+    say: "Nobody signs up \"as\" a company. The person comes first, proved with their own NDI wallet, and the company is proved on its own.",
     route: "/sign-up",
     match: "^/sign-up$",
   },
@@ -232,7 +232,7 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
 export const PRESENTATION_PARTS: PresentationPart[] = [
   {
     title: "Entity Wallet user onboarding",
-    shows: "Dorji gets an account as a person, with no company yet",
+    shows: "Dorji gets an account as a person, tied to him with a Bhutan NDI scan",
     persona: null,
     route: "/sign-up",
     selfService: true,

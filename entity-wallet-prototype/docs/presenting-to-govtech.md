@@ -122,17 +122,36 @@ Saying this early stops people asking "is this connected to the real CRA?"
 ### Flow 1: a person gets an account
 
 **What happens:** Dorji signs up with an email address, confirms it, and sets
-a name and password. He then has an account, but no company.
+a name and password. Then he scans one Bhutan NDI QR code with his own
+wallet, sharing only his name and citizenship ID number. The account is now
+tied to him. He has an account, but no company.
 
 **Say:** "Nobody signs up *as* a company. The account belongs to a real
-person, the one who'll prove who they are in a moment."
+person, and one scan of their NDI wallet proves which person. Many people
+in Bhutan share a name; nobody shares a citizenship ID."
 
-**Why it matters:** the same person can act for several companies, and
-every action is tied to a named individual, not to a shared login.
+**Why it matters:**
+- One citizen can hold only one account, and nobody can set one up in
+  someone else's name, such as an assistant who manages a director's email.
+- Every later check has something to compare against. When Dorji verifies
+  his company, or Ugyen accepts an appointment, the wallet that answers must
+  be the same person who set up the account.
+- The same person can act for several companies, and every action is tied
+  to a named individual, not to a shared login.
 
-**Likely question:** *"Why not just register the company directly?"*
-Because a company can't sign anything itself. People act for it, so we
-start from a real, accountable person.
+**Likely questions:**
+- *"Why not just register the company directly?"* Because a company can't
+  sign anything itself. People act for it, so we start from a real,
+  accountable person.
+- *"Do you store my citizenship ID?"* No. The platform keeps the name and a
+  protected reference to the ID, never the number itself. It's never shown
+  on any screen or in any log.
+- *"What if someone doesn't have the NDI wallet?"* They can still join a
+  company as a member. They can't verify a company or be appointed to act
+  until they confirm who they are, which they can do later from their
+  profile.
+
+Ugyen does the same scan when he accepts Dorji's invitation in Flow 2.
 
 ### Flow 2: the company comes on
 
