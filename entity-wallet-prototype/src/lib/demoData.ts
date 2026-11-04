@@ -2584,6 +2584,13 @@ export interface HarnessState {
    * missing, so a save from before the presentation still loads.
    */
   guide?: GuideId;
+  /**
+   * Whether a part of the presentation is being shown to a client. A few
+   * stand-ins look more like the real thing then — an email opens in a
+   * simulated inbox rather than a dashed panel — while rehearsal keeps the
+   * quicker panel. Optional so older saves still load.
+   */
+  presenting?: boolean;
 }
 
 /** The guided demo's two scripts. */

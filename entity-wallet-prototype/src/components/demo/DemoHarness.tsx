@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
 import { FLOW_ENTRIES, FLOW_GROUPS, type FlowEntry } from "@/lib/demoStory";
 import { PERSONAS, type PersonaId } from "@/lib/demoData";
+import { findMail } from "@/lib/demoMail";
 import {
   castOnStage,
   PRESENTATION_CAST,
@@ -45,6 +46,7 @@ export function DemoHarness() {
     setStateOverride,
     clearStateOverrides,
     resetDemo,
+    setPresenting,
     restoreStoryState,
     setSelfServiceSignup,
     setGuideStep,
@@ -61,6 +63,7 @@ export function DemoHarness() {
     credentialRequests,
     authorityGrants,
     orgInvitations,
+    signup,
     hydrated,
   } = useDemo();
 
@@ -71,6 +74,7 @@ export function DemoHarness() {
     resetDemo();
     startDayZero();
     setGuideStep(0, "full");
+    setPresenting(false);
     setOpen(false);
     setPart(null);
   };
@@ -83,6 +87,7 @@ export function DemoHarness() {
     startPlatformReady();
     setSelfServiceSignup(true);
     setGuideStep(0, "presentation");
+    setPresenting(false);
     setOpen(false);
     setPart(null);
     router.push("/sign-up");
@@ -138,6 +143,7 @@ export function DemoHarness() {
     else restoreStoryState();
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
+    setPresenting(false);
     setOpen(false);
     setPart(null);
     router.push(f.route);
@@ -147,6 +153,7 @@ export function DemoHarness() {
      the client sees the product, not the presenter's notes. */
   const present = (i: number) => {
     walk(PRESENTATION_PARTS[i]);
+    setPresenting(true);
     setGuideStep(null);
     setPart(i);
     setSeenActor(null);
@@ -186,7 +193,14 @@ export function DemoHarness() {
      new screen arrive together. */
   const actor =
     part !== null && hydrated
-      ? presentationActor(pathname, onAuthScreen, people.find((p) => p.id === harness.persona))
+      ? presentationActor(
+          pathname,
+          onAuthScreen,
+          people.find((p) => p.id === harness.persona),
+          pathname.startsWith("/simulated/mail/")
+            ? findMail({ signup, orgInvitations, people, organizations }, pathname.split("/")[3] ?? "")?.mailbox
+            : null,
+        )
       : null;
   const [seenActor, setSeenActor] = useState<string | null>(null);
   const [handover, setHandover] = useState<Actor | null>(null);

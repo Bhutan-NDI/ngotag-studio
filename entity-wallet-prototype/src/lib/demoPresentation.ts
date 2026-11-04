@@ -330,7 +330,13 @@ export const presentationActor = (
   pathname: string,
   signedOut: boolean,
   person: { id: string; name: string; title: string } | undefined,
+  /** Whose inbox, when the screen is the simulated mail. */
+  mailbox?: { name: string; address: string } | null,
 ): Actor | null => {
+  if (pathname.startsWith("/simulated/mail/"))
+    return mailbox
+      ? { key: `mail-${mailbox.address}`, name: mailbox.name, role: `Reading their email · ${mailbox.address}` }
+      : null;
   if (pathname.startsWith("/authority/claim/"))
     return { key: "pema-phone", name: "Pema Choden", role: "Clearing agent · on her own phone" };
   if (pathname.startsWith("/simulated/bnsw") && !pathname.startsWith("/simulated/bnsw/register"))

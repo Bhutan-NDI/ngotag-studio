@@ -17,6 +17,7 @@ import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/for
 import { Icon } from "@/components/ui/icons";
 import { INVITATION_DAYS } from "@/lib/deployment";
 import { roleIn, shortOrgName } from "@/lib/demoData";
+import { mailboxOf } from "@/lib/demoMail";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
@@ -49,7 +50,7 @@ type Sent = { kind: "sent" | "queued"; email: string; id?: string };
  */
 export function InviteView({ kind }: { kind: "M" | "O" }) {
   const router = useRouter();
-  const { inviteToOrganisation, proposeOrganisation, organizations, activeOrgId, currentPerson, harness } =
+  const { inviteToOrganisation, proposeOrganisation, organizations, activeOrgId, currentPerson, people, harness } =
     useDemo();
 
   const forced = useScreenState(`SCR-INV-01-${kind}`, [
@@ -231,9 +232,15 @@ export function InviteView({ kind }: { kind: "M" | "O" }) {
                 <SimulatedStep
                   standsFor="the invitation email"
                   action={
-                    <SimulatedAction onClick={() => router.push(`/invitation/${shownSent.id}`)}>
-                      Open the invitation as {shownSent.email}
-                    </SimulatedAction>
+                    harness.presenting ? (
+                      <SimulatedAction onClick={() => router.push(`/simulated/mail/${shownSent.id}`)}>
+                        Open {mailboxOf(shownSent.email, people).name}&rsquo;s inbox
+                      </SimulatedAction>
+                    ) : (
+                      <SimulatedAction onClick={() => router.push(`/invitation/${shownSent.id}`)}>
+                        Open the invitation as {shownSent.email}
+                      </SimulatedAction>
+                    )
                   }
                 >
                   No email is sent in this prototype. Opening it is what they would do from their inbox.

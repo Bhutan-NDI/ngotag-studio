@@ -202,6 +202,11 @@ It comes two ways:
   acting** card names them and their role at the top of the screen for a
   few seconds, so the room sees the hand-over. Anyone who answers in a
   dashed panel, such as Ugyen accepting in his app, needs no switch.
+  The two emails — the sign-up link and an invitation — open in a
+  simulated **inbox** while a part is on: press **Open <name>'s inbox**,
+  and the page shows whose inbox it is in the top corner, then press the
+  button in the email to carry on. Rehearsal (the guide and Demo controls)
+  keeps the quicker dashed panel.
   For a question from the room, the top of the list has **Driving as**: only
   the people the part on screen needs (Dorji and Ugyen for appointing, Dorji
   and Deki for the TPN), or everyone the presentation uses when no part is

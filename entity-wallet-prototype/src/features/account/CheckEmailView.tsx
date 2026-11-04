@@ -15,6 +15,7 @@ import {
   SENDS_PER_ADDRESS_PER_HOUR,
   VERIFY_LINK_DAYS,
 } from "@/lib/deployment";
+import { mailboxOf } from "@/lib/demoMail";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
@@ -51,7 +52,7 @@ function remaining(ms: number): string {
  */
 export function CheckEmailView() {
   const router = useRouter();
-  const { signup, resendSignupMail, hydrated } = useDemo();
+  const { signup, resendSignupMail, people, harness, hydrated } = useDemo();
 
   const forced = useScreenState("SCR-ONB-02", [
     "default",
@@ -181,9 +182,18 @@ export function CheckEmailView() {
         <SimulatedStep
           standsFor="the verification email"
           action={
-            <SimulatedAction onClick={() => router.push("/sign-up/verify")}>
-              Open the link from the email
-            </SimulatedAction>
+            /* In front of a client the mail opens in a simulated inbox, so
+               the room sees it arrive somewhere else; rehearsal keeps the
+               shortcut straight to the link. */
+            harness.presenting ? (
+              <SimulatedAction onClick={() => router.push("/simulated/mail/verify")}>
+                Open {mailboxOf(signup.email, people).name}&rsquo;s inbox
+              </SimulatedAction>
+            ) : (
+              <SimulatedAction onClick={() => router.push("/sign-up/verify")}>
+                Open the link from the email
+              </SimulatedAction>
+            )
           }
         >
           No email is sent in this prototype. In the product the person opens the link in their
