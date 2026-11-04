@@ -216,6 +216,10 @@ It comes two ways:
   is a new person, not Ugyen, and isn't listed. Once invited they become
   *invited*, and pressing it opens their invitation. Everyone else is still
   in Demo controls.
+  In the product itself, the **bell** at the top shows the same list for
+  whoever is signed in, and **My authority** offers **Review and accept**
+  while an appointment is waiting — so switching to Ugyen any way at all
+  still leads to his Accept / Decline.
   Under it, **Waiting for <person>** lists what is waiting for whoever you
   are driving as, each one click from its screen: Ugyen's appointment to
   accept or decline, Deki's request to answer, Dorji's approvals and

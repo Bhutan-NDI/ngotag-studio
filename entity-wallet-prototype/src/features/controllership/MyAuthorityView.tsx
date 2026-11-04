@@ -1,11 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { AppShell } from "@/components/layout/AppShell";
 import { DetailList } from "@/components/ui/DetailList";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { DetailLayout } from "@/components/ui/DetailLayout";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -33,6 +35,7 @@ import { formatDate, legalBasisLabel } from "./scopeModel";
  * understands their position very differently from one who just has buttons.
  */
 export function MyAuthorityView() {
+  const router = useRouter();
   const { relations, auditEntries, currentPerson, harness } = useDemo();
 
   const screenState = useScreenState("B2", [
@@ -134,6 +137,28 @@ export function MyAuthorityView() {
         }
         side={provenance}
       >
+        {/* Waiting on the appointee: nothing below is in force until they
+            accept, so the way to do it is the first thing on the page —
+            however they got here. */}
+        {relation.state === "PENDING_ACCEPTANCE" ? (
+          <Panel>
+            <div className="relative z-[4] flex flex-wrap items-center gap-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <p className="font-display text-[14.5px] font-semibold text-strong">
+                  You&rsquo;ve been appointed to act for Pelden Trading Pvt. Ltd.
+                </p>
+                <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+                  Nothing below is in force until you accept it. Read what it lets you do, then accept or decline.
+                </p>
+              </div>
+              <GradientButton onClick={() => router.push(`/appointments/${relation.id}`)}>
+                Review and accept
+                <Icon name="arrowRight" size={15} strokeWidth={2} />
+              </GradientButton>
+            </div>
+          </Panel>
+        ) : null}
+
         {stopped ? (
           <Panel>
             <div className="relative z-[4] flex items-start gap-3">
