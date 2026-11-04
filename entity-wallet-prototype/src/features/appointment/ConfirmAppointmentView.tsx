@@ -14,16 +14,24 @@ import { VERIFICATION_ORG_NAME, inOrg } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { SKIP_AFTER_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
+import { formatDate } from "@/features/controllership/scopeModel";
+
+import { PRESETS, presetsOf } from "./presets";
+
 /**
  * SCR-DEL-04 — Confirm with your NDI wallet. FLOW-DEL-01 steps 7–8.
  *
- * ONE APPROVAL IS THE ACCEPTANCE
+ * ONE APPROVAL IS THE ACCEPTANCE — A SIGNATURE, NOT A SECOND "WHO ARE YOU"
  *
  * The request's challenge carries the appointment itself, so approving it
- * both proves who the appointee is and records that they accept these
- * terms (EW-FLOW3-SD/D7). The screen says so before the scan: there is no
- * separate "accept" afterwards, and nothing on the console can stand in for
- * it — not even for someone whose identity was confirmed before.
+ * records that the appointee accepts these terms (EW-FLOW3-SD/D7). Since
+ * ADR-001 the account was tied to its citizen when they joined, so this
+ * approval no longer anchors anything: it is their signed consent, checked
+ * against that identity. It used to read "… is asking who you are", which,
+ * after the joining scan, looked like the same question twice; it now says
+ * what it is — signing the terms, named on the screen — and why it is still
+ * needed. Nothing on the console can stand in for it. (Worded ahead of
+ * UX-EW-01, which hasn't caught up with ADR-001.)
  *
  * WHO IS ASKING
  *
@@ -56,6 +64,13 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
   const orgName = org?.name ?? "Pelden Trading Pvt. Ltd.";
   const root = relations.find((x) => inOrg(org?.id ?? "org-pelden")(x) && x.isRootAuthority);
   const repName = people.find((p) => p.id === (r?.attestation?.attestedBy ?? root?.personId))?.name ?? "Dorji Wangchuk";
+  /* The terms being signed, in the words the appointment screen used. */
+  const can = presetsOf(r)
+    .map((id) => PRESETS.find((p) => p.id === id)?.label.toLowerCase())
+    .filter(Boolean)
+    .join(", ");
+  const until = r?.scope.validUntil ? `, until ${formatDate(r.scope.validUntil)}` : "";
+  const terms = `act for ${orgName}${can ? ` — ${can}` : ""}${until}`;
 
   const answer = (as: string) => {
     const res = acceptAppointment(relationId, as);
@@ -110,10 +125,10 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
   return (
     <AppShell>
       <div className="mx-auto flex w-full max-w-[920px] flex-col gap-5">
-        <PageHeader crumbs={[{ label: orgName }, { label: "Your appointment" }]} title="Confirm with your NDI wallet" />
+        <PageHeader crumbs={[{ label: orgName }, { label: "Your appointment" }]} title="Sign your acceptance with your NDI wallet" />
         <p className="max-w-[64ch] text-[13.5px] leading-[1.65] text-muted">
-          Approving this request in your wallet is your acceptance of the authority to act for {orgName}.
-          There&rsquo;s nothing else to press afterwards.
+          You&rsquo;re agreeing to {terms}. Your wallet signs your acceptance, and it&rsquo;s checked against the identity you
+          confirmed when you joined — so nobody can accept for you. There&rsquo;s nothing else to press afterwards.
         </p>
 
         {shown === "declined"
@@ -177,9 +192,10 @@ export function ConfirmAppointmentView({ relationId }: { relationId: string }) {
           <Panel>
             <WalletHandoff
               value={`ndi-appointment-${relationId}`}
-              title={`${VERIFICATION_ORG_NAME} is asking who you are`}
-              purpose={`NDI records who can act for ${orgName}. Approving confirms it's you and accepts the appointment.`}
-              sharing={["Your identity, from your citizen credential"]}
+              title="Sign your acceptance with Bhutan NDI"
+              purpose={`${VERIFICATION_ORG_NAME} asks your wallet to sign that you agree to ${terms}. It's checked against the identity you confirmed when you joined.`}
+              sharing={["Your signature on these terms", "Your identity, to check it's the account's owner"]}
+              cardVerb="Sign"
               notSharing={["Anything else in your wallet"]}
               sameDevice={forced === "same_device"}
               status={status}
