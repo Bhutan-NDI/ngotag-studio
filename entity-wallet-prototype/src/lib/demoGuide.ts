@@ -228,8 +228,8 @@ export const GUIDE_STEPS: GuideStep[] = [
   {
     chapter: 3,
     title: "Check your email",
-    happening: "In the product an email arrives with a link. No email is sent in this demo.",
-    doThis: "Press **Open the link from the email** in the dashed prototype panel.",
+    happening: "An email arrives with a link, in Dorji's own inbox. No real email is sent — a simulated inbox shows it.",
+    doThis: "Press **Open Dorji Wangchuk's inbox** in the dashed prototype panel, then **Confirm my email address** in the email.",
     route: "/sign-up/check-email",
   },
   {
@@ -345,7 +345,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "The invitation names an address and a role, and says before it's sent what it gives and what it doesn't: they'll see Pelden, but can't act for it.",
     doThis:
-      "Type **ugyen.phuntsho@peldentrading.bt**, leave **Member** selected and press **Send invitation**. Then press **Open the invitation as ugyen.phuntsho@peldentrading.bt** (dashed — it stands in for Ugyen's inbox).",
+      "Type **ugyen.phuntsho@peldentrading.bt**, leave **Member** selected and press **Send invitation**. Then press **Open Ugyen Phuntsho's inbox** and, in the email, **Review the invitation**.",
     say: "Letting someone in and letting them act for the company are two different things, and the screen says so before anything is sent.",
     route: "/members/invite",
   },

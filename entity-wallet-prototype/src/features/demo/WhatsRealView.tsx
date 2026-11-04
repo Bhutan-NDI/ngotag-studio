@@ -111,7 +111,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "A verification email, and the link inside it",
         reality:
-          "No email is sent. The dashed prototype panel stands in for the inbox — in the presentation, a simulated inbox in a familiar mail layout, with the account holder's name on it — and the send limit is counted in your browser.",
+          "No email is sent. A simulated inbox in a familiar mail layout stands in for the person's own, with their name on it, and the send limit is counted in your browser.",
         needs: "A mail service with delivery and bounce reporting, and single-use signed links.",
       },
       {

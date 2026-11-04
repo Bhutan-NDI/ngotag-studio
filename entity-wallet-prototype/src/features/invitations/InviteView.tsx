@@ -232,7 +232,9 @@ export function InviteView({ kind }: { kind: "M" | "O" }) {
                 <SimulatedStep
                   standsFor="the invitation email"
                   action={
-                    harness.presenting ? (
+                    /* A member invitation opens in a simulated inbox; the
+                       platform kinds keep the shortcut. */
+                    kind === "M" ? (
                       <SimulatedAction onClick={() => router.push(`/simulated/mail/${shownSent.id}`)}>
                         Open {mailboxOf(shownSent.email, people).name}&rsquo;s inbox
                       </SimulatedAction>

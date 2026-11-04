@@ -52,7 +52,7 @@ function remaining(ms: number): string {
  */
 export function CheckEmailView() {
   const router = useRouter();
-  const { signup, resendSignupMail, people, harness, hydrated } = useDemo();
+  const { signup, resendSignupMail, people, hydrated } = useDemo();
 
   const forced = useScreenState("SCR-ONB-02", [
     "default",
@@ -182,22 +182,16 @@ export function CheckEmailView() {
         <SimulatedStep
           standsFor="the verification email"
           action={
-            /* In front of a client the mail opens in a simulated inbox, so
-               the room sees it arrive somewhere else; rehearsal keeps the
-               shortcut straight to the link. */
-            harness.presenting ? (
-              <SimulatedAction onClick={() => router.push("/simulated/mail/verify")}>
-                Open {mailboxOf(signup.email, people).name}&rsquo;s inbox
-              </SimulatedAction>
-            ) : (
-              <SimulatedAction onClick={() => router.push("/sign-up/verify")}>
-                Open the link from the email
-              </SimulatedAction>
-            )
+            /* The mail opens in a simulated inbox, so it is seen to arrive
+               somewhere else — the person's own email — not in the wallet. */
+            <SimulatedAction onClick={() => router.push("/simulated/mail/verify")}>
+              Open {mailboxOf(signup.email, people).name}&rsquo;s inbox
+            </SimulatedAction>
           }
         >
-          No email is sent in this prototype. In the product the person opens the link in their
-          inbox — often on another device, sometimes days later — and lands on the next screen.
+          No email is sent in this prototype; a simulated inbox shows it. In the product the person
+          opens the link in their inbox — often on another device, sometimes days later — and lands
+          on the next screen.
         </SimulatedStep>
       </div>
 

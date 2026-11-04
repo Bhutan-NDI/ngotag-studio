@@ -202,11 +202,10 @@ It comes two ways:
   acting** card names them and their role at the top of the screen for a
   few seconds, so the room sees the hand-over. Anyone who answers in a
   dashed panel, such as Ugyen accepting in his app, needs no switch.
-  The two emails — the sign-up link and an invitation — open in a
-  simulated **inbox** while a part is on: press **Open <name>'s inbox**,
-  and the page shows whose inbox it is in the top corner, then press the
-  button in the email to carry on. Rehearsal (the guide and Demo controls)
-  keeps the quicker dashed panel.
+  The two emails — the sign-up link and a member invitation — open in a
+  simulated **inbox**: press **Open <name>'s inbox**, and the page shows
+  whose inbox it is in the top corner, then press the button in the email
+  to carry on.
   For a question from the room, the top of the list has **Driving as**: only
   the people the part on screen needs (Dorji and Ugyen for appointing, Dorji
   and Deki for the TPN), or everyone the presentation uses when no part is
@@ -435,7 +434,8 @@ platform admin.
    sign-up cannot tell a director from their accountant, and the identity step of Flow 2
    is where that is enforced.
 2. **Check your email.** No email is sent. The dashed **Prototype** panel says
-   so, and **Open the link from the email** stands in for the inbox. Resend
+   so, and **Open Dorji Wangchuk's inbox** opens a simulated inbox with the
+   email in it; **Confirm my email address** carries on. Resend
    is limited to five sends an hour, with a cooldown between them.
 3. **Your name and a password**, against a policy shown up front rather than
    after a failure, typed twice — whether the two match is shown as you type.
@@ -453,8 +453,9 @@ its only member.
    the form, *What this invitation does* says, before anything is sent, what
    it gives and — just as plainly — that it does not let them act for Pelden.
    **Send invitation**: the form is replaced by the confirmation (14 days, it
-   gives nothing until accepted) with **Open the invitation as …** in a
-   dashed panel standing in for the invitee's inbox.
+   gives nothing until accepted) with **Open <name>'s inbox** in a dashed
+   panel. It opens a simulated inbox with the invitation email, whose
+   **Review the invitation** opens the invitation.
 3. The invitation names Dorji and Pelden, what it lets the invitee do and
    what it does not, and when it expires. With no account at that address,
    the invitee **sets one up right there** — name, password, the password

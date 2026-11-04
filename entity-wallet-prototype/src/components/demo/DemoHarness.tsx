@@ -46,7 +46,6 @@ export function DemoHarness() {
     setStateOverride,
     clearStateOverrides,
     resetDemo,
-    setPresenting,
     restoreStoryState,
     setSelfServiceSignup,
     setGuideStep,
@@ -74,7 +73,6 @@ export function DemoHarness() {
     resetDemo();
     startDayZero();
     setGuideStep(0, "full");
-    setPresenting(false);
     setOpen(false);
     setPart(null);
   };
@@ -87,7 +85,6 @@ export function DemoHarness() {
     startPlatformReady();
     setSelfServiceSignup(true);
     setGuideStep(0, "presentation");
-    setPresenting(false);
     setOpen(false);
     setPart(null);
     router.push("/sign-up");
@@ -143,7 +140,6 @@ export function DemoHarness() {
     else restoreStoryState();
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
-    setPresenting(false);
     setOpen(false);
     setPart(null);
     router.push(f.route);
@@ -153,7 +149,6 @@ export function DemoHarness() {
      the client sees the product, not the presenter's notes. */
   const present = (i: number) => {
     walk(PRESENTATION_PARTS[i]);
-    setPresenting(true);
     setGuideStep(null);
     setPart(i);
     setSeenActor(null);

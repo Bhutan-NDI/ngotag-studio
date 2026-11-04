@@ -2253,7 +2253,6 @@ interface DemoActions {
   setStateOverride: (screen: string, state: string | null) => void;
   /** The deployment's self-service sign-up setting, switched for the demo. */
   setSelfServiceSignup: (on: boolean) => void;
-  setPresenting: (on: boolean) => void;
   /** Move the guided demo to a step, or stop it with null. A `guide`
    *  switches which script it reads; left out, the script stays. */
   setGuideStep: (step: number | null, guide?: GuideId) => void;
@@ -6790,7 +6789,6 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       setSelfServiceSignup: (selfServiceSignup) =>
         setState((s) => ({ ...s, harness: { ...s.harness, selfServiceSignup } })),
 
-      setPresenting: (presenting) => setState((s) => ({ ...s, harness: { ...s.harness, presenting } })),
 
       setStateOverride: (screen, override) =>
         setState((s) => {
