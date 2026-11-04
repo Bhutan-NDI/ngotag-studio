@@ -345,7 +345,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "The invitation names an address and a role, and says before it's sent what it gives and what it doesn't: they'll see Pelden, but can't act for it.",
     doThis:
-      "Type **ugyen.phuntsho@peldentrading.bt**, leave **Member** selected and press **Send invitation**. Then press **Open Ugyen Phuntsho's inbox** and, in the email, **Review the invitation**.",
+      "Type **ugyen.phuntsho@peldentrading.bt**, leave **Member** selected and press **Send invitation**. Then press **Open Ugyen Phuntsho's inbox** and, in the email, **View invitation**.",
     say: "Letting someone in and letting them act for the company are two different things, and the screen says so before anything is sent.",
     route: "/members/invite",
   },

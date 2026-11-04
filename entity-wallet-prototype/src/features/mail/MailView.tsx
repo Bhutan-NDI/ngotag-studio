@@ -360,7 +360,7 @@ function Message({ mail }: { mail: MailMessage }) {
                   </p>
                 </div>
 
-                <MailButton onClick={() => router.push(`/invitation/${mail.invitation.id}`)}>Review the invitation</MailButton>
+                <MailButton onClick={() => router.push(`/invitation/${mail.invitation.id}`)}>View invitation</MailButton>
                 <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
                   When you accept, you&rsquo;ll confirm it&rsquo;s you with your Bhutan NDI Wallet. This invitation
                   expires in {INVITATION_DAYS.M} days. Not expecting it? Ignore it — nothing happens unless you accept.

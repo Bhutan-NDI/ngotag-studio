@@ -458,7 +458,7 @@ its only member.
    **Send invitation**: the form is replaced by the confirmation (14 days, it
    gives nothing until accepted) with **Open <name>'s inbox** in a dashed
    panel. It opens a simulated inbox with the invitation email, whose
-   **Review the invitation** opens the invitation.
+   **View invitation** opens the invitation.
 3. The invitation names Dorji and Pelden, what it lets the invitee do and
    what it does not, and when it expires. With no account at that address,
    the invitee **sets one up right there** — name, password, the password
