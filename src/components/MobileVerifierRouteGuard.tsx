@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation'
 
 import { getOrganizations } from '@/app/api/organization'
+import { selectSelectedOrgRoles } from '@/lib/orgSlice'
 import { useAppSelector } from '@/lib/hooks'
 
 interface LookedUpRoles {
@@ -25,10 +26,10 @@ interface LookedUpRoles {
  * /dashboard, and a typed URL or a KBar shortcut reaches any page. Anywhere
  * else sends them to the mobile verifier, without showing the page first.
  *
- * The selected organisation's roles arrive with the organisation list, after
- * sign-in or a switch. Until they are known for the current organisation the
- * page waits, and the guard looks them up itself rather than rendering a page
- * it might have to take away.
+ * The selected organisation's roles are stored with it on a switch, and come
+ * with the organisation list after sign-in. On a first load the list may not
+ * have arrived yet, so the page waits and the guard looks the roles up itself
+ * rather than rendering a page it might have to take away.
  *
  * A platform admin is never restricted. Whether the user is one is looked up
  * here too, since every page passes through this guard.
@@ -39,12 +40,10 @@ export function MobileVerifierRouteGuard({
   const pathname = usePathname() ?? ''
   const router = useRouter()
   const orgId = useAppSelector((state) => state.organization.orgId)
-  const orgInfo = useAppSelector((state) => state.organization.orgInfo)
   const [lookedUp, setLookedUp] = useState<LookedUpRoles | null>(null)
   const isPlatformAdmin = useSyncPlatformAdmin()
 
-  const storedRoles =
-    orgInfo && (!orgId || orgInfo.id === orgId) ? orgInfo.roles : null
+  const storedRoles = useAppSelector(selectSelectedOrgRoles)
   const lookedUpRoles = lookedUp?.orgId === orgId ? lookedUp.roles : null
   const roles = storedRoles ?? lookedUpRoles
 
@@ -63,7 +62,10 @@ export function MobileVerifierRouteGuard({
           id: string
           userOrgRoles?: { orgRole: { name: string } }[]
         }[] = response?.data?.data?.organizations ?? []
-        const org = orgs.find((item) => item.id === orgId) ?? orgs[0]
+        // With no organisation selected yet, the top bar selects the first.
+        // One that isn't on this page isn't judged by another organisation's
+        // roles: it counts as unrestricted until the top bar stores its own.
+        const org = orgId ? orgs.find((item) => item.id === orgId) : orgs[0]
         return org?.userOrgRoles?.map((role) => role.orgRole.name) ?? []
       } catch {
         // Fail open: the platform still checks every request.

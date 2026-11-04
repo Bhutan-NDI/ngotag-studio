@@ -1,5 +1,5 @@
 // src/lib/orgSlice.ts
-import { PayloadAction, createSlice } from '@reduxjs/toolkit'
+import { PayloadAction, createSelector, createSlice } from '@reduxjs/toolkit'
 interface Tenant {
   id: string
   name: string
@@ -25,32 +25,6 @@ interface OrgState {
   isPlatformAdmin: boolean | null
 }
 
-// A platform admin holds every role in every organisation, member or not: the
-// platform lets platform_admin through every organisation's role checks. The
-// selected organisation's roles carry these too, so each page's own role
-// checks treat a platform admin as the owner.
-const PLATFORM_ADMIN_ORG_ROLES = [
-  'owner',
-  'ALLOW_VERIFIER',
-  'ALLOW_PROOF_TEMPLATE',
-]
-
-const withPlatformAdminRoles = (
-  orgInfo: OrgInfo | null,
-  isPlatformAdmin: boolean | null,
-): OrgInfo | null => {
-  if (!orgInfo || !isPlatformAdmin) {
-    return orgInfo
-  }
-  const roles = [...orgInfo.roles]
-  PLATFORM_ADMIN_ORG_ROLES.forEach((role) => {
-    if (!roles.includes(role)) {
-      roles.push(role)
-    }
-  })
-  return { ...orgInfo, roles }
-}
-
 const initialState: OrgState = {
   orgId: '',
   ledgerId: '',
@@ -72,14 +46,10 @@ const orgSlice = createSlice({
       state.ledgerId = action.payload
     },
     setOrgInfo: (state, action: PayloadAction<OrgInfo>) => {
-      state.orgInfo = withPlatformAdminRoles(
-        action.payload,
-        state.isPlatformAdmin,
-      )
+      state.orgInfo = action.payload
     },
     setIsPlatformAdmin: (state, action: PayloadAction<boolean>) => {
       state.isPlatformAdmin = action.payload
-      state.orgInfo = withPlatformAdminRoles(state.orgInfo, action.payload)
     },
     setSelectedOrgId: (state, action: PayloadAction<string>) => {
       state.selectedOrgId = action.payload
@@ -117,3 +87,45 @@ export const {
   setIsPlatformAdmin,
 } = orgSlice.actions
 export default orgSlice.reducer
+
+// A platform admin holds every role in every organisation, member or not: the
+// platform lets platform_admin through every organisation's role checks.
+// Added when the roles are read, never stored, so they go away as soon as the
+// flag does.
+const PLATFORM_ADMIN_ORG_ROLES = [
+  'owner',
+  'ALLOW_VERIFIER',
+  'ALLOW_PROOF_TEMPLATE',
+]
+
+interface OrgRootState {
+  organization: OrgState
+}
+
+/**
+ * The selected organisation's roles, or null while they aren't known:
+ * orgInfo is missing, or still describes the previous organisation after
+ * orgId has changed.
+ */
+export const selectSelectedOrgRoles = createSelector(
+  [
+    (state: OrgRootState): OrgInfo | null => state.organization.orgInfo,
+    (state: OrgRootState): string => state.organization.orgId,
+    (state: OrgRootState): boolean | null => state.organization.isPlatformAdmin,
+  ],
+  (orgInfo, orgId, isPlatformAdmin): string[] | null => {
+    if (!orgInfo || (orgId && orgInfo.id !== orgId)) {
+      return null
+    }
+    if (!isPlatformAdmin) {
+      return orgInfo.roles
+    }
+    const roles = [...orgInfo.roles]
+    PLATFORM_ADMIN_ORG_ROLES.forEach((role) => {
+      if (!roles.includes(role)) {
+        roles.push(role)
+      }
+    })
+    return roles
+  },
+)

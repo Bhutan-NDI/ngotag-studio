@@ -1,10 +1,11 @@
+import { selectSelectedOrgRoles, setIsPlatformAdmin } from '@/lib/orgSlice'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import { useEffect, useState } from 'react'
 
 import { AxiosResponse } from 'axios'
 import { PlatformRoles } from '@/features/common/enum'
 import { getUserProfile } from '@/app/api/Auth'
-import { setIsPlatformAdmin } from '@/lib/orgSlice'
+import { usePathname } from 'next/navigation'
 
 // Mirrors the backend's Keycloak client-role check (assertRole in mobile-verifier): these
 // roles are granted explicitly, owner/admin alone do not imply them.
@@ -17,8 +18,12 @@ export const MOBILE_VERIFIER_ROLES = {
 // organisation is loaded instead of a new [] on every store update.
 const NO_ROLES: string[] = []
 
-const useSelectedOrgRoles = (): string[] =>
-  useAppSelector((state) => state.organization.orgInfo?.roles ?? NO_ROLES)
+/**
+ * The selected organisation's roles, with a platform admin's added. Empty
+ * while they aren't known, for example just after switching organisation.
+ */
+export const useSelectedOrgRoles = (): string[] =>
+  useAppSelector(selectSelectedOrgRoles) ?? NO_ROLES
 
 export const useHasOrgRole = (role: string): boolean =>
   useSelectedOrgRoles().includes(role)
@@ -30,8 +35,15 @@ export const useHasOrgRole = (role: string): boolean =>
 export const useIsPlatformAdmin = (): boolean | null =>
   useAppSelector((state) => state.organization.isPlatformAdmin ?? null)
 
-// One profile lookup at a time, however many components ask.
-let platformAdminLookup: Promise<boolean | null> | null = null
+// The profile lookup in flight, so components asking at once share it.
+let platformAdminLookup: {
+  token: string
+  result: Promise<boolean | null>
+} | null = null
+// The token whose answer this page load has already confirmed. A stored
+// answer is used meanwhile, but checked again on every full load, so a
+// removed platform_admin role doesn't linger until sign-out.
+let confirmedToken: string | null = null
 
 const lookUpPlatformAdmin = async (token: string): Promise<boolean | null> => {
   const response = await getUserProfile(token)
@@ -47,40 +59,47 @@ const lookUpPlatformAdmin = async (token: string): Promise<boolean | null> => {
 }
 
 /**
- * Finds out, once per sign-in, whether the user is a platform admin.
- * platform_admin is on the user's profile, not in the token or an
- * organisation's roles. Returns null while that is unknown; a failed lookup
- * counts as not a platform admin for this page, and is retried on the next.
+ * Finds out whether the user is a platform admin. platform_admin is on the
+ * user's profile, not in the token or an organisation's roles. Returns null
+ * while that is unknown. A failed lookup counts as not a platform admin on
+ * the page where it failed, and is tried again on the next page.
  */
 export const useSyncPlatformAdmin = (): boolean | null => {
   const dispatch = useAppDispatch()
+  const pathname = usePathname() ?? ''
   const token = useAppSelector((state) => state.auth.token)
   const isPlatformAdmin = useIsPlatformAdmin()
-  const [lookupFailed, setLookupFailed] = useState(false)
+  const [failedOn, setFailedOn] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!token || isPlatformAdmin !== null) {
+    if (!token || confirmedToken === token) {
       return undefined
     }
     let cancelled = false
-    platformAdminLookup ??= lookUpPlatformAdmin(token)
-      .catch(() => null)
-      .finally(() => {
+    if (platformAdminLookup?.token !== token) {
+      platformAdminLookup = {
+        token,
+        result: lookUpPlatformAdmin(token).catch(() => null),
+      }
+    }
+    const lookup = platformAdminLookup
+    lookup.result.then((found) => {
+      if (platformAdminLookup === lookup) {
         platformAdminLookup = null
-      })
-    platformAdminLookup.then((found) => {
+      }
       if (found !== null) {
+        confirmedToken = token
         dispatch(setIsPlatformAdmin(found))
       } else if (!cancelled) {
-        setLookupFailed(true)
+        setFailedOn(pathname)
       }
     })
     return () => {
       cancelled = true
     }
-  }, [dispatch, isPlatformAdmin, token])
+  }, [dispatch, pathname, token])
 
-  if (isPlatformAdmin === null && (lookupFailed || !token)) {
+  if (isPlatformAdmin === null && (!token || failedOn === pathname)) {
     return false
   }
   return isPlatformAdmin

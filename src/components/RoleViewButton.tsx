@@ -3,7 +3,7 @@ import { JSX, ReactElement } from 'react'
 
 import { Button } from './ui/button'
 import Loader from './Loader'
-import { useAppSelector } from '@/lib/hooks'
+import { useSelectedOrgRoles } from '@/lib/useOrgRoleAccess'
 
 interface RoleViewButtonProps {
   title?: string
@@ -27,9 +27,7 @@ const RoleViewButton = ({
   disabled,
   loading,
 }: RoleViewButtonProps): JSX.Element => {
-  const roles = useAppSelector(
-    (state) => state.organization.orgInfo?.roles || [],
-  )
+  const roles = useSelectedOrgRoles()
 
   const isRoleAccess = (): boolean => {
     switch (feature) {

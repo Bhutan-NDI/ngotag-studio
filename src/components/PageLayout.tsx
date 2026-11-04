@@ -49,6 +49,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
     return (
       <KBar>
         <BhutanndiAppShell>
+          {/* Only this theme's sidebar is filtered for mobile verifier users. */}
           <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
         </BhutanndiAppShell>
       </KBar>
@@ -61,7 +62,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
         <AppSidebar />
         <SidebarInset>
           <Header />
-          <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
+          {children}
         </SidebarInset>
       </SidebarProvider>
     </KBar>
