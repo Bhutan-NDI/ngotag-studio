@@ -1,4 +1,5 @@
-import { inOrg, PELDEN, type DemoState, type GuideId, type PersonaId } from "./demoData";
+import { nameFromAddress } from "./demoMail";
+import { inOrg, PELDEN, PERSONAS, type DemoState, type GuideId, type PersonaId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
 import type { FlowEntry } from "./demoStory";
 
@@ -487,9 +488,9 @@ export interface CastChip {
 /**
  * The people for the row, in the part's order. Somebody who has not joined
  * yet is offered by their invitation, so Ugyen is reachable the moment
- * Dorji invites him at his planned address, and as himself once he has
- * accepted. Nobody outside the plan is listed; whoever is being driven as
- * now is, so the row always shows them.
+ * Dorji invites him, and as himself once he has accepted. Anyone else the
+ * presenter invites is listed too, and whoever is being driven as now, so
+ * the row always shows them.
  */
 export function castOnStage(
   s: Pick<DemoState, "people" | "orgInvitations">,
@@ -521,12 +522,25 @@ export function castOnStage(
     const inv = inviteFor(p.email);
     if (inv) add({ key: inv.id, name: p.name, role: p.title, href: `/invitation/${inv.id}` });
     /* Not invited yet: shown, but not pressable, so the presenter knows
-       who is coming — and the address to invite them at, since only that
-       address makes the invitation theirs. Anything else is somebody new. */
+       who is coming and at what address. */
     else add({ key: p.id, name: p.name, role: p.title, inviteAt: p.email });
   }
-  /* Only the planned people: an invitation to any other address is a new
-     person the story doesn't have, and is not offered here. */
+  /* Anyone off the script the presenter invites — a story person's name
+     already reaches them (storyAddress), so these are genuinely new: listed
+     as invited, then drivable once they've joined. */
+  for (const inv of open) {
+    const p = s.people.find((x) => x.email.toLowerCase() === inv.email.toLowerCase());
+    if (p && ((PERSONAS as string[]).includes(p.id) || hasAccount(p))) continue;
+    add({
+      key: inv.id,
+      name: p?.name ?? nameFromAddress(inv.email),
+      role: `Invited as ${(inv.role ?? "Member").toLowerCase()} · ${inv.email}`,
+      href: `/invitation/${inv.id}`,
+    });
+  }
+  for (const p of s.people.filter((x) => x.joinedBy && hasAccount(x) && !(PERSONAS as string[]).includes(x.id))) {
+    add({ key: p.id, name: p.name, role: p.title, persona: p.id });
+  }
   const now = s.people.find((x) => x.id === current);
   if (now && hasAccount(now)) add({ key: now.id, name: now.name, role: now.title, persona: now.id });
   return chips;

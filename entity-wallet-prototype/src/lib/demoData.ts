@@ -393,9 +393,9 @@ export const shortOrgName = (name: string) => name.replace(/ (Pvt\. )?Ltd\.$/, "
  * them by it — their inbox, their invitation, who they are once they join.
  * Typed slightly differently (ugyen@…, ugyen.p@…) it used to reach a
  * stranger instead, who joined as a second "Ugyen" beside the real one. So
- * an address whose name part starts with a story person's first name goes
- * to that person's own address — at their domain, or for someone with no
- * account yet at any. Anything else is used as typed.
+ * an address whose name part starts with a story person's first name, at
+ * that person's own domain, goes to their own address — for invitations,
+ * sign-up and sign-in alike. Anything else is used as typed.
  */
 export function storyAddress(typed: string, people: Pick<Person, "id" | "name" | "email" | "hasAccount">[]): string {
   const address = typed.trim();
@@ -408,7 +408,7 @@ export function storyAddress(typed: string, people: Pick<Person, "id" | "name" |
     (p) =>
       (PERSONAS as string[]).includes(p.id) &&
       p.name.split(/\s+/)[0].toLowerCase() === first &&
-      (p.email.toLowerCase().endsWith(`@${domain}`) || p.hasAccount === false),
+      p.email.toLowerCase().endsWith(`@${domain}`),
   );
   return matches.length === 1 ? matches[0].email : address;
 }

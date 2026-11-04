@@ -216,8 +216,12 @@ It comes two ways:
   authority sent stays waiting. Someone who hasn't joined yet shows greyed
   as *not joined yet*, with their address. You needn't type it exactly:
   an address starting with their first name (**ugyen@…**, **ugyen.p@…**)
-  reaches them, so it's the same Ugyen everywhere after. Once invited they
-  become *invited*, and pressing it opens their invitation. Everyone else is still
+  reaches them, so it's the same Ugyen everywhere after — and the same goes
+  for signing up as Dorji (**dorji@…**), inviting NDI's administrators
+  (**kinzang@…**) and signing in. Once invited they become *invited*, and
+  pressing it opens their invitation. Anyone off the script you invite is
+  listed too: *invited*, named from their address, then a person to drive
+  as once they've joined. Everyone else is still
   in Demo controls.
   In the product itself, the **bell** at the top shows the same list for
   whoever is signed in, and **My authority** offers **Review and accept**

@@ -10,6 +10,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { SecureSignInScene } from "@/components/ui/scenes";
+import { storyAddress } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
@@ -97,7 +98,7 @@ export function SignUpView() {
       /* Only accounts that exist count: on the platform's day zero NDI's own
          staff are known to the story but have not signed up yet. */
       const taken = people.some(
-        (p) => p.hasAccount !== false && p.email.toLowerCase() === address.toLowerCase(),
+        (p) => p.hasAccount !== false && p.email.toLowerCase() === storyAddress(address, people).toLowerCase(),
       );
       if (taken) {
         /* FLOW-ONB-01 A1: someone arriving from an invitation who already
@@ -110,7 +111,8 @@ export function SignUpView() {
         );
         return;
       }
-      startSignup(address);
+      /* A story person's own address, if this names one (storyAddress). */
+      startSignup(storyAddress(address, people));
       router.push("/sign-up/check-email");
     }, LOCAL_MS);
   };

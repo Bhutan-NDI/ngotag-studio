@@ -4095,7 +4095,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             {
               id,
               kind: "O",
-              email: email.trim(),
+              email: storyAddress(email.trim(), s.people),
               orgId: null,
               role: null,
               legalName,
@@ -4593,7 +4593,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
       signIn: (email) => {
         const s0 = stateRef.current;
-        const address = email.trim().toLowerCase();
+        const address = storyAddress(email.trim(), s0.people).toLowerCase();
         const person = s0.people.find((p) => p.hasAccount !== false && p.email.toLowerCase() === address);
         if (person && ((PERSONAS as string[]).includes(person.id) || person.joinedBy)) {
           const id = person.id;
@@ -4714,7 +4714,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            merely hidden on the screen, because the screen is not the
            boundary. */
         if (!asRoot && !isPlatformAdmin(me)) return { ok: false, error: "E1" };
-        const email = emailIn.trim().toLowerCase();
+        /* A story person's own address, if this names one (storyAddress). */
+        const email = storyAddress(emailIn.trim(), s0.people).toLowerCase();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { ok: false, error: "invalid" };
         const person = s0.people.find((p) => p.email.toLowerCase() === email);
         if (
