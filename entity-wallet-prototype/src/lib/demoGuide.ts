@@ -408,9 +408,9 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     chapter: 6,
-    title: "One approval is the acceptance",
+    title: "Ugyen signs his acceptance",
     happening:
-      "The request comes from Bhutan NDI Verification, named as the wallet will show it. Approving it confirms it's Ugyen and records that Ugyen accepts — there's nothing else to press afterwards.",
+      "Ugyen already proved who he is when he joined, so this isn't that question again: his wallet signs that he agrees to these exact terms — what he can do, for Pelden, until when — and it's checked against the identity on his account. There's nothing else to press afterwards.",
     doThis: "Press **Simulate the scan**. When it's done, the next screen opens by itself.",
     say: "Dorji couldn't accept on Ugyen's behalf. An acceptance someone else makes isn't worth recording.",
     match: "^/appointments/[^/]+/confirm$",
