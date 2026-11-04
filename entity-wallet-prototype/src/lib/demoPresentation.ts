@@ -49,12 +49,12 @@ const fromGuide = (fullChapter: number, chapter: number): GuideStep[] =>
 export const PRESENTATION_CHAPTERS: GuideChapter[] = [
   { title: "What the Entity Wallet is", shows: "A company's own wallet on Bhutan NDI, and the story we'll follow" },
   { title: "A person gets an account", shows: "Flow 1 · Dorji signs up — just the person, no company yet" },
-  { title: "The company comes on", shows: "Flow 2 · The registrar confirms Pelden, then Dorji invites a colleague" },
+  { title: "The company comes on", shows: "Flow 2 · The registrar confirms Pelden Trading, then Dorji invites a colleague" },
   { title: "Appointing someone to act", shows: "Flow 3 · Dorji chooses what Ugyen can do; Ugyen accepts in the Bhutan NDI app" },
-  { title: "Receiving a credential", shows: "Flow 6 · Pelden asks the tax office for its TPN and accepts what comes back" },
-  { title: "Presenting a credential", shows: "Flow 7 · Pelden shares with Bank of Bhutan, from the bank's website and in the wallet" },
+  { title: "Receiving a credential", shows: "Flow 6 · Pelden Trading asks the tax office for its TPN and accepts what comes back" },
+  { title: "Presenting a credential", shows: "Flow 7 · Pelden Trading shares with Bank of Bhutan, from the bank's website and in the wallet" },
   { title: "Giving authority to act", shows: "Flow 8 · Dorji gives the clearing agent authority; she collects it in her own app" },
-  { title: "Acting at the Single Window", shows: "Flow 9 · The agent declares for Pelden, and each declaration is checked" },
+  { title: "Acting at the Single Window", shows: "Flow 9 · The agent declares for Pelden Trading, and each declaration is checked" },
   { title: "What you saw", shows: "The seven flows, and what wasn't shown" },
 ];
 
@@ -74,7 +74,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 0,
     title: "One company's story",
     happening:
-      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden. Pelden receives its taxpayer number from the Department of Revenue & Customs, then shares its registration with Bank of Bhutan. Finally Pelden gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
+      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden Trading is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden Trading. Pelden Trading receives its taxpayer number from the Department of Revenue & Customs, then shares its registration with Bank of Bhutan. Finally Pelden Trading gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
     doThis: "Press **Next**.",
     route: "/sign-up",
     match: "^/sign-up$",
@@ -108,7 +108,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 2,
     title: "Flow 2 · The registrar decides, not NDI",
     happening:
-      "Now Dorji adds Pelden. NDI doesn't decide who a company is: the authority that registered it does. Here that's the Corporate Regulatory Authority, which checks its own register and who Dorji is, from Dorji's Bhutan NDI app. Once it's confirmed, Pelden's registration arrives in Pelden's own wallet. Then Dorji invites a colleague, who joins by email.",
+      "Now Dorji adds Pelden Trading. NDI doesn't decide who a company is: the authority that registered it does. Here that's the Corporate Regulatory Authority, which checks its own register and who Dorji is, from Dorji's Bhutan NDI app. Once it's confirmed, Pelden Trading's registration arrives in Pelden Trading's own wallet. Then Dorji invites a colleague, who joins by email.",
     doThis: "Press **Next**.",
     say: "The registrar stays the source of truth. NDI carries its answer; it doesn't make one up.",
     route: "/onboarding",
@@ -122,7 +122,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 3,
     title: "Flow 3 · Joining isn't acting",
     happening:
-      "Ugyen is a member now: Ugyen can see Pelden, but can't act for it. Appointing is the separate step that lets someone act. Dorji chooses exactly what Ugyen can do, and Ugyen accepts with one approval in their own Bhutan NDI app. Nobody can be made to act for a company without agreeing to it themselves.",
+      "Ugyen is a member now: Ugyen can see Pelden Trading, but can't act for it. Appointing is the separate step that lets someone act. Dorji chooses exactly what Ugyen can do, and Ugyen accepts with one approval in their own Bhutan NDI app. Nobody can be made to act for a company without agreeing to it themselves.",
     doThis: "Press **Next**.",
     say: "Letting someone in and letting them act are two different decisions, and the Entity Wallet keeps them apart.",
     route: "/people-who-can-act/appoint",
@@ -135,7 +135,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 4,
     title: "Flow 6 · Each office issues its own",
     happening:
-      "With its registration in its wallet, Pelden asks the Department of Revenue & Customs for its taxpayer number (TPN). The office sees the registration Pelden shares with it, decides on what was proved, and sends the TPN back as a credential. Someone at Pelden checks the offer and accepts it before it's held.",
+      "With its registration in its wallet, Pelden Trading asks the Department of Revenue & Customs for its taxpayer number (TPN). The office sees the registration Pelden Trading shares with it, decides on what was proved, and sends the TPN back as a credential. Someone at Pelden Trading checks the offer and accepts it before it's held.",
     doThis: "Press **Next**.",
     say: "Each office issues what it's responsible for. The wallet is where it comes together, under the company's control.",
     route: "/wallet/get",
@@ -148,7 +148,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 5,
     title: "Flow 7 · No more photocopies",
     happening:
-      "Pelden opens an account at Bank of Bhutan. Instead of asking for copies, the bank asks for Pelden's credentials from its website. Dorji sees who is asking and every detail that will go, shares, and is taken back to the bank. Then the bank asks again inside the wallet: Ugyen can see the request but wasn't appointed to share, so passes it to Dorji.",
+      "Pelden Trading opens an account at Bank of Bhutan. Instead of asking for copies, the bank asks for Pelden Trading's credentials from its website. Dorji sees who is asking and every detail that will go, shares, and is taken back to the bank. Then the bank asks again inside the wallet: Ugyen can see the request but wasn't appointed to share, so passes it to Dorji.",
     doThis: "Press **Next**.",
     say: "The bank receives the credential from the company, signed by the office that issued it, and can check it's still valid. Nothing to verify by hand.",
     route: "/simulated/bank",
@@ -161,7 +161,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 6,
     title: "Flow 8 · Authority someone else can check",
     happening:
-      "Pelden's clearing agent, Pema Choden, declares its imports at the Bhutan National Single Window. Today she'd carry a letter and copies of Pelden's licence and TPN. Instead Dorji gives her authority to act — for what, under which licence, up to what amount, until when — and she collects it from a link in her own Bhutan NDI app. She needs no account here and isn't a member of Pelden.",
+      "Pelden Trading's clearing agent, Pema Choden, declares its imports at the Bhutan National Single Window. Today she'd carry a letter and copies of Pelden Trading's licence and TPN. Instead Dorji gives her authority to act — for what, under which licence, up to what amount, until when — and she collects it from a link in her own Bhutan NDI app. She needs no account here and isn't a member of Pelden Trading.",
     doThis: "Press **Next**.",
     say: "Delegation the other side can check: who acted, for whom, and under what authority.",
     route: "/authority-to-act",
@@ -174,7 +174,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 7,
     title: "Flow 9 · Checked at every declaration",
     happening:
-      "Pema signs in at the Single Window — simulated here — and shares her authority once from her app. The first try is refused: Pelden has never registered with the Single Window, so Dorji registers it, the same way Pelden shared with the bank. After that, each declaration is checked against her authority, and against Pelden's TPN and licence as they stand at that moment. We'll see it refuse too: above her limit, when the tax office revokes Pelden's TPN, and once Pelden withdraws her authority.",
+      "Pema signs in at the Single Window — simulated here — and shares her authority once from her app. The first try is refused: Pelden Trading has never registered with the Single Window, so Dorji registers it, the same way Pelden Trading shared with the bank. After that, each declaration is checked against her authority, and against Pelden Trading's TPN and licence as they stand at that moment. We'll see it refuse too: above her limit, when the tax office revokes Pelden Trading's TPN, and once Pelden Trading withdraws her authority.",
     doThis: "Press **Next**.",
     say: "Every refusal says why, and who can fix it.",
     route: "/simulated/bnsw",
@@ -186,7 +186,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 8,
     title: "That's the Entity Wallet",
     happening:
-      "Dorji got an account as a person. Pelden was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden received its TPN from the tax office, shared its registration with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
+      "Dorji got an account as a person. Pelden Trading was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden Trading received its TPN from the tax office, shared its registration with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
     doThis:
       "Press **Finish**. To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },
@@ -249,13 +249,13 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Entity onboarding",
-    shows: "The registrar confirms Pelden, and Dorji invites a colleague",
+    shows: "The registrar confirms Pelden Trading, and Dorji invites a colleague",
     persona: "dorji",
     route: "/onboarding",
     selfService: true,
     start: "platformReady",
     cast: ["dorji", "ugyen"],
-    switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/members" }],
+    switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/members" }],
   },
   {
     title: "Appointing a controller",
@@ -267,26 +267,26 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Receiving credentials",
-    shows: "Pelden asks the tax office for its TPN and accepts it",
+    shows: "Pelden Trading asks the tax office for its TPN and accepts it",
     persona: "dorji",
     route: "/wallet/get",
     start: "teamReady",
     cast: ["dorji", "deki"],
     switchTo: [
       { label: "Deki · tax office", persona: "deki", route: "/issuer/requests" },
-      { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/requests" },
+      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/requests" },
     ],
   },
   {
     title: "Presenting credentials",
-    shows: "Pelden shares its credentials with Bank of Bhutan",
+    shows: "Pelden Trading shares its credentials with Bank of Bhutan",
     persona: "dorji",
     route: "/simulated/bank",
     start: "teamReady",
     cast: ["dorji", "ugyen"],
     switchTo: [
-      { label: "Ugyen · Pelden", persona: "ugyen", route: "/wallet/sharing" },
-      { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/sharing" },
+      { label: "Ugyen · Pelden Trading", persona: "ugyen", route: "/wallet/sharing" },
+      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/sharing" },
     ],
   },
   {
@@ -296,17 +296,17 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/authority-to-act",
     start: "teamReady",
     cast: ["dorji"],
-    switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/authority-to-act" }],
+    switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/authority-to-act" }],
   },
   {
     title: "Acting at BNSW",
-    shows: "The clearing agent declares for Pelden, and each declaration is checked",
+    shows: "The clearing agent declares for Pelden Trading, and each declaration is checked",
     persona: null,
     route: "/simulated/bnsw",
     start: "livedIn",
     cast: ["dorji"],
     switchTo: [
-      { label: "Dorji · Pelden", persona: "dorji", route: "/simulated/bnsw/register" },
+      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/simulated/bnsw/register" },
       { label: "Pema · BNSW", route: "/simulated/bnsw" },
     ],
   },

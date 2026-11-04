@@ -77,7 +77,7 @@ export function DemoHarness() {
     setPart(null);
   };
   /* The presentation guide, for practising, starts where a company comes
-     on: NDI's administrators are already set up, and nobody from Pelden has
+     on: NDI's administrators are already set up, and nobody from Pelden Trading has
      an account yet. It skips the platform's own setup (see
      demoPresentation.ts). */
   const startPresentation = () => {
