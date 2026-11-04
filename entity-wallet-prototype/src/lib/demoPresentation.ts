@@ -470,7 +470,8 @@ export const PRESENTATION_CAST: PersonaId[] = [...new Set(PRESENTATION_PARTS.fla
 export interface CastChip {
   key: string;
   name: string;
-  title: string;
+  /** Their role, shown under the name so the room knows who they are. */
+  role: string;
   persona?: string;
   href?: string;
 }
@@ -483,7 +484,7 @@ export interface CastChip {
  * and so is whoever is being driven as now, so the row always shows them.
  */
 export function castOnStage(
-  s: Pick<DemoState, "people" | "orgInvitations">,
+  s: Pick<DemoState, "people" | "orgInvitations" | "organizations">,
   ids: readonly PersonaId[],
   current: string,
   /** Who the part starts as. The early parts drive as Dorji before his
@@ -506,25 +507,30 @@ export function castOnStage(
     const p = s.people.find((x) => x.id === id);
     if (!p) continue;
     if (hasAccount(p)) {
-      add({ key: p.id, name: p.name, title: p.title, persona: p.id });
+      add({ key: p.id, name: p.name, role: p.title, persona: p.id });
       continue;
     }
     const inv = inviteFor(p.email);
-    if (inv) add({ key: inv.id, name: p.name, title: "Invited — opens their invitation", href: `/invitation/${inv.id}` });
+    if (inv) add({ key: inv.id, name: p.name, role: p.title, href: `/invitation/${inv.id}` });
     /* Not invited yet: shown, but not pressable, so the presenter knows
        who is coming and why they cannot be switched to. */
-    else add({ key: p.id, name: p.name, title: "Hasn't joined yet — appears once invited" });
+    else add({ key: p.id, name: p.name, role: p.title });
   }
   for (const inv of open) {
     const p = s.people.find((x) => x.email.toLowerCase() === inv.email.toLowerCase());
     if (p && (hasAccount(p) || ids.includes(p.id as PersonaId))) continue;
-    add({ key: inv.id, name: p?.name ?? inv.email, title: "Invited — opens their invitation", href: `/invitation/${inv.id}` });
+    add({
+      key: inv.id,
+      name: p?.name ?? inv.email,
+      role: p?.title ?? `${inv.role ?? "Member"} at ${s.organizations.find((o) => o.id === inv.orgId)?.name ?? "the organisation"}`,
+      href: `/invitation/${inv.id}`,
+    });
   }
   /* Somebody the story does not know, who joined during this run. */
   for (const p of s.people.filter((x) => x.joinedBy && hasAccount(x) && !(PERSONAS as string[]).includes(x.id))) {
-    add({ key: p.id, name: p.name, title: p.title, persona: p.id });
+    add({ key: p.id, name: p.name, role: p.title, persona: p.id });
   }
   const now = s.people.find((x) => x.id === current);
-  if (now && hasAccount(now)) add({ key: now.id, name: now.name, title: now.title, persona: now.id });
+  if (now && hasAccount(now)) add({ key: now.id, name: now.name, role: now.title, persona: now.id });
   return chips;
 }

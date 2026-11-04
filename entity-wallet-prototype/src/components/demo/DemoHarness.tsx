@@ -161,7 +161,7 @@ export function DemoHarness() {
   /* Only the people this part needs — all the presentation's people when
      no part is on — not everyone the full demo can drive as. */
   const onStage = castOnStage(
-    { people, orgInvitations },
+    { people, orgInvitations, organizations },
     part !== null ? PRESENTATION_PARTS[part].cast : PRESENTATION_CAST,
     harness.persona,
     part !== null ? PRESENTATION_PARTS[part].persona : null,
@@ -233,32 +233,44 @@ export function DemoHarness() {
               <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
                 {part !== null ? "Driving as — people in this part" : "Driving as"}
               </p>
-              <div className="flex flex-wrap gap-1.5">
-                {onStage.map((c) =>
-                  c.persona ? (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => setPersona(c.persona as PersonaId)}
-                      aria-pressed={harness.persona === c.persona}
-                      title={c.title}
-                      className="ndi-navrow rounded-[9px] px-2.5 py-1.5 font-display text-[12.5px] font-medium"
-                      data-active={harness.persona === c.persona ? "1" : "0"}
-                    >
-                      {c.name}
-                    </button>
-                  ) : !c.href ? (
-                    <span
-                      key={c.key}
-                      title={c.title}
-                      className="inline-flex items-center gap-1.5 rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 font-display text-[12.5px] font-medium text-faint"
-                    >
-                      {c.name}
-                      <span className="text-[11px] font-normal">· not joined yet</span>
+              <div className="flex flex-col gap-1">
+                {onStage.map((c) => {
+                  const who = (
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-display text-[13px] font-semibold">
+                        {c.name}
+                        {!c.persona ? (
+                          <span className="ml-1.5 text-[11px] font-normal text-faint">
+                            · {c.href ? "invited" : "not joined yet"}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="text-[11.5px] leading-[1.35] text-muted">{c.role}</span>
                     </span>
-                  ) : (
-                    /* Invited, not joined: nobody to drive as yet, so the
-                       chip opens the link they were sent. */
+                  );
+                  if (c.persona)
+                    return (
+                      <button
+                        key={c.key}
+                        type="button"
+                        onClick={() => setPersona(c.persona as PersonaId)}
+                        aria-pressed={harness.persona === c.persona}
+                        className="ndi-navrow flex w-full rounded-[9px] px-2.5 py-1.5 text-left"
+                        data-active={harness.persona === c.persona ? "1" : "0"}
+                      >
+                        {who}
+                      </button>
+                    );
+                  /* Not joined, not invited: shown so the presenter knows who
+                     is coming, but there is nobody to drive as yet. */
+                  if (!c.href)
+                    return (
+                      <div key={c.key} className="flex w-full rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 opacity-70">
+                        {who}
+                      </div>
+                    );
+                  /* Invited, not joined: the row opens the link they were sent. */
+                  return (
                     <button
                       key={c.key}
                       type="button"
@@ -266,14 +278,12 @@ export function DemoHarness() {
                         setPanel(null);
                         router.push(c.href ?? "/");
                       }}
-                      title={c.title}
-                      className="ndi-navrow inline-flex items-center gap-1.5 rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 font-display text-[12.5px] font-medium"
+                      className="ndi-navrow flex w-full rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 text-left"
                     >
-                      {c.name}
-                      <span className="text-[11px] font-normal text-faint">· invited</span>
+                      {who}
                     </button>
-                  ),
-                )}
+                  );
+                })}
               </div>
               <p className="mt-1 font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
                 Waiting for {currentName}
