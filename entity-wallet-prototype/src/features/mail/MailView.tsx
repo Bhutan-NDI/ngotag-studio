@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { INVITATION_DAYS, VERIFY_LINK_DAYS } from "@/lib/deployment";
+import { shortOrgName } from "@/lib/demoData";
 import { findMail, type Mailbox, type MailMessage } from "@/lib/demoMail";
 import { useDemo } from "@/lib/demoStore";
 
@@ -41,8 +42,18 @@ const ACTIVE = "#d3e3fd";
    the mint kept for the mark only. */
 const DEEP = "#124143";
 const DEEP_SOFT = "#1a585b";
-const DEEP_BAND = "linear-gradient(135deg, #163a3c 0%, #124143 45%, #141b29 100%)";
-const MINT = "#5ac994";
+/* The website's own: its depth gradient, mint grid, CTA and gradient text. */
+const HERO = "radial-gradient(130% 120% at 85% -10%, #1f5a55 0%, #163a3c 28%, #141b29 66%, #0c111b 100%)";
+const GRID = "linear-gradient(rgba(90,201,148,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(90,201,148,0.08) 1px, transparent 1px)";
+const CTA = "linear-gradient(115deg, #8cf0c0 0%, #6fe0a9 24%, #4fc091 56%, #2fa189 80%, #1e8189 100%)";
+const GRADIENT_TEXT = {
+  background: "linear-gradient(92deg, #8cf0c0 0%, #5ac994 55%, #2e8d8f 100%)",
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  color: "transparent",
+} as const;
+const DISPLAY = "var(--font-display)";
+const MONO = "var(--font-mono)";
 const FONT = "Roboto, 'Segoe UI', Arial, sans-serif";
 
 const AVATAR_COLOURS = ["#1a73e8", "#e8710a", "#188038", "#a142f4", "#d93025", "#12838e"];
@@ -200,87 +211,171 @@ function Message({ mail }: { mail: MailMessage }) {
         </div>
       </div>
 
-      <div className="mt-5 rounded-lg px-3 py-6 sm:ml-14 sm:px-8 sm:py-8" style={{ background: "#f1f3f4" }}>
+      <div className="mt-5 rounded-xl px-2 py-6 sm:ml-14 sm:px-8 sm:py-10" style={{ background: "#eef1f4" }}>
         <div
-          className="mx-auto max-w-[600px] overflow-hidden rounded-xl"
-          style={{ background: "#ffffff", border: `1px solid ${LINE}` }}
+          className="mx-auto max-w-[600px] overflow-hidden rounded-[20px]"
+          style={{ background: "#ffffff", boxShadow: "0 18px 50px -20px rgba(12,17,27,0.45), 0 2px 6px rgba(12,17,27,0.08)" }}
         >
-          <div className="flex items-center gap-2 px-6 py-5 sm:px-8" style={{ background: DEEP_BAND, color: "#ffffff" }}>
-            <img src="/media/logos/ndi-mark-mint.png" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
-            <span className="text-[19px] font-bold">Bhutan NDI</span>
-            <span className="text-[14px]" style={{ color: MINT }}>
-              · Entity Wallet
-            </span>
+          {/* ---- Hero: the wallet's depth gradient, grid and glow ---- */}
+          <div className="relative overflow-hidden px-6 pb-9 pt-7 sm:px-10" style={{ background: HERO, color: "#ffffff" }}>
+            <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ backgroundImage: GRID, backgroundSize: "28px 28px", maskImage: "linear-gradient(180deg, #000 0%, transparent 85%)", WebkitMaskImage: "linear-gradient(180deg, #000 0%, transparent 85%)" }} />
+            <span aria-hidden="true" className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full" style={{ background: "radial-gradient(circle, rgba(111,224,169,0.45) 0%, rgba(111,224,169,0) 65%)" }} />
+            <span aria-hidden="true" className="pointer-events-none absolute -bottom-24 -left-10 h-56 w-56 rounded-full" style={{ background: "radial-gradient(circle, rgba(46,141,143,0.5) 0%, rgba(46,141,143,0) 65%)" }} />
+
+            <div className="relative flex items-center gap-2.5">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full" style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(90,201,148,0.35)" }}>
+                <img src="/media/logos/ndi-mark-mint.png" alt="" width={24} height={24} className="h-6 w-6" />
+              </span>
+              <span className="text-[17px] font-semibold tracking-[-0.01em]" style={{ fontFamily: DISPLAY }}>
+                Bhutan NDI
+              </span>
+              <span className="ml-auto rounded-full px-2.5 py-1 text-[10.5px] uppercase tracking-[0.16em]" style={{ fontFamily: MONO, color: "#8cf0c0", background: "rgba(90,201,148,0.1)", border: "1px solid rgba(90,201,148,0.28)" }}>
+                Entity Wallet
+              </span>
+            </div>
+
+            <p className="relative mt-8 text-[11px] uppercase tracking-[0.18em]" style={{ fontFamily: MONO, color: "#8b95a5" }}>
+              {mail.kind === "verify" ? "One step to go" : "An invitation for you"}
+            </p>
+            <h2 className="relative mt-2 text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] sm:text-[32px]" style={{ fontFamily: DISPLAY }}>
+              {mail.kind === "verify" ? (
+                <>
+                  Confirm your <span style={GRADIENT_TEXT}>email address</span>
+                </>
+              ) : (
+                <>
+                  You&rsquo;re invited to <span style={GRADIENT_TEXT}>{mail.orgName}</span>
+                </>
+              )}
+            </h2>
+            <p className="relative mt-3 max-w-[46ch] text-[14.5px] leading-[1.6]" style={{ color: "#c5ccd8" }}>
+              {mail.kind === "verify" ? (
+                <>
+                  Someone — hopefully you — started creating a Bhutan NDI Entity Wallet account with{" "}
+                  <strong style={{ color: "#ffffff" }}>{mail.mailbox.address}</strong>.
+                </>
+              ) : (
+                <>Join your colleagues on the Bhutan NDI Entity Wallet, where {shortOrgName(mail.orgName)} keeps and shares its credentials.</>
+              )}
+            </p>
+
+            {mail.kind === "invite" ? (
+              <div className="relative mt-6 flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}>
+                <Avatar name={mail.inviter?.name ?? "A colleague"} size={38} />
+                <span className="flex min-w-0 flex-col leading-[1.35]">
+                  <span className="text-[11px] uppercase tracking-[0.14em]" style={{ fontFamily: MONO, color: "#8b95a5" }}>
+                    Invited by
+                  </span>
+                  <span className="text-[15px] font-semibold">{mail.inviter?.name ?? "A colleague"}</span>
+                  {mail.inviter ? (
+                    <span className="text-[12.5px]" style={{ color: "#c5ccd8" }}>
+                      {mail.inviter.title}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
           </div>
-          <div className="flex flex-col gap-4 px-6 py-6 text-[15px] leading-[1.6] sm:px-8" style={{ color: "#3c4043" }}>
+
+          {/* ---- Body ---- */}
+          <div className="flex flex-col gap-6 px-6 py-8 text-[15px] leading-[1.6] sm:px-10" style={{ color: "#3c4043" }}>
             {mail.kind === "verify" ? (
               <>
-                <p>Hello,</p>
-                <p>
-                  Someone — hopefully you — started creating a Bhutan NDI Entity Wallet account with{" "}
-                  <strong style={{ color: INK }}>{mail.mailbox.address}</strong>. Confirm it&rsquo;s your address to carry on.
-                </p>
+                <ol className="m-0 flex list-none flex-col gap-0 p-0">
+                  {[
+                    { title: "Confirm your email address", note: "This link, now.", on: true },
+                    { title: "Confirm it’s you", note: "One scan with your Bhutan NDI Wallet.", on: false },
+                    { title: "Choose a password", note: "Your name comes from your NDI wallet.", on: false },
+                  ].map((step, i, all) => (
+                    <li key={step.title} className="flex gap-3.5">
+                      <span className="flex flex-col items-center">
+                        <span
+                          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[13px] font-semibold"
+                          style={
+                            step.on
+                              ? { background: CTA, color: "#06241a", boxShadow: "0 0 0 4px rgba(90,201,148,0.18)" }
+                              : { background: "#f1f4f3", color: "#5f6368", border: "1px solid #dfe5e3" }
+                          }
+                        >
+                          {i + 1}
+                        </span>
+                        {i < all.length - 1 ? <span className="my-1 w-px flex-1" style={{ background: "#dfe5e3", minHeight: 14 }} /> : null}
+                      </span>
+                      <span className="pb-4">
+                        <span className="block text-[15px] font-semibold" style={{ color: step.on ? INK : "#5f6368", fontFamily: DISPLAY }}>
+                          {step.title}
+                        </span>
+                        <span className="block text-[13.5px]" style={{ color: MUTED }}>
+                          {step.note}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
                 <MailButton onClick={() => router.push("/sign-up/verify")}>Confirm my email address</MailButton>
-                <p className="text-[13.5px]" style={{ color: MUTED }}>
-                  The link works once and expires in {VERIFY_LINK_DAYS} days. Next, you&rsquo;ll confirm it&rsquo;s you with
-                  your Bhutan NDI Wallet and choose a password.
-                </p>
-                <p className="text-[13.5px]" style={{ color: MUTED }}>
-                  If this wasn&rsquo;t you, ignore this email. Nothing is set up unless the link is opened.
+                <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
+                  The link works once and expires in {VERIFY_LINK_DAYS} days. If this wasn&rsquo;t you, ignore this
+                  email — nothing is set up unless the link is opened.
                 </p>
               </>
             ) : (
               <>
-                <p>Hello,</p>
-                <p>
-                  <strong style={{ color: INK }}>{mail.inviter?.name ?? "Someone"}</strong> has invited you to join{" "}
-                  <strong style={{ color: INK }}>{mail.orgName}</strong> on the Bhutan NDI Entity Wallet.
-                </p>
-                <span
-                  className="inline-flex w-fit rounded-full px-3.5 py-1 text-[14px] font-semibold"
-                  style={{ background: "#e3eeee", color: DEEP }}
-                >
-                  Role: {mail.invitation.role ?? "Member"}
-                </span>
-                <div className="rounded-lg px-5 py-4" style={{ border: `1px solid ${LINE}`, borderLeft: `4px solid ${DEEP}` }}>
-                  <p className="text-[11.5px] uppercase tracking-[0.08em]" style={{ color: MUTED }}>
-                    Invited by
-                  </p>
-                  <p className="text-[16px] font-semibold" style={{ color: INK }}>
-                    {mail.inviter?.name ?? "A colleague"}
-                  </p>
-                  {mail.inviter ? (
-                    <p className="text-[13.5px]" style={{ color: MUTED }}>
-                      {mail.inviter.title}, {mail.orgName}
+                <div className="grid grid-cols-2 overflow-hidden rounded-2xl" style={{ border: "1px solid #dcebe4", background: "linear-gradient(135deg, #f3fbf7 0%, #eef5f6 100%)" }}>
+                  <div className="px-4 py-3.5" style={{ borderRight: "1px solid #dcebe4" }}>
+                    <p className="text-[10.5px] uppercase tracking-[0.14em]" style={{ fontFamily: MONO, color: MUTED }}>
+                      Organisation
                     </p>
-                  ) : null}
+                    <p className="mt-0.5 text-[15px] font-semibold leading-[1.35]" style={{ color: INK, fontFamily: DISPLAY }}>
+                      {mail.orgName}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3.5">
+                    <p className="text-[10.5px] uppercase tracking-[0.14em]" style={{ fontFamily: MONO, color: MUTED }}>
+                      Your role
+                    </p>
+                    <p className="mt-0.5 text-[15px] font-semibold" style={{ color: DEEP, fontFamily: DISPLAY }}>
+                      {mail.invitation.role ?? "Member"}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg px-5 py-4" style={{ border: `1px solid ${LINE}` }}>
-                  <p className="mb-1.5 text-[13.5px]" style={{ color: MUTED }}>
+
+                <div className="flex flex-col gap-2.5">
+                  <p className="text-[10.5px] uppercase tracking-[0.14em]" style={{ fontFamily: MONO, color: MUTED }}>
                     What joining does
                   </p>
-                  <p className="flex gap-2">
-                    <span style={{ color: DEEP_SOFT }}>✓</span> You can sign in and see {mail.orgName}&rsquo;s information.
+                  <p className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold" style={{ background: CTA, color: "#06241a" }}>
+                      ✓
+                    </span>
+                    <span>You can sign in and see {shortOrgName(mail.orgName)}&rsquo;s information.</span>
                   </p>
-                  <p className="flex gap-2">
-                    <span style={{ color: MUTED }}>✕</span> It doesn&rsquo;t let you act for {mail.orgName}. If that&rsquo;s
-                    needed, they&rsquo;ll give it to you separately.
+                  <p className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold" style={{ background: "#f1f4f3", color: MUTED, border: "1px solid #dfe5e3" }}>
+                      ✕
+                    </span>
+                    <span>
+                      It doesn&rsquo;t let you act for {shortOrgName(mail.orgName)}. If that&rsquo;s needed, they&rsquo;ll give it to you
+                      separately.
+                    </span>
                   </p>
                 </div>
+
                 <MailButton onClick={() => router.push(`/invitation/${mail.invitation.id}`)}>Review the invitation</MailButton>
-                <p className="text-[13.5px]" style={{ color: MUTED }}>
+                <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
                   When you accept, you&rsquo;ll confirm it&rsquo;s you with your Bhutan NDI Wallet. This invitation
-                  expires in {INVITATION_DAYS.M} days.
-                </p>
-                <p className="text-[13.5px]" style={{ color: MUTED }}>
-                  Not expecting this? You can ignore it — nothing happens unless you accept.
+                  expires in {INVITATION_DAYS.M} days. Not expecting it? Ignore it — nothing happens unless you accept.
                 </p>
               </>
             )}
           </div>
-          <div className="px-6 py-4 text-[12px] sm:px-8" style={{ background: "#f8f9fa", color: MUTED }}>
-            Bhutan NDI · Thimphu, Bhutan. You received this because this address was entered on the Bhutan NDI
-            Entity Wallet.
+
+          {/* ---- Footer: the dark ground again, to close ---- */}
+          <div className="flex items-center gap-3 px-6 py-5 text-[12px] leading-[1.55] sm:px-10" style={{ background: "#0c111b", color: "#8b95a5" }}>
+            <img src="/media/logos/ndi-mark-mint.png" alt="" width={20} height={20} className="h-5 w-5 flex-none opacity-80" />
+            <span>
+              Bhutan NDI · Thimphu, Bhutan. You received this because this address was entered on the Bhutan NDI Entity
+              Wallet.
+            </span>
           </div>
         </div>
       </div>
@@ -314,10 +409,18 @@ function MailButton({ onClick, children }: { onClick: () => void; children: Reac
     <button
       type="button"
       onClick={onClick}
-      className="my-1 inline-flex h-12 w-fit items-center rounded-lg px-7 text-[15px] font-semibold shadow-[0_2px_6px_rgb(0_0_0/0.18)]"
-      style={{ background: DEEP, color: "#ffffff" }}
+      className="inline-flex h-[52px] w-fit items-center gap-2.5 rounded-xl px-7 text-[15px] font-semibold transition-transform hover:-translate-y-px"
+      style={{
+        background: CTA,
+        color: "#06241a",
+        fontFamily: DISPLAY,
+        boxShadow: "0 10px 26px -10px rgba(47,161,137,0.7), inset 0 1px 0 rgba(255,255,255,0.45)",
+      }}
     >
       {children}
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 12h14M12 5l7 7-7 7" />
+      </svg>
     </button>
   );
 }
