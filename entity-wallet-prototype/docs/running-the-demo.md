@@ -202,9 +202,13 @@ It comes two ways:
   acting** card names them and their role at the top of the screen for a
   few seconds, so the room sees the hand-over. Anyone who answers in a
   dashed panel, such as Ugyen accepting in his app, needs no switch.
-  For a question from the room, the top of the list has **Driving as**, the
-  same people as Demo controls: switch to anyone, any time, and nothing
-  resets — an appointment, a request or an authority sent stays waiting.
+  For a question from the room, the top of the list has **Driving as**: only
+  the people the part on screen needs (Dorji and Ugyen for appointing, Dorji
+  and Deki for the TPN), or everyone the presentation uses when no part is
+  on. Switch any time and nothing resets — an appointment, a request or an
+  authority sent stays waiting. Someone who hasn't joined yet shows greyed
+  as *not joined yet*; once invited they become *invited*, and pressing it
+  opens their invitation. Everyone else is still in Demo controls.
   Under it, **Waiting for <person>** lists what is waiting for whoever you
   are driving as, each one click from its screen: Ugyen's appointment to
   accept or decline, Deki's request to answer, Dorji's approvals and

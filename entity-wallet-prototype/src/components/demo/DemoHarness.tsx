@@ -8,7 +8,16 @@ import { Icon } from "@/components/ui/icons";
 import { useDemo } from "@/lib/demoStore";
 import { FLOW_ENTRIES, FLOW_GROUPS, type FlowEntry } from "@/lib/demoStory";
 import { PERSONAS, type PersonaId } from "@/lib/demoData";
-import { PRESENTATION_PARTS, presentationActor, waitingFor, waitingToCollect, type Actor, type WaitingItem } from "@/lib/demoPresentation";
+import {
+  castOnStage,
+  PRESENTATION_CAST,
+  PRESENTATION_PARTS,
+  presentationActor,
+  waitingFor,
+  waitingToCollect,
+  type Actor,
+  type WaitingItem,
+} from "@/lib/demoPresentation";
 
 import { GuideCard } from "./GuideCard";
 import { useScreenRegistry } from "./screenState";
@@ -51,6 +60,7 @@ export function DemoHarness() {
     offers,
     credentialRequests,
     authorityGrants,
+    orgInvitations,
     hydrated,
   } = useDemo();
 
@@ -148,6 +158,14 @@ export function DemoHarness() {
     harness.persona,
   );
   const toCollect = waitingToCollect({ organizations, authorityGrants });
+  /* Only the people this part needs — all the presentation's people when
+     no part is on — not everyone the full demo can drive as. */
+  const onStage = castOnStage(
+    { people, orgInvitations },
+    part !== null ? PRESENTATION_PARTS[part].cast : PRESENTATION_CAST,
+    harness.persona,
+    part !== null ? PRESENTATION_PARTS[part].persona : null,
+  );
   const currentName = people.find((p) => p.id === harness.persona)?.name ?? "them";
   const openWaiting = (w: WaitingItem) => {
     if (w.orgId) setActiveOrg(w.orgId);
@@ -212,21 +230,50 @@ export function DemoHarness() {
               authority to collect — has no way back once you've left it. */}
           {!onAuthScreen ? (
             <div className="mb-3 flex flex-col gap-2 rounded-[12px] border border-grid px-3 py-2.5">
-              <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">Driving as</p>
+              <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
+                {part !== null ? "Driving as — people in this part" : "Driving as"}
+              </p>
               <div className="flex flex-wrap gap-1.5">
-                {personas.map(({ id, person }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setPersona(id)}
-                    aria-pressed={harness.persona === id}
-                    title={person.title}
-                    className="ndi-navrow rounded-[9px] px-2.5 py-1.5 font-display text-[12.5px] font-medium"
-                    data-active={harness.persona === id ? "1" : "0"}
-                  >
-                    {person.name}
-                  </button>
-                ))}
+                {onStage.map((c) =>
+                  c.persona ? (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => setPersona(c.persona as PersonaId)}
+                      aria-pressed={harness.persona === c.persona}
+                      title={c.title}
+                      className="ndi-navrow rounded-[9px] px-2.5 py-1.5 font-display text-[12.5px] font-medium"
+                      data-active={harness.persona === c.persona ? "1" : "0"}
+                    >
+                      {c.name}
+                    </button>
+                  ) : !c.href ? (
+                    <span
+                      key={c.key}
+                      title={c.title}
+                      className="inline-flex items-center gap-1.5 rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 font-display text-[12.5px] font-medium text-faint"
+                    >
+                      {c.name}
+                      <span className="text-[11px] font-normal">· not joined yet</span>
+                    </span>
+                  ) : (
+                    /* Invited, not joined: nobody to drive as yet, so the
+                       chip opens the link they were sent. */
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => {
+                        setPanel(null);
+                        router.push(c.href ?? "/");
+                      }}
+                      title={c.title}
+                      className="ndi-navrow inline-flex items-center gap-1.5 rounded-[9px] border border-dashed border-grid px-2.5 py-1.5 font-display text-[12.5px] font-medium"
+                    >
+                      {c.name}
+                      <span className="text-[11px] font-normal text-faint">· invited</span>
+                    </button>
+                  ),
+                )}
               </div>
               <p className="mt-1 font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
                 Waiting for {currentName}

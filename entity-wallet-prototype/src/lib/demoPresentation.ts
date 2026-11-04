@@ -1,4 +1,4 @@
-import { inOrg, PELDEN, type DemoState, type GuideId, type PersonaId } from "./demoData";
+import { inOrg, PELDEN, PERSONAS, type DemoState, type GuideId, type PersonaId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
 import type { FlowEntry } from "./demoStory";
 
@@ -227,6 +227,14 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
    * inbox) needs no entry: they act on the screen already open.
    */
   switchTo?: { label: string; persona?: PersonaId; route: string }[];
+  /**
+   * Who takes part, for the panel's "Driving as" row. Only these are
+   * offered while the part is on screen: a client's "what does Ugyen see?"
+   * is answered in one press, without a row of people the part never
+   * touches. Somebody without an account (the clearing agent) is reached by
+   * her link instead, so is not listed here.
+   */
+  cast: PersonaId[];
 }
 
 export const PRESENTATION_PARTS: PresentationPart[] = [
@@ -237,6 +245,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/sign-up",
     selfService: true,
     start: "platformReady",
+    cast: ["dorji"],
   },
   {
     title: "Entity onboarding",
@@ -245,6 +254,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/onboarding",
     selfService: true,
     start: "platformReady",
+    cast: ["dorji", "ugyen"],
     switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/members" }],
   },
   {
@@ -253,6 +263,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/people-who-can-act/appoint",
     start: "teamReady",
+    cast: ["dorji", "ugyen"],
   },
   {
     title: "Receiving credentials",
@@ -260,6 +271,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/wallet/get",
     start: "teamReady",
+    cast: ["dorji", "deki"],
     switchTo: [
       { label: "Deki · tax office", persona: "deki", route: "/issuer/requests" },
       { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/requests" },
@@ -271,6 +283,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/simulated/bank",
     start: "teamReady",
+    cast: ["dorji", "ugyen"],
     switchTo: [
       { label: "Ugyen · Pelden", persona: "ugyen", route: "/wallet/sharing" },
       { label: "Dorji · Pelden", persona: "dorji", route: "/wallet/sharing" },
@@ -282,6 +295,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/authority-to-act",
     start: "teamReady",
+    cast: ["dorji"],
     switchTo: [{ label: "Dorji · Pelden", persona: "dorji", route: "/authority-to-act" }],
   },
   {
@@ -290,6 +304,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: null,
     route: "/simulated/bnsw",
     start: "livedIn",
+    cast: ["dorji"],
     switchTo: [
       { label: "Dorji · Pelden", persona: "dorji", route: "/simulated/bnsw/register" },
       { label: "Pema · BNSW", route: "/simulated/bnsw" },
@@ -441,4 +456,75 @@ export function waitingToCollect(s: Pick<WaitingState, "organizations" | "author
       label: `${g.delegateName ?? g.name}: collect authority to act for ${orgName(g.orgId)}`,
       href: `/authority/claim/${g.claimRef}`,
     }));
+}
+
+/** Everyone any part of the presentation needs, for when no part is on. */
+export const PRESENTATION_CAST: PersonaId[] = [...new Set(PRESENTATION_PARTS.flatMap((p) => p.cast))];
+
+/**
+ * One chip in the Presentation panel's "Driving as" row: a person to drive
+ * as, or — for somebody invited who has not joined yet — the invitation
+ * link they would open, since there is nobody yet to drive as. With neither,
+ * the person is not invited yet and the chip is shown but not pressable.
+ */
+export interface CastChip {
+  key: string;
+  name: string;
+  title: string;
+  persona?: string;
+  href?: string;
+}
+
+/**
+ * The people for the row, in the part's order. Somebody who has not joined
+ * yet is offered by their invitation, so Ugyen is reachable the moment
+ * Dorji invites him, and as himself once he has accepted. Anyone invited
+ * or joined during the run at an address the story does not know is added,
+ * and so is whoever is being driven as now, so the row always shows them.
+ */
+export function castOnStage(
+  s: Pick<DemoState, "people" | "orgInvitations">,
+  ids: readonly PersonaId[],
+  current: string,
+  /** Who the part starts as. The early parts drive as Dorji before his
+   *  account record exists — it is the one being made — so he is drivable
+   *  regardless, and so is whoever is being driven as now. */
+  lead?: PersonaId | null,
+): CastChip[] {
+  const chips: CastChip[] = [];
+  const seen = new Set<string>();
+  const add = (c: CastChip) => {
+    if (seen.has(c.key)) return;
+    seen.add(c.key);
+    chips.push(c);
+  };
+  const hasAccount = (p: { id: string; hasAccount?: boolean }) => p.hasAccount !== false || p.id === current || p.id === lead;
+  const open = s.orgInvitations.filter((i) => i.kind === "M" && i.state === "PENDING");
+  const inviteFor = (email: string) => open.find((i) => i.email.toLowerCase() === email.toLowerCase());
+
+  for (const id of ids) {
+    const p = s.people.find((x) => x.id === id);
+    if (!p) continue;
+    if (hasAccount(p)) {
+      add({ key: p.id, name: p.name, title: p.title, persona: p.id });
+      continue;
+    }
+    const inv = inviteFor(p.email);
+    if (inv) add({ key: inv.id, name: p.name, title: "Invited — opens their invitation", href: `/invitation/${inv.id}` });
+    /* Not invited yet: shown, but not pressable, so the presenter knows
+       who is coming and why they cannot be switched to. */
+    else add({ key: p.id, name: p.name, title: "Hasn't joined yet — appears once invited" });
+  }
+  for (const inv of open) {
+    const p = s.people.find((x) => x.email.toLowerCase() === inv.email.toLowerCase());
+    if (p && (hasAccount(p) || ids.includes(p.id as PersonaId))) continue;
+    add({ key: inv.id, name: p?.name ?? inv.email, title: "Invited — opens their invitation", href: `/invitation/${inv.id}` });
+  }
+  /* Somebody the story does not know, who joined during this run. */
+  for (const p of s.people.filter((x) => x.joinedBy && hasAccount(x) && !(PERSONAS as string[]).includes(x.id))) {
+    add({ key: p.id, name: p.name, title: p.title, persona: p.id });
+  }
+  const now = s.people.find((x) => x.id === current);
+  if (now && hasAccount(now)) add({ key: now.id, name: now.name, title: now.title, persona: now.id });
+  return chips;
 }
