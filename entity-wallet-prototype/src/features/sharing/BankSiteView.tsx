@@ -177,10 +177,12 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
                   type="button"
                   onClick={start}
                   className="inline-flex h-12 items-center gap-2.5 rounded-[6px] px-5 text-[14.5px] font-semibold text-white"
-                  style={{ background: BOB_BLUE, boxShadow: "0 2px 6px rgba(26,161,219,0.35)" }}
+                  /* NDI's own button on the bank's page, in NDI's deep green — the
+                     same on every site that offers it, so it reads as NDI's. */
+                  style={{ background: "#124143", boxShadow: "0 2px 6px rgba(18,65,67,0.35)" }}
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white">
-                    <img src="/media/logos/ndi-mark-mint.png" alt="" width={16} height={16} className="h-4 w-4" />
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "#124143" }}>
+                    <img src="/media/logos/ndi-mark-mint.png" alt="" width={20} height={20} className="h-5 w-5" />
                   </span>
                   Share from NDI Entity Wallet
                 </button>
