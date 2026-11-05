@@ -639,7 +639,10 @@ Leave **Receive credentials**, tick the statement, **Appoint**.
 
 Dorji first, as the representative; Ugyen *waiting to accept*, with the date
 it lapses. **Open it as Ugyen Phuntsho** (dashed) stands in for Ugyen's
-notification.
+notification. Switched to Ugyen any other way, the **bell** at the top lists
+what is waiting for whoever is signed in, and **My authority** offers
+**Review and accept** while an appointment is waiting, so either leads to his
+Accept / Decline.
 
 **Withdraw** takes the appointment back while it is still waiting (E15,
 EW-FLOW3-SD/D19): the row says *You've withdrawn Ugyen's appointment*, with
