@@ -126,6 +126,15 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "Invitation service with expiry, revocation, single-use signed links and the acceptance-time re-checks run server-side.",
       },
       {
+        /* Built from ADR-001 before its screen spec: FLOW-ONB-01/02 and
+           UX-EW-01 haven't been updated with the set-up scan's states and
+           copy yet. Listed so nobody takes these screens as the spec. */
+        shown: "One Bhutan NDI scan at sign-up that ties the account to its citizen",
+        reality:
+          "No scan happens; \"Simulate the scan\" stands in for the phone, and only the name is kept in your browser. The screens follow ADR-001 (accepted 28 Oct): name and citizenship ID number asked for, the account confirmed at sign-up or before an invitee joins, a member without the wallet not appointable until they confirm from their profile. They were built ahead of FLOW-ONB-01, FLOW-ONB-02 and UX-EW-01, which haven't been updated with this step yet.",
+        needs: "The NDI verification organisation's proof request, a keyed hash of the CID held in a KMS under a unique constraint, and the updated flow and UX specifications.",
+      },
+      {
         /* Not simulated so much as not specified. Kind A was here too until
            FLOW-ONB-02 v0.6 specified it; Kind W still isn't. Listed so nobody
            at the showcase takes it as the spec. */

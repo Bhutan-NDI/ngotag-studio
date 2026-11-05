@@ -16,6 +16,7 @@ import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
 import { AccountSetupForm } from "@/features/account/AccountSetupForm";
+import { IdentityScan } from "@/features/account/IdentityScan";
 import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
 
 type Face =
@@ -200,12 +201,23 @@ export function ReviewInvitationView({ id }: { id: string }) {
   };
 
   const [setupError, setSetupError] = useState<string | null>(null);
+  /* The name and password are in; next the set-up scan (ADR-001), before
+     the invitee is attached to the organisation. */
+  const [scanFor, setScanFor] = useState<string | null>(null);
   const setUp = (name: string) => {
+    if (!name.trim()) {
+      setSetupError("Enter your name.");
+      return;
+    }
     setSetupError(null);
+    setScanFor(name.trim());
+  };
+  const finishSetUp = (name: string, anchor: boolean) => {
+    setScanFor(null);
     setBusy(true);
     window.setTimeout(() => {
       setBusy(false);
-      const r = setUpMember(id, name);
+      const r = setUpMember(id, name, anchor);
       if (r.ok) {
         router.push(`/invitation/${id}/accepted`);
         return;
@@ -284,7 +296,18 @@ export function ReviewInvitationView({ id }: { id: string }) {
               </AuthNotice>
             ) : null}
 
-            {face === "setup" ? (
+            {face === "setup" && scanFor ? (
+              <>
+                <p className="m-0 font-display text-[14.5px] font-semibold text-strong">Confirm it&rsquo;s you</p>
+                <IdentityScan
+                  verifiedName={scanFor}
+                  onProved={() => undefined}
+                  onContinue={() => finishSetUp(scanFor, true)}
+                  onWithout={() => finishSetUp(scanFor, false)}
+                  withoutLabel={`Join ${short} without it`}
+                />
+              </>
+            ) : face === "setup" ? (
               <AccountSetupForm
                 idPrefix="member"
                 email={inv?.email ?? "sangay.choden@peldentrading.bt"}

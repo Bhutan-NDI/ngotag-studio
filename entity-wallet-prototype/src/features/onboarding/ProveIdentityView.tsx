@@ -64,7 +64,8 @@ type Stage =
 
 export function ProveIdentityView() {
   const router = useRouter();
-  const { signup, orgOnboarding, orgInvitations, people, currentPerson, recordIdentityProof, hydrated } = useDemo();
+  const { signup, orgOnboarding, orgInvitations, people, currentPerson, recordIdentityProof, setSignupReturn, hydrated } =
+    useDemo();
 
   const screenState = useScreenState("SCR-ORG-03", [
     "live",
@@ -102,16 +103,20 @@ export function ProveIdentityView() {
       ? { id: invitee.id, name: invitee.name }
       : { id: "dorji", name: accountName || "Dorji Wangchuk" };
 
-  /* FLOW-ORG-01 E13: a different identity is refused only when the account
-     is already anchored to someone. A fresh self-service account is not —
-     step 11 anchors it to whoever the register confirms — so there is
-     nothing for another wallet to mismatch. An organisation's existing owner
-     (Kind E) and an invitee carry the identity they were confirmed with. */
+  /* FLOW-ORG-01 E13: a different identity is refused when the account is
+     anchored to someone else. Since ADR-001 a self-service account is
+     anchored at sign-up, so this step only checks it; an organisation's
+     existing owner (Kind E) and an invitee carry the identity they were
+     confirmed with. */
+  const selfService = !orgOnboarding?.existingOrgId && !invitee;
   const accountAnchored = orgOnboarding?.existingOrgId
     ? Boolean(currentPerson.cidVerified)
     : invitee
       ? Boolean(invitee.cidVerified)
-      : false;
+      : Boolean(signup?.anchoredName);
+  /* ADR-001 Decision 5: an account set up without the scan confirms who it
+     is first, rather than being anchored here. */
+  const mustConfirmFirst = selfService && Boolean(signup?.anchorSkipped) && !signup?.anchoredName;
 
   const prove = () => recordIdentityProof(answerer.name, answerer.id);
 
@@ -182,6 +187,32 @@ export function ProveIdentityView() {
               <Link href={later ? "/onboarding/verifying" : "/onboarding/details"}>
                 <GradientButton>{later ? "Check progress" : "Enter the registration"}</GradientButton>
               </Link>
+            </div>
+          </div>
+        </Panel>
+      </OnboardingShell>
+    );
+  }
+
+  if (screenState === "live" && stage === "idle" && mustConfirmFirst) {
+    return (
+      <OnboardingShell current={2}>
+        <Panel>
+          <div className="relative z-[4] flex flex-col gap-3">
+            <p className="font-display text-[15px] font-semibold text-strong">Confirm who you are first</p>
+            <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
+              Your account was set up without your NDI wallet. Before you can verify an organisation, confirm
+              who you are with one scan — then you&rsquo;ll come straight back here.
+            </p>
+            <div>
+              <GradientButton
+                onClick={() => {
+                  setSignupReturn("/onboarding/prove");
+                  router.push("/sign-up/confirm-identity");
+                }}
+              >
+                Confirm your identity
+              </GradientButton>
             </div>
           </div>
         </Panel>

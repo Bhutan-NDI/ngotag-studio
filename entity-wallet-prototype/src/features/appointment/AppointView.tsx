@@ -137,7 +137,10 @@ export function AppointView() {
       r.scope.grants.some((g) => g.operation === "approval:decide"),
   );
 
-  const [personId, setPersonId] = useState<string>(members.find((m) => !holds(m.id))?.id ?? "");
+  /* ADR-001 Decision 8: only someone whose account is tied to their citizen
+     can be chosen. Anyone else is listed, as not yet appointable. */
+  const appointable = (m: (typeof members)[number]) => Boolean(m.cidVerified) && !holds(m.id);
+  const [personId, setPersonId] = useState<string>(members.find(appointable)?.id ?? "");
   /* Who a named reach can name: organisations approved to verify. */
   const verifiers = shareTargets(organizations, activeOrgId);
   const [presets, setPresets] = useState<PresetId[]>(["receive"]);
@@ -255,7 +258,7 @@ export function AppointView() {
     );
   }
 
-  const canSubmit = Boolean(chosen) && !holds(personId) && attested && !showE13 && !showE12 && face !== "offline";
+  const canSubmit = Boolean(chosen?.cidVerified) && !holds(personId) && attested && !showE13 && !showE12 && face !== "offline";
 
   const submit = () => {
     if (!canSubmit) return;
@@ -301,7 +304,8 @@ export function AppointView() {
                       : null
                   : null;
               const held = forcedHere ?? heldBy(m.id);
-              const taken = held !== null;
+              const unconfirmed = !m.cidVerified;
+              const taken = held !== null || unconfirmed;
               const on = personId === m.id && !taken;
               return (
                 <label
@@ -335,7 +339,14 @@ export function AppointView() {
                         </Link>
                       </span>
                     ) : null}
+                    {unconfirmed && held === null ? (
+                      <span className="mt-1 text-[12.5px] leading-[1.5] text-muted">
+                        {m.name} hasn&rsquo;t confirmed their identity with the NDI wallet yet, so they can&rsquo;t be
+                        appointed. They can do it from their account, under Confirm your identity.
+                      </span>
+                    ) : null}
                   </span>
+                  {unconfirmed && held === null ? <StatusPill status="pending" label="Not yet appointable" /> : null}
                   {held === "E3" ? <StatusPill status="active" label="Can act" /> : null}
                   {held === "E14" ? <StatusPill status="pending_acceptance" label="Waiting to accept" /> : null}
                 </label>
@@ -566,7 +577,9 @@ export function AppointView() {
         ) : null}
         {refused ? (
           <p role="alert" className="m-0 text-[13px] text-body">
-            {refused === "E3"
+            {refused === "E11"
+              ? `${chosen?.name ?? "They"} hasn't confirmed their identity with the NDI wallet yet, so they can't be appointed.`
+              : refused === "E3"
               ? `${chosen?.name ?? "They"} can already act for ${short}.`
               : refused === "E14"
                 ? `${chosen?.name ?? "They"} has an appointment waiting for them to accept.`

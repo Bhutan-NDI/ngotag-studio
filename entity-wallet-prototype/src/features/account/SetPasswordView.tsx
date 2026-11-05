@@ -77,8 +77,9 @@ export function SetPasswordView() {
     setBusy(true);
     window.setTimeout(() => {
       completeSignup(name);
-      const next = signup?.returnTo ?? "/welcome";
-      router.push(next);
+      /* Then the set-up scan (ADR-001), which goes on to wherever sign-up
+         was taking them — the welcome, or an invitation. */
+      router.push("/sign-up/confirm-identity");
     }, ROUND_TRIP_MS);
   };
 

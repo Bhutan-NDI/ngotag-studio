@@ -1231,6 +1231,15 @@ export interface SignupSession {
    */
   returnTo: string | null;
   createdAt: string | null;
+  /**
+   * The verified name from the set-up scan (ADR-001): the account is
+   * anchored to that citizen from here on. Only the name is kept — the
+   * citizenship number is used for the anchor and discarded, and the
+   * anchor itself is never shown, so the session holds neither.
+   */
+  anchoredName?: string | null;
+  /** The person finished without the scan: a member, not yet appointable. */
+  anchorSkipped?: boolean;
 }
 
 /**

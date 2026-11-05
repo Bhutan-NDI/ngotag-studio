@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
@@ -82,6 +83,26 @@ export function ProfileView() {
                   Your email identifies the account and cannot be changed here.
                 </span>
               </label>
+
+              {/* ADR-001: whether the account is tied to its citizen. The
+                  root account is a role account, never tied to one person. */}
+              {currentPerson.platformRole !== "root" ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-grid px-4 py-3">
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span className={LABEL_CLASS}>Identity</span>
+                    <span className="text-[13.5px] leading-[1.5] text-body">
+                      {currentPerson.cidVerified
+                        ? "Confirmed with your NDI wallet. This account can only ever be yours."
+                        : "Not confirmed yet. You can be a member, but not verify an organisation or be appointed."}
+                    </span>
+                  </div>
+                  {currentPerson.cidVerified ? null : (
+                    <Link href="/account/confirm-identity">
+                      <HairlineButton>Confirm your identity</HairlineButton>
+                    </Link>
+                  )}
+                </div>
+              ) : null}
 
               <div className="flex flex-wrap items-center gap-2.5 border-t border-subtle pt-5">
                 <GradientButton>
