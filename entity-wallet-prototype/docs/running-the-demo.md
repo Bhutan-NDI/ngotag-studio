@@ -18,7 +18,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential,
 sharing one and giving a clearing agent authority to act — fourteen chapters,
-92 steps, starting on the platform's day zero:
+93 steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
