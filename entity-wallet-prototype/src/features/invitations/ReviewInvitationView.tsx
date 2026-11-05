@@ -201,19 +201,22 @@ export function ReviewInvitationView({ id }: { id: string }) {
   };
 
   const [setupError, setSetupError] = useState<string | null>(null);
-  /* The name and password are in; next the set-up scan (ADR-001), before
-     the invitee is attached to the organisation. */
-  const [scanFor, setScanFor] = useState<string | null>(null);
-  const setUp = (name: string) => {
-    if (!name.trim()) {
-      setSetupError("Enter your name.");
-      return;
-    }
-    setSetupError(null);
-    setScanFor(name.trim());
-  };
+  /* The set-up scan (ADR-001) comes first, so the name on the account is
+     the one the wallet returns, not one typed; without the wallet they type
+     their own and join unconfirmed. Null until the scan is done or skipped. */
+  const [identity, setIdentity] = useState<{ verified: string | null } | null>(null);
+  /* Who the wallet answers as. The prototype has no phone: someone the story
+     knows by that address, otherwise a name made from the address. */
+  const answeredAs =
+    people.find((p) => p.email.toLowerCase() === inv?.email.toLowerCase())?.name ??
+    (inv?.email ?? "")
+      .split("@")[0]
+      .split(/[._-]/)
+      .filter(Boolean)
+      .map((w) => w[0].toUpperCase() + w.slice(1))
+      .join(" ");
   const finishSetUp = (name: string, anchor: boolean) => {
-    setScanFor(null);
+    setSetupError(null);
     setBusy(true);
     window.setTimeout(() => {
       setBusy(false);
@@ -296,25 +299,26 @@ export function ReviewInvitationView({ id }: { id: string }) {
               </AuthNotice>
             ) : null}
 
-            {face === "setup" && scanFor ? (
+            {face === "setup" && !identity ? (
               <>
-                <p className="m-0 font-display text-[14.5px] font-semibold text-strong">Confirm it&rsquo;s you</p>
+                <p className="m-0 font-display text-[14.5px] font-semibold text-strong">First, confirm it&rsquo;s you</p>
                 <IdentityScan
-                  verifiedName={scanFor}
+                  verifiedName={answeredAs}
                   onProved={() => undefined}
-                  onContinue={() => finishSetUp(scanFor, true)}
-                  onWithout={() => finishSetUp(scanFor, false)}
-                  withoutLabel={`Join ${short} without it`}
+                  onContinue={() => setIdentity({ verified: answeredAs })}
+                  onWithout={() => setIdentity({ verified: null })}
+                  withoutLabel="Set up without it"
                 />
               </>
             ) : face === "setup" ? (
               <AccountSetupForm
+                verifiedName={identity?.verified ?? null}
                 idPrefix="member"
                 email={inv?.email ?? "sangay.choden@peldentrading.bt"}
                 busy={busy}
                 error={setupError}
                 onDismissError={() => setSetupError(null)}
-                onSubmit={setUp}
+                onSubmit={(name) => finishSetUp(name, Boolean(identity?.verified))}
                 submitLabel="Set up account and accept"
                 busyLabel="Setting up your account…"
                 onDecline={() => {

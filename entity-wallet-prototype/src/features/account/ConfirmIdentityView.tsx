@@ -23,9 +23,11 @@ const pinned = (s: string): IdentityScanStage | null => (s === "live" ? null : (
 /**
  * Confirm it's you — the set-up scan at sign-up (ADR-001, FLOW-ONB-01).
  *
- * It comes straight after the password, while the person is still setting
- * up, so the account is never left unanchored by accident. Without a
- * wallet they go on anyway, as a member who isn't yet appointable.
+ * It comes straight after the email is confirmed and before the password,
+ * so the name on the account is the one on the citizen ID: the password
+ * screen shows it from the proof rather than asking for it. Without a
+ * wallet they go on anyway, type their own name, and are a member who
+ * isn't yet appointable.
  *
  * AHEAD OF ITS SCREEN SPEC
  *
@@ -36,14 +38,20 @@ const pinned = (s: string): IdentityScanStage | null => (s === "live" ? null : (
  */
 export function SignUpConfirmIdentityView() {
   const router = useRouter();
-  const { signup, anchorSignup, hydrated } = useDemo();
+  const { signup, people, anchorSignup, hydrated } = useDemo();
   const forced = pinned(useScreenState("SCR-ONB-ID", STATES));
 
   /* Set when the scan on this screen succeeds, so its own confirmation is
      shown rather than the arrived-already-confirmed notice. */
   const [justProved, setJustProved] = useState(false);
-  const ready = signup?.stage === "done";
-  const next = signup?.returnTo ?? "/welcome";
+  /* Reached with the email confirmed (set_password), or later from
+     verifying an organisation, with the account made (done). */
+  const ready = signup?.stage === "set_password" || signup?.stage === "done";
+  const next = signup?.stage === "set_password" ? "/sign-up/password" : (signup?.returnTo ?? "/welcome");
+  /* Who the wallet answers as. The prototype has no phone: someone the story
+     knows by that address, otherwise Dorji, who signs up in the story. */
+  const answeredAs =
+    people.find((p) => p.email.toLowerCase() === signup?.email.toLowerCase())?.name ?? (signup?.name || "Dorji Wangchuk");
 
   return (
     <AuthShell
@@ -59,7 +67,7 @@ export function SignUpConfirmIdentityView() {
       <div className="relative z-[4] flex flex-col gap-4">
         {hydrated && !ready && !forced ? (
           <>
-            <AuthNotice>We need your account set up before you can confirm who you are.</AuthNotice>
+            <AuthNotice>We need to confirm your email address before you can confirm who you are.</AuthNotice>
             <Link href="/sign-up" className="block">
               <GradientButton block>Start again</GradientButton>
             </Link>
@@ -73,7 +81,7 @@ export function SignUpConfirmIdentityView() {
           </>
         ) : (
           <IdentityScan
-            verifiedName={signup?.name || "Dorji Wangchuk"}
+            verifiedName={answeredAs}
             forced={forced}
             onProved={(name) => {
               setJustProved(true);

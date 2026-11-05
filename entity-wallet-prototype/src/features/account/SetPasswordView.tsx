@@ -77,9 +77,7 @@ export function SetPasswordView() {
     setBusy(true);
     window.setTimeout(() => {
       completeSignup(name);
-      /* Then the set-up scan (ADR-001), which goes on to wherever sign-up
-         was taking them — the welcome, or an invitation. */
-      router.push("/sign-up/confirm-identity");
+      router.push(signup?.returnTo ?? "/welcome");
     }, ROUND_TRIP_MS);
   };
 
@@ -123,6 +121,7 @@ export function SetPasswordView() {
             error={serviceError}
             onDismissError={() => setDismissed(true)}
             forcedPasswordError={forced === "policy_error" ? "Your password needs a symbol." : null}
+            verifiedName={signup?.anchoredName ?? null}
             onSubmit={submit}
             submitLabel="Create account"
             busyLabel="Creating your account…"

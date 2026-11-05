@@ -211,7 +211,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "Pelden Trading has never been on NDI. Its director, Dorji Wangchuk, creates a personal account first — just the person; the company comes later.",
     doThis: "Type an email such as **dorji.w@peldentrading.bt** and press **Continue**.",
-    say: "The account has to belong to the person using it. Once the password is set, one scan of Dorji's NDI wallet ties it to him.",
+    say: "The account has to belong to the person using it. Once his email is confirmed, one scan of Dorji's NDI wallet ties it to him.",
     route: "/sign-up",
     match: "^/sign-up$",
   },
@@ -231,20 +231,22 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     chapter: 3,
-    title: "Name and password",
-    happening: "The password rules are shown before anyone types, not after a failure.",
+    title: "Confirm it's you",
+    happening:
+      "One scan of Dorji's Bhutan NDI Wallet ties the account to him. It asks only for his name and citizenship ID number. The platform keeps his name and a protected reference to the ID, never the number itself, so one citizen can hold only one account, and nobody can set one up in his name. On a phone, **Open Bhutan NDI Wallet** does the same without a scan.",
     doThis:
-      "Enter **Dorji Wangchuk** as the name, a password such as **Thimphu-Chorten-2026**, the same password again to confirm, then press **Create account**.",
-    route: "/sign-up/password",
+      "Press **Simulate the scan** (dashed), or **Open Bhutan NDI Wallet** on the card — both stand in for Dorji's phone. It moves on by itself.",
+    say: "Many people in Bhutan share a name. Nobody shares a citizenship ID. From here on, every time Dorji proves who he is, it's checked against this.",
+    route: "/sign-up/confirm-identity",
   },
   {
     chapter: 3,
-    title: "Confirm it's you",
+    title: "Name and password",
     happening:
-      "One scan of Dorji's Bhutan NDI Wallet ties the account to him. It asks only for his name and citizenship ID number. The platform keeps his name and a protected reference to the ID, never the number itself, so one citizen can hold only one account, and nobody can set one up in his name.",
-    doThis: "Press **Simulate the scan** (dashed — it stands in for Dorji's phone). It moves on by itself.",
-    say: "Many people in Bhutan share a name. Nobody shares a citizenship ID. From here on, every time Dorji proves who he is, it's checked against this.",
-    route: "/sign-up/confirm-identity",
+      "Dorji's name is already filled in from his wallet, exactly as it is on his citizen ID, so nobody types it. The password rules are shown before anyone types, not after a failure.",
+    doThis:
+      "Enter a password such as **Thimphu-Chorten-2026**, the same password again to confirm, then press **Create account**.",
+    route: "/sign-up/password",
   },
   {
     chapter: 3,
@@ -341,9 +343,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 5,
     title: "Ugyen sets up an account",
     happening:
-      "The invitation names who sent it, to what, and what it doesn't include. Ugyen has no account yet, so it's set up right here: the link already proves the address, so there's no separate sign-up. Then, before he joins, one scan of his Bhutan NDI Wallet ties the account to him — that's what makes him appointable later.",
+      "The invitation names who sent it, to what, and what it doesn't include. Ugyen has no account yet, so it's set up right here: the link already proves the address, so there's no separate sign-up. First, one scan of his Bhutan NDI Wallet ties the account to him — that's what makes him appointable later — and fills in his name from his citizen ID.",
     doThis:
-      "Enter **Ugyen Phuntsho**, a password such as **Thimphu-Chorten-2026**, the same password again, then press **Set up account and accept**. Then press **Simulate the scan** (dashed — it stands in for Ugyen's phone).",
+      "Press **Simulate the scan** (dashed — it stands in for Ugyen's phone). When the form appears with his name filled in, enter a password such as **Thimphu-Chorten-2026**, the same password again, then press **Set up account and accept**.",
     say: "Without the scan he could still join as a member, but nobody could appoint him to act.",
     match: "^/invitation/[^/]+$",
   },

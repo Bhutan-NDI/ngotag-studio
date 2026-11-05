@@ -26,15 +26,16 @@ import { Icon } from "./icons";
  * own QR". Recognition is a security property at this moment: a hand-off that
  * looks unfamiliar is one people either abandon or learn to approve blindly.
  *
- * THE SCAN, AND THE ONE PLACE A LINK REPLACES IT
+ * THE DEEPLINK, THE SCAN, AND THE ONE PLACE THE LINK STANDS ALONE
  *
- * The console is a web portal mostly used at a desk, so the hand-off is a
- * scan. An "open mobile wallet" link used to sit under every code and was
- * taken out: at a desk it leads nowhere. It comes back in one form only,
- * `sameDevice`, which swaps the code for the link instead of adding it —
- * SCR-ORG-03 has a same-device state, because someone verifying their
- * organisation from their phone cannot scan the phone they are holding.
- * The cloud-wallet link stays out of scope for this release.
+ * As NDI's UI specification for integration draws it, the card offers
+ * **Open Bhutan NDI Wallet** first, then "OR", then the code — a phone
+ * opens the wallet, a desk scans. (It was once dropped as leading nowhere
+ * at a desk; the spec keeps it, so it is back.) `sameDevice` goes further
+ * and shows only the link — SCR-ORG-03 has a same-device state, because
+ * someone verifying their organisation from their phone cannot scan the
+ * phone they are holding. The cloud-wallet link stays out of scope for this
+ * release.
  *
  * WHAT IT ALWAYS SAYS
  *
@@ -96,7 +97,13 @@ export function WalletHandoff({
   notSharing,
   sameDevice = false,
   onResend,
+  cardVerb = "Continue",
 }: {
+  /**
+   * The card's heading verb, as the NDI integration page words it per use:
+   * "Login with Bhutan NDI Wallet", "Confirm with …". Defaults to Continue.
+   */
+  cardVerb?: string;
   /** What the code encodes. Only has to be distinctive, not resolvable. */
   value: string;
   title: string;
@@ -142,7 +149,12 @@ export function WalletHandoff({
           {sameDevice ? (
             <OpenWalletCard closed={settled} onOpen={onSimulateScan} />
           ) : (
-            <ScanCard value={settled ? null : value} dimmed={settled} />
+            <ScanCard
+              value={settled ? null : value}
+              dimmed={settled}
+              verb={cardVerb}
+              onOpen={status === "awaiting_scan" ? onSimulateScan : undefined}
+            />
           )}
         </div>
 
@@ -315,22 +327,63 @@ function OpenWalletCard({ closed, onOpen }: { closed: boolean; onOpen?: () => vo
 }
 
 /**
- * The integration page's card. Everything on it is what the real one carries;
- * the two things a prototype cannot honestly do are said on the card itself —
- * the code does not scan, and there is no video to watch.
+ * The integration page's card, as NDI's UI specification for integration
+ * draws it: the heading, an **Open Bhutan NDI Wallet** button, "OR", then
+ * the code, the two steps, the video guide, the store badges and support.
+ * Everything on it is what the real one carries; the things a prototype
+ * cannot honestly do are said on the card itself — the code does not scan,
+ * the button cannot launch an app, and there is no video to watch.
+ *
+ * THE DEEPLINK, BACK
+ *
+ * This card once dropped the "open the wallet" link, on the grounds that at
+ * a desk it leads nowhere. The integration specification keeps it on every
+ * card, above the code: on a phone it is the only way in, and a card that
+ * differs from the one people meet on other services is the unfamiliarity
+ * this component exists to avoid. So it is back, first, as the spec has it.
+ * In the prototype it answers the request, like the simulated scan.
  */
-function ScanCard({ value, dimmed }: { value: string | null; dimmed: boolean }) {
+function ScanCard({
+  value,
+  dimmed,
+  verb,
+  onOpen,
+}: {
+  value: string | null;
+  dimmed: boolean;
+  verb: string;
+  onOpen?: () => void;
+}) {
   const [videoNote, setVideoNote] = useState(false);
 
   return (
     <section
-      aria-label="Scan with Bhutan NDI Wallet"
+      aria-label={`${verb} with Bhutan NDI Wallet`}
       className="flex flex-col items-center gap-5 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
       style={{ background: "var(--scan-card)" }}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
-        Scan with <span className="text-accent">Bhutan NDI</span> Wallet
+        {verb} with <span className="text-accent">Bhutan NDI</span> Wallet
       </p>
+
+      {/* ---- The deeplink, then OR ---- */}
+      <div className="flex w-full flex-col items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={dimmed || !onOpen}
+          className="inline-flex h-12 w-full max-w-[280px] items-center justify-center rounded-[8px] font-display text-[14px] font-semibold shadow-[0_4px_12px_rgb(0_0_0/0.18)] disabled:opacity-40"
+          style={{ background: "var(--ndi-mint)", color: "var(--text-on-mint)" }}
+        >
+          Open Bhutan NDI Wallet
+        </button>
+        <p className="text-[11.5px] leading-[1.4] text-faint">Prototype — opening it answers the request</p>
+      </div>
+      <div aria-hidden="true" className="flex w-full items-center gap-3">
+        <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
+        <span className="font-display text-[13px] font-semibold text-muted">OR</span>
+        <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
+      </div>
 
       <div className="flex flex-col items-center gap-2">
         <div
