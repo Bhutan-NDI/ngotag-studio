@@ -167,6 +167,8 @@ Two things to do in the room before you say anything:
    the state it needs — day zero, the platform with its two admins, Pelden's
    first day, or the first day with Ugyen joined — never from whatever the
    last person left. Each screen's states are folded under **For reviewers**.
+   The panel closes by itself once you pick something, click away or press
+   Esc.
 2. **Press Reset demo** if anyone has touched it before you. The demo persists
    to browser storage, so it remembers whatever the last person did. Reset —
    like a browser that has never run the demo — opens the platform's **day
