@@ -18,7 +18,7 @@ there** brings you back if you wander off, and the chevron minimises it.
 **The prototype's focus is onboarding**, and the guide walks that and then
 approval to verify or issue, designating an authority, receiving a credential,
 sharing one and giving a clearing agent authority to act — fourteen chapters,
-92 steps, starting on the platform's day zero:
+93 steps, starting on the platform's day zero:
 
 1. **Root admin onboarding** — the NDI root account signs in. It is NDI's
    own account, held by two custodians together, not a person's, and made
@@ -101,7 +101,7 @@ sharing one and giving a clearing agent authority to act — fourteen chapters,
     by itself a few seconds later. Dorji still reviews and accepts by hand;
     Deki's delivery log shows the request received and then issued.
 12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
-    Bhutan's website (dashed), Dorji presses **Share from NDI Entity Wallet**,
+    Bhutan's website (its own page, in the bank's logo and colours), Dorji presses **Share from NDI Entity Wallet**,
     checks the bank's reference on the wallet's page, signs in, and reads
     every detail of the registration under *Bank of Bhutan will receive all
     of the details below — not only the ones it asked for.* He shares and is
@@ -167,6 +167,8 @@ Two things to do in the room before you say anything:
    the state it needs — day zero, the platform with its two admins, Pelden's
    first day, or the first day with Ugyen joined — never from whatever the
    last person left. Each screen's states are folded under **For reviewers**.
+   The panel closes by itself once you pick something, click away or press
+   Esc.
 2. **Press Reset demo** if anyone has touched it before you. The demo persists
    to browser storage, so it remembers whatever the last person did. Reset —
    like a browser that has never run the demo — opens the platform's **day
@@ -639,7 +641,10 @@ Leave **Receive credentials**, tick the statement, **Appoint**.
 
 Dorji first, as the representative; Ugyen *waiting to accept*, with the date
 it lapses. **Open it as Ugyen Phuntsho** (dashed) stands in for Ugyen's
-notification.
+notification. Switched to Ugyen any other way, the **bell** at the top lists
+what is waiting for whoever is signed in, and **My authority** offers
+**Review and accept** while an appointment is waiting, so either leads to his
+Accept / Decline.
 
 **Withdraw** takes the appointment back while it is still waiting (E15,
 EW-FLOW3-SD/D19): the row says *You've withdrawn Ugyen's appointment*, with

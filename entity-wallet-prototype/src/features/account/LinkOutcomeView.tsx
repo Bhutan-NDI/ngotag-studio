@@ -116,9 +116,9 @@ export function LinkOutcomeView() {
           <AuthCardHeader title="Your email is confirmed" />
           <div className="relative z-[4] flex flex-col gap-4">
             <p role="status" className="m-0 text-center text-[14px] leading-[1.6] text-muted">
-              Now choose a password and you&rsquo;re in.
+              Next, confirm it&rsquo;s you with your Bhutan NDI Wallet, then choose a password.
             </p>
-            <GradientButton block onClick={() => router.push("/sign-up/password")}>
+            <GradientButton block onClick={() => router.push("/sign-up/confirm-identity")}>
               Continue
               <Icon name="arrowRight" size={16} strokeWidth={2} />
             </GradientButton>
@@ -158,10 +158,12 @@ export function LinkOutcomeView() {
                  common case, not an attacker — let them carry on. */
               <button
                 type="button"
-                onClick={() => router.push("/sign-up/password")}
+                onClick={() =>
+                  router.push(signup.anchoredName || signup.anchorSkipped ? "/sign-up/password" : "/sign-up/confirm-identity")
+                }
                 className="ndi-plainlink text-center text-[13px] font-medium text-accent"
               >
-                I just opened it — carry on setting my password
+                I just opened it — carry on setting up
               </button>
             ) : null}
           </div>

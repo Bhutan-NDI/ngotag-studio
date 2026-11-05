@@ -62,6 +62,7 @@ export function AccountSetupForm({
   idPrefix,
   intro,
   forcedPasswordError,
+  verifiedName,
 }: {
   /** The invited address, shown so the person can see whose account this is. */
   email: string;
@@ -84,8 +85,14 @@ export function AccountSetupForm({
   intro?: React.ReactNode | null;
   /** A password-rule miss to show at the field — the state switcher's E8. */
   forcedPasswordError?: string | null;
+  /**
+   * The name the set-up scan returned (ADR-001). When given, it fills the
+   * field and can't be changed: it is the name on the citizen ID, not one
+   * typed. Without the scan the person types their own.
+   */
+  verifiedName?: string | null;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(verifiedName ?? "");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [revealed, setRevealed] = useState(false);
@@ -105,7 +112,8 @@ export function AccountSetupForm({
     setNameError(null);
     setPasswordError(null);
     setConfirmMissing(false);
-    if (!name.trim()) {
+    const given = (verifiedName ?? name).trim();
+    if (!given) {
       setNameError("Enter your name.");
       return focus(`${idPrefix}-name`);
     }
@@ -121,7 +129,7 @@ export function AccountSetupForm({
     /* A mismatch is already said beside the field as it is typed; sending
        the form only moves focus there. */
     if (confirm !== password) return focus(`${idPrefix}-confirm-input`);
-    onSubmit(name.trim());
+    onSubmit(given);
   };
 
   return (
@@ -137,27 +145,56 @@ export function AccountSetupForm({
         </p>
       ) : intro}
 
-      <div className={FIELD_BLOCK_CLASS}>
-        <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
-          Your name
-        </label>
-        <input
-          id={`${idPrefix}-name`}
-          name="name"
-          autoComplete="name"
-          placeholder="As it appears on your citizenship ID"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setNameError(null);
-          }}
-          disabled={busy}
-          aria-invalid={nameError ? true : undefined}
-          aria-describedby={nameError ? `${idPrefix}-name-error` : undefined}
-          className={`${FIELD_CLASS} h-12`}
-        />
-        {nameError ? <FieldError id={`${idPrefix}-name-error`} message={nameError} /> : null}
-      </div>
+      {verifiedName ? (
+        /* From the proof, so it can't be edited — and has to look it at a
+           glance. A disabled field, greyed out, is the one control everyone
+           already reads as "can't change this"; the lock and the line under
+           it say why. */
+        <div className={FIELD_BLOCK_CLASS}>
+          <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
+            Your name
+          </label>
+          <div className="relative flex items-center">
+            <input
+              id={`${idPrefix}-name`}
+              name="name"
+              value={verifiedName}
+              disabled
+              readOnly
+              aria-describedby={`${idPrefix}-name-source`}
+              className="h-12 w-full cursor-not-allowed rounded-[12px] border border-transparent px-4 pr-11 font-display text-[14.5px] text-muted"
+              style={{ background: "rgb(var(--tint) / 0.09)", WebkitTextFillColor: "var(--text-muted)", opacity: 1 }}
+            />
+            <Icon name="lock" size={15} strokeWidth={2} className="pointer-events-none absolute right-4 text-faint" />
+          </div>
+          <span id={`${idPrefix}-name-source`} className="inline-flex items-center gap-1.5 text-[12.5px] leading-[1.5] text-faint">
+            <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
+            From your Bhutan NDI Wallet, as it is on your citizen ID. It can&rsquo;t be changed here.
+          </span>
+        </div>
+      ) : (
+        <div className={FIELD_BLOCK_CLASS}>
+          <label htmlFor={`${idPrefix}-name`} className={LABEL_CLASS}>
+            Your name
+          </label>
+          <input
+            id={`${idPrefix}-name`}
+            name="name"
+            autoComplete="name"
+            placeholder="As it appears on your citizenship ID"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setNameError(null);
+            }}
+            disabled={busy}
+            aria-invalid={nameError ? true : undefined}
+            aria-describedby={nameError ? `${idPrefix}-name-error` : undefined}
+            className={`${FIELD_CLASS} h-12`}
+          />
+          {nameError ? <FieldError id={`${idPrefix}-name-error`} message={nameError} /> : null}
+        </div>
+      )}
 
       <div className={FIELD_BLOCK_CLASS}>
         <label htmlFor={`${idPrefix}-password`} className={LABEL_CLASS}>

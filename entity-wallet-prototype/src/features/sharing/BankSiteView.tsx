@@ -3,14 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { AuthHeader } from "@/components/layout/AuthHeader";
-import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { attrLabel } from "./shared";
 import { useDemo } from "@/lib/demoStore";
 import { sessionStatusOf } from "@/lib/sharing";
 
 /**
- * Bank of Bhutan's website — simulated, and drawn as a dashed stand-in.
+ * Bank of Bhutan's website — simulated, and drawn as the bank's own site.
  *
  * WHY IT EXISTS
  *
@@ -23,6 +21,16 @@ import { sessionStatusOf } from "@/lib/sharing";
  * which the wallet will show as the bank's reference — and a session
  * created when the button is pressed, not when the page loads.
  *
+ * WHY IT LOOKS NOTHING LIKE THE WALLET
+ *
+ * It used to be a dashed panel inside the Entity Wallet's own chrome, and
+ * in front of an audience that read as one more wallet screen. The point
+ * of the flow is the hand-off between two organisations' systems, so the
+ * bank's page now looks like the bank's: its logo, white and its blue,
+ * its own type, and none of the wallet's dark glass. It ignores the
+ * wallet's theme for the same reason. The strip across the top still says
+ * it is a stand-in, so nobody takes it for the bank's real site.
+ *
  * THE RETURN PAGE ACTS ON WHAT ITS BACK END FETCHED
  *
  * The address it comes back to carries `status`, which anyone can type.
@@ -32,9 +40,16 @@ import { sessionStatusOf } from "@/lib/sharing";
  * your organisation to finish sharing", never "we have it", for PENDING
  * (UC-35).
  *
- * Everything inside the dashed frame is the bank's, not NDI's; the
- * what's-real page lists it.
+ * Everything below the strip is the bank's, not NDI's; the what's-real
+ * page lists it.
  */
+const BOB_BLUE = "#1aa1db";
+const INK = "#16191d";
+const MUTED = "#5b6670";
+const LINE = "#dfe6ec";
+
+const STEPS = ["Business type", "Company details", "Signatories", "Review"];
+
 export function BankSiteView({ mode, session: returnedSession, state: returnedState, status: returnedStatus }: {
   mode: "start" | "return";
   session?: string | null;
@@ -73,79 +88,172 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
     EXPIRED: "That didn't complete. You can try again.",
     FAILED: "That didn't complete. You can try again.",
   };
+  const tone = fetched === "SHARED" ? "#e7f6ee" : fetched === "PENDING" ? "#fff6e0" : "#f1f4f7";
+  const toneLine = fetched === "SHARED" ? "#9fd8b7" : fetched === "PENDING" ? "#f0d18a" : LINE;
 
   const shared = fetched === "SHARED" && request?.chosen
     ? Object.values(request.chosen).map((id) => heldCredentials.find((c) => c.id === id)).filter((c): c is NonNullable<typeof c> => Boolean(c))
     : [];
 
+  /* Step 2 while filling in; on return the details step is done. */
+  const current = mode === "start" || fetched !== "SHARED" ? 1 : 2;
+
   return (
-    <div className="flex min-h-dvh flex-col">
-      <AuthHeader />
-      <main className="mx-auto flex w-full max-w-[860px] flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6">
-        <SimulatedStep
-          standsFor="Bank of Bhutan's website — another organisation's system"
-          action={
-            mode === "start" ? (
-              <SimulatedAction onClick={start}>Share from NDI Entity Wallet</SimulatedAction>
-            ) : (
-              <SimulatedAction onClick={() => router.push("/simulated/bank")}>Start a new application</SimulatedAction>
-            )
-          }
-        >
-          <div className="flex flex-col gap-3 text-body">
-            <p className="m-0 font-display text-[16px] font-semibold text-strong">Bank of Bhutan · Open a business current account</p>
-            {mode === "start" ? (
-              <>
-                <p className="m-0 text-[13.5px] leading-[1.6]">
-                  Step 2 of 4 — your company&rsquo;s details. Application number{" "}
-                  <span className="font-mono font-semibold text-strong">{reference}</span>.
+    <div
+      className="flex min-h-dvh flex-col"
+      style={{ background: "#f3f7fa", color: INK, fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif', colorScheme: "light" }}
+    >
+      {/* ---- The disclosure: this is a stand-in ---- */}
+      <div
+        className="flex items-center justify-center gap-2 border-b border-dashed px-4 py-1.5 text-center font-mono text-[10.5px] uppercase tracking-[0.12em]"
+        style={{ background: "#fff8e6", borderColor: "#e6c470", color: "#7a5a12" }}
+      >
+        <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "#e0a100" }} />
+        Prototype · stands in for Bank of Bhutan&rsquo;s website — another organisation&rsquo;s system
+      </div>
+
+      {/* ---- The bank's header ---- */}
+      <header className="border-b bg-white" style={{ borderColor: LINE }}>
+        <div className="mx-auto flex w-full max-w-[1040px] items-center justify-between gap-4 px-4 py-3 min-[641px]:px-6">
+          <img src="/media/logos/bank-of-bhutan.png" alt="Bank of Bhutan" className="h-[52px] w-auto" />
+          <nav aria-label="Bank of Bhutan" className="hidden items-center gap-6 text-[13.5px] min-[641px]:flex" style={{ color: MUTED }}>
+            <span>Personal</span>
+            <span style={{ color: INK, fontWeight: 600 }}>Business</span>
+            <span>About us</span>
+            <span className="rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold" style={{ borderColor: BOB_BLUE, color: BOB_BLUE }}>
+              Internet banking
+            </span>
+          </nav>
+        </div>
+      </header>
+
+      {/* ---- The application's band ---- */}
+      <section style={{ background: BOB_BLUE, color: "#fff" }}>
+        <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 px-4 py-7 min-[641px]:px-6">
+          <div className="flex flex-col gap-1">
+            <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.14em] opacity-85">Business banking</p>
+            <h1 className="m-0 text-[26px] font-bold leading-[1.2]">Open a business current account</h1>
+          </div>
+          <ol className="m-0 flex list-none flex-wrap gap-x-5 gap-y-2 p-0 text-[13px]">
+            {STEPS.map((label, i) => (
+              <li key={label} className="flex items-center gap-2" style={{ opacity: i <= current ? 1 : 0.7 }}>
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold"
+                  style={
+                    i < current
+                      ? { background: "#fff", color: BOB_BLUE }
+                      : i === current
+                        ? { background: INK, color: "#fff" }
+                        : { border: "1.5px solid rgba(255,255,255,0.8)", color: "#fff" }
+                  }
+                >
+                  {i < current ? "✓" : i + 1}
+                </span>
+                <span style={{ fontWeight: i === current ? 700 : 400 }}>{label}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* ---- The page ---- */}
+      <main className="mx-auto flex w-full max-w-[1040px] flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6">
+        <div className="flex max-w-[640px] flex-col gap-4 rounded-[8px] border bg-white p-6" style={{ borderColor: LINE, boxShadow: "0 1px 3px rgba(16,24,40,0.06)" }}>
+          {mode === "start" ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <h2 className="m-0 text-[19px] font-bold">Your company&rsquo;s details</h2>
+                <p className="m-0 text-[13.5px]" style={{ color: MUTED }}>
+                  Application number <span className="font-mono font-semibold" style={{ color: INK }}>{reference}</span>
                 </p>
-                <p className="m-0 text-[13.5px] leading-[1.6]">
-                  Share your company&rsquo;s registration from its NDI Entity Wallet instead of uploading certified copies.
-                  You&rsquo;ll leave our site to sign in with Bhutan NDI, and come back here. The wallet will show this application
-                  number — check it matches.
-                </p>
-              </>
-            ) : !hydrated ? null : !session || !matches ? (
-              <p className="m-0 text-[13.5px] leading-[1.6]">
+              </div>
+              <p className="m-0 text-[14px] leading-[1.6]">
+                Share your company&rsquo;s registration from its NDI Entity Wallet instead of uploading certified copies.
+                You&rsquo;ll leave our site to sign in with Bhutan NDI, and come back here. The wallet will show this application
+                number — check it matches.
+              </p>
+              <div>
+                <button
+                  type="button"
+                  onClick={start}
+                  className="inline-flex h-12 items-center gap-2.5 rounded-[6px] px-5 text-[14.5px] font-semibold text-white"
+                  /* NDI's own button on the bank's page, in NDI's deep green — the
+                     same on every site that offers it, so it reads as NDI's. */
+                  style={{ background: "#124143", boxShadow: "0 2px 6px rgba(18,65,67,0.35)" }}
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full" style={{ background: "#124143" }}>
+                    <img src="/media/logos/ndi-mark-mint.png" alt="" width={20} height={20} className="h-5 w-5" />
+                  </span>
+                  Share from NDI Entity Wallet
+                </button>
+              </div>
+              <p className="m-0 border-t pt-3 text-[12.5px]" style={{ borderColor: LINE, color: MUTED }}>
+                Prefer paper? Bring certified copies of your company&rsquo;s registration to any branch.
+              </p>
+            </>
+          ) : !hydrated ? null : !session || !matches ? (
+            <>
+              <h2 className="m-0 text-[19px] font-bold">We couldn&rsquo;t use this</h2>
+              <p className="m-0 text-[14px] leading-[1.6]">
                 We couldn&rsquo;t match this to your application, so we haven&rsquo;t used it. Please start again from your
                 application.
               </p>
-            ) : (
-              <>
-                <p className="m-0 text-[13.5px] leading-[1.6]">
-                  Application <span className="font-mono font-semibold text-strong">{session.displayReference}</span>.
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1">
+                <h2 className="m-0 text-[19px] font-bold">Your company&rsquo;s details</h2>
+                <p className="m-0 text-[13.5px]" style={{ color: MUTED }}>
+                  Application number <span className="font-mono font-semibold" style={{ color: INK }}>{session.displayReference}</span>
                 </p>
-                <p role="status" className="m-0 text-[14px] font-medium leading-[1.6] text-strong">
-                  {message[fetched ?? "FAILED"]}
-                </p>
-                {shared.length ? (
-                  <dl className="m-0 flex flex-col gap-1 text-[13px]">
-                    {shared.flatMap((c) =>
-                      c.attributes
-                        .filter((a) => ["registered_name", "registration_number", "status"].includes(a.name))
-                        .map((a) => (
-                          <div key={`${c.id}-${a.name}`} className="flex flex-wrap gap-2">
-                            <dt className="text-faint">{attrLabel(a.name)}</dt>
-                            <dd className="m-0">{a.value}</dd>
-                          </div>
-                        )),
-                    )}
-                    <div className="flex flex-wrap gap-2">
-                      <dt className="text-faint">Checked</dt>
-                      <dd className="m-0">Signature, holder and issuer on NDI&rsquo;s list — all passed</dd>
-                    </div>
-                  </dl>
-                ) : null}
-                <p className="m-0 text-[12px] text-faint">
-                  The address said <span className="font-mono">status={returnedStatus ?? "—"}</span>; the bank acts only on what its own
-                  system fetched: <span className="font-mono">{fetched}</span>.
-                </p>
-              </>
-            )}
-          </div>
-        </SimulatedStep>
+              </div>
+              <p role="status" className="m-0 rounded-[6px] border px-4 py-3 text-[14.5px] font-semibold leading-[1.55]" style={{ background: tone, borderColor: toneLine }}>
+                {message[fetched ?? "FAILED"]}
+              </p>
+              {shared.length ? (
+                <dl className="m-0 flex flex-col gap-1.5 text-[13.5px]">
+                  {shared.flatMap((c) =>
+                    c.attributes
+                      .filter((a) => ["registered_name", "registration_number", "status"].includes(a.name))
+                      .map((a) => (
+                        <div key={`${c.id}-${a.name}`} className="flex flex-wrap gap-2">
+                          <dt className="min-w-[150px]" style={{ color: MUTED }}>{attrLabel(a.name)}</dt>
+                          <dd className="m-0 font-semibold">{a.value}</dd>
+                        </div>
+                      )),
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <dt className="min-w-[150px]" style={{ color: MUTED }}>Checked</dt>
+                    <dd className="m-0">Signature, holder and issuer on NDI&rsquo;s list — all passed</dd>
+                  </div>
+                </dl>
+              ) : null}
+              <p className="m-0 text-[12px]" style={{ color: MUTED }}>
+                The address said <span className="font-mono">status={returnedStatus ?? "—"}</span>; the bank acts only on what its own
+                system fetched: <span className="font-mono">{fetched}</span>.
+              </p>
+            </>
+          )}
+          {mode === "return" ? (
+            <div>
+              <button
+                type="button"
+                onClick={() => router.push("/simulated/bank")}
+                className="inline-flex h-11 items-center rounded-[6px] border-2 px-4 text-[14px] font-semibold"
+                style={{ borderColor: BOB_BLUE, color: BOB_BLUE, background: "#fff" }}
+              >
+                Start a new application
+              </button>
+            </div>
+          ) : null}
+        </div>
       </main>
+
+      <footer className="border-t bg-white" style={{ borderColor: LINE }}>
+        <p className="mx-auto m-0 w-full max-w-[1040px] px-4 py-4 text-[12px] min-[641px]:px-6" style={{ color: MUTED }}>
+          Bank of Bhutan · A DHI company — simulated for the NDI Entity Wallet prototype. No application is made.
+        </p>
+      </footer>
     </div>
   );
 }

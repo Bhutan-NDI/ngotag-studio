@@ -77,8 +77,7 @@ export function SetPasswordView() {
     setBusy(true);
     window.setTimeout(() => {
       completeSignup(name);
-      const next = signup?.returnTo ?? "/welcome";
-      router.push(next);
+      router.push(signup?.returnTo ?? "/welcome");
     }, ROUND_TRIP_MS);
   };
 
@@ -92,7 +91,10 @@ export function SetPasswordView() {
       }
       lead="A passphrase you won't reuse is stronger than a short password full of symbols — and this one will one day guard what your organisation holds."
     >
-      <AuthCardHeader title="Set your password" subtitle="Your name and a password" />
+      <AuthCardHeader
+        title="Set your password"
+        subtitle={signup?.anchoredName ? "Your name came from your NDI wallet" : "Your name and a password"}
+      />
 
       {noVerification && !loading ? (
         /* Arriving here without a confirmed address — a bookmark, a back
@@ -122,6 +124,7 @@ export function SetPasswordView() {
             error={serviceError}
             onDismissError={() => setDismissed(true)}
             forcedPasswordError={forced === "policy_error" ? "Your password needs a symbol." : null}
+            verifiedName={signup?.anchoredName ?? null}
             onSubmit={submit}
             submitLabel="Create account"
             busyLabel="Creating your account…"

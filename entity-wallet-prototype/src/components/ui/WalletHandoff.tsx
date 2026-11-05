@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 
 import { QrPlaceholder } from "./QrPlaceholder";
 import { Icon } from "./icons";
@@ -26,15 +26,16 @@ import { Icon } from "./icons";
  * own QR". Recognition is a security property at this moment: a hand-off that
  * looks unfamiliar is one people either abandon or learn to approve blindly.
  *
- * THE SCAN, AND THE ONE PLACE A LINK REPLACES IT
+ * THE DEEPLINK, THE SCAN, AND THE ONE PLACE THE LINK STANDS ALONE
  *
- * The console is a web portal mostly used at a desk, so the hand-off is a
- * scan. An "open mobile wallet" link used to sit under every code and was
- * taken out: at a desk it leads nowhere. It comes back in one form only,
- * `sameDevice`, which swaps the code for the link instead of adding it —
- * SCR-ORG-03 has a same-device state, because someone verifying their
- * organisation from their phone cannot scan the phone they are holding.
- * The cloud-wallet link stays out of scope for this release.
+ * As NDI's UI specification for integration draws it, the card offers
+ * **Open Bhutan NDI Wallet** first, then "OR", then the code — a phone
+ * opens the wallet, a desk scans. (It was once dropped as leading nowhere
+ * at a desk; the spec keeps it, so it is back.) `sameDevice` goes further
+ * and shows only the link — SCR-ORG-03 has a same-device state, because
+ * someone verifying their organisation from their phone cannot scan the
+ * phone they are holding. The cloud-wallet link stays out of scope for this
+ * release.
  *
  * WHAT IT ALWAYS SAYS
  *
@@ -96,7 +97,15 @@ export function WalletHandoff({
   notSharing,
   sameDevice = false,
   onResend,
+  cardVerb = "Continue",
 }: {
+  /**
+   * The card's heading verb on a phone, as the NDI integration page words
+   * it per use: "Sign up with Bhutan NDI Wallet" while setting up an
+   * account, "Login with …" for a login. On a wider screen the card always
+   * reads "Scan with Bhutan NDI Wallet". Defaults to Continue.
+   */
+  cardVerb?: string;
   /** What the code encodes. Only has to be distinctive, not resolvable. */
   value: string;
   title: string;
@@ -132,152 +141,162 @@ export function WalletHandoff({
   const settled = status === "confirmed" || status === "expired" || status === "failed";
   const bad = status === "expired" || status === "failed";
 
+  /* The layout. Side by side when there is room: the card on the left, the
+     explanation on the right in its own order. Stacked — a sign-up card, a
+     phone — the card comes straight after the one-line purpose, with the
+     status and the simulated scan under it, and what is shared below: the
+     code was below the fold, and the wallet itself shows what is asked for
+     before anyone approves. On the wide layout each item says where it goes
+     (`col-start-2`, `order`), so one list of blocks serves both. */
+  const side = "@min-[720px]:col-start-2";
   return (
     <div className="@container relative z-[4]">
-      <div className="grid gap-6 @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:items-start">
-        {/* Side by side when there is room. Stacked, what will be shared
-            comes first: the page says what the scan is for before the code
-            asks anyone to scan it. */}
-        <div className="order-2 @min-[720px]:order-1">
+      <div className="flex flex-col gap-4 @min-[720px]:grid @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[720px]:items-start @min-[720px]:gap-x-6 @min-[720px]:gap-y-4">
+        {/* ---- Who is asking, and why ---- */}
+        <div className={`flex flex-col gap-1 ${side} @min-[720px]:order-1`}>
+          <h3 className="font-display text-[15px] font-semibold leading-[1.3] text-strong">{title}</h3>
+          <p className="max-w-[52ch] text-[13px] leading-[1.6] text-muted">{purpose}</p>
+        </div>
+
+        {/* ---- The card ---- */}
+        <div className="@min-[720px]:col-start-1 @min-[720px]:row-span-5 @min-[720px]:row-start-1">
           {sameDevice ? (
             <OpenWalletCard closed={settled} onOpen={onSimulateScan} />
           ) : (
-            <ScanCard value={settled ? null : value} dimmed={settled} />
+            <ScanCard
+              value={settled ? null : value}
+              dimmed={settled}
+              verb={cardVerb}
+              onOpen={status === "awaiting_scan" ? onSimulateScan : undefined}
+            />
           )}
         </div>
 
-        {/* ---- What is happening, and what it costs you ---- */}
-        <div className="order-1 flex min-w-0 flex-col gap-4 @min-[720px]:order-2">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-display text-[15px] font-semibold leading-[1.3] text-strong">{title}</h3>
-            <p className="max-w-[52ch] text-[13px] leading-[1.6] text-muted">{purpose}</p>
-          </div>
-
-          <div className="rounded-[12px] border border-grid px-3.5 py-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">What you will share</p>
-            <ul className="mt-2 flex flex-col gap-1.5">
-              {sharing.map((item) => (
-                <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-body">
-                  <Icon name="arrowRight" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-            {notSharing?.length ? (
-              <>
-                <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Not shared</p>
-                <ul className="mt-2 flex flex-col gap-1.5">
-                  {notSharing.map((item) => (
-                    <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-muted">
-                      <Icon name="close" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : null}
-            <p className="mt-2.5 text-[12px] leading-[1.5] text-faint">
-              Your wallet proves who you are. It never receives the organisation&rsquo;s keys or
-              credentials.
-            </p>
-          </div>
-
-          {/* ---- Live status ---- */}
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-start gap-2.5 rounded-[12px] border px-3.5 py-3"
-            style={{
-              borderColor: bad ? "color-mix(in srgb, var(--ndi-danger) 35%, transparent)" : "var(--border-grid)",
-              background: bad
-                ? "color-mix(in srgb, var(--ndi-danger) 7%, transparent)"
-                : status === "confirmed"
-                  ? "var(--ndi-mint-08)"
-                  : "rgb(var(--tint) / 0.04)",
-            }}
-          >
-            {status === "verifying" || status === "waiting" ? (
-              <Icon name="refresh" size={15} strokeWidth={2} className="mt-px flex-none animate-spin text-accent" />
-            ) : (
-              <Icon
-                name={status === "confirmed" ? "check" : bad ? "close" : "info"}
-                size={15}
-                strokeWidth={2.2}
-                className="mt-px flex-none"
-                style={{
-                  color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-faint)",
-                }}
-              />
-            )}
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <p
-                className="font-display text-[13px] font-medium leading-[1.4]"
-                style={{
-                  color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-body)",
-                }}
-              >
-                {copy.label}
-              </p>
-              <p className="text-[12.5px] leading-[1.5] text-muted">{statusDetail ?? copy.detail}</p>
-            </div>
-          </div>
-
-          {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
-            <div
-              className="flex flex-col gap-2.5 rounded-[12px] border border-dashed px-3.5 py-3"
-              style={{ borderColor: "var(--border-strong)", background: "rgb(var(--tint) / 0.03)" }}
+        {/* ---- Live status ---- */}
+        <div
+          role="status"
+          aria-live="polite"
+          className={`flex items-start gap-2.5 rounded-[12px] border px-3.5 py-3 ${side} @min-[720px]:order-3`}
+          style={{
+            borderColor: bad ? "color-mix(in srgb, var(--ndi-danger) 35%, transparent)" : "var(--border-grid)",
+            background: bad
+              ? "color-mix(in srgb, var(--ndi-danger) 7%, transparent)"
+              : status === "confirmed"
+                ? "var(--ndi-mint-08)"
+                : "rgb(var(--tint) / 0.04)",
+          }}
+        >
+          {status === "verifying" || status === "waiting" ? (
+            <Icon name="refresh" size={15} strokeWidth={2} className="mt-px flex-none animate-spin text-accent" />
+          ) : (
+            <Icon
+              name={status === "confirmed" ? "check" : bad ? "close" : "info"}
+              size={15}
+              strokeWidth={2.2}
+              className="mt-px flex-none"
+              style={{
+                color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-faint)",
+              }}
+            />
+          )}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <p
+              className="font-display text-[13px] font-medium leading-[1.4]"
+              style={{
+                color: bad ? "var(--ndi-danger)" : status === "confirmed" ? "var(--accent)" : "var(--text-body)",
+              }}
             >
-              <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
-                <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
-                Prototype · stands in for {sameDevice ? "answering in the wallet app" : "scanning with your phone"}
-              </p>
-              <div>
-                <button
-                  type="button"
-                  onClick={onSimulateScan}
-                  className="ndi-hairline-btn inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 font-display text-[13px] font-medium"
-                >
-                  <Icon name="scan" size={14} strokeWidth={2} />
-                  {sameDevice ? "Simulate answering" : "Simulate the scan"}
-                </button>
-              </div>
-            </div>
-          ) : null}
+              {copy.label}
+            </p>
+            <p className="text-[12.5px] leading-[1.5] text-muted">{statusDetail ?? copy.detail}</p>
+          </div>
+        </div>
 
-          {/* ---- Ways out ---- */}
-          {(onRetry && bad) || (onCancel && !settled) || (onSkip && !settled) || (onResend && !settled) ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              {onRetry && bad ? (
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="ndi-hairline-btn inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-grid px-3.5 font-display text-[12.5px] font-medium"
-                >
-                  <Icon name="refresh" size={13} strokeWidth={2} />
-                  Try again
-                </button>
-              ) : null}
-              {onResend && !settled ? (
-                <button type="button" onClick={onResend} className="ndi-plainlink text-[12.5px] font-medium text-muted">
-                  Send again
-                </button>
-              ) : null}
-              {onCancel && !settled ? (
-                <button type="button" onClick={onCancel} className="ndi-plainlink text-[12.5px] font-medium text-muted">
-                  Cancel
-                </button>
-              ) : null}
-              {onSkip && !settled ? (
-                <button type="button" onClick={onSkip} className="ndi-plainlink ml-auto text-[12.5px] font-medium text-faint">
-                  Skip the wait
-                </button>
-              ) : null}
+        {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
+          <div
+            className={`flex flex-col gap-2.5 rounded-[12px] border border-dashed px-3.5 py-3 ${side} @min-[720px]:order-4`}
+            style={{ borderColor: "var(--border-strong)", background: "rgb(var(--tint) / 0.03)" }}
+          >
+            <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+              <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
+              Prototype · stands in for {sameDevice ? "answering in the wallet app" : "scanning with your phone"}
+            </p>
+            <div>
+              <button
+                type="button"
+                onClick={onSimulateScan}
+                className="ndi-hairline-btn inline-flex h-10 items-center gap-2 rounded-[10px] px-3.5 font-display text-[13px] font-medium"
+              >
+                <Icon name="scan" size={14} strokeWidth={2} />
+                {sameDevice ? "Simulate answering" : "Simulate the scan"}
+              </button>
             </div>
+          </div>
+        ) : null}
+
+        {/* ---- Ways out ---- */}
+        {(onRetry && bad) || (onCancel && !settled) || (onSkip && !settled) || (onResend && !settled) ? (
+          <div className={`flex flex-wrap items-center gap-2.5 ${side} @min-[720px]:order-5`}>
+            {onRetry && bad ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="ndi-hairline-btn inline-flex h-10 items-center gap-1.5 rounded-[10px] border border-grid px-3.5 font-display text-[12.5px] font-medium"
+              >
+                <Icon name="refresh" size={13} strokeWidth={2} />
+                Try again
+              </button>
+            ) : null}
+            {onResend && !settled ? (
+              <button type="button" onClick={onResend} className="ndi-plainlink text-[12.5px] font-medium text-muted">
+                Send again
+              </button>
+            ) : null}
+            {onCancel && !settled ? (
+              <button type="button" onClick={onCancel} className="ndi-plainlink text-[12.5px] font-medium text-muted">
+                Cancel
+              </button>
+            ) : null}
+            {onSkip && !settled ? (
+              <button type="button" onClick={onSkip} className="ndi-plainlink ml-auto text-[12.5px] font-medium text-faint">
+                Skip the wait
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* ---- What it costs you ---- */}
+        <div className={`rounded-[12px] border border-grid px-3.5 py-3 ${side} @min-[720px]:order-2`}>
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted">What you will share</p>
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {sharing.map((item) => (
+              <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-body">
+                <Icon name="arrowRight" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          {notSharing?.length ? (
+            <>
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Not shared</p>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {notSharing.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-[13px] leading-[1.5] text-muted">
+                    <Icon name="close" size={13} strokeWidth={2} className="mt-[4px] flex-none text-faint" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : null}
+          <p className="mt-2.5 text-[12px] leading-[1.5] text-faint">
+            Your wallet proves who you are. It never receives the organisation&rsquo;s keys or
+            credentials.
+          </p>
         </div>
       </div>
     </div>
-  );
+  );
 }
 
 /**
@@ -286,12 +305,24 @@ export function WalletHandoff({
  * the app cannot be launched from a prototype — so it goes through the same
  * simulate handler and says so.
  */
+/**
+ * The NDI cards are drawn in NDI mint (#5AC994) in both themes, as the NDI
+ * integration specification draws them: the heading's "Bhutan NDI", the
+ * links, icons, borders and buttons. The light theme's deeper reading green,
+ * and any site palette around the card (BNSW), stop at its edge.
+ */
+const NDI_CARD = {
+  background: "var(--scan-card)",
+  "--ndi-mint": "#5ac994",
+  "--accent": "#5ac994",
+} as CSSProperties;
+
 function OpenWalletCard({ closed, onOpen }: { closed: boolean; onOpen?: () => void }) {
   return (
     <section
       aria-label="Open Bhutan NDI Wallet"
       className="flex flex-col items-center gap-4 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
-      style={{ background: "var(--scan-card)" }}
+      style={NDI_CARD}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
         Open <span className="text-accent">Bhutan NDI</span> Wallet
@@ -315,22 +346,70 @@ function OpenWalletCard({ closed, onOpen }: { closed: boolean; onOpen?: () => vo
 }
 
 /**
- * The integration page's card. Everything on it is what the real one carries;
- * the two things a prototype cannot honestly do are said on the card itself —
- * the code does not scan, and there is no video to watch.
+ * The integration page's card, as NDI's UI specification for integration
+ * draws it: the heading, an **Open Bhutan NDI Wallet** button, "OR", then
+ * the code, the two steps, the video guide, the store badges and support.
+ *
+ * PHONE AND WEB DIFFER
+ *
+ * On a phone the card leads with the deeplink and names the action — "Sign
+ * up with", "Login with". On the web there is a phone in the person's hand
+ * and a code on the screen, so the card is "Scan with Bhutan NDI Wallet"
+ * everywhere and the deeplink and its "OR" are left out. The break is the
+ * console's own phone width (641px).
+ * Everything on it is what the real one carries; the things a prototype
+ * cannot honestly do are said on the card itself — the code does not scan,
+ * the button cannot launch an app, and there is no video to watch.
+ *
+ * THE DEEPLINK, BACK
+ *
+ * On a phone the deeplink is the only way in, and the integration
+ * specification puts it first, above the code. In the prototype it answers
+ * the request, like the simulated scan.
  */
-function ScanCard({ value, dimmed }: { value: string | null; dimmed: boolean }) {
+function ScanCard({
+  value,
+  dimmed,
+  verb,
+  onOpen,
+}: {
+  value: string | null;
+  dimmed: boolean;
+  verb: string;
+  onOpen?: () => void;
+}) {
   const [videoNote, setVideoNote] = useState(false);
 
   return (
     <section
-      aria-label="Scan with Bhutan NDI Wallet"
+      aria-label="Bhutan NDI Wallet"
       className="flex flex-col items-center gap-5 rounded-[28px] px-5 py-7 text-center @min-[720px]:px-6"
-      style={{ background: "var(--scan-card)" }}
+      style={NDI_CARD}
     >
       <p className="font-display text-[16.5px] font-semibold text-strong">
-        Scan with <span className="text-accent">Bhutan NDI</span> Wallet
+        <span className="min-[641px]:hidden">{verb}</span>
+        <span className="hidden min-[641px]:inline">Scan</span> with <span className="text-accent">Bhutan NDI</span> Wallet
       </p>
+
+      {/* ---- The deeplink, then OR: phones only ---- */}
+      <div className="flex w-full flex-col items-center gap-1.5 min-[641px]:hidden">
+        <button
+          type="button"
+          onClick={onOpen}
+          disabled={dimmed || !onOpen}
+          className="inline-flex h-12 w-full max-w-[280px] items-center justify-center rounded-[8px] font-display text-[14px] font-semibold shadow-[0_4px_12px_rgb(0_0_0/0.18)] disabled:opacity-40"
+          /* White on mint, as the integration specification draws it. */
+          style={{ background: "var(--ndi-mint)", color: "#ffffff" }}
+        >
+          Open Bhutan NDI Wallet
+        </button>
+        <p className="text-[11.5px] leading-[1.4] text-faint">Prototype — opening it answers the request</p>
+      </div>
+      <div aria-hidden="true" className="flex w-full items-center gap-3 min-[641px]:hidden">
+        <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
+        <span className="font-display text-[13px] font-semibold text-muted">OR</span>
+        <span className="h-px flex-1" style={{ background: "var(--border-strong)" }} />
+      </div>
 
       <div className="flex flex-col items-center gap-2">
         <div

@@ -1,9 +1,8 @@
 "use client";
 
-import { Icon } from "@/components/ui/icons";
-
 import { AccountMenu } from "./AccountMenu";
 import { Lockup } from "./Lockup";
+import { NotificationBell } from "./NotificationBell";
 import { OrgSwitcher } from "./OrgSwitcher";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -64,14 +63,7 @@ export function TopBar({ onToggleNav, navOpen }: TopBarProps) {
         <div className="ml-auto flex items-center gap-2">
           <OrgSwitcher />
 
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="ndi-navrow inline-flex h-10 w-10 items-center justify-center rounded-[10px]"
-            data-active="0"
-          >
-            <Icon name="bell" size={17} strokeWidth={1.7} />
-          </button>
+          <NotificationBell />
 
           <ThemeToggle />
 
