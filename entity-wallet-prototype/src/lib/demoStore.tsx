@@ -237,8 +237,11 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       as FLOW-AUT-01 E15 does ("<Name> didn't collect their authority by
  *       <date>. Nothing was given."), as one the demo lapses does. A
  *       version-29 save keeps the old sentence on that row.
+ *  31 — The TPN offering's tax office and tax types are fixed lists the
+ *       officer chooses from (OfferField.options). A version-30 save holds
+ *       the offering without them, so the officer would still type.
  */
-const SEED_VERSION = 30;
+const SEED_VERSION = 31;
 
 /**
  * Appends one audit row, carrying the hash chain forward.

@@ -298,15 +298,46 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
                 return (
                   <label key={f.name} className={FIELD_BLOCK_CLASS}>
                     <span className={LABEL_CLASS}>{f.label}</span>
-                    <input
-                      className={FIELD_CLASS}
-                      value={values[f.name] ?? ""}
-                      placeholder={`For example, ${f.example}`}
-                      aria-invalid={err ? true : undefined}
-                      aria-describedby={err ? `err-${f.name}` : undefined}
-                      onChange={(e) => setEdits((v) => ({ ...v, [f.name]: e.target.value }))}
-                      disabled={face === "loading"}
-                    />
+                    {f.options ? (
+                      /* A known set: chosen, not typed, so it can't be misspelt
+                         into something a verifier won't recognise. */
+                      <span className="relative block">
+                        <select
+                          className={`${FIELD_CLASS} cursor-pointer appearance-none pr-10`}
+                          value={values[f.name] ?? ""}
+                          aria-invalid={err ? true : undefined}
+                          aria-describedby={err ? `err-${f.name}` : undefined}
+                          onChange={(e) => setEdits((v) => ({ ...v, [f.name]: e.target.value }))}
+                          disabled={face === "loading"}
+                          style={{ color: values[f.name] ? undefined : "var(--text-faint)" }}
+                        >
+                          <option value="" disabled style={OPTION_STYLE}>
+                            Choose {f.label.toLowerCase()}
+                          </option>
+                          {f.options.map((o) => (
+                            <option key={o} value={o} style={OPTION_STYLE}>
+                              {o}
+                            </option>
+                          ))}
+                        </select>
+                        <Icon
+                          name="chevronDown"
+                          size={15}
+                          strokeWidth={2}
+                          className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-muted"
+                        />
+                      </span>
+                    ) : (
+                      <input
+                        className={FIELD_CLASS}
+                        value={values[f.name] ?? ""}
+                        placeholder={`For example, ${f.example}`}
+                        aria-invalid={err ? true : undefined}
+                        aria-describedby={err ? `err-${f.name}` : undefined}
+                        onChange={(e) => setEdits((v) => ({ ...v, [f.name]: e.target.value }))}
+                        disabled={face === "loading"}
+                      />
+                    )}
                     {err ? (
                       <span id={`err-${f.name}`} className="text-[12.5px]" style={{ color: "var(--text-danger)" }}>
                         {f.label}: {err.toLowerCase()}
@@ -362,3 +393,7 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
     </AppShell>
   );
 }
+
+/* The open list is drawn by the browser, which doesn't follow the theme:
+   set its colours outright, or dark mode shows light text on white. */
+const OPTION_STYLE = { background: "var(--surface-raised)", color: "var(--text-strong)" } as const;

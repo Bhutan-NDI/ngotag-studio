@@ -750,7 +750,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "Two panels: what Pelden proved, with the credential it came from, and — separately, below — the name and type NDI holds, which Deki hasn't verified. Deki enters the taxpayer number's details from the office's own register.",
     doThis:
-      "Read the **Verified** panel. Fill in **Taxpayer number** (for example **TPN-114-8830**), **Tax office** and **Registered for** — each shows its format — then press **Issue**.",
+      "Read the **Verified** panel. Type the **Taxpayer number** (for example **TPN-114-8830**), choose the **Tax office** and what it's **Registered for** from their lists, then press **Issue**.",
     say: "The failure this screen is built against isn't a system error. It's an officer issuing on the strength of a name NDI showed them.",
     match: "^/issuer/requests/crq-[^/]+$",
   },
