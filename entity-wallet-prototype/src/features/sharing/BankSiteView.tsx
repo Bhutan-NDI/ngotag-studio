@@ -8,7 +8,7 @@ import { useDemo } from "@/lib/demoStore";
 import { sessionStatusOf } from "@/lib/sharing";
 
 /**
- * Bank of Bhutan's website — simulated, and drawn as the bank's own site.
+ * Partner Bank's website — simulated, and drawn as the bank's own site.
  *
  * WHY IT EXISTS
  *
@@ -26,8 +26,10 @@ import { sessionStatusOf } from "@/lib/sharing";
  * It used to be a dashed panel inside the Entity Wallet's own chrome, and
  * in front of an audience that read as one more wallet screen. The point
  * of the flow is the hand-off between two organisations' systems, so the
- * bank's page now looks like the bank's: its logo, white and its blue,
- * its own type, and none of the wallet's dark glass. It ignores the
+ * bank's page now looks like a bank's: a mark of its own, white and a
+ * navy, its own type, and none of the wallet's dark glass. The bank is a
+ * made-up one, Partner Bank, with no real bank's name, logo or colours, so
+ * the same story can be shown to any bank. It ignores the
  * wallet's theme for the same reason. The strip across the top still says
  * it is a stand-in, so nobody takes it for the bank's real site.
  *
@@ -43,7 +45,7 @@ import { sessionStatusOf } from "@/lib/sharing";
  * Everything below the strip is the bank's, not NDI's; the what's-real
  * page lists it.
  */
-const BOB_BLUE = "#1aa1db";
+const BANK_BLUE = "#2c5a8c";
 const INK = "#16191d";
 const MUTED = "#5b6670";
 const LINE = "#dfe6ec";
@@ -109,18 +111,31 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
         style={{ background: "#fff8e6", borderColor: "#e6c470", color: "#7a5a12" }}
       >
         <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "#e0a100" }} />
-        Prototype · stands in for Bank of Bhutan&rsquo;s website — another organisation&rsquo;s system
+        Prototype · stands in for Partner Bank&rsquo;s website — another organisation&rsquo;s system
       </div>
 
       {/* ---- The bank's header ---- */}
       <header className="border-b bg-white" style={{ borderColor: LINE }}>
         <div className="mx-auto flex w-full max-w-[1040px] items-center justify-between gap-4 px-4 py-3 min-[641px]:px-6">
-          <img src="/media/logos/bank-of-bhutan.png" alt="Bank of Bhutan" className="h-[52px] w-auto" />
-          <nav aria-label="Bank of Bhutan" className="hidden items-center gap-6 text-[13.5px] min-[641px]:flex" style={{ color: MUTED }}>
+          {/* A generic mark: a made-up bank, so no real bank's logo. */}
+          <span className="flex items-center gap-2.5">
+            <svg aria-hidden="true" width="40" height="40" viewBox="0 0 40 40">
+              <rect width="40" height="40" rx="10" fill={BANK_BLUE} />
+              <path d="M20 9 L31 15 H9 Z" fill="#fff" />
+              <rect x="11" y="17" width="3" height="10" fill="#fff" />
+              <rect x="18.5" y="17" width="3" height="10" fill="#fff" />
+              <rect x="26" y="17" width="3" height="10" fill="#fff" />
+              <rect x="9" y="28.5" width="22" height="2.5" fill="#fff" />
+            </svg>
+            <span className="text-[19px] font-bold tracking-[-0.01em]" style={{ color: INK }}>
+              Partner Bank
+            </span>
+          </span>
+          <nav aria-label="Partner Bank" className="hidden items-center gap-6 text-[13.5px] min-[641px]:flex" style={{ color: MUTED }}>
             <span>Personal</span>
             <span style={{ color: INK, fontWeight: 600 }}>Business</span>
             <span>About us</span>
-            <span className="rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold" style={{ borderColor: BOB_BLUE, color: BOB_BLUE }}>
+            <span className="rounded-full border px-3.5 py-1.5 text-[12.5px] font-semibold" style={{ borderColor: BANK_BLUE, color: BANK_BLUE }}>
               Internet banking
             </span>
           </nav>
@@ -128,7 +143,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
       </header>
 
       {/* ---- The application's band ---- */}
-      <section style={{ background: BOB_BLUE, color: "#fff" }}>
+      <section style={{ background: BANK_BLUE, color: "#fff" }}>
         <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-4 px-4 py-7 min-[641px]:px-6">
           <div className="flex flex-col gap-1">
             <p className="m-0 text-[12px] font-semibold uppercase tracking-[0.14em] opacity-85">Business banking</p>
@@ -141,7 +156,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
                   className="flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-bold"
                   style={
                     i < current
-                      ? { background: "#fff", color: BOB_BLUE }
+                      ? { background: "#fff", color: BANK_BLUE }
                       : i === current
                         ? { background: INK, color: "#fff" }
                         : { border: "1.5px solid rgba(255,255,255,0.8)", color: "#fff" }
@@ -240,7 +255,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
                 type="button"
                 onClick={() => router.push("/simulated/bank")}
                 className="inline-flex h-11 items-center rounded-[6px] border-2 px-4 text-[14px] font-semibold"
-                style={{ borderColor: BOB_BLUE, color: BOB_BLUE, background: "#fff" }}
+                style={{ borderColor: BANK_BLUE, color: BANK_BLUE, background: "#fff" }}
               >
                 Start a new application
               </button>
@@ -251,7 +266,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
 
       <footer className="border-t bg-white" style={{ borderColor: LINE }}>
         <p className="mx-auto m-0 w-full max-w-[1040px] px-4 py-4 text-[12px] min-[641px]:px-6" style={{ color: MUTED }}>
-          Bank of Bhutan · A DHI company — simulated for the NDI Entity Wallet prototype. No application is made.
+          Partner Bank · A DHI company — simulated for the NDI Entity Wallet prototype. No application is made.
         </p>
       </footer>
     </div>

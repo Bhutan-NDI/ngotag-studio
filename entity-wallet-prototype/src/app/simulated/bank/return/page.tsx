@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { BankSiteView } from "@/features/sharing/BankSiteView";
 
-export const metadata: Metadata = { title: "Your application — Bank of Bhutan (simulated)" };
+export const metadata: Metadata = { title: "Your application — Partner Bank (simulated)" };
 
 export default async function Page({
   searchParams,

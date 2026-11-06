@@ -29,8 +29,8 @@ import type { FlowEntry } from "./demoStory";
  * WHY THE CHAPTERS IT SKIPS CAN BE SKIPPED
  *
  * It starts from the platform-ready state, with NDI's two administrators
- * already set up, so the root and admin chapters aren't needed. Bank of
- * Bhutan is listed as a verifier and the tax office as an issuer from day
+ * already set up, so the root and admin chapters aren't needed. Partner
+ * Bank is listed as a verifier and the tax office as an issuer from day
  * zero, so sharing with the bank and receiving the TPN don't depend on the
  * approval and designation chapters either — the same reason the Walk a
  * flow entries for Flows 6 to 8 start from the team-ready state.
@@ -53,7 +53,7 @@ export const PRESENTATION_CHAPTERS: GuideChapter[] = [
   { title: "The company comes on", shows: "Flow 2 · The registrar confirms Pelden Trading, then Dorji invites a colleague" },
   { title: "Appointing someone to act", shows: "Flow 3 · Dorji chooses what Ugyen can do; Ugyen accepts in the Bhutan NDI app" },
   { title: "Receiving a credential", shows: "Flow 6 · Pelden Trading asks the tax office for its TPN and accepts what comes back" },
-  { title: "Presenting a credential", shows: "Flow 7 · Pelden Trading shares with Bank of Bhutan, from the bank's website and in the wallet" },
+  { title: "Presenting a credential", shows: "Flow 7 · Pelden Trading shares with Partner Bank, from the bank's website and in the wallet" },
   { title: "Giving authority to act", shows: "Flow 8 · Dorji gives the clearing agent authority; she collects it in her own app" },
   { title: "Acting at the Single Window", shows: "Flow 9 · The agent declares for Pelden Trading, and each declaration is checked" },
   { title: "What you saw", shows: "The seven flows, and what wasn't shown" },
@@ -75,7 +75,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 0,
     title: "One company's story",
     happening:
-      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden Trading is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden Trading. Pelden Trading receives its taxpayer number from the Department of Revenue & Customs, then shares its registration with Bank of Bhutan. Finally Pelden Trading gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
+      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden Trading is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden Trading. Pelden Trading receives its taxpayer number from the Department of Revenue & Customs, then shares its registration with Partner Bank. Finally Pelden Trading gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
     doThis: "Press **Next**.",
     route: "/sign-up",
     match: "^/sign-up$",
@@ -149,7 +149,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 5,
     title: "Flow 7 · No more photocopies",
     happening:
-      "Pelden Trading opens an account at Bank of Bhutan. Instead of asking for copies, the bank asks for Pelden Trading's credentials from its website. Dorji sees who is asking and every detail that will go, shares, and is taken back to the bank. Then the bank asks again inside the wallet: Ugyen can see the request but wasn't appointed to share, so passes it to Dorji.",
+      "Pelden Trading opens an account at Partner Bank. Instead of asking for copies, the bank asks for Pelden Trading's credentials from its website. Dorji sees who is asking and every detail that will go, shares, and is taken back to the bank. Then the bank asks again inside the wallet: Ugyen can see the request but wasn't appointed to share, so passes it to Dorji.",
     doThis: "Press **Next**.",
     say: "The bank receives the credential from the company, signed by the office that issued it, and can check it's still valid. Nothing to verify by hand.",
     route: "/simulated/bank",
@@ -281,7 +281,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Presenting credentials",
-    shows: "Pelden Trading shares its credentials with Bank of Bhutan",
+    shows: "Pelden Trading shares its credentials with Partner Bank",
     persona: "dorji",
     route: "/simulated/bank",
     start: "tpnHeld",

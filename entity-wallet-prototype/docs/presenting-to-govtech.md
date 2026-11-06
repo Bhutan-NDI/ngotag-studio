@@ -95,7 +95,7 @@ with it.
 | **Pema Choden** | A clearing agent at Druk Sharpa Freight, who declares Pelden's imports |
 | **Corporate Regulatory Authority (CRA)** | Registered Pelden, so it confirms Pelden |
 | **Department of Revenue & Customs (DRC)** | Issues Pelden's taxpayer number (TPN); its officer in the demo is Deki |
-| **Bank of Bhutan** | Where Pelden opens an account |
+| **Partner Bank** | Where Pelden opens an account |
 | **Bhutan National Single Window (BNSW)** | Where customs declarations are made |
 
 ---
@@ -266,7 +266,7 @@ guided demo shows this for the bonded-warehouse authorisation.
 ### Flow 7: presenting a credential (the bank)
 
 **What happens:**
-1. On **Bank of Bhutan's website**, Pelden chooses to share from the Entity
+1. On **Partner Bank's website**, Pelden chooses to share from the Entity
    Wallet.
 2. Before anything else, the screen shows who is asking and the bank's
    reference, and warns Dorji to continue only if he expected this.

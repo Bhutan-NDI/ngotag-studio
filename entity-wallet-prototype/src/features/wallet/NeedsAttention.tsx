@@ -54,7 +54,7 @@ export function NeedsAttention({ allClear = false }: { allClear?: boolean } = {}
   } = useDemo();
 
   const persona = harness.persona;
-  /* Only this organisation's wallet: Bank of Bhutan's dashboard never
+  /* Only this organisation's wallet: Partner Bank's dashboard never
      shows what is waiting in Pelden's. */
   const here = inOrg(activeOrgId);
   const orgName = organizations.find((o) => o.id === activeOrgId)?.name ?? "the organisation";

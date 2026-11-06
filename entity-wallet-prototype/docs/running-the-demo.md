@@ -61,7 +61,7 @@ zero:
    their NDI wallet** both confirms who they are and accepts. (The page was
    *Give someone authority to act*; UX-EW-01 v0.23 renamed it so it isn't
    confused with Flow 8.)
-7. **Recognise Bank of Bhutan** (FLOW-ACC-01, recognition) — Kinzang opens
+7. **Recognise Partner Bank** (FLOW-ACC-01, recognition) — Kinzang opens
    **Accreditations**, where the bank is listed as seen verifying without an
    approval, asking for five things from the citizen credential. Kinzang
    proposes approving it, removing the date of birth and the address that
@@ -101,10 +101,10 @@ zero:
     asks for the bonded-warehouse authorisation, which the system answers
     by itself a few seconds later. Dorji still reviews and accepts by hand;
     Deki's delivery log shows the request received and then issued.
-12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Bank of
-    Bhutan's website (its own page, in the bank's logo and colours), Dorji presses **Share from NDI Entity Wallet**,
+12. **Pelden shares with its bank** (FLOW-PRS-01, FLOW-PRS-02) — on Partner
+    Bank's website (its own page and look, a made-up bank so the story fits any bank), Dorji presses **Share from NDI Entity Wallet**,
     checks the bank's reference on the wallet's page, signs in, and reads
-    every detail of the registration under *Bank of Bhutan will receive all
+    every detail of the registration under *Partner Bank will receive all
     of the details below — not only the ones it asked for.* He shares and is
     counted back to the bank, which acts on what it fetched. Then the bank
     asks again with nobody at a website: Ugyen, who can receive but not
@@ -149,7 +149,7 @@ and UX-EW-03 SCR-CRD-01 to 10. Flow 7 follows FLOW-PRS-01 v0.2, FLOW-PRS-02
 v0.3 and EW-FLOW7-SD v0.3, with UX-EW-04 v0.3 SCR-PRS-01 to 06; the approval path —
 a Controller shares, the Root approves — is a Walk a flow entry, because the
 onboarding story never appoints anyone with *Share*. The screens for what
-comes after — appeals, and Bank of Bhutan being verified — still exist and
+comes after — appeals, and Partner Bank being verified — still exist and
 are described further down, but the guide and the demo controls no longer
 walk them.
 
@@ -182,7 +182,7 @@ story through seven parts, in this order:
    credentials — asks the Department of Revenue & Customs for Pelden's TPN,
    Deki issues it, and Ugyen accepts it. The part starts with his
    appointment already accepted.
-5. **Presenting credentials** (Flow 7). Pelden shares with Bank of Bhutan,
+5. **Presenting credentials** (Flow 7). Pelden shares with Partner Bank,
    from the bank's website and in the wallet.
 6. **Issuing authority credentials** (Flow 8). Dorji gives Pema, the clearing
    agent, authority, and she collects it in her own app.
@@ -355,7 +355,7 @@ numbers for the other outcomes too:
 | `CRA-2015-03310` | Norbu Construction — the records don't show Dorji: not verified |
 | `CRA-2008-00731` | Gangri Exports — deregistered: worded exactly as the one above |
 | `CRA-2023-11802` | Druk Valley Hardware — already verified here: refused, without saying why |
-| `CRA-1997-00112` | Bank of Bhutan — confirms Yeshey, its owner (Kind E, below) |
+| `CRA-1997-00112` | Partner Bank — confirms Yeshey, its owner (Kind E, below) |
 
 ### 3 · The authority asks who Dorji is — `/onboarding/prove`
 
@@ -627,18 +627,18 @@ switched-off state — try it to show the open door is shut.
 
 ### Flow 2 · An organisation already on the platform — Kind E
 
-Bank of Bhutan issues and verifies on NDI but has never been verified as a
+Partner Bank issues and verifies on NDI but has never been verified as a
 holder. Start from day zero (**Walk a flow → Root signs in** resets to it,
 then drive as **Yeshey Choden** with **Driving as**) — but an authority is
 only connected once a platform admin exists, so walk the platform-admin flow
 first, or the first screen says nothing can be verified yet.
 
-1. As Yeshey, Bank of Bhutan's dashboard says it hasn't been verified yet.
-   **Verify Bank of Bhutan** (or **Verify organisation** in the sidebar).
+1. As Yeshey, Partner Bank's dashboard says it hasn't been verified yet.
+   **Verify Partner Bank** (or **Verify organisation** in the sidebar).
 2. The same screens as a new company: the type, `CRA-1997-00112`, the CRA's
    identity request, the wait. Nobody at NDI approves anything — there is no
    request to NDI.
-3. **Bank of Bhutan Ltd.** is verified — and because the CRA's name differs
+3. **Partner Bank Ltd.** is verified — and because the CRA's name differs
    from the one on the platform, the verified screen says so. Its issuing and
    verifying carry on throughout, and the screen says that instead of the
    negative clause.
@@ -714,7 +714,7 @@ Worth showing:
 
 - **Share** asks for a reach: only organisations Dorji names, or any that
   asks. The ones Dorji can name are the organisations NDI has approved to
-  verify — on the story's first day, only Bank of Bhutan; the list grows as
+  verify — on the story's first day, only Partner Bank; the list grows as
   Flow 4 approves more. Named with none chosen, **Appoint** stays unavailable (E12).
   The reach limits whom Ugyen presents to; connecting to an organisation
   is not limited by it (EW-FLOW3-SD §4.2).
@@ -801,7 +801,7 @@ there is anything, **All accreditations**. **Propose an accreditation** is
 for an organisation already on the platform or one that isn't yet (it is
 invited to register, then accepts).
 
-**Propose to verify** beside Bank of Bhutan opens SCR-ACC-01 with what the
+**Propose to verify** beside Partner Bank opens SCR-ACC-01 with what the
 bank was seen asking for, each item marked *observed*. Untick **Date of
 birth** and **Permanent address**; the summary on the right says what it
 will be able to ask for, that anything else will be refused, what was
@@ -832,7 +832,7 @@ a reason, which the officer then reads as *NDI has withdrawn this approval:
 <reason>* — and a new proposal for the same organisation is no longer
 refused. **Review it** opens SCR-ACC-03: what the bank can
 ask for, that anything else is refused before it reaches anyone, the public
-listing sentence — *Accepting adds Bank of Bhutan to NDI's public list of
+listing sentence — *Accepting adds Partner Bank to NDI's public list of
 trusted organisations. Anyone can see that it is on the list. Your name is
 recorded as the person who accepted.* — the public identity it will be
 listed under, and that NDI hosts the keys. **Accept with your NDI wallet**,
@@ -991,7 +991,7 @@ isn't on NDI's list — nobody was notified.
 
 Offers sent without a request (FLOW-CRD-02) sit under the same **Waiting for
 you** and open on the same SCR-CRD-04, marked *Sent unasked*. Accepting one
-never needs an approver. In the act-3 seed, Bank of Bhutan's reissued
+never needs an approver. In the act-3 seed, Partner Bank's reissued
 **Business Current Account** says *This replaces the Business Current
 Account you received on …*, and accepting it marks the old one *Superseded*.
 The old `/wallet/offers` pages redirect here.
@@ -1010,72 +1010,72 @@ and nobody is told about it (D3); and whether someone may share, and whether
 someone else must approve, comes from the *Share* box ticked when they were
 appointed — its reach and its approval — never from who they are.
 
-### From the bank's website — **Share from Bank of Bhutan's website**, as Dorji
+### From the bank's website — **Share from Partner Bank's website**, as Dorji
 
-Starts on Bank of Bhutan's account form at `/simulated/bank` — dashed,
+Starts on Partner Bank's account form at `/simulated/bank` — dashed,
 because it's another organisation's website. **Share from NDI Entity Wallet**
 creates a session and sends you to `/present?session=…` (SCR-PRS-01): the
-wallet's address, *Bank of Bhutan is asking for your organisation's details*,
+wallet's address, *Partner Bank is asking for your organisation's details*,
 *You're on the NDI Entity Wallet. Nothing is shared until you choose.*, and
-the bank's application number with *Only continue if you started this on Bank
-of Bhutan's website just now and see this reference there.* Dorji is already
+the bank's application number with *Only continue if you started this on Partner
+Bank's website just now and see this reference there.* Dorji is already
 signed in to the wallet in this browser, so he isn't asked again: *Signed in
 as Dorji Wangchuk* and **Continue**. With one organisation there's no choice
-to make, so *Getting Bank of Bhutan's request…* and on.
+to make, so *Getting Partner Bank's request…* and on.
 
 To show the signed-out arrival, open **Prototype: other ways in** under the
 panel and press **Arrive signed out instead**: **Sign in with Bhutan NDI**
-opens the sign-in in place — *Sign in to see Bank of Bhutan's request* and
+opens the sign-in in place — *Sign in to see Partner Bank's request* and
 the Bhutan NDI scan card — and the dashed scan signs in and carries on to the
 request. **NDI's list can't be reached** there sets up FLOW-PRS-01 E8 for the
 next Continue or scan.
 
-**Share with Bank of Bhutan?** (SCR-PRS-02): the bank's reason in quotes,
-labelled as theirs; the reference again; then *Bank of Bhutan will receive all
+**Share with Partner Bank?** (SCR-PRS-02): the bank's reason in quotes,
+labelled as theirs; the reference again; then *Partner Bank will receive all
 of the details below — not only the ones it asked for.* above the
 registration drawn as its card, as Held credentials shows it, beside every
 attribute in it, each marked *Asked for* or *Also shared*; and *None of
 your other credentials is shared.* Dorji is the representative (AUTO), so
-**Share with Bank of Bhutan** sends at once. SCR-PRS-03 says *Shared with Bank
-of Bhutan. Taking you back in 5 seconds.* — the only outcome that counts
+**Share with Partner Bank** sends at once. SCR-PRS-03 says *Shared with Partner
+Bank. Taking you back in 5 seconds.* — the only outcome that counts
 down — and returns to the bank's registered address, where the bank shows
 what its own system fetched, not what the address said.
 
-**Keep for later** instead returns with *Bank of Bhutan doesn't have this
+**Keep for later** instead returns with *Partner Bank doesn't have this
 yet. It's saved under Sharing until …*, no countdown, and tells the others
 who may answer (A3). **Sign in while NDI's list can't be reached** (dashed)
-instead of the plain sign-in holds the request (E8): *We're checking Bank of
-Bhutan…*, and going back is pending; Sharing then lists it as *Checking Bank
-of Bhutan — you can't answer this yet* until **NDI's list answers**. Driving as Pema (no
+instead of the plain sign-in holds the request (E8): *We're checking Partner
+Bank…*, and going back is pending; Sharing then lists it as *Checking Partner
+Bank — you can't answer this yet* until **NDI's list answers**. Driving as Pema (no
 appointment) gives E4; removing the bank's address on **Verification →
 Return addresses** as Yeshey gives E15: whatever the request has reached is
-still said (*Bank of Bhutan doesn't have this yet…* after a share that needs
-approval), then *Done. Go back to Bank of Bhutan's website to continue.*, with
+still said (*Partner Bank doesn't have this yet…* after a share that needs
+approval), then *Done. Go back to Partner Bank's website to continue.*, with
 no link.
 
 ### A controller shares, the owner approves — as Rinzin, then Dorji
 
 Starts three months on, at **Sharing** (SCR-PRS-05) as Rinzin, who may share
-the registration with Bank of Bhutan and the Single Window, with an approver.
+the registration with Partner Bank and the Single Window, with an approver.
 *Waiting* holds three requests:
 
-- **Bank of Bhutan** — *Waiting for Dorji Wangchuk to approve*: Rinzin chose
+- **Partner Bank** — *Waiting for Dorji Wangchuk to approve*: Rinzin chose
   it yesterday. Opening it as Rinzin says *Sent to Dorji Wangchuk to
   approve.*; she can't approve her own.
 - **Department of Revenue & Customs** — **Answer** shows everything and, in
   place of *Share*, *You can share only with Bhutan National Single Window
-  and Bank of Bhutan. Dorji Wangchuk can share with Department of Revenue &
+  and Partner Bank. Dorji Wangchuk can share with Department of Revenue &
   Customs.* and **Pass to someone who can** (E5).
 - **Ministry of Industry, Commerce & Employment** — asks for the tax
   clearance too, which Pelden holds only expired: *…which can't be shared
   right now: it expired on …*, and *Share* is unavailable (E3, D17).
 
-The dashed **Bank of Bhutan asks on its connection** adds a request Rinzin can
-share: **Answer** shows *Dorji Wangchuk will be asked to approve before Bank
-of Bhutan gets this.* before **Share with Bank of Bhutan**, which sends it to
+The dashed **Partner Bank asks on its connection** adds a request Rinzin can
+share: **Answer** shows *Dorji Wangchuk will be asked to approve before Partner
+Bank gets this.* before **Share with Partner Bank**, which sends it to
 him. Switch to **Dorji**: **Approve** opens SCR-PRS-04 — *Rinzin Dema wants to
-share this with Bank of Bhutan*, the same list, *Rinzin Dema chose to share
-this on …*, and **Approve and share with Bank of Bhutan** or **Don't
+share this with Partner Bank*, the same list, *Rinzin Dema chose to share
+this on …*, and **Approve and share with Partner Bank** or **Don't
 approve** with an optional note. Not approving puts the request back to
 *Waiting* with *Dorji Wangchuk didn't approve sharing this: <note>.* — the
 bank isn't refused. Approving shares it; Rinzin is told, and the History row
@@ -1093,7 +1093,7 @@ pass…**, which tells the others who may answer (FLOW-PRS-01 A3).
 
 Who is told is written to the dashboard's activity feed, naming who it goes
 to, in UX-EW-04 §3.5's notification wording — *Ugyen Phuntsho passed you a
-request from Bank of Bhutan: they can't share it themselves. Answer by …* —
+request from Partner Bank: they can't share it themselves. Answer by …* —
 never a value, and never an approver's note, which stays in the wallet.
 Refused shares and approvals — one's own, or outside the reach — are rows in
 the audit trail.

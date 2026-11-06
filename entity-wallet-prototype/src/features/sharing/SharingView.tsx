@@ -273,7 +273,7 @@ export function SharingView() {
             standsFor="other organisations' systems sending requests"
             action={
               <>
-                <SimulatedAction onClick={() => simulateIncomingRequest("bank_recheck")}>Bank of Bhutan asks on its connection</SimulatedAction>
+                <SimulatedAction onClick={() => simulateIncomingRequest("bank_recheck")}>Partner Bank asks on its connection</SimulatedAction>
                 <SimulatedAction onClick={() => simulateIncomingRequest("untrusted")}>A sender not on NDI&rsquo;s list asks</SimulatedAction>
                 <SimulatedAction onClick={() => simulateIncomingRequest("registry_down")}>A request arrives while NDI&rsquo;s list can&rsquo;t be reached</SimulatedAction>
                 {checking.map((r) => (

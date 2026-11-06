@@ -116,7 +116,7 @@ function PlatformInvitationView({ id }: { id: string }) {
   const invitee = inv ? people.find((p) => p.email.toLowerCase() === inv.email.toLowerCase()) : undefined;
   const org = inv?.orgId ? organizations.find((o) => o.id === inv.orgId) : undefined;
 
-  /* An account exists if the invitee has one already (Bank of Bhutan's
+  /* An account exists if the invitee has one already (Partner Bank's
      owner) or has just made one on the way here (an administrator). */
   const madeNow = signup?.stage === "done" && inv && signup.email.toLowerCase() === inv.email.toLowerCase();
   const hasAccount = Boolean(madeNow || (invitee && invitee.hasAccount !== false));

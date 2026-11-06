@@ -381,7 +381,7 @@ export function sampleAccreditation(overrides: Partial<Accreditation> = {}): Acc
   return {
     id: "acc-sample",
     orgId: "org-bob",
-    orgName: "Bank of Bhutan Ltd.",
+    orgName: "Partner Bank Ltd.",
     officerEmail: null,
     door: "RECOGNITION",
     capability: "verifier",

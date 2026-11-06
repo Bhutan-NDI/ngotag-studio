@@ -24,13 +24,13 @@ Three consequences:
 
 One entity, one grant, one delegation, one failure. Six acts. Everything in `demoData.ts` serves this and nothing else.
 
-**Cast:** Norling Logistics Pvt. Ltd. (CRA-registered) · **Rinzin Dema** — Owner / Root Authority · **Dorji Wangchuk** — Controller · **Pema Choden** — clearing agent / Delegate · counterparties: Bank of Bhutan, BNSW (Bhutan National Single Window).
+**Cast:** Norling Logistics Pvt. Ltd. (CRA-registered) · **Rinzin Dema** — Owner / Root Authority · **Dorji Wangchuk** — Controller · **Pema Choden** — clearing agent / Delegate · counterparties: Partner Bank, BNSW (Bhutan National Single Window).
 
 | Act | What the audience learns | Screens |
 |---|---|---|
 | **1 · The entity becomes real** | An organisation can hold credentials, and the platform never self-asserts its identity — a government register does | A1 claim → A2 prove identity via wallet → *verifying against the register* → A3 foundational credential accepted, "your entity is now verified" |
 | **2 · Authority is granted, narrowly** | *The conceptual core.* Authority is a scoped, legally-grounded, accepted relation — not a role dropdown | C2 create relation (legal basis: board resolution) → **C3 scope builder + live preview** → sent for acceptance → **C4 Dorji accepts fiduciary duties** → ACTIVE · then B2, Dorji's own view of what he may do |
-| **3 · The Controller works, under approval** | Pattern A in operation: least disclosure, an approval gate, dual attribution in the audit trail | B1 dashboard has tasks → B4 incoming offer, in scope, accepted → B5 Bank of Bhutan requests a presentation, minimum attributes preselected, policy requires approval → **parked** → B6/B7 Rinzin reviews and approves-as-signature from her wallet → presented → C6 audit row: "Norling Logistics · acted by Dorji Wangchuk" |
+| **3 · The Controller works, under approval** | Pattern A in operation: least disclosure, an approval gate, dual attribution in the audit trail | B1 dashboard has tasks → B4 incoming offer, in scope, accepted → B5 Partner Bank requests a presentation, minimum attributes preselected, policy requires approval → **parked** → B6/B7 Rinzin reviews and approves-as-signature from her wallet → presented → C6 audit row: "Norling Logistics · acted by Dorji Wangchuk" |
 | **4 · Authority is delegated to a person's wallet** | Pattern B: the entity issues authority *into someone's own wallet*, with public constraints a verifier can read | D2 issue a Capability to Pema — cap Nu. 500,000 per declaration, task = customs declaration, counterparty = BNSW, 90 days → offer sent → awaiting acceptance → accepted |
 | **5 · Authority is checked at the point of use** | **The money shot.** Why the whole system exists | Pema submits a declaration at BNSW → proof request bound to the declaration hash → **D5 PASS**, constraints listed · then Rinzin revokes Pema's parent Role (D4, with blast-radius preview) → Pema retries → **D5 FAIL: revoked ancestor in the authority chain** |
 | **6 · There is recourse** | Revocation isn't arbitrary power — it carries a reason and an appeal | D6 appeal intake with the reason + appeal reference → status |
@@ -62,7 +62,7 @@ One model, two renderings:
 
 - **Read mode** — a sentence someone can check in five seconds:
 
-  > Dorji Wangchuk may **present proofs** using **Business Registration** credentials to **BNSW** and **Bank of Bhutan**, until **31 Dec 2026**.
+  > Dorji Wangchuk may **present proofs** using **Business Registration** credentials to **BNSW** and **Partner Bank**, until **31 Dec 2026**.
   > Every presentation needs **one approver**.
 
 - **Edit mode** — one row per operation, each carrying its own filters and approval policy, since the five dimensions (operation · credential type · relying party · validity · approval policy) don't edit as prose.

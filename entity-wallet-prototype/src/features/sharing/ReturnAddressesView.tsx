@@ -43,7 +43,7 @@ type Face = "live" | "default" | "empty" | "loading" | "error_invalid" | "sign_i
 const ERRORS: Record<string, string> = {
   not_https: "Use an HTTPS address — this one doesn't start with https://.",
   wildcard: "Wildcards aren't allowed. Enter the exact address.",
-  not_full: "Enter a full address, including the page — for example https://www.bob.bt/ekyb/return.",
+  not_full: "Enter a full address, including the page — for example https://www.partnerbank.example/ekyb/return.",
   duplicate: "That address is already registered.",
   not_owner: "Only your organisation's owner can change return addresses.",
 };
@@ -160,7 +160,7 @@ export function ReturnAddressesView() {
                     setUrl(e.target.value);
                     setError(null);
                   }}
-                  placeholder="https://www.bob.bt/ekyb/return"
+                  placeholder="https://www.partnerbank.example/ekyb/return"
                   className={FIELD_CLASS}
                   aria-invalid={face === "error_invalid"}
                 />

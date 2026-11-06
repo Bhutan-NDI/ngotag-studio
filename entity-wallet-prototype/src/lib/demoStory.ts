@@ -29,7 +29,7 @@ export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "
  * WHY ONLY THESE
  *
  * The controls used to carry a six-act story runner and jumps into every
- * flow anyone had asked for: Bank of Bhutan's wallet, NDI inviting a
+ * flow anyone had asked for: Partner Bank's wallet, NDI inviting a
  * business, manual review. The current focus is onboarding — root, platform
  * admins, a new company, and the people that company then brings on — so
  * the panel offers exactly those, and nobody has to work out which of a
@@ -42,7 +42,7 @@ export type FlowGroup = "root" | "admin" | "company" | "members" | "appoint" | "
  *
  * Flow 4's two doors start from the team-ready state: a platform admin
  * exists to propose and review, a second named admin to approve, Pelden is
- * verified with Dorji as its representative, and Bank of Bhutan has been
+ * verified with Dorji as its representative, and Partner Bank has been
  * verifying without an approval.
  *
  * Flow 5 starts from the platform-ready state — two admins, no business —
@@ -133,7 +133,7 @@ export const FLOW_ENTRIES: FlowEntry[] = [
   { group: "accredit", label: "A business asks to verify", persona: "dorji", route: "/organisation", start: "teamReady" },
   { group: "designate", label: "Designate the ministry for sole proprietorships", persona: "tshering", route: "/admin/designations", start: "platformReady" },
   { group: "receive", label: "Pelden asks for its TPN", persona: "dorji", route: "/wallet/get", start: "teamReady" },
-  { group: "share", label: "Share from Bank of Bhutan's website", persona: "dorji", route: "/simulated/bank", start: "teamReady" },
+  { group: "share", label: "Share from Partner Bank's website", persona: "dorji", route: "/simulated/bank", start: "teamReady" },
   { group: "share", label: "A controller shares, the owner approves", persona: "rinzin", route: "/wallet/sharing", start: "livedIn" },
   { group: "authority", label: "The owner gives a clearing agent authority", persona: "dorji", route: "/authority-to-act", start: "teamReady" },
   { group: "authority", label: "A controller gives authority, the owner approves", persona: "rinzin", route: "/authority-to-act/give", start: "livedIn" },

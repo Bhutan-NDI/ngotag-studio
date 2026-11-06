@@ -19,7 +19,7 @@ import { useDemo } from "@/lib/demoStore";
  * WHAT IS DELIBERATELY NOT HERE
  *
  * No disclosed values, anywhere. A row records that five attributes went to
- * Bank of Bhutan and keeps a fingerprint of them; it does not keep the
+ * Partner Bank and keeps a fingerprint of them; it does not keep the
  * attributes. An audit trail that stored what it was protecting would be a
  * second copy of the entity's data with a longer retention period than the
  * original — the single worst thing this feature could turn into.

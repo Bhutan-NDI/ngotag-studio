@@ -13,7 +13,7 @@
  * model that seemed obvious at the time:
  *
  *  1. "Rinzin may present proofs using Business Registration credentials to
- *      BNSW and Bank of Bhutan, until 31 Dec 2026. Every presentation needs
+ *      BNSW and Partner Bank, until 31 Dec 2026. Every presentation needs
  *      one approver."
  *      — fine. This is the shape everything else was measured against.
  *
@@ -35,7 +35,7 @@
  *      relying-party dimension must not print empty clauses about them.
  *
  *  5. "Karma may present proofs using Tax Clearance Certificate credentials
- *      to Bank of Bhutan, until 31 Dec 2026. Every presentation needs two
+ *      to Partner Bank, until 31 Dec 2026. Every presentation needs two
  *      approvers."
  *      — fine, but note the status is nowhere in the sentence. Karma's
  *      relation is terminated. Lifecycle state belongs to a `StatusPill`

@@ -109,7 +109,7 @@ const STORAGE_KEY = "ndi-studio-demo";
 
 /**
  * The simulated verifier websites FLOW-PRS-01 starts from, and what each
- * asks for (EW-FLOW7-VIG §4). Bank of Bhutan's account form asks for the
+ * asks for (EW-FLOW7-VIG §4). Partner Bank's account form asks for the
  * registration; the Single Window's company registration asks for the
  * registration, the TPN and the business licence — what EW-FLOW9-SD §4.1
  * says BNSW keeps, and what a delegate's authority is later matched to.
@@ -181,7 +181,7 @@ const FRESH: DemoState = dayZeroState(SEED);
  *   7 — the activity feed is Pelden's own history, not the inherited
  *       Studio issuer feed a version-6 save would keep showing.
  *   8 — organisations carry capabilities and members, and the platform's
- *       own people (root, platform admins, Bank of Bhutan's owner) exist. A
+ *       own people (root, platform admins, Partner Bank's owner) exist. A
  *       version-7 organisation has no capabilities, and every nav rule
  *       reading them would treat Pelden as having no wallet.
  *   9 — Bhutan NDI's own organisation, and root's account made by the
@@ -291,8 +291,10 @@ const FRESH: DemoState = dayZeroState(SEED);
  *  34 — The TPN offering's tax office and tax types are fixed lists the
  *       officer chooses from (OfferField.options). A version-33 save holds
  *       the offering without them, so the officer would still type.
+ *  35 — The bank in the story is Partner Bank, a made-up bank, so the demo
+ *       can be shown to any bank. A version-34 save still says Bank of Bhutan.
  */
-const SEED_VERSION = 34;
+const SEED_VERSION = 35;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -1457,7 +1459,7 @@ function anchored(p: Person): Person {
  *
  * The role goes on the organisation (`roles`), not on the person. Someone who
  * already has an account keeps their name and their role everywhere else:
- * the first version overwrote both, so inviting Bank of Bhutan's owner into
+ * the first version overwrote both, so inviting Partner Bank's owner into
  * Pelden as an admin also made them an admin of the bank.
  */
 function joinOrganisation(
@@ -4496,7 +4498,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const inv = s0.orgInvitations.find((i) => i.id === ob.invitationId);
         const existingId = ob.existingOrgId ?? (inv?.kind === "W" ? inv.orgId : null);
         if (existingId) {
-          /* Kind E: the organisation already exists — Bank of Bhutan, which
+          /* Kind E: the organisation already exists — Partner Bank, which
              issues and verifies — and step 9 provisions it rather than
              creating another. It gains the holder capability and its
              registration in its own wallet; the person the authority
@@ -6786,7 +6788,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           request = {
             ...base,
             verifierOrgId: "org-bob",
-            verifierName: bob?.name ?? "Bank of Bhutan",
+            verifierName: bob?.name ?? "Partner Bank",
             verifierDid: bob ? sharing.verifierDidOf(bob) : "",
             purpose,
             asked,
@@ -6875,7 +6877,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       setPersona: (persona) =>
         setState((s) => {
           /* Driving as someone puts you in their organisation — Yeshey's
-             console is Bank of Bhutan's, never Pelden's. Administrators
+             console is Partner Bank's, never Pelden's. Administrators
              belong to none, so the workspace stays where it was. */
           const home = s.organizations.find((o) => o.memberIds.includes(persona));
           return { ...s, activeOrgId: home?.id ?? s.activeOrgId, harness: { ...s.harness, persona } };

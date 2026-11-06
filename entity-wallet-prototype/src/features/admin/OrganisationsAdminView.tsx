@@ -16,7 +16,7 @@ import { useDemo } from "@/lib/demoStore";
  * THREE GRANTS, ONE PLACE
  *
  * Issuing, verifying and holding are separate, and an organisation can have
- * any mix: Bank of Bhutan issues and verifies, and holds once its owner has
+ * any mix: Partner Bank issues and verifies, and holds once its owner has
  * verified it; Pelden holds and does neither of the others. Showing all
  * three side by side, per organisation, shows that verifying adds to what a
  * bank does rather than replacing it.

@@ -158,7 +158,7 @@ export function AcceptAccreditationView({ id }: { id: string }) {
 
   /* A forced face with no record previews the bank's recognition below,
      so it is named as the bank too. */
-  const name = org?.name ?? acc?.orgName ?? (forced !== "live" ? "Bank of Bhutan" : "Your organisation");
+  const name = org?.name ?? acc?.orgName ?? (forced !== "live" ? "Partner Bank" : "Your organisation");
   const header = <PageHeader crumbs={[{ label: name }, { label: "Verify or issue", href: "/verify-or-issue" }, { label: "Approval" }]} title="What you're being approved for" />;
   const outcome = (text: React.ReactNode, action?: React.ReactNode) => (
     <AppShell>

@@ -52,7 +52,7 @@ import { IssueTypesEditor, ItemChooser, LegalBasisFields, inline, sameItem, scop
  *
  * RECOGNITION IS WHERE THE SCOPE GETS NARROWER
  *
- * Bank of Bhutan has been asking customers for five things from their
+ * Partner Bank has been asking customers for five things from their
  * citizen credential to open an account. Recognition starts from those five,
  * each marked "observed", and the date after which anything outside the
  * approval is refused. Removing what the purpose doesn't need is the point
@@ -180,7 +180,7 @@ export function ProposeAccreditationView() {
       return;
     }
     if (forced === "existing_org") {
-      setDraft((d) => ({ ...d, kind: "NEW", legalName: "BANK OF BHUTAN LTD", officerEmail: "digital@bob.bt" }));
+      setDraft((d) => ({ ...d, kind: "NEW", legalName: "PARTNER BANK LTD", officerEmail: "digital@partnerbank.example" }));
       return;
     }
     /* Save and resume: a per-browser convenience, never shared state. */
@@ -229,7 +229,7 @@ export function ProposeAccreditationView() {
     setOnPlatform(null);
   };
   const existingMatch =
-    onPlatform ?? (face === "existing_org" ? { orgId: "org-bob", orgName: organizations.find((o) => o.id === "org-bob")?.legalName ?? "Bank of Bhutan Ltd." } : null);
+    onPlatform ?? (face === "existing_org" ? { orgId: "org-bob", orgName: organizations.find((o) => o.id === "org-bob")?.legalName ?? "Partner Bank Ltd." } : null);
 
   const ready =
     (draft.kind === "EXISTING" ? Boolean(draft.orgId) : Boolean(draft.legalName.trim() && /\S+@\S+\.\S+/.test(draft.officerEmail))) &&

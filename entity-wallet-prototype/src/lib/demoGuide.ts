@@ -54,7 +54,7 @@ export interface GuideStep {
  * The prototype is scoped to onboarding: NDI's root administrator, the
  * platform admins root invites, a new company getting an Entity Wallet, and
  * the people that company brings on. The guide used to run on for six more
- * chapters — Bank of Bhutan's wallet, appointing a controller, presenting,
+ * chapters — Partner Bank's wallet, appointing a controller, presenting,
  * authority in a phone, revocation, appeals — which walk flows the catalogue
  * has not designed yet, and made a forty-step demo of an onboarding review.
  * Those screens still exist; the guide no longer walks them.
@@ -80,7 +80,7 @@ export interface GuideStep {
  *
  * Sharing with the bank (Flow 7) follows it: what the organisation holds is
  * worth something only when someone else can check it. Pelden opens an
- * account from Bank of Bhutan's website and is taken back there; then the
+ * account from Partner Bank's website and is taken back there; then the
  * bank asks again with nobody at a website, Ugyen — who can see but not
  * share — passes it to Dorji, and Dorji shares. The approval path, where a
  * Controller shares and the Root approves, needs a Controller appointed
@@ -119,7 +119,7 @@ export const GUIDE_CHAPTERS: GuideChapter[] = [
   { title: "Verify the organisation", shows: "The authority that registered it, not NDI, confirms the company" },
   { title: "Pelden Trading brings on its people", shows: "The owner invites a colleague; they join from the link" },
   { title: "Appoint someone", shows: "Dorji chooses what Ugyen can do; Ugyen accepts with one wallet approval" },
-  { title: "Recognise Bank of Bhutan", shows: "NDI approves a bank already verifying — asking for less — and the bank accepts by name" },
+  { title: "Recognise Partner Bank", shows: "NDI approves a bank already verifying — asking for less — and the bank accepts by name" },
   { title: "Pelden Trading asks to verify customers", shows: "A verified business asks; one administrator reviews, a second decides" },
   { title: "Designate the ministry", shows: "A ministry becomes the authority for sole proprietorships, and agrees what people are asked" },
   { title: "Pelden Trading gets its TPN", shows: "Pelden Trading asks the tax office, shares its registration, and accepts what comes back" },
@@ -136,7 +136,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 0,
     title: "Onboarding onto the Entity Wallet",
     happening:
-      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden Trading's owner invites a colleague and appoints them to act for it. Then NDI approves Bank of Bhutan and Pelden Trading to verify customers, designates the ministry that confirms sole proprietorships, Pelden Trading gets its taxpayer number, shares its registration with its bank, and gives its clearing agent authority to act for it from her own Bhutan NDI app. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
+      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden Trading's owner invites a colleague and appoints them to act for it. Then NDI approves Partner Bank and Pelden Trading to verify customers, designates the ministry that confirms sole proprietorships, Pelden Trading gets its taxpayer number, shares its registration with its bank, and gives its clearing agent authority to act for it from her own Bhutan NDI app. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
     doThis:
       "Press **Next**. The guide takes you to each screen and tells you what to press; you do the clicking. **Minimise** tucks this card away when it's in the way.",
   },
@@ -434,13 +434,13 @@ export const GUIDE_STEPS: GuideStep[] = [
     route: "/organisation",
   },
 
-  /* ---- 7 · Recognise Bank of Bhutan (FLOW-ACC-01, recognition) ---- */
+  /* ---- 7 · Recognise Partner Bank (FLOW-ACC-01, recognition) ---- */
   {
     chapter: 7,
     title: "Seen operating without approval",
     happening:
-      "Approval to verify or issue is about to be required. Until then, NDI only watches — and it has seen Bank of Bhutan asking customers for five things from their citizen credential to open an account. Every organisation on this list has until the date shown.",
-    doThis: "Beside **Bank of Bhutan · Verifying**, press **Propose to verify**.",
+      "Approval to verify or issue is about to be required. Until then, NDI only watches — and it has seen Partner Bank asking customers for five things from their citizen credential to open an account. Every organisation on this list has until the date shown.",
+    doThis: "Beside **Partner Bank · Verifying**, press **Propose to verify**.",
     route: "/admin/accreditations",
     persona: "tshering",
   },
@@ -458,7 +458,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 7,
     title: "Waiting for a second administrator",
     happening: "Kinzang proposed it, so it waits here for someone else. Nothing has changed for the bank yet.",
-    doThis: "Press **Bank of Bhutan Ltd. · Verify**.",
+    doThis: "Press **Partner Bank Ltd. · Verify**.",
     route: "/admin/accreditations",
   },
   {
@@ -483,7 +483,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 7,
     title: "The bank is told",
     happening:
-      "Yeshey Choden is Bank of Bhutan's owner. Until Tshendu approved it the bank saw nothing — a proposal NDI hasn't approved, or has declined, never reaches it. Now the dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
+      "Yeshey Choden is Partner Bank's owner. Until Tshendu approved it the bank saw nothing — a proposal NDI hasn't approved, or has declined, never reaches it. Now the dashboard says NDI has proposed approving the bank to verify, when NDI approved it, and that without it what the bank already does stops on the date. Nothing counts down: if the bank never accepts, NDI is reminded and withdraws it, with a reason.",
     doThis: "Press **Review it**.",
     route: "/dashboard",
     persona: "yeshey",
@@ -841,7 +841,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "Opening an account at the bank",
     happening:
-      "Bank of Bhutan's own website — in the bank's colours and logo, not the wallet's, because it's another organisation's system; the strip across the top says it's a stand-in. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
+      "Partner Bank's own website — in the bank's colours and logo, not the wallet's, because it's another organisation's system; the strip across the top says it's a stand-in. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
     doThis: "Press **Share from NDI Entity Wallet** on the bank's page.",
     route: "/simulated/bank",
     persona: "dorji",
@@ -858,10 +858,10 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     chapter: 12,
-    title: "Share with Bank of Bhutan?",
+    title: "Share with Partner Bank?",
     happening:
-      "The one decision. The bank's reason in its own words, and every detail of Pelden Trading's registration — the three the bank asked for marked, the rest marked as also shared — under the sentence: Bank of Bhutan will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
-    doThis: "Read the list, then press **Share with Bank of Bhutan**.",
+      "The one decision. The bank's reason in its own words, and every detail of Pelden Trading's registration — the three the bank asked for marked, the rest marked as also shared — under the sentence: Partner Bank will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
+    doThis: "Read the list, then press **Share with Partner Bank**.",
     say: "A credential like this can't be shared in part. The screen says so rather than promising less — there's nothing to untick.",
     match: "^/wallet/sharing/pr-[^/]+$",
   },
@@ -870,7 +870,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "Shared — back to the bank",
     happening:
       "One line and a five-second countdown back to the bank's registered address. Only Shared counts down: if the bank didn't have it yet, the person would have to press — so they read that it's waiting.",
-    doThis: "Let the countdown run, or press **Go back to Bank of Bhutan**.",
+    doThis: "Let the countdown run, or press **Go back to Partner Bank**.",
     match: "^/wallet/sharing/pr-[^/]+/done$",
   },
   {
@@ -886,7 +886,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     title: "A request with nobody at a website",
     happening:
       "Sharing: what's waiting, what was shared and who agreed, and what was refused. A bank re-checking a customer sends its request straight to the wallet; it waits here for seven days.",
-    doThis: "In the dashed panel, press **Bank of Bhutan asks on its connection**, then **Answer**.",
+    doThis: "In the dashed panel, press **Partner Bank asks on its connection**, then **Answer**.",
     route: "/wallet/sharing",
     persona: "ugyen",
   },
@@ -903,8 +903,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "Dorji answers",
     happening:
-      "The request is waiting, passed on by Ugyen — the dashboard's activity shows what Dorji was sent: \"Ugyen Phuntsho passed you a request from Bank of Bhutan: they can't share it themselves.\" Dorji may share with anyone, at once.",
-    doThis: "On Bank of Bhutan's request, press **Answer**, then **Share with Bank of Bhutan**.",
+      "The request is waiting, passed on by Ugyen — the dashboard's activity shows what Dorji was sent: \"Ugyen Phuntsho passed you a request from Partner Bank: they can't share it themselves.\" Dorji may share with anyone, at once.",
+    doThis: "On Partner Bank's request, press **Answer**, then **Share with Partner Bank**.",
     say: "Every notice goes by email too, so none carries a value from the credential — only who is asking, who passed it and by when.",
     route: "/wallet/sharing",
     persona: "dorji",

@@ -80,7 +80,7 @@ export function OrgKindView() {
         <Panel>
           <div className="relative z-[4] flex flex-col gap-3" role="status">
             <p className="font-display text-[15px] font-semibold text-strong">
-              Only {existing?.name ?? "Bank of Bhutan"}&rsquo;s owner can verify it
+              Only {existing?.name ?? "Partner Bank"}&rsquo;s owner can verify it
             </p>
             <p className="max-w-[62ch] text-[13px] leading-[1.6] text-muted">
               Ask {owner?.name ?? "its owner"} to start this. Nothing has changed.

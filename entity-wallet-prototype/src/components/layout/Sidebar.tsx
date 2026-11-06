@@ -49,7 +49,7 @@ interface NavItem {
    * What the organisation being worked in must be able to do for the item
    * to exist. Read from the organisation's capabilities, the way the
    * Approvals row reads the person's scope: Pelden holds, so it has a
-   * Wallet and no issuing; Bank of Bhutan issues and verifies, and has a
+   * Wallet and no issuing; Partner Bank issues and verifies, and has a
    * Wallet only once it has set one up. `"no-holder"` is the way in to
    * asking for one.
    */
@@ -72,14 +72,14 @@ const OWNER: PersonaId[] = ["dorji"];
    they can see the organisation, and the wallet tells them they cannot act
    for it (FLOW-ONB-02 AC-08). */
 const OPERATES: PersonaId[] = ["dorji", "rinzin", "ugyen", "invitee", "yeshey"];
-/* An organisation's owner — Dorji for Pelden, Yeshey for Bank of Bhutan. */
+/* An organisation's owner — Dorji for Pelden, Yeshey for Partner Bank. */
 const ORG_OWNERS: PersonaId[] = ["dorji", "yeshey"];
 /* Everyone who belongs to, or works with, Pelden Trading — which is everyone
    except NDI's own administrators, who belong to no business on the
    platform and have nothing in its workspace to see. */
 const PELDEN: PersonaId[] = ["dorji", "rinzin", "pema", "ugyen", "invitee"];
 /* Everyone who works in some organisation's console — Pelden's people and
-   Bank of Bhutan's owner. */
+   Partner Bank's owner. */
 const ANY_ORG: PersonaId[] = [...PELDEN, "yeshey", "kesang", "deki"];
 /* An authority's officer — Kesang for the Ministry of Industry, Commerce &
    Employment. */
@@ -217,7 +217,7 @@ const PRIMARY: NavItem[] = [
 
   /* ---- Issuing and verifying — the platform's existing product ----
      Shown only for an organisation that may do them, which Pelden may not:
-     it signed up for an Entity Wallet and nothing else. Bank of Bhutan
+     it signed up for an Entity Wallet and nothing else. Partner Bank
      issues and verifies, so its owner sees these beside its wallet. */
   {
     label: "Issuance",

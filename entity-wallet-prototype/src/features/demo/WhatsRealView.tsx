@@ -435,7 +435,7 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     icon: "send",
     rows: [
       {
-        shown: "Bank of Bhutan's website, its application number and its return page",
+        shown: "Partner Bank's website, its application number and its return page",
         reality:
           "A dashed stand-in at /simulated/bank, drawn to the verifier integration guide's §5. Pressing its button creates a session in your browser; its return page reads the session back from the demo store and shows what the fetched status means. No bank system exists, and nothing leaves the browser.",
         needs: "A first bank's eKYB journey changed to start a session, redirect, park a pending application and fetch the result from its back end (EW-FLOW7-SD §13 item 4).",

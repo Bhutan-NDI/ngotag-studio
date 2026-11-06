@@ -24,7 +24,7 @@ const LOOKS: Record<string, IssuerLook> = {
   "Royal Insurance Corporation of Bhutan": { short: "RICB", tint: "lilac" },
   "Department of Labour": { short: "DoL", tint: "slate" },
   "Bhutan NDI": { short: "NDI", tint: "mint" },
-  "Bank of Bhutan": { short: "BoB", tint: "sky" },
+  "Partner Bank": { short: "PB", tint: "sky" },
 };
 
 /** Initials from the name, for an issuer nobody has described yet. */

@@ -75,8 +75,8 @@ export function DashboardView({ firstName }: { firstName?: string } = {}) {
      holder and has no verification to offer: it reaches the platform through
      a designation, so its dashboard is what it does and the designation card
      (EW-FLOW2-SD §2.2, D4). */
-  /* An organisation on NDI its authority has not confirmed — Bank of
-     Bhutan before its owner verifies it. Its dashboard is about what it
+  /* An organisation on NDI its authority has not confirmed — Partner
+     Bank before its owner verifies it. Its dashboard is about what it
      already does, with the way to verify it beside that (FLOW-ORG-01 A1).
      It used to offer to ask NDI for a wallet; verifying is the owner's to
      do directly, and NDI decides nothing about it. */

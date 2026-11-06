@@ -84,7 +84,7 @@ export interface Verification {
  * What an organisation may do on the NDI platform. Three separate grants,
  * held in any combination:
  *
- * - issuer / verifier — the platform's existing product. Bank of Bhutan has
+ * - issuer / verifier — the platform's existing product. Partner Bank has
  *   both: it issues account credentials and checks proofs at the counter.
  * - holder — the Entity Wallet: the organisation holds credentials issued to
  *   *it*, and people act for it under scoped authority.
@@ -126,8 +126,8 @@ export interface Organization {
   /**
    * Each member's role in *this* organisation, for people who joined it by
    * invitation. A person's own `memberRole` was written when Pelden was the
-   * only organisation, and one field cannot hold two roles: inviting Bank of
-   * Bhutan's owner into Pelden as an admin overwrote it, and made them an
+   * only organisation, and one field cannot hold two roles: inviting Partner
+   * Bank's owner into Pelden as an admin overwrote it, and made them an
    * admin of the bank too (AC-10 — each membership at its own role, neither
    * affecting the other). Read through `roleIn`, which falls back to
    * `memberRole` for the seed's Pelden people.
@@ -1564,7 +1564,7 @@ export interface OrgOnboarding {
  *   Druk Valley         — already verified on the platform: E3.
  *   Norbu Construction  — Dorji is not a representative: E6.
  *   Gangri Exports      — deregistered: E7, worded exactly as E6.
- *   Bank of Bhutan      — Yeshey is a representative: Kind E.
+ *   Partner Bank      — Yeshey is a representative: Kind E.
  *   Yangchen Handicrafts — a trade licence, so E6 names the other
  *                          authority (only Pelden can be created here).
  */
@@ -1618,7 +1618,7 @@ export const REGISTER_RECORDS: RegisterRecord[] = [
   {
     kind: "company",
     identifier: "CRA-1997-00112",
-    legalName: "Bank of Bhutan Ltd.",
+    legalName: "Partner Bank Ltd.",
     entityType: "Public limited company",
     representatives: ["yeshey"],
     active: true,
@@ -2818,7 +2818,7 @@ export const PUBLISHED_CREDENTIALS: { credential: string; issuer: string; items:
 /**
  * What the capability gate saw organisations doing while it only observed
  * (EW-FLOW4-SD §10) — the recognition list. A fixture: there is no gate.
- * Bank of Bhutan's verifying asks for more than opening an account needs,
+ * Partner Bank's verifying asks for more than opening an account needs,
  * which is the case recognition exists to catch (UC-25).
  */
 export const OBSERVED_OPERATORS: {
@@ -3056,13 +3056,13 @@ export const SEED: DemoState = {
          verified (FLOW-ORG-01 Kind E) — nobody at NDI approved it. Each organisation appears only in its own
          people's switcher, so Pelden's never shows it. */
       id: "org-bob",
-      name: "Bank of Bhutan",
-      legalName: "Bank of Bhutan Ltd.",
+      name: "Partner Bank",
+      legalName: "Partner Bank Ltd.",
       description: "Commercial bank. Issues account credentials and verifies customers on NDI.",
       role: "Owner",
       members: 3,
       createdAt: "2024-02-12",
-      website: "https://www.bob.bt",
+      website: "https://www.partnerbank.example",
       location: "Norzin Lam, Thimphu, Bhutan",
       visibility: "public",
       capabilities: ["issuer", "verifier", "holder"],
@@ -3413,13 +3413,13 @@ export const SEED: DemoState = {
       platformRole: "root",
     },
     {
-      /* Bank of Bhutan's owner on the platform — an account that has
+      /* Partner Bank's owner on the platform — an account that has
          existed since the bank started issuing on NDI. */
       id: "yeshey",
       name: "Yeshey Choden",
       cid: "•••• •••• 7731",
-      email: "yeshey.choden@bob.bt",
-      title: "Head of digital banking · Bank of Bhutan",
+      email: "yeshey.choden@partnerbank.example",
+      title: "Head of digital banking · Partner Bank",
       cidVerified: true,
     },
     {
@@ -3459,7 +3459,7 @@ export const SEED: DemoState = {
 
   relations: [
     {
-      /* Yeshey's root authority over Bank of Bhutan's Entity Wallet, from
+      /* Yeshey's root authority over Partner Bank's Entity Wallet, from
          when the bank set it up. */
       id: "rel-bob-root",
       orgId: "org-bob",
@@ -3468,7 +3468,7 @@ export const SEED: DemoState = {
       instrument: {
         fileName: "board-resolution-bob-2026-06.pdf",
         hash: "sha256:7d0e5a91c3b24f68a0e1d97c52b8f3a4e6c10d29b7f5a8e3",
-        reference: "BOB/BR/2026/022",
+        reference: "PB/BR/2026/022",
       },
       scope: {
         version: 1,
@@ -3547,7 +3547,7 @@ export const SEED: DemoState = {
           {
             operation: "proof:present",
             credentialTypes: { mode: "list", values: ["Business Registration"] },
-            relyingParties: { mode: "list", values: ["Bhutan National Single Window", "Bank of Bhutan"] },
+            relyingParties: { mode: "list", values: ["Bhutan National Single Window", "Partner Bank"] },
             approval: "SINGLE_APPROVER",
           },
           { operation: "connection:create", credentialTypes: { mode: "any" }, relyingParties: { mode: "any" }, approval: "AUTO" },
@@ -3608,7 +3608,7 @@ export const SEED: DemoState = {
           {
             operation: "proof:present",
             credentialTypes: { mode: "list", values: ["Tax Clearance Certificate"] },
-            relyingParties: { mode: "list", values: ["Bank of Bhutan"] },
+            relyingParties: { mode: "list", values: ["Partner Bank"] },
             approval: "DUAL_CONTROL",
           },
         ],
@@ -3644,7 +3644,7 @@ export const SEED: DemoState = {
       status: "active",
     },
     {
-      /* Bank of Bhutan's own registration, in its own wallet. */
+      /* Partner Bank's own registration, in its own wallet. */
       id: "hc-bob-registration",
       orgId: "org-bob",
       type: "Business Registration",
@@ -3652,7 +3652,7 @@ export const SEED: DemoState = {
       issuerDid: "did:polygon:0xe58a0aa81d2ec2fb904f800d2699123052be5913",
       issuerTrusted: true,
       attributes: [
-        { name: "registered_name", value: "Bank of Bhutan Ltd." },
+        { name: "registered_name", value: "Partner Bank Ltd." },
         { name: "registration_number", value: "CRA-1997-00112" },
         { name: "entity_type", value: "Public limited company" },
         { name: "registered_address", value: "Norzin Lam, Thimphu, Bhutan" },
@@ -3670,7 +3670,7 @@ export const SEED: DemoState = {
          to a supplier where payment goes without sending a bank letter. */
       id: "hc-bank",
       type: "Business Current Account",
-      issuer: "Bank of Bhutan",
+      issuer: "Partner Bank",
       issuerDid: "did:polygon:0xa2a4e362eb3f8494b23536454137d49265f1725c",
       issuerTrusted: true,
       attributes: [
@@ -3833,7 +3833,7 @@ export const SEED: DemoState = {
          doesn't hold — neither of which the spec allows. */
       id: "offer-bank",
       type: "Business Current Account",
-      issuer: "Bank of Bhutan",
+      issuer: "Partner Bank",
       issuerDid: "did:polygon:0xa2a4e362eb3f8494b23536454137d49265f1725c",
       attributes: [
         { name: "account_holder", value: "Pelden Trading Pvt. Ltd." },
@@ -3879,7 +3879,7 @@ export const SEED: DemoState = {
     {
       id: "pr-bob-earlier",
       verifierOrgId: "org-bob",
-      verifierName: "Bank of Bhutan",
+      verifierName: "Partner Bank",
       verifierDid: ISSUER_DID,
       purpose: "Annual review of a business customer's registration, as banking rules require.",
       asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] }],
@@ -3925,7 +3925,7 @@ export const SEED: DemoState = {
     {
       id: "pr-bob-loan",
       verifierOrgId: "org-bob",
-      verifierName: "Bank of Bhutan",
+      verifierName: "Partner Bank",
       verifierDid: ISSUER_DID,
       purpose: "Assessing a working-capital loan application.",
       asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number"] }],
@@ -3945,7 +3945,7 @@ export const SEED: DemoState = {
     {
       id: "pr-bob-account",
       verifierOrgId: "org-bob",
-      verifierName: "Bank of Bhutan",
+      verifierName: "Partner Bank",
       verifierDid: ISSUER_DID,
       purpose: "Opening a business current account.",
       asked: [{ id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "registered_address"] }],
@@ -3963,7 +3963,7 @@ export const SEED: DemoState = {
     {
       id: "pr-lapsed",
       verifierOrgId: "org-bob",
-      verifierName: "Bank of Bhutan",
+      verifierName: "Partner Bank",
       verifierDid: ISSUER_DID,
       purpose: "Confirming tax clearance before renewing an overdraft.",
       asked: [{ id: "tax", credentialType: "Tax Clearance Certificate", fields: ["tpn", "assessment_year"] }],
@@ -3991,7 +3991,7 @@ export const SEED: DemoState = {
     {
       id: "pr-bob-scope",
       verifierOrgId: "org-bob",
-      verifierName: "Bank of Bhutan",
+      verifierName: "Partner Bank",
       verifierDid: ISSUER_DID,
       purpose: "Checking a trade-finance customer's transport permits.",
       asked: [{ id: "permit", credentialType: "Freight Forwarder Permit", fields: ["permit_number", "vehicle_classes"] }],
@@ -4004,14 +4004,14 @@ export const SEED: DemoState = {
     },
   ],
   presentationSessions: [],
-  /* Bank of Bhutan's one registered return address — its eKYB journey's
+  /* Partner Bank's one registered return address — its eKYB journey's
      return page. Removing it is how FLOW-PRS-01 E15 is reached live. */
   returnAddresses: [
     {
       id: "ra-bob-ekyb",
       orgId: "org-bob",
       returnUrlId: "ekyb-return",
-      url: "https://www.bob.bt/ekyb/return",
+      url: "https://www.partnerbank.example/ekyb/return",
       addedBy: "yeshey",
       addedAt: day(-40),
     },
@@ -4035,12 +4035,12 @@ export const SEED: DemoState = {
          would actually commit to — B7 shows it for that reason. */
       id: "park-present-bob",
       operation: "proof:present",
-      summary: "Share Business Registration with Bank of Bhutan",
+      summary: "Share Business Registration with Partner Bank",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
       targetId: "pr-bob-earlier",
-      targetRelyingParty: "Bank of Bhutan",
+      targetRelyingParty: "Partner Bank",
       payloadHash: "sha256:c0a71e94b83f2d6508a1c47fe9b230da75146c8be03f9a27",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
@@ -4078,12 +4078,12 @@ export const SEED: DemoState = {
          out in 8.4 and the one a system would be broken to execute. */
       id: "park-stale",
       operation: "proof:present",
-      summary: "Share Tax Clearance Certificate with Bank of Bhutan",
+      summary: "Share Tax Clearance Certificate with Partner Bank",
       requestedBy: "karma",
       relationId: "rel-karma",
       scopeVersion: 2,
       targetId: "pr-lapsed",
-      targetRelyingParty: "Bank of Bhutan",
+      targetRelyingParty: "Partner Bank",
       payloadHash: "sha256:b61f7c05e298a4d3706b1cfe45a9d823017e5b9c4af26d10",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
@@ -4100,12 +4100,12 @@ export const SEED: DemoState = {
     {
       id: "park-approved-bob-loan",
       operation: "proof:present",
-      summary: "Share Business Registration with Bank of Bhutan",
+      summary: "Share Business Registration with Partner Bank",
       requestedBy: "rinzin",
       relationId: "rel-rinzin",
       scopeVersion: 3,
       targetId: "pr-bob-loan",
-      targetRelyingParty: "Bank of Bhutan",
+      targetRelyingParty: "Partner Bank",
       payloadHash: "sha256:e572b0491ac8d36f7be24051c9da8317064fb2e85d1a7c63",
       policy: "SINGLE_APPROVER",
       requiredSignatures: 1,
@@ -4689,13 +4689,13 @@ export const SEED: DemoState = {
 
   orgInvitations: [
     {
-      /* History: the invitation that set up Bank of Bhutan's Entity Wallet. */
+      /* History: the invitation that set up Partner Bank's Entity Wallet. */
       id: "inv-bob-wallet",
       kind: "W",
-      email: "yeshey.choden@bob.bt",
+      email: "yeshey.choden@partnerbank.example",
       orgId: "org-bob",
       role: null,
-      legalName: "Bank of Bhutan Ltd.",
+      legalName: "Partner Bank Ltd.",
       legalIdentity: "Public limited company, CRA-1997-00112",
       purpose: "Entity Wallet for an organisation already issuing and verifying on NDI.",
       needsSecondApproval: false,
@@ -4841,7 +4841,7 @@ export function firstRunState(s: DemoState): DemoState {
   return {
     ...s,
     activeOrgId: entity.id,
-    /* Other organisations are untouched — Bank of Bhutan's day is not
+    /* Other organisations are untouched — Partner Bank's day is not
        Pelden's first one. The issuer/verifier collections (schemas,
        credentials issued…) stay for the same reason: they are the issuers',
        and Pelden, a holder only, never sees them. */
@@ -4856,7 +4856,7 @@ export function firstRunState(s: DemoState): DemoState {
        the story has an account: they come on by invitation. The platform's
        own people keep whatever the story has given them — an admin root
        invited stays one — and so does anyone who belongs to another
-       organisation (Bank of Bhutan's owner). */
+       organisation (Partner Bank's owner). */
     people: s.people.map((p) =>
       p.id === "dorji"
         ? {
@@ -4955,12 +4955,12 @@ export function firstRunState(s: DemoState): DemoState {
  * people to review it, and NDI has none until its root administrator has
  * invited them. So the platform is shown being set up first: root signs in
  * (seeded by the deployment, never onboarded), invites a platform admin, and
- * only then does any organisation get on — Bank of Bhutan by invitation,
+ * only then does any organisation get on — Partner Bank by invitation,
  * Pelden by signing up.
  *
  * WHAT ALREADY EXISTS ON DAY ZERO
  *
- * The NDI platform itself is not new. Bank of Bhutan and Tashi InfoComm
+ * The NDI platform itself is not new. Partner Bank and Tashi InfoComm
  * have issued and verified on it for years, so they are here — without an
  * Entity Wallet. Everyone else is known to the story but has no account:
  * `hasAccount: false` keeps them out of the persona switcher until they

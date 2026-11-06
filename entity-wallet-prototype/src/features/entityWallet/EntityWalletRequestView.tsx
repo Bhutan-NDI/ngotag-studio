@@ -22,7 +22,7 @@ type Face = "unverified" | "in_progress" | "verified";
  *
  * A DIRECT ACTION, NOT A REQUEST TO NDI
  *
- * Bank of Bhutan has issued and verified on NDI for years; it has an owner
+ * Partner Bank has issued and verified on NDI for years; it has an owner
  * account, but its registration has never been confirmed by the authority,
  * so it holds nothing of its own. This screen used to have it *ask NDI* for
  * a wallet, wait for a platform administrator to approve, and then receive
@@ -45,7 +45,7 @@ export function EntityWalletRequestView() {
   const forced = useScreenState("SCR-ORG-A1", ["live", "unverified", "in_progress", "verified"]);
 
   /* Only an organisation outside NDI can be verified. Driven as one of
-     NDI's own people (when reviewing a forced state), Bank of Bhutan stands
+     NDI's own people (when reviewing a forced state), Partner Bank stands
      in, since it is the organisation this screen exists for. */
   const org =
     organizations.find((o) => o.id === activeOrgId && o.id !== NDI_ORG) ?? organizations.find((o) => o.id === "org-bob");

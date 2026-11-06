@@ -163,7 +163,7 @@ const join = (xs: string[]) =>
  * What a set of presets lets someone do, said back in the person's words.
  *
  * `sentence` is UC-20's one-line read-back — "Ugyen can receive credentials
- * and share them with Bank of Bhutan. Ugyen can't approve anything or give
+ * and share them with Partner Bank. Ugyen can't approve anything or give
  * authority to act." `allows` and `wont` are the same thing as lists, for
  * the screens that set them out line by line; `wont` always ends with the
  * two lines no combination changes.

@@ -29,7 +29,7 @@ const TRY_THESE: Record<string, { number: string; shows: string }[]> = {
     { number: "CRA-2015-03310", shows: "Norbu Construction — the register doesn't show Dorji" },
     { number: "CRA-2008-00731", shows: "Gangri Exports — no longer registered; worded the same" },
     { number: "CRA-2023-11802", shows: "Druk Valley Hardware — already verified here" },
-    { number: "CRA-1997-00112", shows: "Bank of Bhutan — confirms Yeshey, its owner" },
+    { number: "CRA-1997-00112", shows: "Partner Bank — confirms Yeshey, its owner" },
   ],
   sole_proprietorship: [
     { number: "BL-PARO-2011-0387", shows: "Yangchen Handicrafts — the ministry doesn't show Dorji" },
