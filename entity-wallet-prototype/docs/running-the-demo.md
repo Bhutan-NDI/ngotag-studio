@@ -1015,9 +1015,17 @@ creates a session and sends you to `/present?session=…` (SCR-PRS-01): the
 wallet's address, *Bank of Bhutan is asking for your organisation's details*,
 *You're on the NDI Entity Wallet. Nothing is shared until you choose.*, and
 the bank's application number with *Only continue if you started this on Bank
-of Bhutan's website just now and see this reference there.* **Continue**,
-then the dashed **Sign in as Dorji Wangchuk**; with one organisation there's
-no choice to make, so *Getting Bank of Bhutan's request…* and on.
+of Bhutan's website just now and see this reference there.* Dorji is already
+signed in to the wallet in this browser, so he isn't asked again: *Signed in
+as Dorji Wangchuk* and **Continue**. With one organisation there's no choice
+to make, so *Getting Bank of Bhutan's request…* and on.
+
+To show the signed-out arrival, open **Prototype: other ways in** under the
+panel and press **Arrive signed out instead**: **Sign in with Bhutan NDI**
+opens the sign-in in place — *Sign in to see Bank of Bhutan's request* and
+the Bhutan NDI scan card — and the dashed scan signs in and carries on to the
+request. **NDI's list can't be reached** there sets up FLOW-PRS-01 E8 for the
+next Continue or scan.
 
 **Share with Bank of Bhutan?** (SCR-PRS-02): the bank's reason in quotes,
 labelled as theirs; the reference again; then *Bank of Bhutan will receive all
@@ -1384,7 +1392,7 @@ Worth showing:
 | `/issuer/requests` | **e6**, **a2** | Why a request is in the officers' queue: not picked up, or referred by the office's system |
 | `/issuer/requests/...` | **e7**, **e10**, **e11** | Expired, already answered, withdrawn |
 | `/approvals/...` | **stale**, **expired**, **rejected** | The outcomes nobody demos |
-| `/present?session=…` | **signed_out**, **choose**, **checking**, **error_unknown**, **error_expired**, **error_used**, **no_organisation**, **refused**, **no_request**, **offline** | SCR-PRS-01: FLOW-PRS-01 E1–E4, E7, E8, E11 |
+| `/present?session=…` | **signed_in**, **signed_out**, **sign_in**, **choose**, **checking**, **error_unknown**, **error_expired**, **error_used**, **no_organisation**, **refused**, **no_request**, **offline** | SCR-PRS-01: FLOW-PRS-01 E1–E4, E7, E8, E11 |
 | `/wallet/sharing/…` | **with_approval**, **cant_satisfy**, **no_approver**, **recheck_error**, **send_error**, **already_answered**, **cancelled**, **no_permission**, **outside_reach**, **offline** | SCR-PRS-02, including E6/E13 (no approver while the Root is inactive) |
 | `/wallet/sharing/…/done` | **pending_approval**, **pending_kept**, **pending_passed**, **pending_checking**, **declined**, **refused**, **failed**, **cancelled**, **expired**, **no_return** | SCR-PRS-03: only *Shared* counts down |
 | `/wallet/sharing/…/approve` | **own**, **initiator_lapsed**, **recheck_error**, **already_decided**, **send_error**, **cancelled**, **no_permission** | SCR-PRS-04, including E16/E11 — nothing in the prototype ends an appointment |

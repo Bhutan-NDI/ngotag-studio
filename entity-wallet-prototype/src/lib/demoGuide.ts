@@ -852,7 +852,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "The wallet's own address, the bank's name as NDI lists it — never as the link says — and the bank's reference, with a sentence telling Dorji to continue only if he started this on the bank's site just now and sees that reference there.",
     doThis:
-      "Check the reference matches the bank's page, press **Continue**, then **Sign in as Dorji Wangchuk** (dashed — it stands in for the Bhutan NDI sign-in on the phone).",
+      "Check the reference matches the bank's page. Dorji is already signed in to the wallet, so it says so — press **Continue**. (Under **Prototype: other ways in**, **Arrive signed out instead** shows the Bhutan NDI sign-in first.)",
     say: "Being sent from a site you trust to a page asking you to sign in is exactly what phishing looks like. The address and the listed name are the only reassurance, so they come first.",
     match: "^/present$",
   },
@@ -1018,7 +1018,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 14,
     title: "Who is asking",
     happening: "The wallet's own address, the Single Window's name as NDI lists it, and BNSW's registration number to check against its page.",
-    doThis: "Press **Continue**, then **Sign in as Dorji Wangchuk** (dashed).",
+    doThis: "Dorji is already signed in to the wallet — press **Continue**.",
     match: "^/present$",
   },
   {

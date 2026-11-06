@@ -9,6 +9,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Panel } from "@/components/ui/Panel";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
+import { WalletHandoff, type HandoffStatus } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
 import { shortOrgName } from "@/lib/demoData";
 import { useDemo, type SessionLook } from "@/lib/demoStore";
@@ -37,16 +38,28 @@ import { ReferenceCheck } from "./shared";
  * one, and "Getting <verifier>'s request…" while the wallet receives it.
  * Nothing is shared here — permission is decided on the next screen.
  *
+ * SIGNED IN OR NOT
+ *
+ * Someone already signed in to the Entity Wallet in this browser is not
+ * asked again (FLOW-PRS-01 step 2: "if they have no Studio session"): they
+ * see who they are signed in as and continue. Signed out, Sign in with
+ * Bhutan NDI opens the sign-in — the Bhutan NDI scan — in place, so the
+ * request is still here when it is done.
+ *
  * SIMULATED
  *
- * The Bhutan NDI sign-in happens on the person's phone; the dashed step
- * stands in for it and signs in as whoever the demo is driven as. In the
+ * The Bhutan NDI sign-in happens on the person's phone; the dashed scan
+ * stands in for it and signs in as whoever the demo is driven as. Which of
+ * the two arrivals the demo shows, and NDI's list being out of reach (E8),
+ * are prototype what-ifs folded under the panel. In the
  * product Studio keeps the session reference on its own side through the
  * sign-in and accepts only a Studio path after it (§7.3).
  */
 type Face =
   | "live"
+  | "signed_in"
   | "signed_out"
+  | "sign_in"
   | "choose"
   | "loading"
   | "checking"
@@ -66,7 +79,9 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
     useDemo();
   const forced = useScreenState("SCR-PRS-01", [
     "live",
+    "signed_in",
     "signed_out",
+    "sign_in",
     "choose",
     "loading",
     "checking",
@@ -81,6 +96,12 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
 
   const [look, setLook] = useState<SessionLook | null>(null);
   const [phase, setPhase] = useState<Phase>("signed_out");
+  /* Whether this browser already has a wallet session. Most arrivals in the
+     demo do — the presenter is driving as someone — so that is the default;
+     the folded what-if below shows the signed-out arrival. */
+  const [signedIn, setSignedIn] = useState(true);
+  /* The Bhutan NDI scan on the sign-in page. */
+  const [scan, setScan] = useState<HandoffStatus>("awaiting_scan");
   const [usedRequest, setUsedRequest] = useState<string | null>(null);
   const [address, setAddress] = useState("");
   /* Simulated: NDI's list can't be reached when the request arrives (E8). */
@@ -128,7 +149,11 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
                   ? "no_organisation"
                   : phase === "refused"
                     ? "refused"
-                    : "signed_out";
+                    : phase === "signing_in"
+                      ? "sign_in"
+                      : signedIn
+                        ? "signed_in"
+                        : "signed_out";
   const face: Face = forced === "live" ? natural : forced;
   const usedId = usedRequest ?? (look?.kind === "used" ? look.requestId : null);
 
@@ -161,6 +186,18 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
       setPhase("no_organisation");
     } else if (orgs.length === 1) redeem(orgs[0].id, listDown);
     else setPhase("choose");
+  };
+
+  /* The simulated scan: checked, confirmed, then on as if back from the phone. */
+  const scanned = () => {
+    setScan("verifying");
+    window.setTimeout(() => {
+      setScan("confirmed");
+      window.setTimeout(() => {
+        setSignedIn(true);
+        afterSignIn(registryDown);
+      }, 700);
+    }, ROUND_TRIP_MS);
   };
 
   const goBack = () => {
@@ -198,14 +235,18 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
             NDI Entity Wallet{address ? ` · ${address}` : ""}
           </p>
           <h1 className="m-0 font-display text-[clamp(24px,3vw,32px)] font-semibold leading-[1.15] tracking-[-0.02em] text-strong">
-            {error && face === "error_unknown" ? "This link can't be opened" : `${verifier} is asking for your organisation's details`}
+            {error && face === "error_unknown"
+              ? "This link can't be opened"
+              : face === "sign_in"
+                ? `Sign in to see ${verifier}'s request`
+                : `${verifier} is asking for your organisation's details`}
           </h1>
           <p className="m-0 text-[14.5px] leading-[1.6] text-body">You&rsquo;re on the NDI Entity Wallet. Nothing is shared until you choose.</p>
         </div>
 
         {reference && !error ? <ReferenceCheck verifier={verifier} reference={reference} /> : null}
 
-        {minutesLeft !== null && !error && (face === "signed_out" || face === "choose") ? (
+        {minutesLeft !== null && !error && (face === "signed_out" || face === "sign_in" || face === "choose") ? (
           <p role="status" className="m-0 flex items-center gap-2 text-[13.5px] text-body">
             <Icon name="info" size={14} strokeWidth={2} className="flex-none text-muted" />
             {minutesLeft === 1 ? "Less than a minute" : `${minutesLeft} minutes`} left to sign in and continue. After that, start again on{" "}
@@ -272,35 +313,102 @@ export function OpeningRequestView({ sessionId }: { sessionId: string | null }) 
                   <HairlineButton onClick={goBack}>Go back to {verifier}</HairlineButton>
                 </div>
               </>
-            ) : (
+            ) : face === "signed_in" ? (
               <>
-                <p className="m-0 text-[14.5px] leading-[1.6] text-body">Sign in with Bhutan NDI to continue.</p>
+                {/* Already signed in to the wallet here: not asked again
+                    (FLOW-PRS-01 step 2). Who it is, so a shared computer
+                    can't pass as someone else. */}
+                <div className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-10 w-10 flex-none items-center justify-center rounded-full font-display text-[14px] font-semibold"
+                    style={{ background: "var(--grad-cta)", color: "var(--text-on-mint)" }}
+                  >
+                    {currentPerson.name.charAt(0)}
+                  </span>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="text-[12.5px] text-muted">Signed in as</span>
+                    <span className="font-display text-[15px] font-semibold text-strong">{currentPerson.name}</span>
+                  </span>
+                </div>
+                <p className="m-0 text-[14px] leading-[1.6] text-body">
+                  Next you&rsquo;ll see exactly what {verifier} is asking for, and choose whether to share it.
+                </p>
                 <div className="flex flex-wrap gap-2.5">
-                  <GradientButton onClick={() => setPhase("signing_in")} disabled={phase === "signing_in" || forced !== "live"}>
+                  <GradientButton onClick={() => afterSignIn(registryDown)} disabled={forced !== "live"}>
                     Continue
+                    <Icon name="arrowRight" size={15} strokeWidth={2} />
                   </GradientButton>
                   <HairlineButton onClick={goBack}>Go back to {verifier}</HairlineButton>
                 </div>
-                {phase === "signing_in" && forced === "live" ? (
-                  <SimulatedStep
-                    standsFor="the Bhutan NDI sign-in on your phone"
-                    action={
-                      <>
-                        <SimulatedAction onClick={() => afterSignIn(false)}>Sign in as {currentPerson.name}</SimulatedAction>
-                        <SimulatedAction onClick={() => afterSignIn(true)}>Sign in while NDI&rsquo;s list can&rsquo;t be reached</SimulatedAction>
-                      </>
-                    }
+              </>
+            ) : face === "sign_in" ? (
+              /* The sign-in page: the Bhutan NDI scan, in place, so the
+                 request is still here when it's done (EW-FLOW7-SD §7.3). */
+              <WalletHandoff
+                value={`ndi-sign-in-${sessionId ?? "session"}`}
+                cardVerb="Login"
+                title="Sign in with Bhutan NDI"
+                purpose={`Scan with the Bhutan NDI Wallet on your phone to sign in. ${verifier}'s request waits here while you do.`}
+                sharing={["Your identity, to sign you in to your NDI Entity Wallet account"]}
+                notSharing={[`Anything about your organisation — that's only shared with ${verifier} if you choose to, after this`]}
+                status={forced === "live" ? scan : "awaiting_scan"}
+                onSimulateScan={forced === "live" ? scanned : undefined}
+                onCancel={() => {
+                  setScan("awaiting_scan");
+                  setPhase("signed_out");
+                }}
+              />
+            ) : (
+              <>
+                <p className="m-0 text-[14.5px] leading-[1.6] text-body">
+                  Sign in to see what {verifier} is asking for. Nothing is shared by signing in.
+                </p>
+                <div className="flex flex-wrap gap-2.5">
+                  <GradientButton
+                    onClick={() => {
+                      setScan("awaiting_scan");
+                      setPhase("signing_in");
+                    }}
+                    disabled={forced !== "live"}
                   >
-                    Sign-in sends you to the Bhutan NDI app and back. The request waits for you here; nothing about it changes while
-                    you sign in. The second button also stands in for NDI&rsquo;s list of trusted organisations being out of reach when
-                    the request arrives, so it is held and checked again.
-                  </SimulatedStep>
-                ) : null}
+                    Sign in with Bhutan NDI
+                  </GradientButton>
+                  <HairlineButton onClick={goBack}>Go back to {verifier}</HairlineButton>
+                </div>
               </>
             )}
           </div>
         </Panel>
 
+        {/* Prototype what-ifs, folded away so the page reads as the product. */}
+        {forced === "live" && (face === "signed_in" || face === "signed_out") ? (
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 font-display text-[12px] font-medium text-faint">
+              <Icon name="chevronRight" size={12} strokeWidth={2.2} className="transition-transform duration-200 group-open:rotate-90" />
+              Prototype: other ways in
+            </summary>
+            <div className="mt-2">
+              <SimulatedStep
+                standsFor="how the person arrives, and NDI's list of trusted organisations"
+                action={
+                  <>
+                    <SimulatedAction onClick={() => setSignedIn(!signedIn)}>
+                      {signedIn ? "Arrive signed out instead" : `Arrive already signed in as ${currentPerson.name}`}
+                    </SimulatedAction>
+                    <SimulatedAction onClick={() => setRegistryDown(!registryDown)}>
+                      {registryDown ? "NDI's list is back" : "NDI's list can't be reached"}
+                    </SimulatedAction>
+                  </>
+                }
+              >
+                Already signed in to the NDI Entity Wallet in this browser, the person isn&rsquo;t asked again; signed out, they
+                sign in with the Bhutan NDI scan first. With NDI&rsquo;s list out of reach{registryDown ? " (on now)" : ""}, the
+                request is held and checked again rather than passed unchecked.
+              </SimulatedStep>
+            </div>
+          </details>
+        ) : null}
       </main>
     </div>
   );
