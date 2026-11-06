@@ -217,9 +217,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
   return (
     <AppShell>
-      {/* Wider than the app's reading pages: this is a comparison, two cards
-          side by side, and on a wide screen the decision sits beside them. */}
-      <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
         {header}
         {face === "offline" ? (
           <p role="alert" className="m-0 rounded-[12px] border border-grid px-4 py-3 text-[13px] text-body">
@@ -234,14 +232,14 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
         ) : null}
 
         <Panel>
-          <div className="relative z-[4] grid gap-6 @min-[1100px]/page:grid-cols-[minmax(0,1fr)_300px] @min-[1100px]/page:gap-8">
+          <div className="relative z-[4] flex flex-col gap-6">
             {/* ---- The exchange, as a picture: what goes, what comes back ----
                 One credential out, one in. Every detail of the one going out
                 is shown (EW-FLOW6-SD/D20 — all of it is shared), sorted into
                 what the issuer says it uses and what goes along anyway, so
                 the "used / not used" reading is a glance, not a column of
                 labels. Stacked on a phone, share still comes first. */}
-            <div className="grid items-stretch gap-3 min-[761px]:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+            <div className="grid items-stretch gap-3 min-[761px]:grid-cols-2">
               <section aria-labelledby="ask-share" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
                 <h2 id="ask-share" className={LABEL_CLASS}>
                   You share
@@ -297,17 +295,6 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                 </p>
               </section>
 
-              {/* The swap between them. */}
-              <div aria-hidden="true" className="flex items-center justify-center">
-                <span
-                  className="flex h-10 w-10 rotate-90 flex-col items-center justify-center rounded-full border border-grid min-[761px]:rotate-0"
-                  style={{ background: "var(--surface-raised)" }}
-                >
-                  <Icon name="arrowRight" size={13} strokeWidth={2.2} className="text-accent" />
-                  <Icon name="arrowLeft" size={13} strokeWidth={2.2} className="-mt-0.5 text-muted" />
-                </span>
-              </div>
-
               <section aria-labelledby="ask-receive" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
                 <h2 id="ask-receive" className={LABEL_CLASS}>
                   You may receive
@@ -332,17 +319,13 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </section>
             </div>
 
-            {/* ---- The decision: what happens next, and the buttons ----
-                Beside the cards on a wide screen, so asking is in view without
-                scrolling; below them otherwise. */}
-            <aside className="flex flex-col gap-5 @min-[1100px]/page:border-l @min-[1100px]/page:border-subtle @min-[1100px]/page:pl-8">
             {/* ---- What happens next, as three steps ----
                 The second decision named at the first (UN-37, UC-27). */}
             <section aria-labelledby="ask-next" className="flex flex-col gap-3">
               <h2 id="ask-next" className={LABEL_CLASS}>
                 What happens next
               </h2>
-              <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3 @min-[1100px]/page:grid-cols-1">
+              <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3">
                 {[
                   { icon: "send" as const, title: "You ask", note: `Your ${offering.prerequisite.credential} goes to them.` },
                   {
@@ -376,19 +359,12 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </ol>
             </section>
 
-            <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4 @min-[1100px]/page:mt-auto @min-[1100px]/page:flex-col">
-              <GradientButton
-                onClick={() => ask()}
-                disabled={readOnly || face === "loading"}
-                className="@min-[1100px]/page:h-auto @min-[1100px]/page:min-h-12 @min-[1100px]/page:w-full @min-[1100px]/page:py-2.5 @min-[1100px]/page:text-center"
-              >
+            <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
+              <GradientButton onClick={() => ask()} disabled={readOnly || face === "loading"}>
                 {face === "loading" ? "Asking…" : `Ask ${issuerInline(issuer)}`}
               </GradientButton>
-              <HairlineButton onClick={() => router.push("/wallet/get")} className="@min-[1100px]/page:w-full @min-[1100px]/page:justify-center">
-                Cancel
-              </HairlineButton>
+              <HairlineButton onClick={() => router.push("/wallet/get")}>Cancel</HairlineButton>
             </div>
-            </aside>
           </div>
         </Panel>
 
