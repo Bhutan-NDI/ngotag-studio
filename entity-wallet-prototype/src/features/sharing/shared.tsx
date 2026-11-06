@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { CredentialCard } from "@/components/ui/CredentialCard";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
@@ -114,6 +115,11 @@ export function ReferenceCheck({ verifier, reference }: { verifier: string; refe
  * rest are visibly *also* sent (UC-33). The sentence above it is one of the
  * two that must survive review unchanged.
  *
+ * Each credential that goes is drawn as its card — the one Held credentials
+ * shows — beside its details, so "which one goes" is recognised before the
+ * values are read. The card has no format pill: "W3C VC" means nothing to
+ * the person deciding.
+ *
  * Where a descriptor can't be answered (V7), its place in the list says why
  * and offers the way to get it (E9/E3, D17). Where more than one held
  * credential answers it, the newest is chosen and the person may change it
@@ -167,11 +173,20 @@ export function CredentialsToShare({
             );
           }
           return (
-            <li key={credential.id} className="flex flex-col gap-2 rounded-[12px] border border-grid px-4 py-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="m-0 text-[14px] font-medium text-strong">{credential.type}</p>
-                <p className="m-0 text-[12.5px] text-faint">From {credential.issuer} · received {formatDate(credential.receivedAt)}</p>
+            <li
+              key={credential.id}
+              className="grid gap-4 rounded-[14px] border border-grid p-4 @min-[760px]/page:grid-cols-[260px_minmax(0,1fr)] @min-[760px]/page:gap-5"
+            >
+              <div className="flex flex-col gap-2">
+                <CredentialCard
+                  type={credential.type}
+                  issuer={credential.issuer}
+                  foundational={credential.isFoundational}
+                  formats={[]}
+                />
+                <p className="m-0 text-[12px] text-faint">Received {formatDate(credential.receivedAt)}</p>
               </div>
+              <div className="flex min-w-0 flex-col gap-2">
               {/* A4 — "We've chosen the newest" is said only while it is true: once the
                   sharer picks an older one, and on SCR-PRS-04 where that one is
                   what will be sent, it would tell the approver something false
@@ -210,7 +225,7 @@ export function CredentialsToShare({
                   return (
                     <div
                       key={a.name}
-                      className={`grid gap-0.5 py-1.5 min-[521px]:grid-cols-[200px_1fr_auto] min-[521px]:items-baseline min-[521px]:gap-4 ${i > 0 ? "border-t border-subtle" : ""}`}
+                      className={`grid gap-0.5 py-1.5 min-[521px]:grid-cols-[150px_minmax(0,1fr)_auto] min-[521px]:items-baseline min-[521px]:gap-4 ${i > 0 ? "border-t border-subtle" : ""}`}
                     >
                       <dt className="text-[12.5px] text-faint">{attrLabel(a.name)}</dt>
                       <dd className="m-0 text-[13px] text-body">{a.value}</dd>
@@ -228,6 +243,7 @@ export function CredentialsToShare({
                   );
                 })}
               </dl>
+              </div>
             </li>
           );
         })}

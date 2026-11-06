@@ -1029,8 +1029,9 @@ next Continue or scan.
 
 **Share with Bank of Bhutan?** (SCR-PRS-02): the bank's reason in quotes,
 labelled as theirs; the reference again; then *Bank of Bhutan will receive all
-of the details below — not only the ones it asked for.* above every attribute
-of the registration, each marked *Asked for* or *Also shared*; and *None of
+of the details below — not only the ones it asked for.* above the
+registration drawn as its card, as Held credentials shows it, beside every
+attribute in it, each marked *Asked for* or *Also shared*; and *None of
 your other credentials is shared.* Dorji is the representative (AUTO), so
 **Share with Bank of Bhutan** sends at once. SCR-PRS-03 says *Shared with Bank
 of Bhutan. Taking you back in 5 seconds.* — the only outcome that counts
