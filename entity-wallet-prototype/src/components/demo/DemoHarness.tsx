@@ -293,8 +293,12 @@ export function DemoHarness() {
                         key={c.key}
                         type="button"
                         onClick={() => {
+                          /* A new cast member starts on their own dashboard:
+                             the page left open was the last person's. */
+                          const changed = harness.persona !== c.persona;
                           setPersona(c.persona as PersonaId);
                           setPanel(null);
+                          if (changed) router.push("/dashboard");
                         }}
                         aria-pressed={harness.persona === c.persona}
                         className="ndi-navrow flex w-full rounded-[9px] px-2.5 py-1.5 text-left"
@@ -517,8 +521,11 @@ export function DemoHarness() {
                     key={id}
                     type="button"
                     onClick={() => {
+                      /* Start on their own dashboard, not the last person's page. */
+                      const changed = harness.persona !== id;
                       setPersona(id);
                       setOpen(false);
+                      if (changed) router.push("/dashboard");
                     }}
                     aria-pressed={harness.persona === id}
                     /* Names only, with the role on hover: eight two-line
