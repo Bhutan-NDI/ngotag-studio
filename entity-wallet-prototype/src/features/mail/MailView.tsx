@@ -251,8 +251,9 @@ function Message({ mail }: { mail: MailMessage }) {
             <p className="relative mt-3 max-w-[46ch] text-[14.5px] leading-[1.6]" style={{ color: "#c5ccd8" }}>
               {mail.kind === "verify" ? (
                 <>
-                  Someone — hopefully you — started creating a Bhutan NDI Entity Wallet account with{" "}
-                  <strong style={{ color: "#ffffff" }}>{mail.mailbox.address}</strong>.
+                  You started setting up a Bhutan NDI Entity Wallet account with{" "}
+                  <strong style={{ color: "#ffffff" }}>{mail.mailbox.address}</strong>. Confirm it&rsquo;s your address to
+                  carry on.
                 </>
               ) : (
                 <>Join your colleagues on the Bhutan NDI Entity Wallet, where {shortOrgName(mail.orgName)} keeps and shares its credentials.</>
@@ -283,9 +284,9 @@ function Message({ mail }: { mail: MailMessage }) {
               <>
                 <ol className="m-0 flex list-none flex-col gap-0 p-0">
                   {[
-                    { title: "Confirm your email address", note: "This link, now.", on: true },
-                    { title: "Confirm it’s you", note: "One scan with your Bhutan NDI Wallet.", on: false },
-                    { title: "Choose a password", note: "Your name comes from your NDI wallet.", on: false },
+                    { title: "Confirm your email address", note: "Press the button below.", on: true },
+                    { title: "Confirm it’s you", note: "Scan once with your Bhutan NDI Wallet.", on: false },
+                    { title: "Choose a password", note: "Your name is filled in from your NDI wallet.", on: false },
                   ].map((step, i, all) => (
                     <li key={step.title} className="flex gap-3.5">
                       <span className="flex flex-col items-center">
@@ -314,8 +315,8 @@ function Message({ mail }: { mail: MailMessage }) {
                 </ol>
                 <MailButton onClick={() => router.push("/sign-up/verify")}>Confirm my email address</MailButton>
                 <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
-                  The link works once and expires in {VERIFY_LINK_DAYS} days. If this wasn&rsquo;t you, ignore this
-                  email — nothing is set up unless the link is opened.
+                  The link works once and expires in {VERIFY_LINK_DAYS} days. If you didn&rsquo;t start this, ignore this
+                  email — no account is set up unless the link is opened.
                 </p>
               </>
             ) : (
