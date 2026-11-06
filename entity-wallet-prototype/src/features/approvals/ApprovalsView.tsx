@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Countdown } from "@/components/ui/Countdown";
 import { DualAttribution } from "@/components/ui/DualAttribution";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -191,12 +192,7 @@ export function ApprovalsView() {
                           <Icon name="arrowRight" size={14} strokeWidth={2} />
                         </Link>
                       ) : (
-                        <Link
-                          href={href(operation)}
-                          className="ndi-plainlink text-[12.5px] font-medium text-muted"
-                        >
-                          Open
-                        </Link>
+                        <OpenLink href={href(operation)} />
                       )}
                     </div>
                   </div>

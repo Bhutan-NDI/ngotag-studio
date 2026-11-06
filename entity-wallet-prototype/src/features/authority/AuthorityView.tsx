@@ -9,6 +9,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -220,13 +221,7 @@ export function AuthorityView() {
                       <StatusPill status={words.pill} label={words.label} />
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <Link
-                        href={`/authority-to-act/${g.id}`}
-                        aria-label={`Open the authority for ${delegateNameOf(g)}`}
-                        className="ndi-plainlink text-[12.5px] font-medium text-accent"
-                      >
-                        Open
-                      </Link>
+                      <OpenLink href={`/authority-to-act/${g.id}`} aria-label={`Open the authority for ${delegateNameOf(g)}`} />
                       {waiting && mayCancel && cancellable(g) ? (
                         <button
                           type="button"

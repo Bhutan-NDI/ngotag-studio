@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { SearchField } from "@/components/ui/SearchField";
@@ -83,12 +84,7 @@ export function EcosystemsView() {
                       {e.members} {e.members === 1 ? "organization" : "organizations"} · joined{" "}
                       {e.joinedAt}
                     </span>
-                    <Link
-                      href="/ecosystems/manage"
-                      className="ndi-plainlink whitespace-nowrap text-[12.5px] text-accent"
-                    >
-                      Manage
-                    </Link>
+                    <OpenLink href="/ecosystems/manage">Manage</OpenLink>
                   </div>
                 </div>
               </Panel>

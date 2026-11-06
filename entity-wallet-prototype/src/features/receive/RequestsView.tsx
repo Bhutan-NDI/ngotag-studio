@@ -11,6 +11,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -222,10 +223,8 @@ export function RequestsView() {
                         </td>
                         <td>{next ? formatDate(next) : "—"}</td>
                         <td>
-                          <span className="flex flex-wrap gap-3">
-                            <Link href={`/wallet/requests/${r.id}`} className="ndi-plainlink whitespace-nowrap text-[12.5px] font-medium text-muted">
-                              Open
-                            </Link>
+                          <span className="flex flex-wrap items-center gap-3">
+                            <OpenLink href={`/wallet/requests/${r.id}`} />
                             {canWithdraw ? (
                               <button
                                 type="button"

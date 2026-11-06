@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useScreenState } from "@/components/demo/screenState";
@@ -9,10 +8,10 @@ import { DataTable } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
-import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { SAMPLE_REFERRAL_NOTE, inOfficerQueue, inOrg, type CredentialRequest } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
@@ -181,20 +180,7 @@ export function IssuerRequestsView() {
                       <td>{daysLeft(r.answerBy)} days</td>
                       <td className="max-w-[28ch] text-[12.5px] text-muted">{why(r)}</td>
                       <td>
-                        {/* A button, not a faint word: it's the row's one action. */}
-                        {face === "offline" ? (
-                          <span className="inline-flex h-8 items-center rounded-[9px] border border-grid px-3 font-display text-[12.5px] font-semibold text-faint">
-                            Open
-                          </span>
-                        ) : (
-                          <Link
-                            href={`/issuer/requests/${r.id}`}
-                            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[9px] border border-[var(--ndi-mint-40)] px-3 font-display text-[12.5px] font-semibold text-accent"
-                          >
-                            Open
-                            <Icon name="arrowRight" size={13} strokeWidth={2.2} />
-                          </Link>
-                        )}
+                        <OpenLink href={`/issuer/requests/${r.id}`} disabled={face === "offline"} />
                       </td>
                     </tr>
                   ))

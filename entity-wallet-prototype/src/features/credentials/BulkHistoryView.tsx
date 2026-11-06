@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/layout/AppShell";
 import { DataTable } from "@/components/ui/DataTable";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { OpenLink } from "@/components/ui/OpenLink";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Panel } from "@/components/ui/Panel";
 import { StatusPill } from "@/components/ui/StatusPill";
@@ -69,12 +70,7 @@ export function BulkHistoryView() {
                     </td>
                     <td className="text-muted">{u.uploadedAt}</td>
                     <td>
-                      <Link
-                        href={`/credentials/issue/bulk-issuance/history/${u.id}`}
-                        className="ndi-plainlink whitespace-nowrap text-[12.5px] text-accent"
-                      >
-                        View records
-                      </Link>
+                      <OpenLink href={`/credentials/issue/bulk-issuance/history/${u.id}`}>View records</OpenLink>
                     </td>
                   </tr>
                 ))
