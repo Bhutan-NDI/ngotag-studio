@@ -2011,6 +2011,21 @@ interface DemoActions {
    */
   appointUgyenToReceive: () => void;
   /**
+   * The presentation's "Receiving credentials" part, already done: Pelden
+   * holds its TPN, received today. Lets a later part be shown on its own
+   * as if the parts before it had been walked. Call after
+   * appointUgyenToReceive.
+   */
+  storyTpnHeld: () => void;
+  /**
+   * The "Issuing authority credentials" part, already done: Pelden holds its
+   * business licence, is listed to give authority, and Pema Choden holds
+   * ACTIVE authority to declare for it at BNSW, collected today. BNSW has
+   * no registration from Pelden yet, as after the walk. Call after
+   * storyTpnHeld.
+   */
+  storyAuthorityGiven: () => void;
+  /**
    * Sign in with an address. Resolves it to a person with an account and
    * drives the console as them; a stand-in for the server's answer, so the
    * screen only renders what comes back.
@@ -4703,6 +4718,40 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               },
               ...s.relations.filter((r) => !(r.personId === "ugyen" && inOrg(PELDEN)(r))),
             ],
+          };
+        }),
+
+      storyTpnHeld: () =>
+        setState((s) => {
+          const tpn = SEED.heldCredentials.find((c) => c.id === "hc-tpn");
+          if (!tpn || s.heldCredentials.some((c) => c.id === tpn.id)) return s;
+          return { ...s, heldCredentials: [{ ...tpn, orgId: PELDEN, receivedAt: today() }, ...s.heldCredentials] };
+        }),
+
+      storyAuthorityGiven: () =>
+        setState((s) => {
+          const licence = SEED.heldCredentials.find((c) => c.id === "hc-licence-plg");
+          const grant = SEED.authorityGrants.find((g) => g.id === "g-pema");
+          const listing = SEED.organizations.find((o) => o.id === PELDEN)?.authorityListing;
+          const now = today();
+          return {
+            ...s,
+            heldCredentials:
+              licence && !s.heldCredentials.some((c) => c.id === licence.id)
+                ? [{ ...licence, orgId: PELDEN, receivedAt: now }, ...s.heldCredentials]
+                : s.heldCredentials,
+            organizations: s.organizations.map((o) =>
+              o.id === PELDEN && listing ? { ...o, authorityListing: { ...listing, listedAt: now, firstNotice: null } } : o,
+            ),
+            /* Pema's authority as the walk leaves it: given by Dorji, collected
+               in her app today, for 90 days. Pema needs no account. */
+            authorityGrants: grant
+              ? [
+                  { ...grant, validFrom: now, validUntil: inDays(90), submittedAt: now, statusAt: now },
+                  ...s.authorityGrants.filter((g) => g.id !== grant.id),
+                ]
+              : s.authorityGrants,
+            counterpartyRegistrations: s.counterpartyRegistrations.filter((r) => r.orgId !== PELDEN),
           };
         }),
 

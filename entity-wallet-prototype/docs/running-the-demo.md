@@ -194,9 +194,12 @@ It comes two ways:
 
 - **In front of the client: the Presentation list.** Press **Presentation**,
   the outlined button beside **Guided demo**. It opens a list of the seven
-  parts, without flow numbers. Each one resets the demo to what that part
-  needs and opens its first screen, with no guide card, so the room sees
-  only the product. The part on screen is highlighted. The list closes by
+  parts, without flow numbers. Each one resets the demo to what the parts
+  before it leave behind and opens its first screen, with no guide card, so
+  the room sees only the product. Any part can be shown on its own: jumping
+  to the bank, Ugyen is already appointed and Pelden holds its TPN; jumping
+  to BNSW, Pema has collected her authority and Pelden holds its licence,
+  with BNSW still waiting for Pelden to register. The part on screen is highlighted. The list closes by
   itself once you pick something (or click away, or press Esc); drive the
   screens yourself, then open it again for the next part.
   Where another person picks the part up, the highlighted part has a

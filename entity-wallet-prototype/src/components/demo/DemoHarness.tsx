@@ -54,6 +54,8 @@ export function DemoHarness() {
     startFirstDay,
     startTeamReady,
     appointUgyenToReceive,
+    storyTpnHeld,
+    storyAuthorityGiven,
     setActiveOrg,
     organizations,
     relations,
@@ -138,9 +140,13 @@ export function DemoHarness() {
     else if (f.start === "platformReady") startPlatformReady();
     else if (f.start === "firstDay") startFirstDay();
     else if (f.start === "teamReady") startTeamReady();
-    else if (f.start === "controllerReady") {
+    else if (f.start === "controllerReady" || f.start === "tpnHeld" || f.start === "authorityGiven") {
+      /* A later part starts where the parts before it leave the story, so
+         it can be shown on its own without walking them first. */
       startTeamReady();
       appointUgyenToReceive();
+      if (f.start !== "controllerReady") storyTpnHeld();
+      if (f.start === "authorityGiven") storyAuthorityGiven();
     }
     else restoreStoryState();
     if (f.persona) setPersona(f.persona);
@@ -377,7 +383,7 @@ export function DemoHarness() {
           ) : null}
           <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">Presentation</p>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
-            Each one starts fresh on its first screen. Show them in this order.
+            Each one opens on its first screen as if the parts before it were done, so any can be shown on its own.
           </p>
           <ol className="mt-2.5 flex flex-col gap-1.5">
             {PRESENTATION_PARTS.map((p, i) => (

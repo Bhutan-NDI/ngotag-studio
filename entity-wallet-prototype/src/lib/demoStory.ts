@@ -106,9 +106,13 @@ export interface FlowEntry {
    * - `firstDay` — Pelden registered a moment ago, Dorji its only member.
    * - `teamReady` — the first day, with Ugyen joined and no authority
    *   yet: where appointing starts, and Flow 8's first grant.
+   * - `tpnHeld` — controllerReady, plus the TPN Ugyen asked for, held: the
+   *   presentation up to and including receiving credentials.
+   * - `authorityGiven` — tpnHeld, plus the business licence and Pema's
+   *   collected authority: the presentation up to acting at BNSW.
    * - `livedIn` — the story three months in, for the acts beyond onboarding.
    */
-  start: "dayZero" | "platformReady" | "firstDay" | "teamReady" | "controllerReady" | "livedIn";
+  start: "dayZero" | "platformReady" | "firstDay" | "teamReady" | "controllerReady" | "tpnHeld" | "authorityGiven" | "livedIn";
 }
 
 export const FLOW_ENTRIES: FlowEntry[] = [

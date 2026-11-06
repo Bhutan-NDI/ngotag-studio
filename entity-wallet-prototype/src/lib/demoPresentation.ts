@@ -214,7 +214,8 @@ export const FULL_GUIDE: GuideScript = {
  * The guide above is for practising — its card says what to press and what
  * to say, which is the presenter's business, not the room's. In front of a
  * client the presenter picks the next part from this list, each one starting
- * from a clean state on its first screen, and no card is shown. No flow
+ * on its first screen, from the state the parts before it leave behind
+ * (so any part can be shown on its own), and no card is shown. No flow
  * numbers: they mean something to the team, not to the audience.
  */
 export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | "selfService" | "start"> {
@@ -283,7 +284,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     shows: "Pelden Trading shares its credentials with Bank of Bhutan",
     persona: "dorji",
     route: "/simulated/bank",
-    start: "teamReady",
+    start: "tpnHeld",
     cast: ["dorji", "ugyen"],
     switchTo: [
       { label: "Ugyen · Pelden Trading", persona: "ugyen", route: "/wallet/sharing" },
@@ -295,8 +296,8 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     shows: "Dorji gives the clearing agent authority; she collects it in her own app",
     persona: "dorji",
     route: "/authority-to-act",
-    start: "teamReady",
-    cast: ["dorji"],
+    start: "tpnHeld",
+    cast: ["dorji", "ugyen"],
     switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/authority-to-act" }],
   },
   {
@@ -304,8 +305,8 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     shows: "The clearing agent declares for Pelden Trading, and each declaration is checked",
     persona: null,
     route: "/simulated/bnsw",
-    start: "livedIn",
-    cast: ["dorji"],
+    start: "authorityGiven",
+    cast: ["dorji", "ugyen"],
     switchTo: [
       { label: "Dorji · Pelden Trading", persona: "dorji", route: "/simulated/bnsw/register" },
       { label: "Pema · BNSW", route: "/simulated/bnsw" },
