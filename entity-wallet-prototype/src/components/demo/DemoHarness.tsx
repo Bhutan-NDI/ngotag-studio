@@ -171,11 +171,13 @@ export function DemoHarness() {
     harness.persona,
   );
   const toCollect = waitingToCollect({ organizations, authorityGrants });
-  /* Only the people this part needs — all the presentation's people when
-     no part is on — not everyone the full demo can drive as. */
+  /* Everyone in the presentation, whichever part is on — the part's own
+     people first — not everyone the full demo can drive as. */
   const onStage = castOnStage(
     { people, orgInvitations },
-    part !== null ? PRESENTATION_PARTS[part].cast : PRESENTATION_CAST,
+    part !== null
+      ? [...PRESENTATION_PARTS[part].cast, ...PRESENTATION_CAST.filter((id) => !PRESENTATION_PARTS[part].cast.includes(id))]
+      : PRESENTATION_CAST,
     harness.persona,
     part !== null ? PRESENTATION_PARTS[part].persona : null,
   );
@@ -268,11 +270,10 @@ export function DemoHarness() {
               however often the presenter switches. And what waits for a
               person is listed, because some of it — an appointment, an
               authority to collect — has no way back once you've left it. */}
-          {!onAuthScreen ? (
-            <div className="mb-3 flex flex-col gap-2 rounded-[12px] border border-grid px-3 py-2.5">
-              <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">
-                {part !== null ? "Driving as — people in this part" : "Driving as"}
-              </p>
+          {/* On every page, the sign-up and invitation screens too: the
+              presenter can always see who is in the story and switch. */}
+          <div className="mb-3 flex flex-col gap-2 rounded-[12px] border border-grid px-3 py-2.5">
+              <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">Driving as</p>
               <div className="flex flex-col gap-1">
                 {onStage.map((c) => {
                   const who = (
@@ -379,8 +380,7 @@ export function DemoHarness() {
                   </ul>
                 </>
               ) : null}
-            </div>
-          ) : null}
+          </div>
           <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">Presentation</p>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
             Each one opens on its first screen as if the parts before it were done, so any can be shown on its own.

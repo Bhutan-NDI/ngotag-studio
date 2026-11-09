@@ -1,5 +1,5 @@
 import { nameFromAddress } from "./demoMail";
-import { inOrg, PELDEN, PERSONAS, type DemoState, type GuideId, type PersonaId } from "./demoData";
+import { inOrg, PELDEN, type DemoState, type GuideId, type PersonaId } from "./demoData";
 import { GUIDE_CHAPTERS, GUIDE_STEPS, type GuideChapter, type GuideStep } from "./demoGuide";
 import type { FlowEntry } from "./demoStory";
 
@@ -529,9 +529,11 @@ export function castOnStage(
   /* Anyone off the script the presenter invites — a story person's name
      already reaches them (storyAddress), so these are genuinely new: listed
      as invited, then drivable once they've joined. */
+  /* Story people too, when this part doesn't list them: Ugyen invited
+     during the first part is someone to show, not to hide until the next. */
   for (const inv of open) {
     const p = s.people.find((x) => x.email.toLowerCase() === inv.email.toLowerCase());
-    if (p && ((PERSONAS as string[]).includes(p.id) || hasAccount(p))) continue;
+    if (p && ((ids as string[]).includes(p.id) || hasAccount(p))) continue;
     add({
       key: inv.id,
       name: p?.name ?? nameFromAddress(inv.email),
@@ -539,7 +541,7 @@ export function castOnStage(
       href: `/invitation/${inv.id}`,
     });
   }
-  for (const p of s.people.filter((x) => x.joinedBy && hasAccount(x) && !(PERSONAS as string[]).includes(x.id))) {
+  for (const p of s.people.filter((x) => x.joinedBy && hasAccount(x) && !(ids as string[]).includes(x.id))) {
     add({ key: p.id, name: p.name, role: p.title, persona: p.id });
   }
   const now = s.people.find((x) => x.id === current);
