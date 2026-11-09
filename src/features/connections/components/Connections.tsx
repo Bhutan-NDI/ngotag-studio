@@ -38,8 +38,10 @@ import type { AxiosResponse } from 'axios'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { isBhutanndiTheme } from '@/lib/active-theme'
+import { useMigrationPaused } from '@/features/walletMigration/components/PausedBanner'
 
 export default function Connections(): JSX.Element {
+  const migrationPaused = useMigrationPaused()
   const metadata: ITableMetadata = {
     enableSelection: false,
   }
@@ -307,7 +309,11 @@ export default function Connections(): JSX.Element {
   const column = getColumns<Connection>(tableStyling)
 
   const scanQrButton = (
-    <Button onClick={handleOpenQrModal} className="gap-2">
+    <Button
+      onClick={handleOpenQrModal}
+      className="gap-2"
+      disabled={migrationPaused}
+    >
       <QrCode className="h-4 w-4" />
       Create Connection
     </Button>
