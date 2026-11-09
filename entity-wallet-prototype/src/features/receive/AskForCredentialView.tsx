@@ -17,7 +17,9 @@ import { inOrg, requestInFlight } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, ROUND_TRIP_MS } from "@/lib/demoTiming";
 
-import { cannotAsk, issuerInline, useHolder } from "./shared";
+import { formatDate } from "@/features/controllership/scopeModel";
+
+import { cannotAsk, issuerInline, useHolder, valueFor } from "./shared";
 
 /** "sole proprietorships" — the kind of business as running text uses it. */
 const KIND_PLURAL: Record<string, string> = { company: "companies", sole_proprietorship: "sole proprietorships", partnership: "partnerships" };
@@ -213,7 +215,14 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
   if (!offering) return null;
   const readOnly = face === "no_permission";
-  const sharedCard = holder.held.find((c) => c.type === offering.prerequisite.credential);
+  /* The one that goes: active, not replaced by a newer one, and the newest
+     of those — the same rule the store applies when it asks. */
+  const sendable = holder.held
+    .filter((c) => c.type === offering.prerequisite.credential && c.status === "active" && !c.supersededBy)
+    .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+  const sharedCard = sendable[0];
+  /* Dates are held as ISO strings; everything else reads as it is. */
+  const shown = (v: string | null) => (v === null ? "—" : /^\d{4}-\d{2}-\d{2}/.test(v) ? formatDate(v) : v);
 
   return (
     <AppShell>
@@ -242,53 +251,58 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
             <div className="grid items-stretch gap-3 min-[761px]:grid-cols-2">
               <section aria-labelledby="ask-share" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
                 <h2 id="ask-share" className={LABEL_CLASS}>
-                  You share
+                  What you send
                 </h2>
                 {/* The card Pelden Trading holds, as Held credentials draws it,
                     so "which one goes" is recognised rather than read. */}
-                <CredentialCard
-                  type={offering.prerequisite.credential}
-                  issuer={sharedCard?.issuer ?? offering.prerequisite.issuer}
-                  foundational={Boolean(sharedCard?.isFoundational)}
-                  /* No format pill: "W3C VC" means nothing to the person deciding. */
-                  formats={[]}
-                />
+                <div className="flex flex-col gap-1.5">
+                  <CredentialCard
+                    type={offering.prerequisite.credential}
+                    issuer={sharedCard?.issuer ?? offering.prerequisite.issuer}
+                    foundational={Boolean(sharedCard?.isFoundational)}
+                    /* No format pill: "W3C VC" means nothing to the person deciding. */
+                    formats={[]}
+                  />
+                  {sharedCard ? (
+                    <p className="m-0 text-[12px] text-faint">
+                      Received {formatDate(sharedCard.receivedAt)}
+                      {sendable.length > 1 ? ` · the newest of your ${sendable.length}` : ""}
+                    </p>
+                  ) : null}
+                </div>
+                {/* Its details with their values, in the open: what is sent is
+                    read before agreeing to send it, not found behind a flip.
+                    Each says whether the issuer uses it (EW-FLOW6-SD/D20 — all
+                    of it goes either way). */}
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">
-                  They see all {offering.prerequisite.attributes.length} details in it:
+                  {issuerShort(issuer)} sees everything in it:
                 </p>
-                <div className="flex flex-col gap-1.5">
-                  <p className="m-0 text-[11.5px] font-medium text-faint">{issuerShort(issuer)} says it uses</p>
-                  <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                    {offering.prerequisite.attributes
-                      .filter((a) => offering.prerequisite.uses.includes(a))
-                      .map((a) => (
-                        <li
-                          key={a}
-                          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] text-body"
-                          style={{ background: "var(--ndi-mint-12)", border: "1px solid var(--ndi-mint-25)" }}
-                        >
-                          <Icon name="check" size={12} strokeWidth={2.4} className="text-accent" />
-                          {a}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <p className="m-0 text-[11.5px] font-medium text-faint">Also included, not used</p>
-                  <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                    {offering.prerequisite.attributes
-                      .filter((a) => !offering.prerequisite.uses.includes(a))
-                      .map((a) => (
-                        <li
-                          key={a}
-                          className="inline-flex items-center rounded-full border border-grid px-2.5 py-1 text-[12.5px] text-muted"
-                          style={{ background: "rgb(var(--tint) / 0.04)" }}
-                        >
-                          {a}
-                        </li>
-                      ))}
-                  </ul>
-                </div>
+                <dl className="m-0 flex flex-col">
+                  {offering.prerequisite.attributes.map((a, i) => {
+                    const used = offering.prerequisite.uses.includes(a);
+                    return (
+                      <div
+                        key={a}
+                        className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-1.5 ${i > 0 ? "border-t border-subtle" : ""}`}
+                      >
+                        <dt className="text-[12px] text-faint">{a}</dt>
+                        <dd className="m-0 row-start-1 col-start-2 self-center text-[11.5px] font-medium">
+                          {used ? (
+                            <span className="inline-flex items-center gap-1 text-accent">
+                              <Icon name="check" size={11} strokeWidth={2.4} />
+                              Used
+                            </span>
+                          ) : (
+                            <span className="text-faint">Not used</span>
+                          )}
+                        </dd>
+                        <dd className="col-span-2 m-0 text-[13px] text-body">
+                          {shown(sharedCard ? valueFor(sharedCard.attributes, a) : null)}
+                        </dd>
+                      </div>
+                    );
+                  })}
+                </dl>
                 <p className="m-0 mt-auto flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
                   <Icon name="shieldCheck" size={14} strokeWidth={2} className="flex-none text-accent" />
                   None of your other credentials is shared.
@@ -297,11 +311,13 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
               <section aria-labelledby="ask-receive" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
                 <h2 id="ask-receive" className={LABEL_CLASS}>
-                  You may receive
+                  What you get back
                 </h2>
                 {/* Marked as an offer: not held, and not until someone accepts. */}
                 <CredentialCard type={offering.credential} issuer={issuer} status="offered" formats={[]} />
-                <p className="m-0 text-[13px] leading-[1.5] text-muted">From {issuerInline(issuer)}, with:</p>
+                <p className="m-0 text-[13px] leading-[1.5] text-muted">
+                  If {issuerInline(issuer)} approves, they send you this, with:
+                </p>
                 <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
                   {offering.fields.map((f) => (
                     <li
@@ -338,15 +354,13 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                     title: "You decide",
                     note: "Nothing is added until someone here accepts it.",
                   },
-                ].map((step, i) => (
+                ].map((step) => (
                   <li key={step.title} className="flex items-start gap-3 rounded-[12px] border border-grid px-3.5 py-3">
+                    {/* All three alike: this explains what comes, it is not
+                        a progress bar with the first step already lit. */}
                     <span
-                      className="flex h-8 w-8 flex-none items-center justify-center rounded-full"
-                      style={
-                        i === 0
-                          ? { background: "var(--grad-cta)", color: "var(--text-on-mint)" }
-                          : { background: "rgb(var(--tint) / 0.06)", color: "var(--text-muted)" }
-                      }
+                      className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-accent"
+                      style={{ background: "var(--ndi-mint-12)", border: "1px solid var(--ndi-mint-25)" }}
                     >
                       <Icon name={step.icon} size={14} strokeWidth={2.2} />
                     </span>
@@ -359,7 +373,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </ol>
             </section>
 
-            <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
+            <div className="flex flex-wrap justify-center gap-2.5 border-t border-subtle pt-4">
               <GradientButton onClick={() => ask()} disabled={readOnly || face === "loading"}>
                 {face === "loading" ? "Asking…" : `Ask ${issuerInline(issuer)}`}
               </GradientButton>
