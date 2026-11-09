@@ -3527,8 +3527,16 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         const name = auth.delegateNameOf(g);
         const citizen = SIM_CITIZENS.find((c) => c.cid === auth.digitsOnly(cid));
 
+        const presented = auth.keyedFor(g.orgId, cid);
+        /* Demo only — nobody presenting remembers Pema's invented number, so
+           whatever ID number the grantor typed, Pema stands in for the person
+           named. Unless the number is one of the other sample people's: then
+           it was meant for them, and Pema is someone else (E9). */
+        const forAnotherSample = SIM_CITIZENS.some((c) => c.personId !== "pema" && auth.keyedFor(g.orgId, c.cid) === g.delegateIdKeyed);
+        const pemaStandsIn = citizen?.personId === "pema" && !forAnotherSample && presented !== g.delegateIdKeyed;
+
         /* G8 — the keyed hash of the presented number against the grant's. */
-        if (auth.keyedFor(g.orgId, cid) !== g.delegateIdKeyed) {
+        if (presented !== g.delegateIdKeyed && !pemaStandsIn) {
           /* A mismatch counts towards E9 and leaves an offer out untouched
              (E18). Once the delegate has accepted, nothing ends the grant
              but its registration (§4.2), so it counts for nothing. */
@@ -3621,6 +3629,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               /* The verified name, from the citizen credential (D11). */
               delegateName: citizen?.name ?? name,
               delegatePersonId: citizen?.personId ?? null,
+              /* Where Pema stood in, the grant now carries her number, so the
+                 Single Window's check against her sign-in matches too. */
+              ...(pemaStandsIn ? { delegateIdKeyed: presented } : {}),
               delegateDid: g.delegateDid ?? newDidId("did:key"),
               /* Generated now, registered only if accepted (D23). */
               revocationId: uuidish(),

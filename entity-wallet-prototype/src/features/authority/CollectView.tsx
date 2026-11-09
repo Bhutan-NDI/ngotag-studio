@@ -7,8 +7,8 @@ import { AuthHeader } from "@/components/layout/AuthHeader";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { Panel } from "@/components/ui/Panel";
-import { QrPlaceholder } from "@/components/ui/QrPlaceholder";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
+import { WalletHandoff } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { IDENTITY_MS, NOTICE_GRANT, ending, orgName as orgNameOf, statement } from "@/lib/authority";
@@ -218,7 +218,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <AuthHeader />
-      <main className="mx-auto flex w-full max-w-[640px] flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6 min-[641px]:py-10">
+      <main className={`mx-auto flex w-full ${face === "waiting_app" || face === "offer" || face === "opened_again" ? "max-w-[880px]" : "max-w-[640px]"} flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6 min-[641px]:py-10`}>
         {/* ---- NDI's name and address, before anything else ---- */}
         <div className="flex flex-col gap-2">
           <p className="m-0 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
@@ -272,21 +272,19 @@ export function CollectView({ claimRef }: { claimRef: string }) {
               </p>
             ) : face === "waiting_app" ? (
               <>
-                <p className="m-0 text-[14.5px] leading-[1.6] text-body">Open Bhutan NDI to share your ID.</p>
-                {phone ? (
-                  <GradientButton block>
-                    <Icon name="phone" size={15} strokeWidth={2} />
-                    Open Bhutan NDI
-                  </GradientButton>
-                ) : (
-                  <div className="w-full max-w-[220px]">
-                    <QrPlaceholder value={`ndi-identity-${claimRef}`} />
-                  </div>
-                )}
-                <p className="m-0 text-[13px] text-muted">Time remaining: {mmss(identityLeft)}. For your security, the request ends after 5 minutes.</p>
-                <div>
-                  <HairlineButton onClick={() => setPhase("before")}>Cancel</HairlineButton>
-                </div>
+                {/* The NDI integration card, as on every web-to-wallet step,
+                    so Pema meets the scan she knows from other services. */}
+                <WalletHandoff
+                  value={`ndi-identity-${claimRef}`}
+                  sameDevice={phone}
+                  title="Show it's you, with Bhutan NDI"
+                  purpose={`${orgName} named you to act for it. Scan with the Bhutan NDI Wallet on your phone so we can check you're that person.`}
+                  sharing={[`Your name and citizen ID number, from your citizen ID — to check they match the person ${orgName} named`]}
+                  notSharing={["Anything else in your Bhutan NDI Wallet"]}
+                  status="awaiting_scan"
+                  statusDetail={`Time remaining: ${mmss(identityLeft)}. For your security, the request ends after 5 minutes.`}
+                  onCancel={() => setPhase("before")}
+                />
               </>
             ) : (face === "offer" || face === "opened_again") && shown ? (
               <>
@@ -297,22 +295,19 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                 ) : null}
                 <Statement>{statement({ organizations }, shown, "delegate")}</Statement>
                 <p className="m-0 text-[13.5px] leading-[1.6] text-muted">
-                  It will be in your own Bhutan NDI app, in your name. It doesn&rsquo;t include {orgName}&rsquo;s licence or TPN — only the licence number you act under.
+                  It will be in your own Bhutan NDI app, in your name.
                 </p>
-                {phone ? (
-                  <GradientButton block>
-                    <Icon name="phone" size={15} strokeWidth={2} />
-                    Collect in Bhutan NDI
-                  </GradientButton>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <p className="m-0 text-[14px] font-medium text-strong">Collect in Bhutan NDI</p>
-                    <div className="w-full max-w-[220px]">
-                      <QrPlaceholder value={`ndi-offer-${claimRef}`} />
-                    </div>
-                  </div>
-                )}
-                <p className="m-0 text-[13px] text-muted">Time remaining: {mmss(offerLeft)}. For your security, the offer ends after 30 minutes.</p>
+                <WalletHandoff
+                  value={`ndi-offer-${claimRef}`}
+                  sameDevice={phone}
+                  cardVerb="Collect"
+                  title="Collect it in Bhutan NDI"
+                  purpose="Scan with the Bhutan NDI Wallet on your phone. The authority above arrives in the app, and you accept it there."
+                  sharing={["Nothing from your wallet — the authority comes to it, in your name"]}
+                  notSharing={[`${orgName}'s licence or TPN — only the licence number you act under`]}
+                  status="awaiting_scan"
+                  statusDetail={`Time remaining: ${mmss(offerLeft)}. For your security, the offer ends after 30 minutes.`}
+                />
               </>
             ) : face === "finishing" ? (
               <p role="status" className="m-0 text-[14.5px] leading-[1.6] text-body">
@@ -359,7 +354,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
             }
           >
             Bhutan NDI Verification asks for the citizen credential, its challenge bound to this authority. The ID number shared is compared with
-            the one {orgName} entered — by its keyed hash, never the number. Sharing someone else&rsquo;s plays a forwarded link (Journey U); the third
+            the one {orgName} entered — by its keyed hash, never the number. For the demo, Pema matches whatever ID number was typed, unless it is one of the other sample people&rsquo;s. Sharing someone else&rsquo;s plays a forwarded link (Journey U); the third
             time ends it.
           </SimulatedStep>
         ) : null}
