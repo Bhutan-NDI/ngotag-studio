@@ -7,28 +7,13 @@ import {
   MigrationResult,
 } from '@/features/walletMigration/types'
 import { axiosGet, axiosPost } from '@/services/apiRequests'
-import {
-  mockCancelMigration,
-  mockGetMigration,
-  mockRerunPreflight,
-  mockRunRehearsal,
-  mockScheduleMigration,
-  mockStartMigration,
-  mockStepUpSignIn,
-} from '@/features/walletMigration/mockMigrationApi'
-import {
-  mockDisasterRestore,
-  mockListMigrations,
-} from '@/features/walletMigration/mockAdminMigrationApi'
 
 import { AxiosResponse } from 'axios'
-import { MOCK_MIGRATION_API } from '@/features/walletMigration/config'
 import { apiRoutes } from '@/config/apiRoutes'
 import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 import { passwordValueEncryption } from '@/utils/passwordEncryption'
 
 // Organisation wallet migration API (platform org-migration gateway routes).
-// Every call uses dummy data when NEXT_PUBLIC_WALLET_MIGRATION_MOCK=true.
 
 type ApiError = Error & {
   statusCode?: number
@@ -74,9 +59,6 @@ const call = async <T>(
 export const getMigration = async (
   orgId: string,
 ): Promise<MigrationResult<IMigration | null>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockGetMigration(orgId)
-  }
   const result = await call<IMigration | null>(() =>
     axiosGet({ url: migrationUrl(orgId), config: getHeaderConfigs() }),
   )
@@ -100,9 +82,6 @@ export const stepUpSignIn = async (
   email: string,
   password: string,
 ): Promise<MigrationResult<IStepUpSession>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockStepUpSignIn(password)
-  }
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL}${apiRoutes.auth.sinIn}`,
@@ -140,7 +119,7 @@ export const stepUpSignIn = async (
 export const endStepUpSession = async (
   session: IStepUpSession,
 ): Promise<void> => {
-  if (MOCK_MIGRATION_API || !session.sessionId) {
+  if (!session.sessionId) {
     return
   }
   await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}${apiRoutes.auth.signOut}`, {
@@ -163,9 +142,6 @@ export const startMigration = async (
   payload: IStartMovePayload,
   session: IStepUpSession,
 ): Promise<MigrationResult<IMigrationWithPreflight>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockStartMigration(orgId, payload)
-  }
   try {
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL}${migrationUrl(orgId)}`,
@@ -201,33 +177,25 @@ export const startMigration = async (
 export const rerunPreflight = async (
   orgId: string,
   body: { apiKey?: string; backupsConfirmed?: boolean } = {},
-): Promise<MigrationResult<IMigrationWithPreflight>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockRerunPreflight(orgId, body)
-  }
-  return call<IMigrationWithPreflight>(() =>
+): Promise<MigrationResult<IMigrationWithPreflight>> =>
+  call<IMigrationWithPreflight>(() =>
     axiosPost({
       url: migrationUrl(orgId, apiRoutes.walletMigration.preflight),
       payload: body,
       config: getHeaderConfigs(),
     }),
   )
-}
 
 /** Starts the rehearsal in the background; poll the move for the result. */
 export const runRehearsal = async (
   orgId: string,
-): Promise<MigrationResult<IMigration>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockRunRehearsal(orgId)
-  }
-  return call<IMigration>(() =>
+): Promise<MigrationResult<IMigration>> =>
+  call<IMigration>(() =>
     axiosPost({
       url: migrationUrl(orgId, apiRoutes.walletMigration.rehearse),
       config: getHeaderConfigs(),
     }),
   )
-}
 
 /**
  * Confirm the move with the typed org name and book its slot (within 14
@@ -238,33 +206,25 @@ export const scheduleMigration = async (
   orgId: string,
   confirmationName: string,
   scheduledFor?: string,
-): Promise<MigrationResult<IMigration>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockScheduleMigration(orgId, confirmationName, scheduledFor)
-  }
-  return call<IMigration>(() =>
+): Promise<MigrationResult<IMigration>> =>
+  call<IMigration>(() =>
     axiosPost({
       url: migrationUrl(orgId, apiRoutes.walletMigration.schedule),
       payload: { confirmationName, ...(scheduledFor ? { scheduledFor } : {}) },
       config: getHeaderConfigs(),
     }),
   )
-}
 
 /** Call the move off before it starts (CREATED, REHEARSED or SCHEDULED). It ends as CANCELLED. */
 export const cancelMigration = async (
   orgId: string,
-): Promise<MigrationResult<IMigration>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockCancelMigration(orgId)
-  }
-  return call<IMigration>(() =>
+): Promise<MigrationResult<IMigration>> =>
+  call<IMigration>(() =>
     axiosPost({
       url: migrationUrl(orgId, apiRoutes.walletMigration.cancel),
       config: getHeaderConfigs(),
     }),
   )
-}
 
 /**
  * Moves across organisations, for platform admins; anyone else gets a 403.
@@ -274,9 +234,6 @@ export const cancelMigration = async (
 export const listMigrations = async (
   query: IListMigrationsQuery = {},
 ): Promise<MigrationResult<IMigrationList>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockListMigrations(query)
-  }
   const params = new URLSearchParams()
   Object.entries(query).forEach(([key, value]) => {
     if (value !== undefined && value !== '') {
@@ -300,18 +257,14 @@ export const listMigrations = async (
  */
 export const disasterRestore = async (
   orgId: string,
-): Promise<MigrationResult<IMigration>> => {
-  if (MOCK_MIGRATION_API) {
-    return mockDisasterRestore(orgId)
-  }
-  return call<IMigration>(() =>
+): Promise<MigrationResult<IMigration>> =>
+  call<IMigration>(() =>
     axiosPost({
       url: `${apiRoutes.walletMigration.listAll}/${orgId}${apiRoutes.walletMigration.disasterRestore}`,
       payload: { acknowledgeLosses: true },
       config: getHeaderConfigs(),
     }),
   )
-}
 
 /**
  * The release the dedicated agent must run: the shared agent's own, which the
@@ -322,9 +275,6 @@ export const disasterRestore = async (
 export const getRequiredAgentRelease = async (
   orgId: string,
 ): Promise<string | null> => {
-  if (MOCK_MIGRATION_API) {
-    return null
-  }
   const result = await call<{ releaseVersion?: string }>(() =>
     axiosGet({
       url: `${apiRoutes.organizations.root}/${orgId}${apiRoutes.Agent.checkAgentHealth}`,

@@ -2,7 +2,6 @@
 
 import { IMigration, MigrationResult } from './types'
 import {
-  MOCK_MIGRATION_API,
   PAUSED_STATUSES,
   POLL_IDLE_MS,
   POLL_RUNNING_MS,
@@ -57,15 +56,9 @@ const needsFastPolling = (migration: IMigration | null): boolean => {
     return true
   }
   if (migration.status === 'SCHEDULED' && migration.scheduledFor) {
-    if (MOCK_MIGRATION_API) {
-      return true
-    }
     return new Date(migration.scheduledFor).getTime() - Date.now() < SOON_MS
   }
-  return (
-    MOCK_MIGRATION_API &&
-    (migration.status === 'STABILISING' || migration.status === 'ROTATING')
-  )
+  return false
 }
 
 /**

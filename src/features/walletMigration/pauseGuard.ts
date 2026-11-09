@@ -4,8 +4,7 @@ import { MigrationStatus } from './types'
 
 // While the selected org is paused for its wallet move (SCR-WM-08), writes that
 // would touch its agent are refused before they leave the browser. The server
-// enforces this with 423 too; this also keeps demo data from issuing or
-// verifying on the shared agent mid-move.
+// enforces this with 423 too.
 const PAUSED_WRITE_PATHS = [
   '/credentials',
   '/proofs',

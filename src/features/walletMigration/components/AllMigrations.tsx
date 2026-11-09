@@ -11,11 +11,6 @@ import {
 } from '@/components/ui/dialog'
 import { IMigration, MigrationStatus } from '../types'
 import { Loader2, RefreshCw } from 'lucide-react'
-import {
-  MOCK_MIGRATION_API,
-  formatBtt,
-  isWalletMigrationEnabled,
-} from '../config'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   Select,
@@ -33,8 +28,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { disasterRestore, listMigrations } from '@/app/api/walletMigration'
+import { formatBtt, isWalletMigrationEnabled } from '../config'
 
-import { Badge } from '@/components/ui/badge'
 import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -315,11 +310,6 @@ export function AllMigrations(): React.JSX.Element {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {MOCK_MIGRATION_API && isWalletMigrationEnabled && (
-              <Badge variant="outline" className="text-xs">
-                Demo data
-              </Badge>
-            )}
             <Select
               value={status}
               onValueChange={(value) => {

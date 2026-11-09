@@ -13,7 +13,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   CANCELLABLE_STATUSES,
-  MOCK_MIGRATION_API,
   PAUSED_STATUSES,
   isWalletMigrationEnabled,
 } from '../config'
@@ -22,7 +21,6 @@ import { describeMigrationError, findMigrationError } from '../errorMessages'
 import { useIsOrgOwner, useMigrationStatus } from '../useMigrationStatus'
 
 import type { AxiosResponse } from 'axios'
-import { Badge } from '@/components/ui/badge'
 import { Breadcrumb } from '@/components/bhutanndi/ui/Breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -36,7 +34,6 @@ import { StartMoveForm } from './StartMoveForm'
 import { cancelMigration } from '@/app/api/walletMigration'
 import { getOrganizationById } from '@/app/api/organization'
 import { isBhutanndiTheme } from '@/lib/active-theme'
-import { resetMockMigration } from '../mockMigrationApi'
 import { useAppSelector } from '@/lib/hooks'
 import { useRouter } from 'next/navigation'
 
@@ -316,11 +313,6 @@ export default function MigrationWizard(): React.JSX.Element {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {migration && <MigrationStatusChip migration={migration} />}
-            {MOCK_MIGRATION_API && isWalletMigrationEnabled && (
-              <Badge variant="outline" className="text-xs">
-                Demo data
-              </Badge>
-            )}
           </div>
         </div>
 
@@ -335,36 +327,11 @@ export default function MigrationWizard(): React.JSX.Element {
 
         {renderBody()}
 
-        {(canCancel ||
-          (MOCK_MIGRATION_API &&
-            isWalletMigrationEnabled &&
-            isOwner &&
-            migration)) && (
-          <div className="border-border mt-8 flex flex-wrap items-center justify-between gap-3 border-t pt-6">
-            {MOCK_MIGRATION_API &&
-            isWalletMigrationEnabled &&
-            isOwner &&
-            orgId &&
-            migration ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={() => {
-                  resetMockMigration(orgId)
-                  applyResult({ ok: true, data: null })
-                }}
-              >
-                Reset demo data
-              </Button>
-            ) : (
-              <span />
-            )}
-            {canCancel && (
-              <Button variant="outline" onClick={() => setCancelOpen(true)}>
-                Cancel move
-              </Button>
-            )}
+        {canCancel && (
+          <div className="border-border mt-8 flex flex-wrap items-center justify-end gap-3 border-t pt-6">
+            <Button variant="outline" onClick={() => setCancelOpen(true)}>
+              Cancel move
+            </Button>
           </div>
         )}
       </div>
