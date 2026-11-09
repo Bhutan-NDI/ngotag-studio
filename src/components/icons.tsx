@@ -24,6 +24,7 @@ import {
   IconPlus,
   IconProps,
   IconSettings,
+  IconShieldCheck,
   IconShoppingBag,
   IconSun,
   IconTopologyStar,
@@ -76,4 +77,5 @@ export const Icons = {
   schemas: IconFileText,
   users: IconUsers,
   world: IconWorld,
+  mobileVerifier: IconShieldCheck,
 }

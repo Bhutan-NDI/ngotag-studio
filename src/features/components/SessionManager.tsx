@@ -38,6 +38,7 @@ const preventRedirectOnPaths = [
   '/agent-config',
   '/credentials',
   '/verification',
+  '/mobile-verifier',
 ]
 const excludeRouteForSessionCheck = [
   '/verify-email-success',

@@ -96,6 +96,11 @@ interface DataTableProps<TData, TValue> {
    * "Scan QR" button) without modifying the toolbar itself.
    */
   toolbarActions?: React.ReactNode
+
+  /**
+   * Hides the search input, for lists whose API has no search.
+   */
+  hideSearch?: boolean
 }
 
 /**
@@ -130,6 +135,7 @@ export function DataTable<TData, TValue>({
   onSearchTerm,
   isLoading = false,
   toolbarActions,
+  hideSearch = false,
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
@@ -186,6 +192,7 @@ export function DataTable<TData, TValue>({
         table={table}
         onSearchTermChange={onSearchTerm}
         toolbarActions={toolbarActions}
+        hideSearch={hideSearch}
       />
       <div className="overflow-hidden rounded-lg border">
         <Table className="divide-muted">
