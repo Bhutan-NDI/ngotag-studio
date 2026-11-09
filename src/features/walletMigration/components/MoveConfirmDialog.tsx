@@ -19,7 +19,10 @@ import { formatBtt } from '../config'
 interface MoveConfirmDialogProps {
   open: boolean
   orgName: string
-  scheduledFor: string
+  /** Null when the move starts at once ("Start now"). */
+  scheduledFor: string | null
+  /** The rehearsal's predicted pause, e.g. "12 minutes". */
+  expectedPause: string
   loading: boolean
   onOpenChange: (open: boolean) => void
   /** Called with what the owner typed; the platform checks it again. */
@@ -35,6 +38,7 @@ export function MoveConfirmDialog({
   open,
   orgName,
   scheduledFor,
+  expectedPause,
   loading,
   onOpenChange,
   onConfirm,
@@ -66,9 +70,22 @@ export function MoveConfirmDialog({
             Confirm the move: no going back after the switch
           </DialogTitle>
           <DialogDescription>
-            Scheduled for {formatBtt(scheduledFor)}.
+            {scheduledFor
+              ? `Scheduled for ${formatBtt(scheduledFor)}.`
+              : 'Starts now.'}
           </DialogDescription>
         </DialogHeader>
+
+        {!scheduledFor && (
+          <p
+            role="alert"
+            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
+          >
+            The move starts within a minute. Issuing and verifying pause
+            straight away, for about {expectedPause}. Don&apos;t restart your
+            dedicated agent until the move finishes.
+          </p>
+        )}
 
         <ul className="text-muted-foreground my-2 list-disc space-y-2 pl-5 text-sm">
           <li>
@@ -116,7 +133,9 @@ export function MoveConfirmDialog({
             onClick={() => onConfirm(typed.trim())}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Confirm and schedule the move
+            {scheduledFor
+              ? 'Confirm and schedule the move'
+              : 'Confirm and start the move'}
           </Button>
         </DialogFooter>
       </DialogContent>
