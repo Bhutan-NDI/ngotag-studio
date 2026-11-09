@@ -13,6 +13,11 @@ const NON_PUBLIC_IPV4 = [
   /^192\.168\./,
 ]
 
+// For test environments whose dedicated agents sit on an internal network the
+// platform can reach. Never set it in production.
+const ALLOW_INTERNAL_AGENTS =
+  process.env.NEXT_PUBLIC_WALLET_MIGRATION_ALLOW_INTERNAL_AGENTS === 'true'
+
 const parseUrl = (value?: string): URL | null => {
   try {
     return value ? new URL(value) : null
@@ -37,6 +42,9 @@ export const isPublicHost = (value?: string): boolean => {
   const url = parseUrl(value)
   if (!url) {
     return true // reported by the HTTPS check
+  }
+  if (ALLOW_INTERNAL_AGENTS) {
+    return true
   }
   const host = url.hostname
   if (host === 'localhost' || host.endsWith('.localhost')) {

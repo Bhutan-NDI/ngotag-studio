@@ -63,11 +63,18 @@ export const isRehearsed = (status: MigrationStatus): boolean =>
   status === 'REHEARSED' || status === 'SCHEDULED'
 
 /**
- * A move can only start from a recent rehearsal, measured at the slot (the
- * platform's ORG_MIGRATION_REHEARSAL_MAX_AGE_DAYS, 14 by default). Booking
- * past it is refused, and a slot reached past it is taken back.
+ * A move can only start from a recent rehearsal, measured at the slot. Booking
+ * past it is refused, and a slot reached past it is taken back. Set it to the
+ * platform's ORG_MIGRATION_REHEARSAL_MAX_AGE_DAYS where ops changed that from
+ * 14; the platform enforces its own value, this only shapes the wording.
  */
-export const REHEARSAL_MAX_AGE_DAYS = 14
+const configuredMaxAgeDays = Number(
+  process.env.NEXT_PUBLIC_WALLET_MIGRATION_REHEARSAL_MAX_AGE_DAYS,
+)
+export const REHEARSAL_MAX_AGE_DAYS =
+  Number.isInteger(configuredMaxAgeDays) && configuredMaxAgeDays > 0
+    ? configuredMaxAgeDays
+    : 14
 
 export const isRehearsalStale = (
   migration: Pick<IMigration, 'rehearsal'>,
@@ -81,9 +88,16 @@ export const isRehearsalStale = (
   return at - new Date(finishedAt).getTime() > maxAgeMs
 }
 
-/** The address an org's agent sends its webhooks to. */
+/**
+ * The address an org's agent sends its webhooks to: the platform's
+ * WEBHOOK_HOST, which is the API address unless the environment says otherwise.
+ */
 export const webhookUrlFor = (orgId: string): string =>
-  `${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/wh/${orgId}`
+  `${
+    process.env.NEXT_PUBLIC_WALLET_MIGRATION_WEBHOOK_HOST ||
+    process.env.NEXT_PUBLIC_BASE_URL ||
+    ''
+  }/wh/${orgId}`
 
 /** The platform only accepts a cancel before the move starts. */
 export const CANCELLABLE_STATUSES: MigrationStatus[] = [

@@ -312,3 +312,24 @@ export const disasterRestore = async (
     }),
   )
 }
+
+/**
+ * The release the dedicated agent must run: the shared agent's own, which the
+ * preflight's release check compares against. While the org is on the shared
+ * agent, its agent health is the shared agent's GET /agent. Null when it
+ * can't be read; the panel then falls back to the configured release.
+ */
+export const getRequiredAgentRelease = async (
+  orgId: string,
+): Promise<string | null> => {
+  if (MOCK_MIGRATION_API) {
+    return null
+  }
+  const result = await call<{ releaseVersion?: string }>(() =>
+    axiosGet({
+      url: `${apiRoutes.organizations.root}/${orgId}${apiRoutes.Agent.checkAgentHealth}`,
+      config: getHeaderConfigs(),
+    }),
+  )
+  return result.ok ? (result.data?.releaseVersion ?? null) : null
+}

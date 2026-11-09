@@ -1,13 +1,15 @@
 'use client'
 
 import { Check, Copy } from 'lucide-react'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import { getRequiredAgentRelease } from '@/app/api/walletMigration'
 import { webhookUrlFor } from '../config'
 
 // Per-environment values the owner needs to set up their agent (UX spec v1.1,
-// SCR-WM-02). Set them in the environment; they aren't secrets.
+// SCR-WM-02). Set them in the environment; they aren't secrets. The agent
+// release is read from the shared agent; the configured one is the fallback.
 const EXPORT_BUCKET = process.env.NEXT_PUBLIC_WALLET_MIGRATION_EXPORT_BUCKET
 const AGENT_RELEASE = process.env.NEXT_PUBLIC_WALLET_MIGRATION_AGENT_RELEASE
 const PLATFORM_IPS = (
@@ -61,6 +63,19 @@ export function BeforeYouStart({
   orgId,
 }: Readonly<{ orgId: string }>): React.JSX.Element {
   const webhookUrl = webhookUrlFor(orgId)
+  const [agentRelease, setAgentRelease] = useState(AGENT_RELEASE)
+
+  useEffect(() => {
+    let cancelled = false
+    getRequiredAgentRelease(orgId).then((release) => {
+      if (release && !cancelled) {
+        setAgentRelease(release)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [orgId])
   const rows: { label: string; hint: string; value?: string }[] = [
     {
       label: 'Webhook URL',
@@ -75,7 +90,7 @@ export function BeforeYouStart({
     {
       label: 'Required agent-controller release',
       hint: 'Your agent must run exactly this release.',
-      value: AGENT_RELEASE,
+      value: agentRelease,
     },
     {
       label: 'Platform IP addresses',
