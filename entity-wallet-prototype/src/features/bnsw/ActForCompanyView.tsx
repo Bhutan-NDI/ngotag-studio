@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useScreenState } from "@/components/demo/screenState";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
-import { QrPlaceholder } from "@/components/ui/QrPlaceholder";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { WalletHandoff } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { formatDate } from "@/features/controllership/scopeModel";
@@ -27,7 +27,7 @@ import {
   timeOf,
   tpnStatus,
 } from "@/lib/bnsw";
-import { PELDEN, SIM_CITIZENS, type AuthoritySession, type BnswCheck, type DeclarationDraft } from "@/lib/demoData";
+import { PELDEN, SIM_CITIZENS, type AuthoritySession, type BnswCheck, type CounterpartyDeclaration, type DeclarationDraft } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 import { namesOf } from "@/lib/sharing";
@@ -171,6 +171,9 @@ export function ActForCompanyView() {
   const mine = session
     ? counterpartyDeclarations.filter((d) => d.counterpartyId === BNSW && d.orgId === session.orgId && d.delegateCid === session.delegateCid)
     : [];
+  /* Just submitted: said where the form was, not only at the top of the
+     page, which is off screen by the time Submit is pressed. */
+  const justDeclared = phase === "acting" && notice?.code === "accepted" ? mine[0] : undefined;
 
   return (
     <BnswFrame signedIn={signedIn?.name ?? null} onSignOut={live && signedIn ? bnswSignOut : undefined}>
@@ -192,7 +195,7 @@ export function ActForCompanyView() {
         </BnswMessage>
       ) : null}
 
-      {notice && notice.text ? (
+      {notice && notice.text && !justDeclared ? (
         <BnswMessage tone={notice.code === "accepted" ? "success" : notice.code === "A4" || notice.code === "stopped" ? "info" : "warning"} role={notice.code.startsWith("E") ? "alert" : "status"}>
           <span>{notice.text}</span>
           {live && (notice.code === "accepted" || notice.code === "A4" || notice.code === "stopped") ? (
@@ -240,25 +243,20 @@ export function ActForCompanyView() {
 
       {/* ---- Waiting for the app (steps 2–4) ---- */}
       {phase === "waiting" ? (
-        <section className="flex flex-col gap-4 rounded-[12px] border border-grid px-4 py-5 min-[641px]:flex-row min-[641px]:items-start">
-          <div className="w-[168px] flex-none">
-            <QrPlaceholder value={model.requestId} />
-          </div>
-          <div className="flex min-w-0 flex-col gap-2.5">
-            <h2 className="m-0 font-display text-[16px] font-semibold text-strong">Scan with your Bhutan NDI app</h2>
-            <p className="m-0 max-w-[56ch] text-[13.5px] leading-[1.6] text-muted">
-              Your app will ask you to share your citizen ID and your authority to act for a company, together. On this phone? Open the request in
-              the app instead.
-            </p>
-            <p role="status" className="m-0 text-[13px] text-body">
-              {remaining(model.requestStartedAt, now)}
-            </p>
-            <span>
-              <HairlineButton className="!h-10 !px-4 !text-[13.5px]" onClick={() => (live ? bnswCancelRequest() : undefined)}>
-                Cancel
-              </HairlineButton>
-            </span>
-          </div>
+        /* The NDI integration card every relying party embeds, so the
+           scan at BNSW looks like the scan anywhere else in Bhutan. */
+        <section className="rounded-[12px] border border-grid px-4 py-5">
+          <WalletHandoff
+            value={model.requestId ?? "bnsw-request"}
+            cardVerb="Share"
+            title="Share your authority with BNSW"
+            purpose="Scan with the Bhutan NDI Wallet on your phone. The app asks for your citizen ID and your authority to act for a company, together. On this phone? Open the request in the app instead."
+            sharing={["Your citizen ID — so BNSW knows it's you", "The authority you choose — who it's for, what you may do, up to what, until when"]}
+            notSharing={["The company's licence or TPN — BNSW has those from its registration"]}
+            status="awaiting_scan"
+            statusDetail={`${remaining(model.requestStartedAt, now)}. For your security, the request ends after 5 minutes.`}
+            onCancel={() => (live ? bnswCancelRequest() : undefined)}
+          />
         </section>
       ) : null}
 
@@ -303,6 +301,13 @@ export function ActForCompanyView() {
             </span>
           </section>
 
+          {justDeclared ? (
+            <Declared
+              declaration={justDeclared}
+              amended={justDeclared.amends ? counterpartyDeclarations.find((x) => x.id === justDeclared.amends)?.reference ?? null : null}
+              onAnother={live ? bnswDismissNotice : undefined}
+            />
+          ) : (
           <DeclarationForm
             session={session}
             company={company}
@@ -313,6 +318,7 @@ export function ActForCompanyView() {
             onSubmit={bnswSubmit}
             amending={draft?.amends ? counterpartyDeclarations.find((d) => d.id === draft.amends)?.reference ?? null : null}
           />
+          )}
 
           {mine.length ? (
             <section className="flex flex-col gap-2">
@@ -350,6 +356,57 @@ export function ActForCompanyView() {
       {live ? <Elsewhere /> : null}
       <Records notice={notice} session={session} />
     </BnswFrame>
+  );
+}
+
+
+/** The answer to Submit, in the form's place: what was declared, and its reference. */
+function Declared({
+  declaration: d,
+  amended,
+  onAnother,
+}: {
+  declaration: CounterpartyDeclaration;
+  amended: string | null;
+  onAnother?: () => void;
+}) {
+  const ref = useRef<HTMLElement>(null);
+  /* Brought into view and focused, so the answer is seen and announced
+     wherever the page was scrolled to when Submit was pressed. */
+  useEffect(() => {
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    ref.current?.focus({ preventScroll: true });
+  }, [d.id]);
+  return (
+    <section
+      ref={ref}
+      tabIndex={-1}
+      role="status"
+      aria-labelledby="bnsw-declared"
+      className="flex flex-col items-center gap-4 rounded-[12px] border px-4 py-7 text-center outline-none"
+      style={{ borderColor: "color-mix(in srgb, var(--ndi-success) 35%, transparent)", background: "color-mix(in srgb, var(--ndi-success) 6%, transparent)" }}
+    >
+      <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: "var(--ndi-success)", color: "#fff" }}>
+        <Icon name="check" size={24} strokeWidth={2.6} />
+      </span>
+      <div className="flex flex-col gap-1">
+        <h2 id="bnsw-declared" className="m-0 font-display text-[18px] font-semibold text-strong">
+          {amended ? "Amendment submitted" : "Declaration submitted"}
+        </h2>
+        <p className="m-0 text-[13.5px] text-muted">
+          {amended ? `It replaces ${amended}. ` : ""}BNSW has accepted it for processing.
+        </p>
+      </div>
+      <dl className="m-0 grid w-full max-w-[520px] gap-3 rounded-[10px] border border-subtle px-4 py-3 text-left min-[521px]:grid-cols-2">
+        <Fact label="Reference">
+          <span className="font-mono">{d.reference}</span>
+        </Fact>
+        <Fact label="Goods">{d.goods}</Fact>
+        <Fact label="Value">Nu {grouped(d.valueNu)}</Fact>
+        <Fact label="Licence">{d.licenceNumber}</Fact>
+      </dl>
+      {onAnother ? <GradientButton onClick={onAnother}>Make another declaration</GradientButton> : null}
+    </section>
   );
 }
 
