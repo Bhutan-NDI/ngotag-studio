@@ -32,6 +32,10 @@ import { isBhutanndiTheme } from '@/lib/active-theme'
 import { switchOrganization } from '@/lib/switchOrganization'
 import { useCanCreateOrganization } from '@/lib/useOrgRoleAccess'
 
+// The platform's MAX_ORG_LIMIT. It counts every organisation the user belongs
+// to, invited ones included, not just the ones they own.
+const MAX_ORGANIZATIONS = 10
+
 export const OrganizationList = (): React.JSX.Element => {
   // A mobile verifier member can switch between their organisations but not
   // create one.
@@ -53,6 +57,8 @@ export const OrganizationList = (): React.JSX.Element => {
     total: 0,
     totalCount: 0,
   })
+  const orgLimitReached = currentPage.totalCount >= MAX_ORGANIZATIONS
+  const orgLimitMessage = `You can be in at most ${MAX_ORGANIZATIONS} organizations. Leave one to create another.`
 
   const getAllOrganizations = async (): Promise<void> => {
     setLoading(true)
@@ -239,9 +245,14 @@ export const OrganizationList = (): React.JSX.Element => {
                 onChange={setSearchText}
                 className="w-64"
               />
+              {canCreateOrg && orgLimitReached && (
+                <span className="text-bhutanndi-muted text-[12.5px]">
+                  {orgLimitMessage}
+                </span>
+              )}
               {canCreateOrg && (
                 <GradientButton
-                  disabled={currentPage.totalCount >= 10 || isCreatingOrg}
+                  disabled={orgLimitReached || isCreatingOrg}
                   onClick={handleCreateOrg}
                 >
                   {isCreatingOrg ? (
@@ -333,9 +344,14 @@ export const OrganizationList = (): React.JSX.Element => {
             onChange={(e) => setSearchText(e.target.value)}
             className="w-64"
           />
+          {canCreateOrg && orgLimitReached && (
+            <span className="text-muted-foreground text-sm">
+              {orgLimitMessage}
+            </span>
+          )}
           {canCreateOrg && (
             <Button
-              disabled={currentPage.totalCount >= 10 || isCreatingOrg}
+              disabled={orgLimitReached || isCreatingOrg}
               onClick={handleCreateOrg}
               className="gap-2"
             >
