@@ -1,5 +1,7 @@
 import {
+  IListMigrationsQuery,
   IMigration,
+  IMigrationList,
   IMigrationWithPreflight,
   IStartMovePayload,
   MigrationResult,
@@ -14,6 +16,10 @@ import {
   mockStartMigration,
   mockStepUpSignIn,
 } from '@/features/walletMigration/mockMigrationApi'
+import {
+  mockDisasterRestore,
+  mockListMigrations,
+} from '@/features/walletMigration/mockAdminMigrationApi'
 
 import { AxiosResponse } from 'axios'
 import { MOCK_MIGRATION_API } from '@/features/walletMigration/config'
@@ -22,7 +28,7 @@ import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 import { passwordValueEncryption } from '@/utils/passwordEncryption'
 
 // Organisation wallet migration API (platform org-migration gateway routes).
-// Every call uses dummy data unless NEXT_PUBLIC_WALLET_MIGRATION_MOCK=false.
+// Every call uses dummy data when NEXT_PUBLIC_WALLET_MIGRATION_MOCK=true.
 
 type ApiError = Error & {
   statusCode?: number
@@ -255,6 +261,53 @@ export const cancelMigration = async (
   return call<IMigration>(() =>
     axiosPost({
       url: migrationUrl(orgId, apiRoutes.walletMigration.cancel),
+      config: getHeaderConfigs(),
+    }),
+  )
+}
+
+/**
+ * Moves across organisations, for platform admins; anyone else gets a 403.
+ * The org filter is targetOrgId: the platform's role guard reads an orgId as
+ * "check membership of that org" and would refuse an admin who isn't a member.
+ */
+export const listMigrations = async (
+  query: IListMigrationsQuery = {},
+): Promise<MigrationResult<IMigrationList>> => {
+  if (MOCK_MIGRATION_API) {
+    return mockListMigrations(query)
+  }
+  const params = new URLSearchParams()
+  Object.entries(query).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') {
+      params.set(key, String(value))
+    }
+  })
+  const search = params.toString()
+  return call<IMigrationList>(() =>
+    axiosGet({
+      url: `${apiRoutes.walletMigration.listAll}${search ? `?${search}` : ''}`,
+      config: getHeaderConfigs(),
+    }),
+  )
+}
+
+/**
+ * Platform admins only: put an organisation back on the shared agent after its
+ * new agent was lost. Allowed only while the move is STABILISING and the old
+ * wallet isn't purged yet. Lossy: what the new agent recorded since the switch
+ * is gone, and connections made since then break.
+ */
+export const disasterRestore = async (
+  orgId: string,
+): Promise<MigrationResult<IMigration>> => {
+  if (MOCK_MIGRATION_API) {
+    return mockDisasterRestore(orgId)
+  }
+  return call<IMigration>(() =>
+    axiosPost({
+      url: `${apiRoutes.walletMigration.listAll}/${orgId}${apiRoutes.walletMigration.disasterRestore}`,
+      payload: { acknowledgeLosses: true },
       config: getHeaderConfigs(),
     }),
   )

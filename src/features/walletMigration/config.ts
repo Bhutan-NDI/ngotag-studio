@@ -5,11 +5,12 @@ export const isWalletMigrationEnabled =
   process.env.NEXT_PUBLIC_ENABLE_WALLET_MIGRATION === 'true'
 
 /**
- * Use dummy data until the platform migration API exists. Defaults to on, so
- * enabling the feature never calls endpoints that aren't deployed yet.
+ * Dummy data instead of the platform's migration API, for demos and UI work.
+ * Off unless NEXT_PUBLIC_WALLET_MIGRATION_MOCK=true: the platform serves the
+ * API from develop on.
  */
 export const MOCK_MIGRATION_API =
-  process.env.NEXT_PUBLIC_WALLET_MIGRATION_MOCK !== 'false'
+  process.env.NEXT_PUBLIC_WALLET_MIGRATION_MOCK === 'true'
 
 export const POLL_RUNNING_MS = 5_000
 export const POLL_IDLE_MS = 60_000

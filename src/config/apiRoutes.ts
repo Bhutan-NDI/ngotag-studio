@@ -149,7 +149,9 @@ export const apiRoutes = {
     rehearse: '/rehearse',
     schedule: '/schedule',
     cancel: '/cancel',
+    // Platform admins: not under /orgs/:orgId, see listMigrations.
     listAll: '/agents/migrations',
+    disasterRestore: '/disaster-restore',
   },
   Agent: {
     checkAgentHealth: '/agents/health',

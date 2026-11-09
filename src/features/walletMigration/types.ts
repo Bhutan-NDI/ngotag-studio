@@ -69,6 +69,8 @@ export interface IRotationProgress {
   /** total, pending, retrying, failed, waiting, stale, refused, updated */
   counts: Record<string, number>
   polledAt: string
+  /** Since when the number of connections still waiting hasn't changed. */
+  stalledSince?: string
 }
 
 export interface IMigration {
@@ -115,6 +117,19 @@ export interface IStartMovePayload {
 export interface IMigrationWithPreflight {
   migration: IMigration
   preflight: IPreflightReport | null
+}
+
+/** GET /agents/migrations (platform admins): moves across organisations. */
+export interface IMigrationList {
+  total: number
+  migrations: IMigration[]
+}
+
+export interface IListMigrationsQuery {
+  targetOrgId?: string
+  status?: MigrationStatus
+  pageNumber?: number
+  pageSize?: number
 }
 
 export type MigrationResult<T> =

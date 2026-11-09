@@ -32,6 +32,8 @@
 //                  the switch-over waits, then goes ahead and keeps the error
 //   rotation-stalled  connection updates stall halfway (ROTATION_STALLED)
 // A re-run of the checks or rehearsal, or a new booking, then succeeds.
+// A platform admin can restore any demo move in its first 48 hours from
+// /wallet-migration/all; the list there shows every demo move in this browser.
 //
 // Statuses follow the platform: REHEARSED → SCHEDULED → FROZEN …, an owner's
 // cancel ends as CANCELLED, an automatic abort as FAILED.
@@ -61,7 +63,7 @@ const STUCK_MS = 16_000
 const DEFER_MS = 12_000
 const TOTAL_CONNECTIONS = 1240
 
-interface IMockRecord {
+export interface IMockRecord {
   id: string
   orgId: string
   targetAdminEndpoint: string
@@ -79,11 +81,14 @@ interface IMockRecord {
   cancelledAt: string | null
   /** When the last finished rehearsal ended, while a new one runs. */
   previousRehearsalAt?: string | null
+  /** Set once a platform admin restores the org to the shared agent. */
+  restoredAt?: string | null
 }
 
-const storageKey = (orgId: string): string => `walletMigrationMock:${orgId}`
+export const storageKey = (orgId: string): string =>
+  `walletMigrationMock:${orgId}`
 
-const load = (orgId: string): IMockRecord | null => {
+export const load = (orgId: string): IMockRecord | null => {
   try {
     const raw = localStorage.getItem(storageKey(orgId))
     return raw ? (JSON.parse(raw) as IMockRecord) : null
@@ -92,7 +97,7 @@ const load = (orgId: string): IMockRecord | null => {
   }
 }
 
-const save = (record: IMockRecord): void => {
+export const save = (record: IMockRecord): void => {
   try {
     localStorage.setItem(storageKey(record.orgId), JSON.stringify(record))
   } catch {
@@ -100,13 +105,13 @@ const save = (record: IMockRecord): void => {
   }
 }
 
-const wait = (): Promise<void> =>
+export const wait = (): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, LATENCY_MS))
 
 const trigger = (record: IMockRecord, word: string): boolean =>
   record.targetAdminEndpoint.toLowerCase().includes(word)
 
-const iso = (ms: number): string => new Date(ms).toISOString()
+export const iso = (ms: number): string => new Date(ms).toISOString()
 
 const blank = (record: IMockRecord): IMigration => ({
   id: record.id,
@@ -173,7 +178,7 @@ const newest = (
   b: IPreflightReport,
 ): IPreflightReport => (a && a.ranAt > b.ranAt ? a : b)
 
-const derive = (record: IMockRecord, now: number): IMigration => {
+const deriveMove = (record: IMockRecord, now: number): IMigration => {
   let m = blank(record)
 
   // Rehearsal
@@ -363,9 +368,16 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   }
   if (rotateT < ROTATE_MS) {
     const stalled = trigger(record, 'rotation-stalled') && share >= 0.5
+    // It stalls halfway through the connection updates.
+    const halfwayMs = ROTATE_MS / 2
+    const halfwayAt = rotation.job.startedAt
+      ? Date.parse(rotation.job.startedAt) + halfwayMs
+      : now
     return {
       ...at(m, 'ROTATING'),
-      rotation,
+      rotation: stalled
+        ? { ...rotation, stalledSince: iso(halfwayAt) }
+        : rotation,
       ...(stalled ? { error: 'ROTATION_STALLED' } : {}),
     }
   }
@@ -376,7 +388,18 @@ const derive = (record: IMockRecord, now: number): IMigration => {
   }
 }
 
-const notFound = (): MigrationResult<never> => ({
+// A restore freezes the move where it stood, as DISASTER_RESTORED.
+export const derive = (record: IMockRecord, now: number): IMigration => {
+  if (record.restoredAt) {
+    return at(
+      deriveMove(record, Date.parse(record.restoredAt)),
+      'DISASTER_RESTORED',
+    )
+  }
+  return deriveMove(record, now)
+}
+
+export const notFound = (): MigrationResult<never> => ({
   ok: false,
   message: 'No move found for this organisation.',
 })

@@ -298,6 +298,13 @@ export function MoveDashboard({
                   app.
                 </p>
               )}
+              {status === 'ROTATING' && migration.rotation?.stalledSince && (
+                <p className="text-muted-foreground text-sm">
+                  No more connections have updated since{' '}
+                  {formatBtt(migration.rotation.stalledSince)}. The rest are
+                  likely phones that are offline.
+                </p>
+              )}
               {counts.refused > 0 && (
                 <p className="text-muted-foreground text-sm">
                   {counts.refused} connections refused the update. They&apos;ll
