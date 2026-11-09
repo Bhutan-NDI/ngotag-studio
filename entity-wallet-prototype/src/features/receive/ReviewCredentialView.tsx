@@ -319,29 +319,34 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
           {/* The credential being offered, drawn as the card it will be once
               accepted — so what the organisation is getting is recognised at
               a glance, before the details are read. */}
-          <div className="flex flex-col gap-2.5">
+          {/* Who it is from sits under the card, with the card: the column
+              would otherwise end at the card and leave a gap beside the
+              details, and the right-hand side is left for checking and
+              deciding. */}
+          <div className="flex flex-col gap-3">
             <CredentialCard type={credential} issuer={issuer} status="offered" formats={[]} size="lg" />
-            <p className="m-0 flex items-center gap-1.5 text-[12.5px] text-muted">
-              <Icon name="download" size={13} strokeWidth={2} className="flex-none text-accent" />
-              Offered to {holder.name}
-            </p>
-          </div>
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1">
-              <p className="m-0 text-[14px] text-body">
-                From <span className="font-medium text-strong">{issuer}</span>
+            <div className="flex flex-col gap-2 border-t border-subtle pt-3">
+              <p className="m-0 flex items-start gap-2 text-[13px] text-body">
+                <Icon name="download" size={14} strokeWidth={2} className="mt-[2px] flex-none text-accent" />
+                <span>
+                  Offered to <span className="font-medium text-strong">{holder.name}</span>
+                </span>
               </p>
-              <p className="m-0 flex items-center gap-1.5 text-[12.5px] text-muted">
-                <Icon name="shieldCheck" size={13} strokeWidth={2} style={{ color: "var(--ndi-success)" }} />
-                On NDI&rsquo;s list of trusted organisations
+              <p className="m-0 flex items-start gap-2 text-[13px] text-body">
+                <Icon name="shieldCheck" size={14} strokeWidth={2} className="mt-[2px] flex-none" style={{ color: "var(--ndi-success)" }} />
+                <span>
+                  From <span className="font-medium text-strong">{issuer}</span>, on NDI&rsquo;s list of trusted organisations
+                </span>
               </p>
-              <p className="m-0 text-[12.5px] text-faint">
+              <p className="m-0 flex items-start gap-2 text-[13px] text-muted">
+                <Icon name="send" size={14} strokeWidth={2} className="mt-[2px] flex-none text-faint" />
                 {r
                   ? `In answer to the request ${personById(r.requestedBy).name} made on ${formatDate(r.requestedAt)}`
                   : `Sent unasked on ${formatDate(o?.receivedAt ?? "")}`}
               </p>
             </div>
-
+          </div>
+          <div className="flex flex-col gap-5">
             <p className="m-0 max-w-[66ch] text-[14px] leading-[1.6] text-body">
               Check these details are right. If something is wrong, decline and contact {issuerInline(issuer)}.
             </p>

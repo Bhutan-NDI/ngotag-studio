@@ -248,10 +248,10 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                 what the issuer says it uses and what goes along anyway, so
                 the "used / not used" reading is a glance, not a column of
                 labels. Stacked on a phone, share still comes first. */}
-            <div className="grid items-stretch gap-3 min-[761px]:grid-cols-2">
-              <section aria-labelledby="ask-share" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
+            <div className="grid gap-6 min-[761px]:grid-cols-2 min-[761px]:gap-0">
+              <section aria-labelledby="ask-share" className="flex min-w-0 flex-col gap-3 min-[761px]:pr-6">
                 <h2 id="ask-share" className={LABEL_CLASS}>
-                  What you send
+                  You share
                 </h2>
                 {/* The card Pelden Trading holds, as Held credentials draws it,
                     so "which one goes" is recognised rather than read. */}
@@ -263,74 +263,69 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                     /* No format pill: "W3C VC" means nothing to the person deciding. */
                     formats={[]}
                   />
-                  {sharedCard ? (
-                    <p className="m-0 text-[12px] text-faint">
-                      Received {formatDate(sharedCard.receivedAt)}
-                      {sendable.length > 1 ? ` · the newest of your ${sendable.length}` : ""}
-                    </p>
-                  ) : null}
+                  <p className="m-0 text-[12px] text-faint">
+                    {sharedCard
+                      ? `Received ${formatDate(sharedCard.receivedAt)}${sendable.length > 1 ? ` · the newest of your ${sendable.length}` : ""}`
+                      : " "}
+                  </p>
                 </div>
                 {/* Its details with their values, in the open: what is sent is
                     read before agreeing to send it, not found behind a flip.
-                    Each says whether the issuer uses it (EW-FLOW6-SD/D20 — all
-                    of it goes either way). */}
-                <p className="m-0 text-[13px] leading-[1.5] text-muted">
-                  {issuerShort(issuer)} sees everything in it:
-                </p>
-                <dl className="m-0 flex flex-col">
-                  {offering.prerequisite.attributes.map((a, i) => {
-                    const used = offering.prerequisite.uses.includes(a);
-                    return (
-                      <div
-                        key={a}
-                        className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-1.5 ${i > 0 ? "border-t border-subtle" : ""}`}
-                      >
-                        <dt className="text-[12px] text-faint">{a}</dt>
-                        <dd className="m-0 row-start-1 col-start-2 self-center text-[11.5px] font-medium">
-                          {used ? (
-                            <span className="inline-flex items-center gap-1 text-accent">
-                              <Icon name="check" size={11} strokeWidth={2.4} />
-                              Used
-                            </span>
-                          ) : (
-                            <span className="text-faint">Not used</span>
-                          )}
-                        </dd>
-                        <dd className="col-span-2 m-0 text-[13px] text-body">
-                          {shown(sharedCard ? valueFor(sharedCard.attributes, a) : null)}
-                        </dd>
-                      </div>
-                    );
-                  })}
-                </dl>
-                <p className="m-0 mt-auto flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
+                    Grouped by whether the issuer uses them, so the marking is
+                    two headings rather than a tag on every row
+                    (EW-FLOW6-SD/D20 — all of it goes either way). */}
+                <p className="m-0 text-[13px] leading-[1.5] text-muted">{issuerShort(issuer)} sees everything in it.</p>
+                {[
+                  { used: true, title: `Used by ${issuerShort(issuer).toLowerCase()}` },
+                  { used: false, title: "Sent, but not used" },
+                ].map((group) => (
+                  <div key={group.title} className="flex flex-col gap-1">
+                    <p className="m-0 flex items-center gap-2 text-[11.5px] font-semibold text-muted">
+                      <span
+                        aria-hidden="true"
+                        className="h-1.5 w-1.5 flex-none rounded-full"
+                        style={{ background: group.used ? "var(--ndi-mint)" : "var(--text-faint)" }}
+                      />
+                      {group.title}
+                    </p>
+                    <DetailRows
+                      rows={offering.prerequisite.attributes
+                        .filter((a) => offering.prerequisite.uses.includes(a) === group.used)
+                        .map((a) => ({ label: a, value: shown(sharedCard ? valueFor(sharedCard.attributes, a) : null) }))}
+                      quiet={!group.used}
+                    />
+                  </div>
+                ))}
+                <p className="m-0 flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
                   <Icon name="shieldCheck" size={14} strokeWidth={2} className="flex-none text-accent" />
                   None of your other credentials is shared.
                 </p>
               </section>
 
-              <section aria-labelledby="ask-receive" className="flex flex-col gap-3 rounded-[14px] border border-grid p-4">
+              {/* A rule between the two rather than a box round each: the two
+                  sides are rarely the same height, and a box shows the
+                  difference as empty space. */}
+              <section
+                aria-labelledby="ask-receive"
+                className="flex min-w-0 flex-col gap-3 border-t border-subtle pt-6 min-[761px]:border-l min-[761px]:border-t-0 min-[761px]:pl-6 min-[761px]:pt-0"
+              >
                 <h2 id="ask-receive" className={LABEL_CLASS}>
-                  What you get back
+                  You&rsquo;ll receive, if approved
                 </h2>
                 {/* Marked as an offer: not held, and not until someone accepts. */}
-                <CredentialCard type={offering.credential} issuer={issuer} status="offered" formats={[]} />
+                <div className="flex flex-col gap-1.5">
+                  <CredentialCard type={offering.credential} issuer={issuer} status="offered" formats={[]} />
+                  <p className="m-0 text-[12px] text-faint">Not in your wallet yet</p>
+                </div>
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">
-                  If {issuerInline(issuer)} approves, they send you this, with:
+                  {issuerShort(issuer)} fills it in. It will look like this:
                 </p>
-                <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                  {offering.fields.map((f) => (
-                    <li
-                      key={f.name}
-                      className="inline-flex items-center rounded-full border border-grid px-2.5 py-1 text-[12.5px] text-body"
-                    >
-                      {f.label}
-                    </li>
-                  ))}
-                </ul>
-                <p className="m-0 mt-auto flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
+                {/* The offering's own examples, so the rows read like the
+                    ones opposite rather than a list of names. */}
+                <DetailRows rows={offering.fields.map((f) => ({ label: f.label, value: f.example ? `e.g. ${f.example}` : "—" }))} quiet />
+                <p className="m-0 flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
                   <Icon name="info" size={14} strokeWidth={2} className="flex-none text-accent" />
-                  Arrives as an offer — you choose whether to accept it.
+                  It arrives as an offer — you choose whether to accept it.
                 </p>
               </section>
             </div>
@@ -409,5 +404,22 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
 /** "Department of Revenue & Customs" → "The department", for running text
  *  where the full name has already been said in the heading. */
+/** A credential's details as label and value, one per line where there is room. */
+function DetailRows({ rows, quiet = false }: { rows: { label: string; value: string }[]; quiet?: boolean }) {
+  return (
+    <dl className="m-0 flex flex-col rounded-[10px] border border-subtle px-3">
+      {rows.map((r, i) => (
+        <div
+          key={r.label}
+          className={`grid gap-0.5 py-2 min-[521px]:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] min-[521px]:gap-3 ${i > 0 ? "border-t border-subtle" : ""}`}
+        >
+          <dt className="text-[12px] text-faint">{r.label}</dt>
+          <dd className={`m-0 text-[13px] ${quiet ? "text-muted" : "font-medium text-strong"}`}>{r.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 const issuerShort = (name: string) =>
   /^Department/.test(name) ? "The department" : /^Ministry/.test(name) ? "The ministry" : name;
