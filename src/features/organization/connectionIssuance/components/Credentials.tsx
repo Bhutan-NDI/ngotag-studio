@@ -37,6 +37,7 @@ import { isBhutanndiTheme } from '@/lib/active-theme'
 import { issuanceSvgComponent } from '@/config/svgs/issuanceSvgComponent'
 import { pathRoutes } from '@/config/pathRoutes'
 import { resetSchemaDetails } from '@/lib/schemaStorageSlice'
+import { useMigrationPaused } from '@/features/walletMigration/components/PausedBanner'
 import { useRouter } from 'next/navigation'
 
 interface PaginationState {
@@ -138,6 +139,7 @@ const stateCell = ({
 }): JSX.Element => <StatusCellForCredential state={row.original.state} />
 
 const Credentials = (): JSX.Element => {
+  const migrationPaused = useMigrationPaused()
   const router = useRouter()
   const orgId = useAppSelector((state) => state.organization.orgId)
   const [loading, setLoading] = useState<boolean>(true)
@@ -385,6 +387,7 @@ const Credentials = (): JSX.Element => {
               svgComponent={isIssuing ? <Loader /> : issuanceSvgComponent()}
               onClickEvent={schemeSelection}
               loading={isIssuing}
+              disabled={migrationPaused}
             />
           </div>
         )}

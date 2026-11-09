@@ -1,3 +1,7 @@
+import {
+  MIGRATION_PAUSED_MESSAGE,
+  isMigrationWriteBlocked,
+} from '@/features/walletMigration/pauseGuard'
 import axios, { type AxiosError, type AxiosResponse } from 'axios'
 import {
   instance as axiosUser,
@@ -10,6 +14,7 @@ import {
 } from '@/config/marketplaceErrors'
 
 import { HeaderConfig } from '@/config/GetHeaderConfigs'
+import { setPausedByServer } from '@/lib/walletMigrationSlice'
 import { store } from '@/lib/store'
 import { toast } from 'sonner'
 
@@ -51,7 +56,11 @@ const HandleResponse = (
   responseData: AxiosResponse | undefined,
 ): Promise<AxiosResponse> => {
   if (responseData) {
-    const body = responseData.data as { message?: string; code?: string }
+    const body = responseData.data as {
+      message?: string
+      code?: string
+      error?: string
+    }
     const errorMessage =
       body?.message || 'Something went wrong, please try later...'
     // Attach the HTTP status and any backend error code so callers can branch on them
@@ -59,15 +68,41 @@ const HandleResponse = (
     const error = new Error(errorMessage) as Error & {
       statusCode?: number
       code?: string
+      errorCode?: string
     }
     error.statusCode = responseData.status
     error.code = body?.code
+    // The platform's exception filter puts domain codes (e.g.
+    // ORG_AGENT_MIGRATING, STEP_UP_REQUIRED) in `error`, not `code`.
+    error.errorCode = body?.error
     notifyMarketplaceGate(body?.code, body?.message)
+    // The org is mid-move: show the paused banner wherever this happened
+    // (SCR-WM-08). Caught here because most API wrappers drop the status.
+    if (
+      responseData.status === 423 &&
+      (body?.code ?? body?.error) === 'ORG_AGENT_MIGRATING'
+    ) {
+      store.dispatch(setPausedByServer())
+    }
     return Promise.reject(error)
   }
   return Promise.reject(
     new Error('Please check your internet connectivity and try again'),
   )
+}
+
+const migrationPauseError = (url: string): Error | null => {
+  const { walletMigration, organization } = store.getState()
+  if (!isMigrationWriteBlocked(url, walletMigration, organization.orgId)) {
+    return null
+  }
+  const error = new Error(MIGRATION_PAUSED_MESSAGE) as Error & {
+    statusCode?: number
+    code?: string
+  }
+  error.statusCode = 423
+  error.code = 'ORG_AGENT_MIGRATING'
+  return error
 }
 
 const publicAxiosUser = axios.create({
@@ -169,6 +204,10 @@ export const axiosPost = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.post(url, payload, config)
 
@@ -184,6 +223,10 @@ export const axiosPatch = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.patch(url, payload, config)
 
@@ -199,6 +242,10 @@ export const axiosPut = async ({
   payload,
   config,
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const response = await axiosUser.put(url, payload, config)
 
@@ -214,6 +261,10 @@ export const axiosDelete = async ({
   config,
   payload = {},
 }: APIParameters): Promise<AxiosResponse> => {
+  const paused = migrationPauseError(url)
+  if (paused) {
+    return Promise.reject(paused)
+  }
   try {
     const requestConfig =
       Object.keys(payload).length > 0 ? { ...config, data: payload } : config

@@ -141,6 +141,18 @@ export const apiRoutes = {
     organizations: '/orgs/public-profile',
     organizationDetails: '/orgs/public-profiles',
   },
+  // Organisation wallet migration (platform org-migration gateway routes),
+  // prefixed with /orgs/:orgId by the wrappers.
+  walletMigration: {
+    root: '/agents/migrate',
+    preflight: '/preflight',
+    rehearse: '/rehearse',
+    schedule: '/schedule',
+    cancel: '/cancel',
+    // Platform admins: not under /orgs/:orgId, see listMigrations.
+    listAll: '/agents/migrations',
+    disasterRestore: '/disaster-restore',
+  },
   Agent: {
     checkAgentHealth: '/agents/health',
     agentDedicatedSpinup: '/agents/spinup',

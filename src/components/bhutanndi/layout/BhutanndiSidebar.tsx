@@ -7,6 +7,7 @@ import { Organization } from '@/features/dashboard/type/organization'
 import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
 import { getOrganizations } from '@/app/api/organization'
 import { mobileVerifierNavItem, navItems } from '@/constants/data'
+import { useCanSeeAllMigrations } from '@/features/walletMigration/useCanSeeAllMigrations'
 import {
   resetOrgState,
   setOrgId,
@@ -60,6 +61,13 @@ const ACCOUNT_LINKS: { label: string; href: string; icon: IconName }[] = [
   { label: 'Developer settings', href: '/developers-setting', icon: 'key' },
 ]
 
+// Platform admins only: every organisation's move to a dedicated agent.
+const ALL_MIGRATIONS_LINK = {
+  label: 'Wallet moves',
+  href: '/wallet-migration/all',
+  icon: 'wallet' as IconName,
+}
+
 interface BhutanndiSidebarProps {
   open?: boolean
   onClose?: () => void
@@ -78,6 +86,7 @@ export function BhutanndiSidebar({
 }: BhutanndiSidebarProps): React.JSX.Element {
   const pathname = usePathname()
   const dispatch = useAppDispatch()
+  const canSeeAllMigrations = useCanSeeAllMigrations()
 
   const [currentPage] = useState(currentPageNumber)
   const [pageSize] = useState(itemPerPage)
@@ -181,8 +190,12 @@ export function BhutanndiSidebar({
     for (const link of ACCOUNT_LINKS) {
       hrefs.push(link.href)
     }
+    if (canSeeAllMigrations) {
+      hrefs.push(ALL_MIGRATIONS_LINK.href)
+    }
     return hrefs
   }, [visibleNavItem])
+  }, [managedNavItem, canSeeAllMigrations])
 
   const activeHref = useMemo(() => {
     let best: string | null = null
@@ -441,6 +454,31 @@ export function BhutanndiSidebar({
             </Link>
           ))}
         </nav>
+
+        {canSeeAllMigrations && (
+          <>
+            <div className="border-bhutanndi-subtle my-4 h-px border-t" />
+            <nav aria-label="Platform" className="flex flex-col gap-0.5">
+              <Link
+                href={ALL_MIGRATIONS_LINK.href}
+                onClick={onClose}
+                aria-current={
+                  isCurrent(ALL_MIGRATIONS_LINK.href) ? 'page' : undefined
+                }
+                className="ndi-navrow font-display flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium"
+                data-active={isCurrent(ALL_MIGRATIONS_LINK.href) ? '1' : '0'}
+              >
+                <Icon
+                  name={ALL_MIGRATIONS_LINK.icon}
+                  size={18}
+                  strokeWidth={1.7}
+                  className="flex-none"
+                />
+                {ALL_MIGRATIONS_LINK.label}
+              </Link>
+            </nav>
+          </>
+        )}
 
         {process.env.NEXT_PUBLIC_DOCS_URL ? (
           <>

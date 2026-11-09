@@ -54,6 +54,7 @@ import { ethers } from 'ethers'
 import { formatDidWebError } from './formatDidWebError'
 import { nanoid } from 'nanoid'
 import { useRouter } from 'next/navigation'
+import { useMigrationPaused } from '@/features/walletMigration/components/PausedBanner'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -242,6 +243,7 @@ const CopyDid = ({
 // ---------------------------------------------------------------------------
 
 const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
+  const migrationPaused = useMigrationPaused()
   // DID list state
   const [didList, setDidList] = useState<IDidListData[]>([])
   const [showPopup, setShowPopup] = useState(false)
@@ -900,7 +902,8 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
             userRoles.includes(Roles.ISSUER) ||
             userRoles.includes(Roles.VERIFIER) ||
             isMethodLoading ||
-            isCreatingDid
+            isCreatingDid ||
+            migrationPaused
           }
         >
           {getButtonLabel()}
@@ -935,7 +938,7 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
                       >
                         Primary DID
                       </Badge>
-                    ) : (
+                    ) : migrationPaused ? null : (
                       <div className="ml-auto">
                         <AlertDialogDemo
                           handler={() => setPrimaryDid(item.id, item.did)}
