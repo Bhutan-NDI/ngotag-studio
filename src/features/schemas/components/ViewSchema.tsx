@@ -30,6 +30,7 @@ import { getLedgersPlatformUrl } from '@/app/api/Agent'
 import { nanoid } from 'nanoid'
 import { useAppSelector } from '@/lib/hooks'
 import { useRouter } from 'next/navigation'
+import { useSelectedOrgRoles } from '@/lib/useOrgRoleAccess'
 
 type SchemaData = {
   schema: {
@@ -67,7 +68,7 @@ const ViewSchemas = ({ schemaId }: { schemaId: string }): React.JSX.Element => {
   const router = useRouter()
   const [userRoles, setUserRoles] = useState<string[]>([])
   const organizationId = useAppSelector((state) => state.organization.orgId)
-  const orgInfo = useAppSelector((state) => state.organization.orgInfo)
+  const selectedOrgRoles = useSelectedOrgRoles()
 
   const getSchemaDetails = async (
     SchemaId: string,
@@ -119,8 +120,8 @@ const ViewSchemas = ({ schemaId }: { schemaId: string }): React.JSX.Element => {
   }, [fetchData])
 
   useEffect(() => {
-    setUserRoles(orgInfo?.roles?.length ? orgInfo.roles : [])
-  }, [orgInfo?.roles])
+    setUserRoles(selectedOrgRoles)
+  }, [selectedOrgRoles])
 
   const submit = async (values: Values): Promise<void> => {
     setCreateLoader(true)

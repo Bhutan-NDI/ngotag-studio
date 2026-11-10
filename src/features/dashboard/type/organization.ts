@@ -110,6 +110,8 @@ export interface Organisation {
   userOrgRoles: UserOrgRole[]
   org_agents: OrgAgent[]
   publicProfile: boolean
+  // Returned by GET /orgs, read by the app launcher.
+  appLaunchDetails?: object[]
   checked?: boolean
   error?: string
 }

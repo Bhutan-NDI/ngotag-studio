@@ -20,6 +20,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 import React from 'react'
 import { RootState } from '@/lib/store'
 import { hardNavigate } from '@/utils/navigation'
+import { useCanCreateOrganization } from '@/lib/useOrgRoleAccess'
 
 type Tenant = SwitchableOrg
 
@@ -38,6 +39,8 @@ const OrgSwitcherInner = ({
 
   const dispatch = useAppDispatch()
   const selectedOrgId = useAppSelector((state) => state.organization.orgId)
+  // A mobile verifier member can switch organisations but not create one.
+  const canCreateOrg = useCanCreateOrganization()
 
   const currentTenant = React.useMemo(() => {
     if (selectedOrgId) {
@@ -161,28 +164,34 @@ const OrgSwitcherInner = ({
                   </DropdownMenuItem>
                 ))}
 
-                <DropdownMenuSeparator />
+                {canCreateOrg && (
+                  <>
+                    <DropdownMenuSeparator />
 
-                <DropdownMenuItem
-                  onSelect={() => hardNavigate('/create-organization')}
-                  className="flex cursor-pointer items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Create Organization
-                </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => hardNavigate('/create-organization')}
+                      className="flex cursor-pointer items-center gap-2"
+                    >
+                      <Plus size={16} />
+                      Create Organization
+                    </DropdownMenuItem>
+                  </>
+                )}
               </div>
             ) : (
               <>
                 <DropdownMenuItem className="text-muted-foreground">
                   No organization found
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={() => hardNavigate('/create-organization')}
-                  className="flex cursor-pointer items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Create Organization
-                </DropdownMenuItem>
+                {canCreateOrg && (
+                  <DropdownMenuItem
+                    onSelect={() => hardNavigate('/create-organization')}
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <Plus size={16} />
+                    Create Organization
+                  </DropdownMenuItem>
+                )}
               </>
             )}
           </DropdownMenuContent>

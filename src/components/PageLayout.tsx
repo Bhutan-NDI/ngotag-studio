@@ -8,6 +8,7 @@ import { BhutanndiAppShell } from './bhutanndi/layout/BhutanndiAppShell'
 import { BhutanndiBareShell } from './bhutanndi/layout/BhutanndiBareShell'
 import Header from './layout/header'
 import KBar from './kbar'
+import { MobileVerifierRouteGuard } from './MobileVerifierRouteGuard'
 import { PausedBanner } from '@/features/walletMigration/components/PausedBanner'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { usePathname } from 'next/navigation'
@@ -50,7 +51,8 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
       <KBar>
         <BhutanndiAppShell>
           <PausedBanner />
-          {children}
+          {/* Only this theme's sidebar is filtered for mobile verifier users. */}
+          <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
         </BhutanndiAppShell>
       </KBar>
     )

@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import React, { useCallback, useEffect, useState } from 'react'
+import { RoleI, applyMemberRule, toggleRole } from '../roleSelection'
 import { RoleNames, apiStatusCodes } from '@/config/CommonConstant'
 import {
   Tooltip,
@@ -29,13 +30,6 @@ import { Label } from '@/components/ui/label'
 import { TextTitlecase } from '@/utils/TextTransform'
 import { User } from './users-interface'
 import { useAppSelector } from '@/lib/hooks'
-
-interface RoleI {
-  id: string
-  name: string
-  checked: boolean
-  disabled: boolean
-}
 
 const ROLE_DISPLAY_LABELS: Record<string, string> = {
   ALLOW_PROOF_TEMPLATE: 'Create Proof Templates',
@@ -80,20 +74,13 @@ const EditUserRoleModal = ({
                 role.name,
               ),
           )
-          .map((role) => {
-            if (
-              user?.roles.includes(role.name) &&
-              role.name !== RoleNames.MEMBER
-            ) {
-              return { ...role, checked: true, disabled: false }
-            } else if (role.name === RoleNames.MEMBER) {
-              return { ...role, checked: true, disabled: true }
-            } else {
-              return { ...role, checked: false, disabled: false }
-            }
-          })
+          .map((role) => ({
+            ...role,
+            checked: Boolean(user?.roles.includes(role.name)),
+            disabled: false,
+          }))
 
-        setRoles(filteredRoles)
+        setRoles(applyMemberRule(filteredRoles))
       } else {
         setErrorMsg(response as unknown as string)
       }
@@ -109,46 +96,8 @@ const EditUserRoleModal = ({
     }
   }, [openModal, user, getRoles])
 
-  const handleIssuerOrVerifier = (
-    role: RoleI,
-    checked: boolean,
-  ): RoleI[] | null =>
-    roles?.map((r) => {
-      if (r.id === role.id) {
-        return { ...r, checked }
-      }
-      if (['verifier', 'issuer', 'member'].includes(r.name)) {
-        return { ...r, checked: true }
-      }
-      return { ...r, checked: false }
-    }) ?? null
-
-  const handleAdmin = (role: RoleI, checked: boolean): RoleI[] | null =>
-    roles?.map((r) => {
-      if (r.id === role.id) {
-        return { ...r, checked }
-      }
-      if (r.name === 'member') {
-        return { ...r, checked: true }
-      }
-      return { ...r, checked: false }
-    }) ?? null
-
-  const handleDefault = (role: RoleI, checked: boolean): RoleI[] | null =>
-    roles?.map((r) => (r.id === role.id ? { ...r, checked } : r)) ?? null
-
   const handleRoleChange = (checked: boolean, role: RoleI): void => {
-    let updatedRoles: RoleI[] | null = null
-
-    if (['issuer', 'verifier'].includes(role.name) && checked) {
-      updatedRoles = handleIssuerOrVerifier(role, checked)
-    } else if (role.name === 'admin' && checked) {
-      updatedRoles = handleAdmin(role, checked)
-    } else {
-      updatedRoles = handleDefault(role, checked)
-    }
-
-    setRoles(updatedRoles)
+    setRoles(roles && toggleRole(roles, role, checked))
   }
 
   const getCheckboxClass = (role: RoleI): string => {

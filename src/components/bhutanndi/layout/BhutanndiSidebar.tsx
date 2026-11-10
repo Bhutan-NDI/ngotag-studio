@@ -16,6 +16,13 @@ import {
   setTenantData,
 } from '@/lib/orgSlice'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
+import {
+  MOBILE_VERIFIER_ROLES,
+  useHasOrgRole,
+  useIsMobileVerifierAdmin,
+  useIsMobileVerifierOnly,
+  useIsPlatformAdmin,
+} from '@/lib/useOrgRoleAccess'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React, { useEffect, useMemo, useState } from 'react'
@@ -107,6 +114,38 @@ export function BhutanndiSidebar({
     ]
   })
 
+  // A mobile-verifier-only user sees just their organisations and the mobile
+  // verifier, plus Users for a mobile verifier admin;
+  // MobileVerifierRouteGuard keeps the other pages closed.
+  // A platform admin always sees all of Studio and the mobile verifier.
+  const isPlatformAdmin = useIsPlatformAdmin() === true
+  const mobileVerifierOnly = useIsMobileVerifierOnly() && !isPlatformAdmin
+  const mobileVerifierAdmin = useIsMobileVerifierAdmin()
+  // The Mobile Verifier section is shown only with Manage Mobile Verifier.
+  const managesMobileVerifier =
+    useHasOrgRole(MOBILE_VERIFIER_ROLES.VERIFIER) || isPlatformAdmin
+  const visibleNavItem = useMemo(() => {
+    const navItems = managesMobileVerifier
+      ? managedNavItem
+      : managedNavItem.filter(
+          (item) => item.title !== mobileVerifierNavItem.title,
+        )
+    if (!mobileVerifierOnly) {
+      return navItems
+    }
+    return navItems.filter(
+      (item) =>
+        item.url === '/organizations' ||
+        (mobileVerifierAdmin && item.url === '/users') ||
+        item.title === mobileVerifierNavItem.title,
+    )
+  }, [
+    managedNavItem,
+    managesMobileVerifier,
+    mobileVerifierOnly,
+    mobileVerifierAdmin,
+  ])
+
   const selectedOrgId = useAppSelector((state) => state.organization.orgId)
   const ecosystemEnableStatus = useAppSelector(
     (state) => state.ecosystem.ecosystemEnableStatus,
@@ -116,9 +155,20 @@ export function BhutanndiSidebar({
     Boolean(item.items?.some((child) => pathname.startsWith(child.url)))
 
   const [expanded, setExpanded] = useState<string | null>(
-    () => managedNavItem.find(groupHoldsPath)?.title ?? null,
+    () => visibleNavItem.find(groupHoldsPath)?.title ?? null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   )
+
+  // Open the group holding the current page when the page changes without a
+  // click, e.g. a mobile-verifier-only member sent from /dashboard to the
+  // mobile verifier right after sign-in.
+  useEffect(() => {
+    const holding = visibleNavItem.find(groupHoldsPath)?.title
+    if (holding) {
+      setExpanded(holding)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, visibleNavItem])
 
   // Sibling routes can nest path-wise without being related — e.g.
   // Organizations (/organizations) and Billing (/organizations/billing) —
@@ -128,7 +178,7 @@ export function BhutanndiSidebar({
   // that one counts as current.
   const allHrefs = useMemo(() => {
     const hrefs: string[] = []
-    for (const item of managedNavItem) {
+    for (const item of visibleNavItem) {
       if (item.items && item.items.length > 0) {
         for (const child of item.items) {
           hrefs.push(child.url)
@@ -144,7 +194,7 @@ export function BhutanndiSidebar({
       hrefs.push(ALL_MIGRATIONS_LINK.href)
     }
     return hrefs
-  }, [managedNavItem, canSeeAllMigrations])
+  }, [visibleNavItem, canSeeAllMigrations])
 
   const activeHref = useMemo(() => {
     let best: string | null = null
@@ -263,8 +313,46 @@ export function BhutanndiSidebar({
         }}
       >
         <nav className="flex flex-col gap-0.5">
-          {managedNavItem.map((item) => {
+          {visibleNavItem.map((item) => {
             const icon = iconFor(item.icon)
+
+            // Mobile Verifier is a section, not a dropdown: a heading with
+            // all its pages always listed.
+            if (item.title === mobileVerifierNavItem.title && item.items) {
+              return (
+                <div
+                  key={item.title}
+                  role="group"
+                  aria-labelledby="nav-section-mobile-verifier"
+                  className="mt-3 flex flex-col gap-0.5"
+                >
+                  <p
+                    id="nav-section-mobile-verifier"
+                    className="font-display text-bhutanndi-muted px-3 pt-1 pb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase"
+                  >
+                    {item.title}
+                  </p>
+                  {item.items.map((child) => (
+                    <Link
+                      key={child.url}
+                      href={child.url}
+                      onClick={onClose}
+                      aria-current={isCurrent(child.url) ? 'page' : undefined}
+                      className="ndi-navrow font-display flex w-full items-center gap-3 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium"
+                      data-active={isCurrent(child.url) ? '1' : '0'}
+                    >
+                      <Icon
+                        name={iconFor(child.icon)}
+                        size={18}
+                        strokeWidth={1.7}
+                        className="flex-none"
+                      />
+                      {child.title}
+                    </Link>
+                  ))}
+                </div>
+              )
+            }
 
             if (item.items && item.items.length > 0) {
               const isOpen = expanded === item.title

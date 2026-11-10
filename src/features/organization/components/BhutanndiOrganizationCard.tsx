@@ -4,6 +4,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  isMobileVerifierMember,
+  useIsPlatformAdmin,
+} from '@/lib/useOrgRoleAccess'
 
 import { AvatarBadge } from '@/components/bhutanndi/ui/AvatarBadge'
 import { Icon } from '@/components/bhutanndi/ui/icons'
@@ -49,18 +53,32 @@ export function BhutanndiOrgCard({
   onEdit: () => void
   onDelete: () => void
 }): React.JSX.Element {
-  const roleLabel =
-    org.userOrgRoles.length > 0
-      ? org.userOrgRoles
-          .map((role) => role.orgRole.name)
-          .join(', ')
-          .toUpperCase()
-      : 'NO ROLE'
+  // A platform admin sees every organisation, including ones they hold no
+  // role in, and can manage each of them.
+  const isPlatformAdmin = useIsPlatformAdmin() === true
 
-  const canManageOrg = org.userOrgRoles.some(
-    (role) =>
-      role.orgRole.name === Roles.OWNER || role.orgRole.name === Roles.ADMIN,
-  )
+  let roleLabel = 'NO ROLE'
+  if (org.userOrgRoles.length > 0) {
+    roleLabel = org.userOrgRoles
+      .map((role) => role.orgRole.name)
+      .join(', ')
+      .toUpperCase()
+  } else if (isPlatformAdmin) {
+    roleLabel = 'PLATFORM ADMIN'
+  }
+
+  const canManageOrg =
+    isPlatformAdmin ||
+    org.userOrgRoles.some(
+      (role) =>
+        role.orgRole.name === Roles.OWNER || role.orgRole.name === Roles.ADMIN,
+    )
+
+  // Members (/users) is closed to a mobile verifier member of this org, open
+  // to a mobile verifier admin.
+  const canViewMembers =
+    isPlatformAdmin ||
+    !isMobileVerifierMember(org.userOrgRoles.map((role) => role.orgRole.name))
 
   return (
     <Panel>
@@ -140,13 +158,15 @@ export function BhutanndiOrgCard({
             </>
           ) : null}
 
-          <button
-            type="button"
-            onClick={onMembers}
-            className="ndi-plainlink text-bhutanndi-muted font-medium"
-          >
-            Members
-          </button>
+          {canViewMembers && (
+            <button
+              type="button"
+              onClick={onMembers}
+              className="ndi-plainlink text-bhutanndi-muted font-medium"
+            >
+              Members
+            </button>
+          )}
         </div>
       </div>
     </Panel>
