@@ -234,14 +234,10 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
    * offered while the part is on screen: a client's "what does Ugyen see?"
    * is answered in one press, without a row of people the part never
    * touches. Somebody without an account (the clearing agent) is listed
-   * too, and reached by her link or at the Single Window; the registrar is
-   * listed so the room sees who answers, though nobody drives it.
+   * too, and reached by her link or at the Single Window.
    */
-  cast: CastId[];
+  cast: PersonaId[];
 }
-
-/** Someone the panel lists: a persona, or the registrar, who answers on its own. */
-export type CastId = PersonaId | "registrar";
 
 export const PRESENTATION_PARTS: PresentationPart[] = [
   {
@@ -260,7 +256,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/onboarding",
     selfService: true,
     start: "platformReady",
-    cast: ["dorji", "registrar", "ugyen"],
+    cast: ["dorji", "ugyen"],
     switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/members" }],
   },
   {
@@ -289,7 +285,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/simulated/bank",
     start: "tpnHeld",
-    cast: ["dorji", "ugyen", "yeshey"],
+    cast: ["dorji", "ugyen"],
     switchTo: [
       { label: "Ugyen · Pelden Trading", persona: "ugyen", route: "/wallet/sharing" },
       { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/sharing" },
@@ -471,7 +467,7 @@ export function waitingToCollect(s: Pick<WaitingState, "organizations" | "author
 }
 
 /** Everyone any part of the presentation needs, for when no part is on. */
-export const PRESENTATION_CAST: CastId[] = [...new Set(PRESENTATION_PARTS.flatMap((p) => p.cast))];
+export const PRESENTATION_CAST: PersonaId[] = [...new Set(PRESENTATION_PARTS.flatMap((p) => p.cast))];
 
 /**
  * One chip in the Presentation panel's "Driving as" row: a person to drive
@@ -503,7 +499,7 @@ export interface CastChip {
  */
 export function castOnStage(
   s: Pick<DemoState, "people" | "orgInvitations" | "authorityGrants">,
-  ids: readonly CastId[],
+  ids: readonly PersonaId[],
   current: string,
   /** Who the part starts as. The early parts drive as Dorji before his
    *  account record exists — it is the one being made — so he is drivable
@@ -523,18 +519,6 @@ export function castOnStage(
 
   for (const id of ids) {
     const p = s.people.find((x) => x.id === id);
-    /* The registrar answers on its own, from its own register: listed so
-       the room sees who confirms the company, never driven. */
-    if (id === "registrar") {
-      add({
-        key: id,
-        name: p?.name ?? "Office of the Registrar",
-        role: p?.title ?? "Registrar of Companies · Corporate Regulatory Authority",
-        tag: "answers on its own",
-        note: "Confirms the company when Dorji adds it. Nobody to drive.",
-      });
-      continue;
-    }
     if (!p) continue;
     /* The clearing agent has no account here (a Pattern B delegate): she
        is reached by the link she is sent, then at the Single Window. */
