@@ -17,6 +17,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * Something sent to the app without a scan (an offer after the person has
  * shown who they are) starts on the request itself: `arrived`.
  *
+ * ONE PHONE, SEVERAL REQUESTS
+ *
+ * The same phone can carry on to the next request without moving: while
+ * the page checks an answer it shows `waiting`, and when the request
+ * changes (`requestKey`) the new one slides in, under the app's own
+ * notification (`banner`). So Pema shares her ID and, in the same place,
+ * her phone moves on to the offer — the page around it stays still.
+ *
  * The screen is the app's, so it keeps the app's light palette in both
  * themes. It is labelled as a simulation under the frame.
  */
@@ -52,9 +60,18 @@ export function NdiAppPhone({
   onDecline,
   note,
   arrived = false,
+  requestKey = "request",
+  waiting,
+  banner,
 }: {
   /** Already in the app — sent there, not scanned: no scan step. */
   arrived?: boolean;
+  /** Which request this is. A new key slides the new request in. */
+  requestKey?: string;
+  /** Shown while the page works on the last answer. */
+  waiting?: { title: string; detail: string };
+  /** The app's notification as a new request arrives. */
+  banner?: string;
   /** Whose phone: "Pema Choden's phone". */
   owner: string;
   /** Who is asking, as the app names them. */
@@ -76,8 +93,23 @@ export function NdiAppPhone({
 }) {
   const start = arrived ? "request" : "scan";
   const [screen, setScreen] = useState<"scan" | "request" | "done">(start);
+  /* A new request arrives: the phone moves to it, announced. Adjusted
+     during render, so the new screen and its banner come in together. */
+  const [seenKey, setSeenKey] = useState(requestKey);
+  const [news, setNews] = useState(false);
+  if (requestKey !== seenKey) {
+    setSeenKey(requestKey);
+    setScreen("request");
+    setNews(true);
+  }
   const timer = useRef<number | null>(null);
   useEffect(() => () => (timer.current ? window.clearTimeout(timer.current) : undefined), []);
+  useEffect(() => {
+    if (!news) return;
+    const t = window.setTimeout(() => setNews(false), 2600);
+    return () => window.clearTimeout(t);
+  }, [news]);
+  const face = waiting && screen === "done" ? "waiting" : screen;
 
   const confirm = () => {
     setScreen("done");
@@ -96,10 +128,18 @@ export function NdiAppPhone({
           className="relative flex h-[560px] flex-col overflow-hidden rounded-[34px]"
           style={{ background: APP.paper, color: APP.ink, fontFamily: "var(--font-sans, ui-sans-serif, system-ui)" }}
         >
+          <style>{PHONE_MOTION}</style>
           <StatusBar />
-          {screen === "scan" ? (
+          {banner && news ? <Banner text={banner} /> : null}
+          <div
+            key={`${face}-${seenKey}`}
+            className={`flex min-h-0 flex-1 flex-col ${face === "request" && news ? "ndi-phone-slide" : "ndi-phone-fade"}`}
+          >
+          {face === "scan" ? (
             <ScanScreen onScan={() => setScreen("request")} />
-          ) : screen === "request" ? (
+          ) : face === "waiting" && waiting ? (
+            <WaitingScreen title={waiting.title} detail={waiting.detail} />
+          ) : face === "request" ? (
             <RequestScreen
               from={from}
               mark={mark}
@@ -117,6 +157,7 @@ export function NdiAppPhone({
           ) : (
             <DoneScreen title={done.title} detail={done.detail} />
           )}
+          </div>
         </div>
       </div>
       <figcaption className="flex max-w-[300px] flex-col items-center gap-1 text-center">
@@ -301,6 +342,60 @@ function DoneScreen({ title, detail }: { title: string; detail: string }) {
         </svg>
       </span>
       <p className="m-0 text-[16px] font-semibold" style={{ color: APP.ink }}>
+        {title}
+      </p>
+      <p className="m-0 text-[12.5px] leading-[1.5]" style={{ color: APP.muted }}>
+        {detail}
+      </p>
+    </div>
+  );
+}
+
+/* Screens change inside the phone: a fade within one request, a slide
+   from the right for a new one, and the app's notification dropping in
+   from the top. None of it moves under reduced motion. */
+const PHONE_MOTION = `
+@keyframes ndi-phone-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ndi-phone-slide { from { opacity: 0.4; transform: translateX(100%); } to { opacity: 1; transform: none; } }
+@keyframes ndi-phone-banner { 0% { opacity: 0; transform: translateY(-120%); } 12% { opacity: 1; transform: none; } 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-120%); } }
+.ndi-phone-fade { animation: ndi-phone-fade 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ndi-phone-slide { animation: ndi-phone-slide 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.ndi-phone-banner { animation: ndi-phone-banner 2600ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ndi-phone-fade, .ndi-phone-slide { animation: none; }
+  .ndi-phone-banner { animation: none; }
+}
+`;
+
+function Banner({ text }: { text: string }) {
+  return (
+    <div
+      role="status"
+      className="ndi-phone-banner absolute inset-x-2.5 top-[40px] z-10 flex items-center gap-2.5 rounded-[14px] px-3 py-2.5 shadow-[0_6px_18px_rgb(0_0_0/0.18)]"
+      style={{ background: "rgba(255,255,255,0.97)", color: APP.ink }}
+    >
+      <span className="flex h-7 w-7 flex-none items-center justify-center rounded-[7px]" style={{ background: "#16302f" }}>
+        <img src="/media/logos/ndi-mark-mint.png" alt="" width={18} height={18} className="h-[18px] w-[18px]" />
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.06em]" style={{ color: APP.muted }}>
+          Bhutan NDI · now
+        </span>
+        <span className="text-[12px] font-medium leading-[1.3]">{text}</span>
+      </span>
+    </div>
+  );
+}
+
+function WaitingScreen({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div role="status" className="flex flex-1 flex-col items-center justify-center gap-4 px-7 pb-10 text-center">
+      <span
+        aria-hidden="true"
+        className="h-12 w-12 animate-spin rounded-full border-[3px]"
+        style={{ borderColor: `${APP.mint}33`, borderTopColor: APP.mint }}
+      />
+      <p className="m-0 text-[15px] font-semibold" style={{ color: APP.ink }}>
         {title}
       </p>
       <p className="m-0 text-[12.5px] leading-[1.5]" style={{ color: APP.muted }}>

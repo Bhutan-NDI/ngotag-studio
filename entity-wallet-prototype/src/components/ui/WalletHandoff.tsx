@@ -154,10 +154,15 @@ export function WalletHandoff({
      code was below the fold, and the wallet itself shows what is asked for
      before anyone approves. On the wide layout each item says where it goes
      (`col-start-2`, `order`), so one list of blocks serves both. */
-  const side = "@min-[720px]:col-start-2";
+  /* With a phone and room for it (1000px), three columns — the card, the
+     phone, the explanation — so nothing sits above the phone and it stays
+     put while the explanation beside it changes from step to step. */
+  const side = phone ? "@min-[720px]:col-start-2 @min-[1000px]:col-start-3" : "@min-[720px]:col-start-2";
   return (
     <div className="@container relative z-[4]">
-      <div className="flex flex-col gap-4 @min-[720px]:grid @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[720px]:items-start @min-[720px]:gap-x-6 @min-[720px]:gap-y-4">
+      <div
+        className={`flex flex-col gap-4 @min-[720px]:grid @min-[720px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] @min-[720px]:grid-rows-[auto_auto_auto_auto_1fr] @min-[720px]:items-start @min-[720px]:gap-x-6 @min-[720px]:gap-y-4 ${phone ? "@min-[1000px]:grid-cols-[minmax(0,320px)_300px_minmax(0,1fr)]" : ""}`}
+      >
         {/* ---- Who is asking, and why ---- */}
         <div className={`flex flex-col gap-1 ${side} @min-[720px]:order-1`}>
           <h3 className="font-display text-[15px] font-semibold leading-[1.3] text-strong">{title}</h3>
@@ -219,7 +224,11 @@ export function WalletHandoff({
         </div>
 
         {phone && !settled ? (
-          <div className={`flex justify-center py-1 ${side} @min-[720px]:order-4 @min-[720px]:justify-start`}>{phone}</div>
+          <div
+            className={`flex justify-center py-1 @min-[720px]:col-start-2 @min-[720px]:order-4 @min-[720px]:justify-start @min-[1000px]:order-none @min-[1000px]:col-start-2 @min-[1000px]:row-span-5 @min-[1000px]:row-start-1 @min-[1000px]:py-0`}
+          >
+            {phone}
+          </div>
         ) : null}
 
         {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
