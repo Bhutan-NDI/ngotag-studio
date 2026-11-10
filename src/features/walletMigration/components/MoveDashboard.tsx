@@ -7,6 +7,7 @@ import {
 } from '../afterSwitchMessages'
 import { completedTime, formatBtt, hoursUntil, webhookUrlFor } from '../config'
 
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { IMigration } from '../types'
 import React from 'react'
@@ -111,14 +112,26 @@ const ProblemNotice = ({
   </div>
 )
 
+interface MoveDashboardProps {
+  migration: IMigration
+  /**
+   * After a disaster restore the org is back on the shared agent and may try
+   * again: the platform accepts a new move. Given only to the owner of an org
+   * on the shared agent.
+   */
+  onStartNewMove?: () => void
+}
+
 /**
  * SCR-WM-06: first 48 hours, updating connections, moved. Read-only for
  * everyone; there is no switch-back (problems are fixed forward). Shows only
- * what the platform records.
+ * what the platform records. The one action is starting over after a
+ * disaster restore.
  */
 export function MoveDashboard({
   migration,
-}: Readonly<{ migration: IMigration }>): React.JSX.Element {
+  onStartNewMove,
+}: Readonly<MoveDashboardProps>): React.JSX.Element {
   const { status, error } = migration
   const counts = connectionCounts(migration.rotation?.counts)
   const problem = describeAfterSwitch(error, webhookUrlFor(migration.orgId))
@@ -157,8 +170,16 @@ export function MoveDashboard({
               Your organisation was restored to the shared agent after its own
               agent was lost. Activity on the new agent since the move
               couldn&apos;t be recovered, and citizens who connected since then
-              need to reconnect. Please contact support.
+              need to reconnect.{' '}
+              {onStartNewMove
+                ? 'Contact support if you need help, or start a new move.'
+                : 'Please contact support.'}
             </p>
+            {onStartNewMove && (
+              <Button size="sm" className="mt-4" onClick={onStartNewMove}>
+                Start a new move
+              </Button>
+            )}
           </div>
         </div>
       </Card>

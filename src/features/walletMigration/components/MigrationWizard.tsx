@@ -14,6 +14,7 @@ import {
 import {
   CANCELLABLE_STATUSES,
   PAUSED_STATUSES,
+  canStartNewMove,
   isWalletMigrationEnabled,
 } from '../config'
 import React, { useEffect, useRef, useState } from 'react'
@@ -239,7 +240,7 @@ export default function MigrationWizard(): React.JSX.Element {
               Reference: {migration.error}
             </p>
           )}
-          {isOwner && agentType === 'shared' && (
+          {canStartNewMove(isOwner, agentType) && (
             <Button size="sm" className="mt-4" onClick={startNew}>
               Start a new move
             </Button>
@@ -251,7 +252,7 @@ export default function MigrationWizard(): React.JSX.Element {
       return (
         <MoveDayProgress
           migration={migration}
-          isOwner={isOwner && agentType === 'shared'}
+          isOwner={canStartNewMove(isOwner, agentType)}
           onStartNewMove={startNew}
           onOpenDashboard={() => undefined}
         />
@@ -272,7 +273,15 @@ export default function MigrationWizard(): React.JSX.Element {
         current,
       )
     ) {
-      return <MoveDashboard migration={migration} />
+      // A restored org is back on the shared agent and can try again.
+      const canStartOver =
+        current === 'DISASTER_RESTORED' && canStartNewMove(isOwner, agentType)
+      return (
+        <MoveDashboard
+          migration={migration}
+          onStartNewMove={canStartOver ? startNew : undefined}
+        />
+      )
     }
     return (
       <ChecksRehearsalSchedule
