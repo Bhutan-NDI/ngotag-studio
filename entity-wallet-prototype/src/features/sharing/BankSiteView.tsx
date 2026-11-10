@@ -183,7 +183,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
                 </p>
               </div>
               <p className="m-0 text-[14px] leading-[1.6]">
-                Share your company&rsquo;s registration from its NDI Entity Wallet instead of uploading certified copies.
+                Share your company&rsquo;s registration and taxpayer number (TPN) from its NDI Entity Wallet instead of uploading certified copies.
                 You&rsquo;ll leave our site to sign in with Bhutan NDI, and come back here. The wallet will show this application
                 number — check it matches.
               </p>
@@ -203,7 +203,7 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
                 </button>
               </div>
               <p className="m-0 border-t pt-3 text-[12.5px]" style={{ borderColor: LINE, color: MUTED }}>
-                Prefer paper? Bring certified copies of your company&rsquo;s registration to any branch.
+                Prefer paper? Bring certified copies of your company&rsquo;s registration and TPN certificate to any branch.
               </p>
             </>
           ) : !hydrated ? null : !session || !matches ? (
@@ -227,16 +227,17 @@ export function BankSiteView({ mode, session: returnedSession, state: returnedSt
               </p>
               {shared.length ? (
                 <dl className="m-0 flex flex-col gap-1.5 text-[13.5px]">
-                  {shared.flatMap((c) =>
-                    c.attributes
-                      .filter((a) => ["registered_name", "registration_number", "status"].includes(a.name))
-                      .map((a) => (
-                        <div key={`${c.id}-${a.name}`} className="flex flex-wrap gap-2">
-                          <dt className="min-w-[150px]" style={{ color: MUTED }}>{attrLabel(a.name)}</dt>
-                          <dd className="m-0 font-semibold">{a.value}</dd>
-                        </div>
-                      )),
-                  )}
+                  {/* Each detail once: the registration and the TPN both
+                      carry the registered name. */}
+                  {shared
+                    .flatMap((c) => c.attributes.filter((a) => ["registered_name", "registration_number", "status", "tpn"].includes(a.name)).map((a) => ({ c, a })))
+                    .filter(({ a }, i, all) => all.findIndex((x) => x.a.name === a.name) === i)
+                    .map(({ c, a }) => (
+                      <div key={`${c.id}-${a.name}`} className="flex flex-wrap gap-2">
+                        <dt className="min-w-[150px]" style={{ color: MUTED }}>{attrLabel(a.name)}</dt>
+                        <dd className="m-0 font-semibold">{a.value}</dd>
+                      </div>
+                    ))}
                   <div className="flex flex-wrap gap-2">
                     <dt className="min-w-[150px]" style={{ color: MUTED }}>Checked</dt>
                     <dd className="m-0">Signature, holder and issuer on NDI&rsquo;s list — all passed</dd>

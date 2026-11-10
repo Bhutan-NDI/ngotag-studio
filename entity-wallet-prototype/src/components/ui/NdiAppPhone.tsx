@@ -14,6 +14,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * It stands in for the scan. It starts on the app's scan step; a tap opens
  * the request, the answer shows the app's confirmation, and only then does
  * the page move on — so the hand-off reads in order: scan, read, answer.
+ * Something sent to the app without a scan (an offer after the person has
+ * shown who they are) starts on the request itself: `arrived`.
  *
  * The screen is the app's, so it keeps the app's light palette in both
  * themes. It is labelled as a simulation under the frame.
@@ -49,7 +51,10 @@ export function NdiAppPhone({
   onAnswer,
   onDecline,
   note,
+  arrived = false,
 }: {
+  /** Already in the app — sent there, not scanned: no scan step. */
+  arrived?: boolean;
   /** Whose phone: "Pema Choden's phone". */
   owner: string;
   /** Who is asking, as the app names them. */
@@ -69,7 +74,8 @@ export function NdiAppPhone({
   /** A line under the frame, beside the simulation label. */
   note?: string;
 }) {
-  const [screen, setScreen] = useState<"scan" | "request" | "done">("scan");
+  const start = arrived ? "request" : "scan";
+  const [screen, setScreen] = useState<"scan" | "request" | "done">(start);
   const timer = useRef<number | null>(null);
   useEffect(() => () => (timer.current ? window.clearTimeout(timer.current) : undefined), []);
 
@@ -103,10 +109,10 @@ export function NdiAppPhone({
               answer={answer}
               onAnswer={confirm}
               onDecline={() => {
-                setScreen("scan");
+                setScreen(start);
                 onDecline();
               }}
-              onBack={() => setScreen("scan")}
+              onBack={() => setScreen(start)}
             />
           ) : (
             <DoneScreen title={done.title} detail={done.detail} />
@@ -203,7 +209,7 @@ function RequestScreen({
           </svg>
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[18px] pb-2 [scrollbar-width:none]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[18px] pb-2" style={{ scrollbarWidth: "none" }}>
         <div className="flex flex-col items-center gap-3.5 pt-1 text-center">
           <span
             aria-hidden="true"

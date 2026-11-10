@@ -334,43 +334,53 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                   </p>
                 ) : null}
                 <Statement>{statement({ organizations }, shown, "delegate")}</Statement>
-                <p className="m-0 text-[13.5px] leading-[1.6] text-muted">
-                  It will be in your own Bhutan NDI app, in your name.
-                </p>
-                <WalletHandoff
-                  value={`ndi-offer-${claimRef}`}
-                  sameDevice={phone}
-                  cardVerb="Collect"
-                  title="Collect it in Bhutan NDI"
-                  purpose="Scan with the Bhutan NDI Wallet on your phone. The authority above arrives in the app, and you accept it there."
-                  sharing={["Nothing from your wallet — the authority comes to it, in your name"]}
-                  notSharing={[`${orgName}'s licence or TPN — only the licence number you act under`]}
-                  status="awaiting_scan"
-                  statusDetail={`Time remaining: ${mmss(offerLeft)}. For your security, the offer ends after 30 minutes.`}
-                  phone={
-                    live ? (
-                      <NdiAppPhone
-                        owner={`${holder.name}'s phone`}
-                        from={orgName}
-                        mark={initials(orgName)}
-                        markColor="#2f6f5e"
-                        ask="issue"
-                        fields={[
-                          { label: "Credential", value: "Authority to act", source: { mark: initials(orgName), color: "#2f6f5e" } },
-                          { label: "Acting for", value: orgName },
-                          { label: "You may", value: tasksPhrase(shown.tasks).replace(/^./, (c) => c.toUpperCase()) },
-                          { label: shown.licenceNumbers.length > 1 ? "Licences" : "Licence", value: namesOf(shown.licenceNumbers) },
-                          { label: "Limit", value: `Nu ${grouped(shown.valueCapNu)} per declaration` },
-                          { label: "Valid until", value: formatDate(shown.validUntil) },
-                        ]}
-                        answer="Accept"
-                        done={{ title: "Added to your wallet", detail: `Your authority to act for ${shortOrgName(orgName)} is in your Bhutan NDI app.` }}
-                        onAnswer={() => answerOffer(claimRef, "accept")}
-                        onDecline={() => answerOffer(claimRef, "decline")}
-                      />
-                    ) : undefined
-                  }
-                />
+                {/* No second scan: the app that just showed who she is gets
+                    the offer straight away, and she accepts it there. */}
+                <div className="flex flex-col items-center gap-5 min-[761px]:flex-row min-[761px]:items-start min-[761px]:gap-8">
+                  <NdiAppPhone
+                    arrived
+                    owner={`${holder.name}'s phone`}
+                    from={orgName}
+                    mark={initials(orgName)}
+                    markColor="#2f6f5e"
+                    ask="issue"
+                    fields={[
+                      { label: "Credential", value: "Authority to act", source: { mark: initials(orgName), color: "#2f6f5e" } },
+                      { label: "Acting for", value: orgName },
+                      { label: "You may", value: tasksPhrase(shown.tasks).replace(/^./, (c) => c.toUpperCase()) },
+                      { label: shown.licenceNumbers.length > 1 ? "Licences" : "Licence", value: namesOf(shown.licenceNumbers) },
+                      { label: "Limit", value: `Nu ${grouped(shown.valueCapNu)} per declaration` },
+                      { label: "Valid until", value: formatDate(shown.validUntil) },
+                    ]}
+                    answer="Accept"
+                    done={{ title: "Added to your wallet", detail: `Your authority to act for ${shortOrgName(orgName)} is in your Bhutan NDI app.` }}
+                    onAnswer={() => (live ? answerOffer(claimRef, "accept") : undefined)}
+                    onDecline={() => (live ? answerOffer(claimRef, "decline") : undefined)}
+                    note="The offer arrives in the app by itself. Tap Accept or Decline on it."
+                  />
+                  <div className="flex w-full min-w-0 flex-1 flex-col gap-3">
+                    <h2 className="m-0 font-display text-[15px] font-semibold leading-[1.3] text-strong">Accept it in your Bhutan NDI app</h2>
+                    <p className="m-0 text-[13.5px] leading-[1.6] text-muted">
+                      We&rsquo;ve sent it to the Bhutan NDI app you just used to show it&rsquo;s you — there&rsquo;s nothing more to scan. It
+                      will be in your app, in your name.
+                    </p>
+                    <div role="status" className="flex items-start gap-2.5 rounded-[12px] border border-grid px-3.5 py-3" style={{ background: "rgb(var(--tint) / 0.04)" }}>
+                      <Icon name="info" size={15} strokeWidth={2.2} className="mt-px flex-none text-faint" />
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <p className="m-0 font-display text-[13px] font-medium leading-[1.4] text-body">Waiting for you to accept</p>
+                        <p className="m-0 text-[12.5px] leading-[1.5] text-muted">
+                          Time remaining: {mmss(offerLeft)}. For your security, the offer ends after 30 minutes.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-[12px] border border-grid px-3.5 py-3">
+                      <p className="m-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted">Not shared</p>
+                      <p className="m-0 mt-1.5 text-[13px] leading-[1.5] text-muted">
+                        {orgName}&rsquo;s licence or TPN — only the licence number you act under is in the authority.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </>
             ) : face === "finishing" ? (
               <p role="status" className="m-0 text-[14.5px] leading-[1.6] text-body">

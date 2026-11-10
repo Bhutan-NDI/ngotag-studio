@@ -136,7 +136,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 0,
     title: "Onboarding onto the Entity Wallet",
     happening:
-      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden Trading's owner invites a colleague and appoints them to act for it. Then NDI approves Partner Bank and Pelden Trading to verify customers, designates the ministry that confirms sole proprietorships, Pelden Trading gets its taxpayer number, shares its registration with its bank, and gives its clearing agent authority to act for it from her own Bhutan NDI app. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
+      "Everything it takes to get onto the Entity Wallet and ready to use it, in the order it has to happen: NDI's root account signs in, root brings on the platform's two administrators, who each set up their own account, a new company — Pelden Trading — signs up and is verified by the authority that registered it, and Pelden Trading's owner invites a colleague and appoints them to act for it. Then NDI approves Partner Bank and Pelden Trading to verify customers, designates the ministry that confirms sole proprietorships, Pelden Trading gets its taxpayer number, shares its registration and TPN with its bank, and gives its clearing agent authority to act for it from her own Bhutan NDI app. Nothing is real: the dashed \"Prototype\" panels stand in for a phone, an inbox or a government register.",
     doThis:
       "Press **Next**. The guide takes you to each screen and tells you what to press; you do the clicking. **Minimise** tucks this card away when it's in the way.",
   },
@@ -841,7 +841,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "Opening an account at the bank",
     happening:
-      "Partner Bank's own website — in the bank's colours and logo, not the wallet's, because it's another organisation's system; the strip across the top says it's a stand-in. Its account form asks for the company's registration, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
+      "Partner Bank's own website — in the bank's colours and logo, not the wallet's, because it's another organisation's system; the strip across the top says it's a stand-in. Its account form asks for the company's registration and TPN, with an application number on the page and a line saying the customer will leave to sign in with Bhutan NDI and come back.",
     doThis: "Press **Share from NDI Entity Wallet** on the bank's page.",
     route: "/simulated/bank",
     persona: "dorji",
@@ -860,7 +860,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "Share with Partner Bank?",
     happening:
-      "The one decision. The bank's reason in its own words, and every detail of Pelden Trading's registration — the three the bank asked for marked, the rest marked as also shared — under the sentence: Partner Bank will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
+      "The one decision. The bank's reason in its own words, and every detail of Pelden Trading's registration and TPN — the ones the bank asked for marked, the rest marked as also shared — under the sentence: Partner Bank will receive all of the details below — not only the ones it asked for. Dorji is the representative, so sharing goes at once.",
     doThis: "Read the list, then press **Share with Partner Bank**.",
     say: "A credential like this can't be shared in part. The screen says so rather than promising less — there's nothing to untick.",
     match: "^/wallet/sharing/pr-[^/]+$",
@@ -877,7 +877,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 12,
     title: "The bank acts on what it fetched",
     happening:
-      "Back on the bank's page. The address carries a status anyone could type; the bank checks the application matches and acts only on what its own system fetched — the registration, verified, with its issuer on NDI's list.",
+      "Back on the bank's page. The address carries a status anyone could type; the bank checks the application matches and acts only on what its own system fetched — the registration and TPN, verified, with its issuer on NDI's list.",
     doThis: "Press **Next** — the guide switches to Ugyen.",
     match: "^/simulated/bank/return$",
   },
@@ -961,10 +961,10 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 13,
     title: "Pema collects it",
     happening:
-      "Before Pema proves who she is, the page names only Pelden Trading — and tells her to continue only if she expected it. Whoever else holds the link gets no further. Once her citizen ID matches, she sees exactly what she'll be able to do, and collects it in the app.",
+      "Before Pema proves who she is, the page names only Pelden Trading — and tells her to continue only if she expected it. Whoever else holds the link gets no further. Once her citizen ID matches, she sees exactly what she'll be able to do, and the offer arrives in the app she just used — no second scan.",
     doThis:
-      "Press **Continue with Bhutan NDI**, then **Share Pema Choden's ID** (dashed — the Bhutan NDI app). Read what she'll be able to do, then press **Accept in the app** (dashed).",
-    say: "Try sharing someone else's ID first: the page says the authority is for someone else, and nothing is given — Open the link again (dashed) to go on. Three tries and the link is dead. And before she accepts, opening the link again on another phone (dashed) makes her prove who she is once more, then replaces the offer with a new one.",
+      "Press **Continue with Bhutan NDI**. On Pema's phone, press **Scan the code**, then **Share**. Read what she'll be able to do — the offer is already on her phone — then press **Accept** there.",
+    say: "Try someone else sharing their ID first (dashed): the page says the authority is for someone else, and nothing is given — Open the link again (dashed) to go on. Three tries and the link is dead. And before she accepts, opening the link again on another phone (dashed) makes her prove who she is once more, then replaces the offer with a new one.",
     match: "^/authority/claim/[^/]+$",
   },
   {
@@ -991,8 +991,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 14,
     title: "One share, both credentials",
     happening:
-      "BNSW asks for two things in one request: her citizen ID and an authority. The dashed panel stands in for her Bhutan NDI app: who is asking, each authority she holds by company name, and that her citizen ID goes with it.",
-    doThis: "In the dashed app panel, press **Share**.",
+      "BNSW asks for two things in one request: her citizen ID and an authority. The phone beside the code is her Bhutan NDI app: who is asking, her citizen ID, and the authority — tap its row to pick another if she holds more than one.",
+    doThis: "On Pema's phone, press **Scan the code**, then **Share**.",
     say: "This is the only trip to the app. After this, each declaration is checked at BNSW without asking her phone again.",
     route: "/simulated/bnsw",
   },
@@ -1050,7 +1050,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     happening:
       "Pema is still signed in. This time every check passes — including a lookup of Pelden Trading's TPN and licence — and BNSW opens a session: the one sentence that must survive review — company, licence, limit, until when — and Pelden Trading's TPN and registered name, shown, never typed.",
     doThis:
-      "Press **Act for a company**, then **Share** (dashed). Read the sentence. Type goods and **420000** as the value, and press **Submit declaration**.",
+      "Press **Act for a company**, then on Pema's phone **Scan the code** and **Share**. Read the sentence. Type goods and **420000** as the value, and press **Submit declaration**.",
     say: "BNSW sees Pema's name and citizen ID number — it keeps them with every declaration. It never sees Pelden Trading's credentials again, and Pelden Trading isn't told each time.",
     route: "/simulated/bnsw",
   },
@@ -1096,7 +1096,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     chapter: 15,
     title: "That's the story",
     happening:
-      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden Trading to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden Trading used its registration to get its taxpayer number, from an office that decided on what Pelden Trading proved — then its bonded-warehouse authorisation, answered by the office's system; Pelden Trading shared its registration with its bank — whole, and said so — from the bank's website and from its wallet; Pelden Trading gave its clearing agent authority to declare for it, which she collected in her own Bhutan NDI app without an account; and she used it at the Single Window, where every declaration was checked against it — until Pelden Trading withdrew it.",
+      "The platform went from its root account to two named platform admins; Pelden Trading went from one person signing up to a company holding its own registration; its people were invited, then given authority to act; NDI approved a bank and Pelden Trading to verify — each asking for no more than it needs; a ministry became the authority for sole proprietorships, agreeing exactly what people are asked in its name; Pelden Trading used its registration to get its taxpayer number, from an office that decided on what Pelden Trading proved — then its bonded-warehouse authorisation, answered by the office's system; Pelden Trading shared its registration and TPN with its bank — whole, and said so — from the bank's website and from its wallet; Pelden Trading gave its clearing agent authority to declare for it, which she collected in her own Bhutan NDI app without an account; and she used it at the Single Window, where every declaration was checked against it — until Pelden Trading withdrew it.",
     doThis:
       "To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },
