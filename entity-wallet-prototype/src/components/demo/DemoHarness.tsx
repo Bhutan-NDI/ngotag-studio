@@ -206,7 +206,7 @@ export function DemoHarness() {
           onAuthScreen,
           people.find((p) => p.id === harness.persona),
           pathname.startsWith("/simulated/mail/")
-            ? findMail({ signup, orgInvitations, people, organizations }, pathname.split("/")[3] ?? "")?.mailbox
+            ? findMail({ signup, orgInvitations, people, organizations, authorityGrants }, pathname.split("/")[3] ?? "")?.mailbox
             : null,
         )
       : null;

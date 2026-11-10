@@ -7,14 +7,15 @@ import { INVITATION_DAYS, VERIFY_LINK_DAYS } from "@/lib/deployment";
 import { shortOrgName } from "@/lib/demoData";
 import { findMail, type Mailbox, type MailMessage } from "@/lib/demoMail";
 import { useDemo } from "@/lib/demoStore";
+import { formatDate } from "@/features/controllership/scopeModel";
 
 /**
  * A simulated email inbox, for the presentation.
  *
  * WHY IT EXISTS
  *
- * Two flows hand over by email: the sign-up verification link and a member
- * invitation. In rehearsal a dashed panel stands in for the inbox, which is
+ * Three flows hand over by email: the sign-up verification link, a member
+ * invitation, and the link to collect authority to act. In rehearsal a dashed panel stands in for the inbox, which is
  * quick but reads, in front of a client, as one more wallet screen — and
  * the point is that someone else, on their own device, opens it. So while a
  * part of the presentation is on, the mail opens here, in a layout most
@@ -68,9 +69,9 @@ const initials = (name: string) =>
     .join("");
 
 export function MailView({ messageId }: { messageId: string }) {
-  const { signup, orgInvitations, people, organizations, hydrated } = useDemo();
+  const { signup, orgInvitations, people, organizations, authorityGrants, hydrated } = useDemo();
   if (!hydrated) return <div style={{ background: PAGE, minHeight: "100dvh" }} />;
-  const mail = findMail({ signup, orgInvitations, people, organizations }, messageId);
+  const mail = findMail({ signup, orgInvitations, people, organizations, authorityGrants }, messageId);
   return <Inbox mail={mail} />;
 }
 
@@ -175,7 +176,9 @@ function Message({ mail }: { mail: MailMessage }) {
   const subject =
     mail.kind === "verify"
       ? "Confirm your email address for Bhutan NDI Entity Wallet"
-      : `${mail.inviter?.name ?? "Someone"} invited you to ${mail.orgName} on Bhutan NDI Entity Wallet`;
+      : mail.kind === "authority"
+        ? `${shortOrgName(mail.orgName)} wants to give you authority to act for it`
+        : `${mail.inviter?.name ?? "Someone"} invited you to ${mail.orgName} on Bhutan NDI Entity Wallet`;
   const time = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
   return (
@@ -235,12 +238,16 @@ function Message({ mail }: { mail: MailMessage }) {
             </div>
 
             <p className="relative mt-8 text-[11px] uppercase tracking-[0.18em]" style={{ fontFamily: MONO, color: "#8b95a5" }}>
-              {mail.kind === "verify" ? "One step to go" : "An invitation for you"}
+              {mail.kind === "verify" ? "One step to go" : mail.kind === "authority" ? "Authority to act" : "An invitation for you"}
             </p>
             <h2 className="relative mt-2 text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] sm:text-[32px]" style={{ fontFamily: DISPLAY }}>
               {mail.kind === "verify" ? (
                 <>
                   Confirm your <span style={GRADIENT_TEXT}>email address</span>
+                </>
+              ) : mail.kind === "authority" ? (
+                <>
+                  <span style={GRADIENT_TEXT}>{shortOrgName(mail.orgName)}</span> wants to give you authority to act for it
                 </>
               ) : (
                 <>
@@ -255,10 +262,27 @@ function Message({ mail }: { mail: MailMessage }) {
                   <strong style={{ color: "#ffffff" }}>{mail.mailbox.address}</strong>. Confirm it&rsquo;s your address to
                   carry on.
                 </>
+              ) : mail.kind === "authority" ? (
+                <>You collect it in your own Bhutan NDI app. You don&rsquo;t need an account, and you don&rsquo;t join {shortOrgName(mail.orgName)}.</>
               ) : (
                 <>Join your colleagues on the Bhutan NDI Entity Wallet, where {shortOrgName(mail.orgName)} keeps and shares its credentials.</>
               )}
             </p>
+
+            {mail.kind === "authority" ? (
+              <div className="relative mt-6 flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}>
+                <Avatar name={mail.sender?.name ?? shortOrgName(mail.orgName)} size={38} />
+                <span className="flex min-w-0 flex-col leading-[1.35]">
+                  <span className="text-[11px] uppercase tracking-[0.14em]" style={{ fontFamily: MONO, color: "#8b95a5" }}>
+                    Sent by
+                  </span>
+                  <span className="text-[15px] font-semibold">{mail.sender?.name ?? "Someone"}</span>
+                  <span className="text-[12.5px]" style={{ color: "#c5ccd8" }}>
+                    {mail.orgName}
+                  </span>
+                </span>
+              </div>
+            ) : null}
 
             {mail.kind === "invite" ? (
               <div className="relative mt-6 flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(8px)" }}>
@@ -317,6 +341,50 @@ function Message({ mail }: { mail: MailMessage }) {
                 <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
                   The link works once and expires in {VERIFY_LINK_DAYS} days. If you didn&rsquo;t start this, ignore this
                   email — no account is set up unless the link is opened.
+                </p>
+              </>
+            ) : mail.kind === "authority" ? (
+              <>
+                {/* Only the organisation's name before the person proves who
+                    they are — as the claim page (S3). What she may do, where
+                    and up to what is shown once her citizen ID matches, so a
+                    forwarded email tells nobody else anything. */}
+                <ol className="m-0 flex list-none flex-col gap-0 p-0">
+                  {[
+                    { title: "Open the link", note: "Press the button below.", on: true },
+                    { title: "Show it’s you", note: "Share your citizen ID from your Bhutan NDI app.", on: false },
+                    { title: "Accept it", note: "The authority arrives in the same app. Check it, then accept.", on: false },
+                  ].map((step, i, all) => (
+                    <li key={step.title} className="flex gap-3.5">
+                      <span className="flex flex-col items-center">
+                        <span
+                          className="flex h-8 w-8 flex-none items-center justify-center rounded-full text-[13px] font-semibold"
+                          style={
+                            step.on
+                              ? { background: CTA, color: "#06241a", boxShadow: "0 0 0 4px rgba(90,201,148,0.18)" }
+                              : { background: "#f1f4f3", color: "#5f6368", border: "1px solid #dfe5e3" }
+                          }
+                        >
+                          {i + 1}
+                        </span>
+                        {i < all.length - 1 ? <span className="my-1 w-px flex-1" style={{ background: "#dfe5e3", minHeight: 14 }} /> : null}
+                      </span>
+                      <span className="pb-4">
+                        <span className="block text-[15px] font-semibold" style={{ color: step.on ? INK : "#5f6368", fontFamily: DISPLAY }}>
+                          {step.title}
+                        </span>
+                        <span className="block text-[13.5px]" style={{ color: MUTED }}>
+                          {step.note}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <MailButton onClick={() => router.push(`/authority/claim/${mail.grant.claimRef}`)}>Collect your authority</MailButton>
+                <p className="text-[13px] leading-[1.6]" style={{ color: MUTED }}>
+                  Only the person this was meant for can collect it: their citizen ID has to match the one {shortOrgName(mail.orgName)} entered.
+                  {mail.grant.claimExpiresAt ? ` The link works until ${formatDate(mail.grant.claimExpiresAt)}.` : ""} Not expecting it? Ignore it —
+                  nothing happens unless you collect it.
                 </p>
               </>
             ) : (
@@ -390,8 +458,8 @@ function Empty() {
     <div className="flex flex-col items-center gap-3 px-6 py-20 text-center" style={{ color: MUTED }}>
       <p className="text-[16px]">This email isn&rsquo;t in the inbox.</p>
       <p className="max-w-[44ch] text-[13.5px]">
-        The demo was reset, or the sign-up or invitation it belonged to has gone. Start that part of the presentation
-        again.
+        The demo was reset, or the sign-up, invitation or authority it belonged to has gone. Start that part of the
+        presentation again.
       </p>
       <button
         type="button"

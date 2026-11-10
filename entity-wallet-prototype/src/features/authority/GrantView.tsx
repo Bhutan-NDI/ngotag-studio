@@ -13,6 +13,7 @@ import { Panel } from "@/components/ui/Panel";
 import { QrPlaceholder } from "@/components/ui/QrPlaceholder";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { DEFAULT_DAYS, cancellable, delegateNameOf, inDays, statement, stateWords, tabOf } from "@/lib/authority";
@@ -26,14 +27,18 @@ import { Fact, Notice, Statement } from "./shared";
  * Also the read-only detail SCR-AUT-01 opens for a grant in any other
  * state (§3.2, SCR-AUT-01 exits).
  *
- * THE PLATFORM SENDS NOTHING
+ * EMAILED, WITH THE LINK STILL TO HAND
  *
- * The grantor copies the link, or shows it as a QR code, and sends it the
- * way they usually reach the person (UXD-51) — the platform has no contact
- * for someone outside the organisation (D10). So the screen's job is to
- * hand over the link and say what makes passing it on safe enough: only
- * the person whose ID number was entered can collect it (G8). It promises
- * nothing about the channel.
+ * The grantor types the person's email and the platform sends the link —
+ * the same hand-off as a member invitation, and what the presentation
+ * shows. FLOW-AUT-01 v0.3 has the grantor send it by their own channel,
+ * with the platform sending nothing (step 8, D10), and leaves open whether
+ * the platform should offer email (Q3); the prototype shows that it does.
+ * The address is used for this one email and kept only to say where it
+ * went. The docs' way stays one step away, under *Send it another way*:
+ * copy the link or show it as a QR code. Either way, what makes passing it
+ * on safe enough is the same: only the person whose ID number was entered
+ * can collect it (G8).
  *
  * WAITING IS WAITING, NOT FAILING
  *
@@ -64,6 +69,7 @@ export function GrantView({ grantId }: { grantId: string }) {
     settleAuthorityListing,
     lapseGrant,
     simulateLicenceRevoked,
+    emailClaimLink,
   } = useDemo();
   const forced = useScreenState("SCR-AUT-04", [
     "live",
@@ -80,6 +86,9 @@ export function GrantView({ grantId }: { grantId: string }) {
   ]) as Face;
   const [qr, setQr] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => setOrigin(window.location.origin), []);
@@ -177,7 +186,7 @@ export function GrantView({ grantId }: { grantId: string }) {
       <div className="mx-auto flex w-full max-w-[820px] flex-col gap-5">
         <PageHeader
           crumbs={[{ label: "Authority", href: "/authority-to-act" }, { label: name }]}
-          title={sendTitle ? `Send this link to ${name}` : `${name}'s authority`}
+          title={face === "ready" && g.emailedTo ? `Sent to ${name}` : sendTitle ? `Send this to ${name}` : `${name}'s authority`}
           actions={<StatusPill status={words.pill} label={words.label} />}
         />
 
@@ -194,27 +203,108 @@ export function GrantView({ grantId }: { grantId: string }) {
             {face === "ready" ? (
               mayIssue ? (
                 <>
-                  <p className="m-0 text-[14.5px] leading-[1.6] text-body">
-                    Only {name} can collect this — they&rsquo;ll prove who they are with Bhutan NDI. The link works until{" "}
-                    {formatDate(g.claimExpiresAt ?? g.statusAt)}.
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-grid px-3 py-2.5" style={{ background: "rgb(var(--tint) / 0.03)" }}>
-                    <Icon name="link" size={14} strokeWidth={2} className="flex-none text-muted" />
-                    <span className="min-w-0 flex-1 break-all font-mono text-[12.5px] text-body">{link || "—"}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <GradientButton onClick={copy}>
-                      <Icon name="copy" size={15} strokeWidth={2} />
-                      {copied ? "Copied" : "Copy link"}
-                    </GradientButton>
-                    <HairlineButton onClick={() => setQr((x) => !x)}>{qr ? "Hide QR code" : "Show QR code"}</HairlineButton>
-                  </div>
-                  {qr ? (
-                    <div className="w-full max-w-[220px]">
-                      <QrPlaceholder value={link} />
+                  {g.emailedTo && !resending ? (
+                    <>
+                      <p role="status" className="m-0 flex items-start gap-2 text-[14.5px] leading-[1.6] text-body">
+                        <Icon name="check" size={16} strokeWidth={2.4} className="mt-[3px] flex-none" style={{ color: "var(--ndi-success)" }} />
+                        <span>
+                          Emailed to {name} at <span className="font-medium text-strong">{g.emailedTo}</span>. Only {name} can collect it —
+                          they&rsquo;ll prove who they are with Bhutan NDI. The link works until {formatDate(g.claimExpiresAt ?? g.statusAt)}.
+                        </span>
+                      </p>
+                      <div>
+                        <HairlineButton
+                          onClick={() => {
+                            setEmail(g.emailedTo ?? "");
+                            setResending(true);
+                          }}
+                        >
+                          Send it again
+                        </HairlineButton>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <p className="m-0 text-[14.5px] leading-[1.6] text-body">
+                        We&rsquo;ll email {name} a link to collect it. Only {name} can — they&rsquo;ll prove who they are with Bhutan NDI. The link
+                        works until {formatDate(g.claimExpiresAt ?? g.statusAt)}.
+                      </p>
+                      <form
+                        noValidate
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const r = emailClaimLink(g.id, email);
+                          if (r.ok) {
+                            setEmailError(null);
+                            setResending(false);
+                          } else
+                            setEmailError(
+                              r.error === "invalid"
+                                ? email.trim()
+                                  ? "Enter a full email address, like name@druksharpa.bt."
+                                  : `Enter ${name}'s email address.`
+                                : "This link can't be sent any more.",
+                            );
+                        }}
+                        className="flex flex-col gap-2"
+                      >
+                        <label className={FIELD_BLOCK_CLASS}>
+                          <span className={LABEL_CLASS}>{name}&rsquo;s email</span>
+                          <div className="flex flex-wrap items-start gap-2.5">
+                            <input
+                              type="email"
+                              inputMode="email"
+                              autoComplete="off"
+                              value={email}
+                              onChange={(e) => {
+                                setEmail(e.target.value);
+                                setEmailError(null);
+                              }}
+                              placeholder="name@company.bt"
+                              aria-invalid={emailError ? true : undefined}
+                              aria-describedby={emailError ? "grant-email-error" : undefined}
+                              className={`${FIELD_CLASS} h-11 min-w-0 flex-1 basis-[240px]`}
+                            />
+                            <GradientButton type="submit">
+                              <Icon name="send" size={15} strokeWidth={2} />
+                              Email the link
+                            </GradientButton>
+                          </div>
+                        </label>
+                        {emailError ? (
+                          <p id="grant-email-error" role="alert" className="m-0 text-[12.5px]" style={{ color: "var(--ndi-danger)" }}>
+                            {emailError}
+                          </p>
+                        ) : null}
+                      </form>
+                    </>
+                  )}
+                  {/* The docs' way still works: the grantor's own channel (step 8). */}
+                  <details className="group border-t border-subtle pt-3">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-medium text-muted">
+                      <Icon name="chevronRight" size={12} strokeWidth={2.2} className="transition-transform duration-200 group-open:rotate-90" />
+                      Send it another way
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-2 rounded-[12px] border border-grid px-3 py-2.5" style={{ background: "rgb(var(--tint) / 0.03)" }}>
+                        <Icon name="link" size={14} strokeWidth={2} className="flex-none text-muted" />
+                        <span className="min-w-0 flex-1 break-all font-mono text-[12.5px] text-body">{link || "—"}</span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <HairlineButton onClick={copy}>
+                          <Icon name="copy" size={15} strokeWidth={2} />
+                          {copied ? "Copied" : "Copy link"}
+                        </HairlineButton>
+                        <HairlineButton onClick={() => setQr((x) => !x)}>{qr ? "Hide QR code" : "Show QR code"}</HairlineButton>
+                      </div>
+                      {qr ? (
+                        <div className="w-full max-w-[220px]">
+                          <QrPlaceholder value={link} />
+                        </div>
+                      ) : null}
+                      <p className="m-0 text-[13px] text-muted">Send it the way you usually reach them — a message, say.</p>
                     </div>
-                  ) : null}
-                  <p className="m-0 text-[13px] text-muted">Send it the way you usually reach them — a message or email.</p>
+                  </details>
                 </>
               ) : (
                 <p className="m-0 text-[14px] leading-[1.6] text-body">
@@ -308,7 +398,11 @@ export function GrantView({ grantId }: { grantId: string }) {
             standsFor={`the message reaching ${name}, and time passing`}
             action={
               <>
-                <SimulatedAction onClick={() => router.push(`/authority/claim/${g.claimRef}`)}>Open the link as {name}</SimulatedAction>
+                {g.emailedTo ? (
+                  <SimulatedAction onClick={() => router.push(`/simulated/mail/${g.id}`)}>Open {name}&rsquo;s inbox</SimulatedAction>
+                ) : (
+                  <SimulatedAction onClick={() => router.push(`/authority/claim/${g.claimRef}`)}>Open the link as {name}</SimulatedAction>
+                )}
                 <SimulatedAction onClick={() => lapseGrant(g.id)}>Let seven days pass</SimulatedAction>
                 {g.licenceNumbers[0] ? (
                   <SimulatedAction onClick={() => simulateLicenceRevoked(g.licenceNumbers[0])}>Have the ministry revoke {g.licenceNumbers[0]}</SimulatedAction>
@@ -316,7 +410,7 @@ export function GrantView({ grantId }: { grantId: string }) {
               </>
             }
           >
-            The link goes by the grantor&rsquo;s own message or email; opening it here plays {name} on their phone. Seven days without anyone collecting
+            No email is sent in this prototype. {g.emailedTo ? `Opening the inbox is what ${name} would do on their own device.` : `Opening the link here plays ${name} on their phone.`} Seven days without anyone collecting
             it ends it (E15). A licence revoked before it is collected stops it at collection (E11).
           </SimulatedStep>
         ) : null}

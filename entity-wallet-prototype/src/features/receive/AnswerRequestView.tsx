@@ -96,7 +96,10 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
   const org = organizations.find((o) => o.id === r?.orgId);
   const business = org ? shortOrgName(org.name) : "The business";
   /* What was presented — never a superseded one (EW-FLOW6-SD §4.5). */
-  const prereq = r ? heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential && !c.supersededBy) : undefined;
+  const presented = (r?.consented ?? []).map((p) => ({
+    p,
+    held: heldCredentials.filter(inOrg(r?.orgId ?? "")).find((c) => c.type === p.credential && !c.supersededBy),
+  }));
   const missing = (offering?.fields ?? []).filter((f) => !values[f.name]?.trim());
 
   /* E7 is past answerBy with no answer. A request that expired after it was
@@ -245,17 +248,21 @@ export function AnswerRequestView({ requestId }: { requestId: string }) {
               <Icon name="shieldCheck" size={15} strokeWidth={2} style={{ color: "var(--ndi-success)" }} />
               Verified
             </h2>
-            <dl className="m-0 grid gap-x-6 gap-y-3 min-[641px]:grid-cols-2">
-              {r.consented.uses.map((u) => (
-                <div key={u} className="flex flex-col gap-0.5">
-                  <dt className={LABEL_CLASS}>{u}</dt>
-                  <dd className="m-0 text-[14px] text-body">{(prereq && valueFor(prereq.attributes, u)) ?? "—"}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="m-0 text-[12.5px] text-muted">
-              From their {r.consented.credential}, issued by {r.consented.issuer}.
-            </p>
+            {presented.map(({ p, held }, n) => (
+              <div key={p.credential} className={`flex flex-col gap-3 ${n > 0 ? "border-t border-subtle pt-3" : ""}`}>
+                <dl className="m-0 grid gap-x-6 gap-y-3 min-[641px]:grid-cols-2">
+                  {p.uses.map((u) => (
+                    <div key={u} className="flex flex-col gap-0.5">
+                      <dt className={LABEL_CLASS}>{u}</dt>
+                      <dd className="m-0 text-[14px] text-body">{(held && valueFor(held.attributes, u)) ?? "—"}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="m-0 text-[12.5px] text-muted">
+                  From their {p.credential}, issued by {p.issuer}.
+                </p>
+              </div>
+            ))}
             {/* What the business agreed to share when asked for more (A1) —
                 part of what it proved, so it belongs in this panel. */}
             {r.alsoShared ? (

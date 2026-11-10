@@ -141,7 +141,7 @@ export function OfferingsView() {
                       <Fact term="Who can ask" value={o.eligibleKinds.map((k) => KIND_WORDS[k]).join(", ")} />
                       <Fact
                         term="What they show first"
-                        value={`Their ${o.prerequisite.credential} (${o.prerequisite.issuer}). You use: ${o.prerequisite.uses.join(", ")}.`}
+                        value={o.prerequisites.map((p) => `Their ${p.credential} (${p.issuer}). You use: ${p.uses.join(", ")}.`).join(" ")}
                       />
                       <Fact term="How it's answered" value={o.answering === "queue" ? "By your officers, from the queue" : "By your system, with the queue as fallback"} />
                       <Fact term="Answer window" value={`${o.answerWindowDays} days`} />
@@ -213,28 +213,33 @@ function Composer({
 }: {
   offering: CredentialOffering;
   onCancel: () => void;
-  onPublish: (changes: { uses: string[]; answerWindowDays: number; renewable: boolean }) => void;
+  onPublish: (changes: { uses: string[][]; answerWindowDays: number; renewable: boolean }) => void;
 }) {
-  const [uses, setUses] = useState<string[]>(offering.prerequisite.uses);
+  /* What the office uses from each credential it asks to see, in order. */
+  const [uses, setUses] = useState<string[][]>(offering.prerequisites.map((p) => p.uses));
   const [days, setDays] = useState(String(offering.answerWindowDays));
   const [renewable, setRenewable] = useState(offering.renewable);
   const n = Number(days);
-  const valid = uses.length > 0 && Number.isInteger(n) && n >= 1 && n <= 30;
+  const valid = uses.every((u) => u.length > 0) && Number.isInteger(n) && n >= 1 && n <= 30;
 
   return (
     <div className="flex flex-col gap-4 rounded-[12px] border border-grid px-4 py-4">
-      <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-        <legend className={`${LABEL_CLASS} mb-2`}>What you use from their {offering.prerequisite.credential}</legend>
-        {offering.prerequisite.attributes.map((a) => (
-          <Checkbox
-            key={a}
-            label={a}
-            checked={uses.includes(a)}
-            onChange={(on: boolean) => setUses((u) => (on ? [...u, a] : u.filter((x) => x !== a)))}
-          />
-        ))}
-        {!uses.length ? <p className="m-0 text-[12.5px] text-muted">Choose at least one item.</p> : null}
-      </fieldset>
+      {offering.prerequisites.map((p, i) => (
+        <fieldset key={p.credential} className="m-0 flex flex-col gap-2 border-0 p-0">
+          <legend className={`${LABEL_CLASS} mb-2`}>What you use from their {p.credential}</legend>
+          {p.attributes.map((a) => (
+            <Checkbox
+              key={a}
+              label={a}
+              checked={uses[i]?.includes(a) ?? false}
+              onChange={(on: boolean) =>
+                setUses((all) => all.map((u, j) => (j !== i ? u : on ? [...u, a] : u.filter((x) => x !== a))))
+              }
+            />
+          ))}
+          {!uses[i]?.length ? <p className="m-0 text-[12.5px] text-muted">Choose at least one item.</p> : null}
+        </fieldset>
+      ))}
       <label className={`${FIELD_BLOCK_CLASS} max-w-[220px]`}>
         <span className={LABEL_CLASS}>Answer window, in days</span>
         <input className={FIELD_CLASS} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />

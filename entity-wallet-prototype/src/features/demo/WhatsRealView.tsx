@@ -208,13 +208,19 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
       {
         shown: "The business licence the agent acts under, and whether it can be named",
         reality:
-          "Pelden's licence comes from a dashed step, because the ministry doesn't offer one on request in the prototype. Whether a licence may be relied on by someone acting for the holder is a constant in lib/authority.ts standing in for the Trust Registry's delegable flag, which doesn't exist yet. Revoking it is a dashed step on the waiting authority.",
+          "Pelden asks the ministry for its licence from Get a credential, before its TPN, and the ministry's system answers by itself (see Receiving a credential). Walked on its own from Walk a flow, the authority form still offers a dashed step that puts the licence straight in the wallet. Whether a licence may be relied on by someone acting for the holder is a constant in lib/authority.ts standing in for the Trust Registry's delegable flag, which doesn't exist yet. Revoking it is a dashed step on the waiting authority.",
         needs: "MoICE issuing revocable business licences marked delegable (FLOW-AUT-01 P7), the delegable flag (D9), and the held-credential index carrying licence numbers (EW-FLOW6-SD §4.5).",
       },
       {
         shown: "Revocation ids, registered when the agent accepts",
         reality: "A generated id on the grant, discarded if the offer isn't accepted. \"Accept — the registration is slow\" shows E17. Nothing is registered anywhere.",
         needs: "Revocation for platform-issued credentials (FLOW-AUT-01 P6, D23).",
+      },
+      {
+        shown: "Emailing Pema the link, and her inbox",
+        reality:
+          "No email is sent. The address Dorji types is kept on the grant only to say where it went, and \"Open Pema Choden's inbox\" opens a simulated inbox with the email in it. FLOW-AUT-01 has the grantor send the link by their own channel, with the platform sending nothing (step 8), and asks whether the platform should offer email (Q3); the prototype shows that it does, and keeps copying the link or showing a QR code under \"Send it another way\".",
+        needs: "A decision on FLOW-AUT-01 Q3, then the platform's mail delivery — and a note in the privacy assessment that the platform now holds a contact for someone outside the organisation.",
       },
       {
         shown: "Seven days passing, thirty minutes passing",
@@ -381,9 +387,9 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
     icon: "credentials",
     rows: [
       {
-        shown: "Pelden shares its registration with the tax office, and the office checks it",
+        shown: "Pelden shares its registration with the ministry, and its registration and licence with the tax office, and each office checks them",
         reality:
-          "A timer moves the request from sending to waiting. No proof is requested or presented, no signature is checked, and the office's \"Verified\" panel reads Pelden's registration straight from the demo data.",
+          "A timer moves the request from sending to waiting. No proof is requested or presented, no signature is checked, and the office's \"Verified\" panel reads Pelden's registration and licence straight from the demo data.",
         needs: "The organisation's agent presenting the whole credential to the issuer's proof request, verified at the issuer before the request reaches anyone (FLOW-CRD-01 steps 4–8).",
       },
       {
@@ -409,6 +415,18 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         reality:
           "Seeded rows in your browser. No issuer sends anything; superseding is a field the demo store sets on the older credential when the newer one is accepted.",
         needs: "The organisation's agent receiving the offer, checks C1–C5 before it reaches the inbox, and the held-credential index with supersededBy (EW-FLOW6-SD §4.5).",
+      },
+      {
+        shown: "The ministry's licensing system answers by itself",
+        reality:
+          "A timer in your browser, as for the tax office's system below. The ministry's system is taken as already connected (CONNECTED_SYSTEMS in lib/demoData.ts), so a few seconds after Pelden's registration reaches it, the demo writes an offer with the offering's example values — the licence number the rest of the story uses. Nobody at the ministry is involved. Whether MoICE answers this way or from an officers' queue is still open with GovTech (REQ-EW-01 item 24).",
+        needs: "MoICE's licensing system (BLMIS) connected through the issuer request API, looking the company up in its own register (FLOW-CRD-03 Kind A).",
+      },
+      {
+        shown: "Offices that issue on NDI, beside what can be asked for",
+        reality:
+          "Read from the organisations in your browser that can issue. Choosing one filters the list; searching matches the name, what the office does, and the credentials it offers.",
+        needs: "UX-EW-03 lists offerings only; a directory of issuers is the prototype's suggestion, and would read the issuers listed on NDI's Trust Registry.",
       },
       {
         shown: "The tax office's system answers a request by itself",

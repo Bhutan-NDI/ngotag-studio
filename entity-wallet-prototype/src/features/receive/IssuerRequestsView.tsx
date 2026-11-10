@@ -132,8 +132,11 @@ export function IssuerRequestsView() {
   }
 
   const identifier = (r: CredentialRequest) => {
-    const held = heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === r.consented.credential && !c.supersededBy);
-    return held ? valueFor(held.attributes, r.consented.uses.find((u) => /number/i.test(u)) ?? r.consented.uses[0]) : null;
+    /* The first credential presented leads — the registration, whose number the office looks up. */
+    const first = r.consented[0];
+    if (!first) return null;
+    const held = heldCredentials.filter(inOrg(r.orgId)).find((c) => c.type === first.credential && !c.supersededBy);
+    return held ? valueFor(held.attributes, first.uses.find((u) => /number/i.test(u)) ?? first.uses[0]) : null;
   };
   const business = (r: CredentialRequest) => organizations.find((o) => o.id === r.orgId)?.name ?? "A business";
   const outcome = (r: CredentialRequest) =>

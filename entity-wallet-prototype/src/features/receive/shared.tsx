@@ -26,6 +26,9 @@ import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 export const daysLeft = (date: string | null) =>
   date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000)) : 0;
 
+/** "a day", "5 days" — an answer window in running text. */
+export const withinDays = (n: number) => (n === 1 ? "a day" : `${n} days`);
+
 /** A short name for an issuer inside a sentence: "the Department of Revenue & Customs". */
 export const issuerInline = (name: string) => (/^(Department|Ministry|Corporate|Office)/.test(name) ? `the ${name}` : name);
 
@@ -38,7 +41,7 @@ export function requestWords(r: Pick<CredentialRequest, "state" | "issuerName" |
     case "NEEDS_CONSENT":
       return { status: "awaiting_acceptance", label: "Your answer needed", sentence: `${issuer} is asking for more — your answer needed` };
     case "WITH_ISSUER":
-      return { status: "pending", label: "With the issuer", sentence: `Waiting for ${issuerInline(issuer)} — usually within ${windowDays} days` };
+      return { status: "pending", label: "With the issuer", sentence: `Waiting for ${issuerInline(issuer)} — usually within ${withinDays(windowDays)}` };
     case "OFFER_READY":
       return { status: "offered", label: "Replied", sentence: `${issuer} has replied — review it` };
     case "ISSUED":

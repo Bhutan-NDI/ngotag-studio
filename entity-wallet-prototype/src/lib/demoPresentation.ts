@@ -136,7 +136,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 4,
     title: "Flow 6 · Each office issues its own",
     happening:
-      "With its registration in its wallet, Pelden Trading asks the Department of Revenue & Customs for its taxpayer number (TPN). The office sees the registration Pelden Trading shares with it, decides on what was proved, and sends the TPN back as a credential. Someone at Pelden Trading checks the offer and accepts it before it's held.",
+      "With its registration in its wallet, Pelden Trading asks the Ministry of Industry, Commerce & Employment for its business licence. The ministry's system is connected to NDI, so it checks the registration and offers the licence back in moments. Then Pelden Trading asks the Department of Revenue & Customs for its taxpayer number (TPN), sharing the registration and the licence; an officer decides on what was proved and sends the TPN back. Each time, someone at Pelden Trading checks the offer and accepts it before it's held.",
     doThis: "Press **Next**.",
     say: "Each office issues what it's responsible for. The wallet is where it comes together, under the company's control.",
     route: "/wallet/get",
@@ -162,7 +162,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 6,
     title: "Flow 8 · Authority someone else can check",
     happening:
-      "Pelden Trading's clearing agent, Pema Choden, declares its imports at the Bhutan National Single Window. Today she'd carry a letter and copies of Pelden Trading's licence and TPN. Instead Dorji gives her authority to act — for what, under which licence, up to what amount, until when — and she collects it from a link in her own Bhutan NDI app. She needs no account here and isn't a member of Pelden Trading.",
+      "Pelden Trading's clearing agent, Pema Choden, declares its imports at the Bhutan National Single Window. Today she'd carry a letter and copies of Pelden Trading's licence and TPN. Instead Dorji gives her authority to act — for what, under which licence, up to what amount, until when — and emails her a link; she collects it in her own Bhutan NDI app. She needs no account here and isn't a member of Pelden Trading.",
     doThis: "Press **Next**.",
     say: "Delegation the other side can check: who acted, for whom, and under what authority.",
     route: "/authority-to-act",
@@ -187,7 +187,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 8,
     title: "That's the Entity Wallet",
     happening:
-      "Dorji got an account as a person. Pelden Trading was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden Trading received its TPN from the tax office, shared its registration and TPN with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
+      "Dorji got an account as a person. Pelden Trading was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden Trading received its business licence from the ministry and its TPN from the tax office, shared its registration and TPN with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
     doThis:
       "Press **Finish**. To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },
@@ -269,7 +269,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Receiving credentials",
-    shows: "Ugyen, appointed to receive credentials, asks the tax office for the TPN and accepts it",
+    shows: "Ugyen gets Pelden Trading's business licence from the ministry's system, then its TPN from the tax office",
     persona: "ugyen",
     route: "/wallet/get",
     start: "controllerReady",
@@ -293,7 +293,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
   },
   {
     title: "Issuing authority credentials",
-    shows: "Dorji gives the clearing agent authority; she collects it in her own app",
+    shows: "Dorji gives the clearing agent authority and emails her the link; she collects it in her own app",
     persona: "dorji",
     route: "/authority-to-act",
     start: "tpnHeld",
@@ -525,7 +525,10 @@ export function castOnStage(
     if (id === "pema" && id !== current) {
       const toCollect = s.authorityGrants.find((g) => g.claimRef && (g.status === "CLAIMABLE" || g.status === "ISSUING"));
       const holds = s.authorityGrants.some((g) => g.status === "ACTIVE" && g.delegateIdKeyed);
-      if (toCollect)
+      /* Emailed: her inbox, where she'd open it. Otherwise the link itself. */
+      if (toCollect?.emailedTo && toCollect.status === "CLAIMABLE")
+        add({ key: p.id, name: p.name, role: p.title, tag: "link in her inbox", href: `/simulated/mail/${toCollect.id}` });
+      else if (toCollect)
         add({ key: p.id, name: p.name, role: p.title, tag: "collects by link", href: `/authority/claim/${toCollect.claimRef}` });
       else if (holds) add({ key: p.id, name: p.name, role: p.title, tag: "at the Single Window", href: "/simulated/bnsw" });
       else
@@ -534,7 +537,7 @@ export function castOnStage(
           name: p.name,
           role: p.title,
           tag: "no account",
-          note: "Gets her authority by a link once Dorji gives it.",
+          note: "Gets her authority by email once Dorji gives it.",
         });
       continue;
     }

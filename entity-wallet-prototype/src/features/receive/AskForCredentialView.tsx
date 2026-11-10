@@ -13,13 +13,14 @@ import { Panel } from "@/components/ui/Panel";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { LABEL_CLASS } from "@/components/ui/formStyles";
 import { Icon } from "@/components/ui/icons";
-import { inOrg, requestInFlight } from "@/lib/demoData";
+import { CONNECTED_SYSTEMS, inOrg, requestInFlight } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, ROUND_TRIP_MS } from "@/lib/demoTiming";
+import { namesOf } from "@/lib/sharing";
 
 import { formatDate } from "@/features/controllership/scopeModel";
 
-import { cannotAsk, issuerInline, useHolder, valueFor } from "./shared";
+import { cannotAsk, issuerInline, useHolder, valueFor, withinDays } from "./shared";
 
 /** "sole proprietorships" — the kind of business as running text uses it. */
 const KIND_PLURAL: Record<string, string> = { company: "companies", sole_proprietorship: "sole proprietorships", partnership: "partnerships" };
@@ -31,8 +32,10 @@ const KIND_PLURAL: Record<string, string> = { company: "companies", sole_proprie
  *
  * EVERY ATTRIBUTE, BECAUSE ALL OF IT GOES
  *
- * The prerequisite is a JSON-LD credential, and those can't be shared in
- * part (EW-FLOW6-SD/D20). So the screen lists every attribute in it — the
+ * Each prerequisite is a JSON-LD credential, and those can't be shared in
+ * part (EW-FLOW6-SD/D20). An offering can need more than one — the TPN
+ * needs the registration and the business licence — and each is shown
+ * whole, one after the other. So the screen lists every attribute in it — the
  * address and date of incorporation the issuer doesn't need included — and
  * separately what the issuer says it uses. The tempting version lists only
  * the used items under "what is shared", which reads better and is false.
@@ -93,6 +96,8 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
   const [refused, setRefused] = useState<"E3" | "E4" | "E5" | "E5_held" | "not_eligible" | "offline" | null>(null);
 
   const offering = offerings.find((o) => o.id === offeringId);
+  const needed = offering?.prerequisites.map((p) => p.credential) ?? [];
+  const missing = needed.filter((t) => !holder.held.some((c) => c.type === t));
   const existing = credentialRequests.find((r) => inOrg(holder.orgId)(r) && r.offeringId === offeringId && requestInFlight(r));
 
   const natural: Face = submitted
@@ -107,7 +112,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
           ? "e5"
           : refused === "E5_held" || (!offering.renewable && holder.held.some((c) => c.type === offering.credential))
             ? "e5_held"
-          : refused === "E4" || !holder.held.some((c) => c.type === offering.prerequisite.credential)
+          : refused === "E4" || missing.length > 0
             ? "e4"
           : refused === "offline"
             ? "offline"
@@ -163,7 +168,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
           <Panel>
             <p role="status" className="relative z-[4] m-0 flex items-start gap-2 text-[15px] font-medium text-strong">
               <Icon name="check" size={16} strokeWidth={2.4} className="mt-[3px] flex-none" style={{ color: "var(--ndi-success)" }} />
-              Asked. Sending your {offering?.prerequisite.credential ?? "credential"} to {issuerInline(issuer)}…
+              Asked. Sending your {namesOf(needed) || "credential"} to {issuerInline(issuer)}…
             </p>
           </Panel>
         </div>
@@ -175,7 +180,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
     /* E4 arrives here only by address — the catalogue doesn't offer Ask
        until the prerequisite is held — so it says what's needed and offers
        the way to get it. */
-    const prereq = offerings.find((o) => o.credential === offering?.prerequisite.credential && o.status === "ACTIVE");
+    const prereq = offerings.find((o) => o.credential === missing[0] && o.status === "ACTIVE");
     return (
       <AppShell>
         <div className="mx-auto flex w-full max-w-[860px] flex-col gap-5">
@@ -188,7 +193,7 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                   : face === "not_eligible"
                     ? `${issuer} doesn't offer this to ${KIND_PLURAL[holder.kind]}. Nothing has been sent.`
                   : face === "e4"
-                    ? `To ask for this you first need: ${offering?.prerequisite.credential ?? "another credential"}.`
+                    ? `To ask for this you first need: ${namesOf(missing) || "another credential"}.`
                     : face === "e5_held"
                       ? "Your organisation already has this."
                       : "You've already asked for this. Here's where it stands."}
@@ -215,12 +220,16 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
 
   if (!offering) return null;
   const readOnly = face === "no_permission";
-  /* The one that goes: active, not replaced by a newer one, and the newest
-     of those — the same rule the store applies when it asks. */
-  const sendable = holder.held
-    .filter((c) => c.type === offering.prerequisite.credential && c.status === "active" && !c.supersededBy)
-    .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
-  const sharedCard = sendable[0];
+  /* For each prerequisite, the one that goes: active, not replaced by a
+     newer one, and the newest of those — the same rule the store applies
+     when it asks. */
+  const going = offering.prerequisites.map((p) => {
+    const sendable = holder.held
+      .filter((c) => c.type === p.credential && c.status === "active" && !c.supersededBy)
+      .sort((a, b) => b.receivedAt.localeCompare(a.receivedAt));
+    return { p, sendable, card: sendable[0] };
+  });
+  const fast = offering.answering === "api" && Boolean(CONNECTED_SYSTEMS[offering.issuerOrgId]);
   /* Dates are held as ISO strings; everything else reads as it is. */
   const shown = (v: string | null) => (v === null ? "—" : /^\d{4}-\d{2}-\d{2}/.test(v) ? formatDate(v) : v);
 
@@ -253,47 +262,51 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                 <h2 id="ask-share" className={LABEL_CLASS}>
                   You share
                 </h2>
-                {/* The card Pelden Trading holds, as Held credentials draws it,
-                    so "which one goes" is recognised rather than read. */}
-                <div className="flex flex-col gap-1.5">
-                  <CredentialCard
-                    type={offering.prerequisite.credential}
-                    issuer={sharedCard?.issuer ?? offering.prerequisite.issuer}
-                    foundational={Boolean(sharedCard?.isFoundational)}
-                    /* No format pill: "W3C VC" means nothing to the person deciding. */
-                    formats={[]}
-                  />
-                  <p className="m-0 text-[12px] text-faint">
-                    {sharedCard
-                      ? `Received ${formatDate(sharedCard.receivedAt)}${sendable.length > 1 ? ` · the newest of your ${sendable.length}` : ""}`
-                      : " "}
-                  </p>
-                </div>
-                {/* Its details with their values, in the open: what is sent is
-                    read before agreeing to send it, not found behind a flip.
-                    Grouped by whether the issuer uses them, so the marking is
-                    two headings rather than a tag on every row
-                    (EW-FLOW6-SD/D20 — all of it goes either way). */}
-                <p className="m-0 text-[13px] leading-[1.5] text-muted">{issuerShort(issuer)} sees everything in it.</p>
-                {[
-                  { used: true, title: `Used by ${issuerShort(issuer).toLowerCase()}` },
-                  { used: false, title: "Sent, but not used" },
-                ].map((group) => (
-                  <div key={group.title} className="flex flex-col gap-1">
-                    <p className="m-0 flex items-center gap-2 text-[11.5px] font-semibold text-muted">
-                      <span
-                        aria-hidden="true"
-                        className="h-1.5 w-1.5 flex-none rounded-full"
-                        style={{ background: group.used ? "var(--ndi-mint)" : "var(--text-faint)" }}
+                {going.map(({ p, sendable, card }, n) => (
+                  <div key={p.credential} className={`flex flex-col gap-3 ${n > 0 ? "border-t border-subtle pt-4" : ""}`}>
+                    {/* The card Pelden Trading holds, as Held credentials draws it,
+                        so "which one goes" is recognised rather than read. */}
+                    <div className="flex flex-col gap-1.5">
+                      <CredentialCard
+                        type={p.credential}
+                        issuer={card?.issuer ?? p.issuer}
+                        foundational={Boolean(card?.isFoundational)}
+                        /* No format pill: "W3C VC" means nothing to the person deciding. */
+                        formats={[]}
                       />
-                      {group.title}
-                    </p>
-                    <DetailRows
-                      rows={offering.prerequisite.attributes
-                        .filter((a) => offering.prerequisite.uses.includes(a) === group.used)
-                        .map((a) => ({ label: a, value: shown(sharedCard ? valueFor(sharedCard.attributes, a) : null) }))}
-                      quiet={!group.used}
-                    />
+                      <p className="m-0 text-[12px] text-faint">
+                        {card
+                          ? `Received ${formatDate(card.receivedAt)}${sendable.length > 1 ? ` · the newest of your ${sendable.length}` : ""}`
+                          : " "}
+                      </p>
+                    </div>
+                    {/* Its details with their values, in the open: what is sent is
+                        read before agreeing to send it, not found behind a flip.
+                        Grouped by whether the issuer uses them, so the marking is
+                        two headings rather than a tag on every row
+                        (EW-FLOW6-SD/D20 — all of it goes either way). */}
+                    <p className="m-0 text-[13px] leading-[1.5] text-muted">{issuerShort(issuer)} sees everything in it.</p>
+                    {[
+                      { used: true, title: `Used by ${issuerShort(issuer).toLowerCase()}` },
+                      { used: false, title: "Sent, but not used" },
+                    ].map((group) => {
+                      const rows = p.attributes
+                        .filter((a) => p.uses.includes(a) === group.used)
+                        .map((a) => ({ label: a, value: shown(card ? valueFor(card.attributes, a) : null) }));
+                      return rows.length ? (
+                        <div key={group.title} className="flex flex-col gap-1">
+                          <p className="m-0 flex items-center gap-2 text-[11.5px] font-semibold text-muted">
+                            <span
+                              aria-hidden="true"
+                              className="h-1.5 w-1.5 flex-none rounded-full"
+                              style={{ background: group.used ? "var(--ndi-mint)" : "var(--text-faint)" }}
+                            />
+                            {group.title}
+                          </p>
+                          <DetailRows rows={rows} quiet={!group.used} />
+                        </div>
+                      ) : null;
+                    })}
                   </div>
                 ))}
                 <p className="m-0 flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
@@ -338,11 +351,13 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
               </h2>
               <ol className="m-0 grid list-none gap-2.5 p-0 min-[761px]:grid-cols-3">
                 {[
-                  { icon: "send" as const, title: "You ask", note: `Your ${offering.prerequisite.credential} goes to them.` },
+                  { icon: "send" as const, title: "You ask", note: `Your ${namesOf(needed)} ${needed.length > 1 ? "go" : "goes"} to them.` },
                   {
                     icon: "refresh" as const,
                     title: "They check",
-                    note: `Usually within ${offering.answerWindowDays} days. They may decline.`,
+                    note: fast
+                      ? "Their system checks it and answers in moments. It may decline."
+                      : `Usually within ${withinDays(offering.answerWindowDays)}. They may decline.`,
                   },
                   {
                     icon: "check" as const,

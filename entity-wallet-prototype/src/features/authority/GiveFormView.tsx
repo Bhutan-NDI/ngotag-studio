@@ -327,8 +327,8 @@ export function GiveFormView() {
                         standsFor="the ministry issuing Pelden its business licence"
                         action={<SimulatedAction onClick={simulateLicenceIssued}>Have the ministry issue Pelden&rsquo;s business licence</SimulatedAction>}
                       >
-                        Getting a licence is Flow 6 — asking the Ministry of Industry, Commerce &amp; Employment and accepting what it sends. The
-                        prototype&rsquo;s ministry doesn&rsquo;t offer one on request yet, so this puts it straight into Pelden&rsquo;s wallet.
+                        Getting a licence is Flow 6 — asking the Ministry of Industry, Commerce &amp; Employment from Get a credential, which its
+                        system answers in moments. This puts it straight into Pelden&rsquo;s wallet instead, for walking this flow on its own.
                       </SimulatedStep>
                     ) : null}
                   </div>

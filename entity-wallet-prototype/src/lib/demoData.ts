@@ -1050,6 +1050,12 @@ export interface AuthorityGrant {
   /** The bearer reference in the claim link's path (FLOW-AUT-01 §7.2). */
   claimRef: string | null;
   claimExpiresAt: string | null;
+  /**
+   * Where the grantor emailed the claim link from SCR-AUT-04, if they did.
+   * FLOW-AUT-01 Q3 asks whether the platform should offer this; the
+   * prototype shows it. The address is kept only to say where it went.
+   */
+  emailedTo?: string | null;
   /** SHA-256 of the grant as submitted — an approval is bound to it (D20). */
   approvalHash: string;
   status: GrantStatus;
@@ -2309,7 +2315,12 @@ export interface CredentialOffering {
   credential: string;
   summary: string;
   eligibleKinds: OrgKind[];
-  prerequisite: Prerequisite;
+  /**
+   * What the issuer needs to see first — at least one credential, each shared
+   * whole (EW-FLOW6-SD §4.1, `prerequisites[]`). The TPN asks for two: the
+   * registration and the business licence.
+   */
+  prerequisites: Prerequisite[];
   /** `queue` — officers answer on SCR-CRD-08 (Kind Q). `api` — the issuer's system answers (Kind A). */
   answering: "queue" | "api";
   answerWindowDays: number;
@@ -2348,8 +2359,8 @@ export interface CredentialRequest {
   requestedBy: PersonId;
   requestedAt: string;
   state: CrdRequestState;
-  /** What the consent on SCR-CRD-02 covered. */
-  consented: Prerequisite;
+  /** What the consent on SCR-CRD-02 covered — every credential the offering needs. */
+  consented: Prerequisite[];
   /** A1 — what the issuer asked for beyond the consent, listed separately (UXD-35). */
   askedMore: { credential: string; items: string[] } | null;
   /** A1 answered "share this too": what was shared beyond the first consent, which the officer sees too. */
@@ -2494,7 +2505,32 @@ const REGISTRATION_ATTRIBUTES = [
   "Status",
 ];
 
+/** The Business Licence's attributes, in the words SCR-CRD-02 lists them. */
+const LICENCE_ATTRIBUTES = ["Registered name", "Licence number", "Licensed activity", "Branch"];
+
 /**
+ * Issuers whose own system is already connected and answers requests by
+ * itself (FLOW-CRD-03 Kind A) — the client it answers with. The ministry's
+ * licensing system is taken as ready in the prototype, so a licence comes
+ * back as an offer moments after the registration is shared. Whether MoICE
+ * answers this way or from a queue is still open with GovTech (REQ-EW-01
+ * item 24). The tax office's own system is set up on SCR-CRD-10 instead.
+ */
+export const CONNECTED_SYSTEMS: Record<string, { id: string; name: string }> = {
+  "org-moice": { id: "cli-blmis", name: "Business licensing system (BLMIS)" },
+};
+
+/**
+ * What the Ministry of Industry, Commerce & Employment and the Department
+ * of Revenue & Customs offer on request.
+ *
+ * The business licence comes first: a company gets it from the ministry
+ * on its registration (Story A2), and the tax office then asks to see both
+ * the registration and the licence before it issues the TPN. The ministry's
+ * system answers by itself (CONNECTED_SYSTEMS), so the offer arrives in
+ * seconds; its values are the ones Pelden's licence carries everywhere
+ * else in the story, so the authority and the Single Window line up.
+ *
  * What the Department of Revenue & Customs offers on request. The TPN is
  * the next credential in a company's chain (UX-EW-01 UXD-14) and what the
  * first day's dashboard leads with; the bonded-warehouse authorisation
@@ -2512,18 +2548,54 @@ const REGISTRATION_ATTRIBUTES = [
  */
 export const SEED_OFFERINGS: CredentialOffering[] = [
   {
+    id: "off-licence",
+    issuerOrgId: "org-moice",
+    issuerName: "Ministry of Industry, Commerce & Employment",
+    credential: "Business Licence",
+    summary: "The licence for what your business does — what the tax office, a bank or the Single Window asks for.",
+    eligibleKinds: ["company"],
+    prerequisites: [
+      {
+        credential: "Business Registration",
+        issuer: "Corporate Regulatory Authority",
+        attributes: REGISTRATION_ATTRIBUTES,
+        uses: ["Registered name", "Registration number", "Company type", "Registered address"],
+      },
+    ],
+    answering: "api",
+    answerWindowDays: 1,
+    renewable: false,
+    status: "ACTIVE",
+    version: 1,
+    fields: [
+      { name: "registered_name", label: "Registered name", example: "Pelden Trading Pvt. Ltd." },
+      { name: "licence_number", label: "Licence number", example: "BL-PLG-2025-00871" },
+      { name: "licensed_activity", label: "Licensed activity", example: "General trading — import and wholesale" },
+      { name: "branch", label: "Branch", example: "Phuentsholing" },
+    ],
+    covered: true,
+  },
+  {
     id: "off-tpn",
     issuerOrgId: "org-drc",
     issuerName: "Department of Revenue & Customs",
     credential: "Taxpayer Number (TPN)",
     summary: "Your business's tax identity — what a bank, a customs broker or a supplier asks for.",
     eligibleKinds: ["company", "sole_proprietorship", "partnership"],
-    prerequisite: {
-      credential: "Business Registration",
-      issuer: "Corporate Regulatory Authority",
-      attributes: REGISTRATION_ATTRIBUTES,
-      uses: ["Registered name", "Registration number", "Company type"],
-    },
+    prerequisites: [
+      {
+        credential: "Business Registration",
+        issuer: "Corporate Regulatory Authority",
+        attributes: REGISTRATION_ATTRIBUTES,
+        uses: ["Registered name", "Registration number", "Company type"],
+      },
+      {
+        credential: "Business Licence",
+        issuer: "Ministry of Industry, Commerce & Employment",
+        attributes: LICENCE_ATTRIBUTES,
+        uses: ["Registered name", "Licence number", "Licensed activity"],
+      },
+    ],
     answering: "queue",
     answerWindowDays: 5,
     renewable: false,
@@ -2561,12 +2633,14 @@ export const SEED_OFFERINGS: CredentialOffering[] = [
     credential: "Bonded Warehouse Authorisation",
     summary: "Permission to store goods in a bonded warehouse before duty is paid.",
     eligibleKinds: ["company"],
-    prerequisite: {
-      credential: "Taxpayer Number (TPN)",
-      issuer: "Department of Revenue & Customs",
-      attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
-      uses: ["Registered name", "Taxpayer number"],
-    },
+    prerequisites: [
+      {
+        credential: "Taxpayer Number (TPN)",
+        issuer: "Department of Revenue & Customs",
+        attributes: ["Registered name", "Taxpayer number", "Tax office", "Registered for"],
+        uses: ["Registered name", "Taxpayer number"],
+      },
+    ],
     answering: "api",
     answerWindowDays: 15,
     renewable: true,

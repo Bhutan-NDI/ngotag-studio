@@ -79,6 +79,7 @@ import {
   crdEnding,
   inOfficerQueue,
   systemConnected,
+  CONNECTED_SYSTEMS,
   SAMPLE_REFERRAL_NOTE,
   supersedes,
   type CredentialOffering,
@@ -297,8 +298,12 @@ const FRESH: DemoState = dayZeroState(SEED);
  *       the offering without them, so the officer would still type.
  *  35 — The bank in the story is Partner Bank, a made-up bank, so the demo
  *       can be shown to any bank. A version-34 save still says Bank of Bhutan.
+ *  36 — The ministry offers the business licence on request, answered by its
+ *       own system, and the TPN needs the licence as well as the
+ *       registration (`prerequisites[]`). A version-35 save holds offerings
+ *       and requests with a single prerequisite.
  */
-const SEED_VERSION = 35;
+const SEED_VERSION = 36;
 
 /**
  * Appends one audit row, carrying the hash chain forward.
@@ -361,6 +366,18 @@ function appendAudit(
  * was made, the other not at all — and a renewal accepted from the inbox
  * left two credentials that both looked current.
  */
+/**
+ * Whether Pelden already holds this licence — the seeded one, or the same
+ * licence number received by asking the ministry (FLOW-CRD-01), which has
+ * an id of its own. Either way, adding the seed's again would show it twice.
+ */
+function holdsLicence(s: Pick<DemoState, "heldCredentials">, licence: HeldCredential): boolean {
+  const number = auth.licenceNumberOf(licence);
+  return s.heldCredentials.some(
+    (c) => c.id === licence.id || (c.type === licence.type && (c.orgId ?? PELDEN) === PELDEN && !c.supersededBy && auth.licenceNumberOf(c) === number),
+  );
+}
+
 function storeAccepted(
   held: HeldCredential[],
   incoming: Omit<HeldCredential, "id" | "isFoundational" | "receivedAt" | "status" | "issuerTrusted">,
@@ -1060,7 +1077,11 @@ function routeToIssuer(
   offering: CredentialOffering | undefined,
   issuerOrgId: string,
 ): { system: SystemRoute | null; integration: IssuerIntegration } {
-  if (offering?.answering !== "api" || integration.orgId !== issuerOrgId) return { system: null, integration };
+  if (offering?.answering !== "api") return { system: null, integration };
+  /* An issuer whose system the prototype takes as already connected answers
+     by itself; the tax office's own integration is untouched. */
+  if (integration.orgId !== issuerOrgId)
+    return CONNECTED_SYSTEMS[issuerOrgId] ? { system: { state: "WAITING", plan: "answer", note: null }, integration } : { system: null, integration };
   if (!systemConnected(integration)) return { system: { state: "UNCONNECTED", plan: "answer", note: null }, integration };
   const plan = integration.nextAnswer;
   const used = { ...integration, nextAnswer: "answer" as const };
@@ -1092,7 +1113,7 @@ function systemAnswers(s: DemoState, requestId: string, force = false): DemoStat
   if (!force && r.system.state !== "WAITING") return s;
   if (r.answerBy && r.answerBy < today()) return s;
   const offering = s.offerings.find((o) => o.id === r.offeringId);
-  const client = s.integration.clients[0];
+  const client = s.integration.orgId === r.issuerOrgId ? s.integration.clients[0] : CONNECTED_SYSTEMS[r.issuerOrgId];
   const plan = force ? "answer" : r.system.plan;
   const patch = (x: CredentialRequest, change: Partial<CredentialRequest>) => (x.id === requestId ? { ...x, ...change } : x);
   const note = (text: string, orgId: string) => ({ id: rid("a"), text, at: today(), orgId });
@@ -1782,6 +1803,8 @@ interface DemoActions {
   settleAuthorityListing: (grantId: string, confirmed: boolean) => void;
   /** Simulated — seven days pass with nobody collecting or approving (E15, A1). */
   lapseGrant: (grantId: string) => void;
+  /** SCR-AUT-04 — email the claim link to the person (FLOW-AUT-01 Q3, shown). Simulated: no email leaves. */
+  emailClaimLink: (grantId: string, email: string) => { ok: true } | { ok: false; error: "invalid" | "not_claimable" | "not_permitted" };
   /** Simulated — the ministry issues Pelden its business licence (FLOW-CRD-01, its own flow). */
   simulateLicenceIssued: () => void;
   /** Simulated — the ministry revokes a licence a waiting grant names (AC-06 → E11 at claim). */
@@ -2262,7 +2285,8 @@ interface DemoActions {
   simulateIssuerRecheck: (id: string, outcome: "delisted" | "unreachable") => void;
   /** SCR-CRD-07 — pause, resume or retire an offering, or publish a new version of it. */
   setOfferingStatus: (offeringId: string, status: "ACTIVE" | "PAUSED" | "RETIRED") => void;
-  publishOfferingVersion: (offeringId: string, changes: { uses: string[]; answerWindowDays: number; renewable: boolean }) => void;
+  /** `uses` — what the issuer uses from each prerequisite, in the offering's order. */
+  publishOfferingVersion: (offeringId: string, changes: { uses: string[][]; answerWindowDays: number; renewable: boolean }) => void;
   /** SCR-CRD-10 — the integration lead's settings. */
   setWebhook: (url: string) => void;
   rotateSecret: () => void;
@@ -3481,10 +3505,22 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         endByDate(back(s0)).notes.forEach((n) => log(n.text, n.orgId));
       },
 
+      emailClaimLink: (grantId, email) => {
+        const s0 = stateRef.current;
+        const g = s0.authorityGrants.find((x) => x.id === grantId);
+        const address = email.trim();
+        if (!g || g.status !== "CLAIMABLE" || !g.claimRef) return { ok: false, error: "not_claimable" };
+        if (!auth.grantFor(s0, s0.harness.persona, g.orgId, "authority:issue")) return { ok: false, error: "not_permitted" };
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return { ok: false, error: "invalid" };
+        setState((s) => patchGrant(s, grantId, { emailedTo: address }));
+        log(`Emailed the link to collect authority to ${auth.delegateNameOf(g)} at ${address}`, g.orgId);
+        return { ok: true };
+      },
+
       simulateLicenceIssued: () => {
         const s0 = stateRef.current;
         const licence = SEED.heldCredentials.find((c) => c.id === "hc-licence-plg");
-        if (!licence || s0.heldCredentials.some((c) => c.id === licence.id)) return;
+        if (!licence || holdsLicence(s0, licence)) return;
         setState((s) => ({ ...s, heldCredentials: [{ ...licence, orgId: PELDEN, receivedAt: today() }, ...s.heldCredentials] }));
         log("Ministry of Industry, Commerce & Employment issued Pelden's business licence BL-PLG-2025-00871", PELDEN);
       },
@@ -4738,11 +4774,17 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           };
         }),
 
+      /* The licence comes first now — the tax office asks to see it before it
+         issues the TPN — so a story that holds the TPN holds the licence too. */
       storyTpnHeld: () =>
         setState((s) => {
+          const licence = SEED.heldCredentials.find((c) => c.id === "hc-licence-plg");
           const tpn = SEED.heldCredentials.find((c) => c.id === "hc-tpn");
-          if (!tpn || s.heldCredentials.some((c) => c.id === tpn.id)) return s;
-          return { ...s, heldCredentials: [{ ...tpn, orgId: PELDEN, receivedAt: today() }, ...s.heldCredentials] };
+          const adding = [
+            ...(tpn && !s.heldCredentials.some((c) => c.id === tpn.id) ? [{ ...tpn, orgId: PELDEN, receivedAt: today() }] : []),
+            ...(licence && !holdsLicence(s, licence) ? [{ ...licence, orgId: PELDEN, receivedAt: today() }] : []),
+          ];
+          return adding.length ? { ...s, heldCredentials: [...adding, ...s.heldCredentials] } : s;
         }),
 
       storyAuthorityGiven: () =>
@@ -4754,7 +4796,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           return {
             ...s,
             heldCredentials:
-              licence && !s.heldCredentials.some((c) => c.id === licence.id)
+              licence && !holdsLicence(s, licence)
                 ? [{ ...licence, orgId: PELDEN, receivedAt: now }, ...s.heldCredentials]
                 : s.heldCredentials,
             organizations: s.organizations.map((o) =>
@@ -5990,8 +6032,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         /* Only what can be shared counts: a superseded credential is the
            record, not something presented. */
         const held = s0.heldCredentials.filter((c) => (c.orgId ?? PELDEN) === org.id && c.status === "active" && !c.supersededBy);
-        /* P4 — the prerequisite is held (E4). */
-        if (!held.some((c) => c.type === offering.prerequisite.credential)) return { ok: false, error: "E4" };
+        /* P4 — every prerequisite is held (E4). */
+        if (!offering.prerequisites.every((p) => held.some((c) => c.type === p.credential))) return { ok: false, error: "E4" };
         /* P5 — nothing in flight, and not held unless renewable (E5). The
            two halves are told apart: one is "here's where it stands", the
            other "your organisation already has this". */
@@ -6017,7 +6059,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
               requestedBy: s.harness.persona,
               requestedAt: today(),
               state: "AWAITING_PROOF",
-              consented: offering.prerequisite,
+              consented: offering.prerequisites,
               askedMore: null,
               consentBy: null,
               answerBy: null,
@@ -6035,7 +6077,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
            once; it doesn't wait for the Root's approval. */
         if (!isRoot)
           log(
-            `${me?.name ?? "Someone"} asked ${offering.issuerName} for your ${offering.credential} and shared your ${offering.prerequisite.credential}`,
+            `${me?.name ?? "Someone"} asked ${offering.issuerName} for your ${offering.credential} and shared your ${namesOf(offering.prerequisites.map((p) => p.credential))}`,
             org.id,
           );
         return { ok: true, id };
@@ -6252,7 +6294,10 @@ export function DemoProvider({ children }: { children: ReactNode }) {
             /* Step 9 — the issuer's system is told what it answered was
                issued (Q3). Only a system's answer: an officer's isn't
                delivered to a webhook. */
-            integration: r?.answeredBySystem ? withLogRow(s.integration, "credential-request.issued", 200) : s.integration,
+            integration:
+              r?.answeredBySystem && r.issuerOrgId === s.integration.orgId
+                ? withLogRow(s.integration, "credential-request.issued", 200)
+                : s.integration,
             auditEntries: appendAudit(s, {
               operation: "credential:accept",
               summary: `Accepted ${item.type} from ${item.issuer}`,
@@ -6322,7 +6367,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
                   version: o.version + 1,
                   answerWindowDays: changes.answerWindowDays,
                   renewable: changes.renewable,
-                  prerequisite: { ...o.prerequisite, uses: changes.uses },
+                  prerequisites: o.prerequisites.map((p, i) => ({ ...p, uses: changes.uses[i] ?? p.uses })),
                 }
               : o,
           ),

@@ -18,6 +18,7 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { inOrg, PELDEN, supersedes, type CrdRequestState, type CredentialOffer } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+import { namesOf } from "@/lib/sharing";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
 import { attrLabel, issuerInline, requestWords, useHolder, useSimulatedDelivery } from "./shared";
@@ -200,7 +201,7 @@ export function ReviewCredentialView({ requestId }: { requestId: string }) {
               </div>
               <dl className="m-0 grid gap-x-6 gap-y-3 min-[641px]:grid-cols-2">
                 <Fact term="Asked by" value={`${personById(r.requestedBy).name} on ${formatDate(r.requestedAt)}`} />
-                <Fact term="Shared" value={`Your ${r.consented.credential}, all of it`} />
+                <Fact term="Shared" value={`Your ${namesOf(r.consented.map((p) => p.credential))}, ${r.consented.length > 1 ? "each in full" : "all of it"}`} />
                 {r.answerBy ? <Fact term={`${issuer} answers by`} value={formatDate(r.answerBy)} /> : null}
                 {r.consentBy ? <Fact term="Your answer needed by" value={formatDate(r.consentBy)} /> : null}
               </dl>

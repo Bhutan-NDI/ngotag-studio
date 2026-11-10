@@ -147,7 +147,7 @@ export function AskingForMoreView({ requestId }: { requestId: string }) {
                 You agreed to share
               </h2>
               <p className="m-0 text-[13.5px] leading-[1.6] text-body">
-                Your {r.consented.credential}: {r.consented.attributes.join(", ")}.
+                {r.consented.map((p) => `Your ${p.credential}: ${p.attributes.join(", ")}.`).join(" ")}
               </p>
             </section>
             <section
