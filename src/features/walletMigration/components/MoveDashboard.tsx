@@ -170,7 +170,10 @@ export function MoveDashboard({
               Your organisation was restored to the shared agent after its own
               agent was lost. Activity on the new agent since the move
               couldn&apos;t be recovered, and citizens who connected since then
-              need to reconnect. Please contact support.
+              need to reconnect.{' '}
+              {onStartNewMove
+                ? 'Contact support if you need help, or start a new move.'
+                : 'Please contact support.'}
             </p>
             {onStartNewMove && (
               <Button size="sm" className="mt-4" onClick={onStartNewMove}>

@@ -91,6 +91,16 @@ export const webhookUrlFor = (orgId: string): string =>
     ''
   }/wh/${orgId}`
 
+/**
+ * Whether the user can start a new move after the last one ended: only the
+ * org owner, and only while the org is on the shared agent, since a move
+ * goes from the shared agent to a dedicated one.
+ */
+export const canStartNewMove = (
+  isOwner: boolean,
+  agentType: string | null,
+): boolean => isOwner && agentType === 'shared'
+
 /** The platform only accepts a cancel before the move starts. */
 export const CANCELLABLE_STATUSES: MigrationStatus[] = [
   'CREATED',
