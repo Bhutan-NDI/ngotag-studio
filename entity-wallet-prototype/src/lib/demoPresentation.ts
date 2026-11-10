@@ -233,11 +233,15 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
    * Who takes part, for the panel's "Driving as" row. Only these are
    * offered while the part is on screen: a client's "what does Ugyen see?"
    * is answered in one press, without a row of people the part never
-   * touches. Somebody without an account (the clearing agent) is reached by
-   * her link instead, so is not listed here.
+   * touches. Somebody without an account (the clearing agent) is listed
+   * too, and reached by her link or at the Single Window; the registrar is
+   * listed so the room sees who answers, though nobody drives it.
    */
-  cast: PersonaId[];
+  cast: CastId[];
 }
+
+/** Someone the panel lists: a persona, or the registrar, who answers on its own. */
+export type CastId = PersonaId | "registrar";
 
 export const PRESENTATION_PARTS: PresentationPart[] = [
   {
@@ -256,7 +260,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     route: "/onboarding",
     selfService: true,
     start: "platformReady",
-    cast: ["dorji", "ugyen"],
+    cast: ["dorji", "registrar", "ugyen"],
     switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/members" }],
   },
   {
@@ -285,7 +289,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/simulated/bank",
     start: "tpnHeld",
-    cast: ["dorji", "ugyen"],
+    cast: ["dorji", "ugyen", "yeshey"],
     switchTo: [
       { label: "Ugyen · Pelden Trading", persona: "ugyen", route: "/wallet/sharing" },
       { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/sharing" },
@@ -297,7 +301,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: "dorji",
     route: "/authority-to-act",
     start: "tpnHeld",
-    cast: ["dorji", "ugyen"],
+    cast: ["dorji", "ugyen", "pema"],
     switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/authority-to-act" }],
   },
   {
@@ -306,7 +310,7 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     persona: null,
     route: "/simulated/bnsw",
     start: "authorityGiven",
-    cast: ["dorji", "ugyen"],
+    cast: ["pema", "dorji", "ugyen"],
     switchTo: [
       { label: "Dorji · Pelden Trading", persona: "dorji", route: "/simulated/bnsw/register" },
       { label: "Pema · BNSW", route: "/simulated/bnsw" },
@@ -467,7 +471,7 @@ export function waitingToCollect(s: Pick<WaitingState, "organizations" | "author
 }
 
 /** Everyone any part of the presentation needs, for when no part is on. */
-export const PRESENTATION_CAST: PersonaId[] = [...new Set(PRESENTATION_PARTS.flatMap((p) => p.cast))];
+export const PRESENTATION_CAST: CastId[] = [...new Set(PRESENTATION_PARTS.flatMap((p) => p.cast))];
 
 /**
  * One chip in the Presentation panel's "Driving as" row: a person to drive
@@ -484,6 +488,10 @@ export interface CastChip {
   href?: string;
   /** For someone not invited yet: the address the story invites them at. */
   inviteAt?: string;
+  /** Beside the name, for someone not driven as: "invited", "no account"… */
+  tag?: string;
+  /** A line under the role: how this person is reached, or why not. */
+  note?: string;
 }
 
 /**
@@ -494,8 +502,8 @@ export interface CastChip {
  * the row always shows them.
  */
 export function castOnStage(
-  s: Pick<DemoState, "people" | "orgInvitations">,
-  ids: readonly PersonaId[],
+  s: Pick<DemoState, "people" | "orgInvitations" | "authorityGrants">,
+  ids: readonly CastId[],
   current: string,
   /** Who the part starts as. The early parts drive as Dorji before his
    *  account record exists — it is the one being made — so he is drivable
@@ -515,7 +523,37 @@ export function castOnStage(
 
   for (const id of ids) {
     const p = s.people.find((x) => x.id === id);
+    /* The registrar answers on its own, from its own register: listed so
+       the room sees who confirms the company, never driven. */
+    if (id === "registrar") {
+      add({
+        key: id,
+        name: p?.name ?? "Office of the Registrar",
+        role: p?.title ?? "Registrar of Companies · Corporate Regulatory Authority",
+        tag: "answers on its own",
+        note: "Confirms the company when Dorji adds it. Nobody to drive.",
+      });
+      continue;
+    }
     if (!p) continue;
+    /* The clearing agent has no account here (a Pattern B delegate): she
+       is reached by the link she is sent, then at the Single Window. */
+    if (id === "pema" && id !== current) {
+      const toCollect = s.authorityGrants.find((g) => g.claimRef && (g.status === "CLAIMABLE" || g.status === "ISSUING"));
+      const holds = s.authorityGrants.some((g) => g.status === "ACTIVE" && g.delegateIdKeyed);
+      if (toCollect)
+        add({ key: p.id, name: p.name, role: p.title, tag: "collects by link", href: `/authority/claim/${toCollect.claimRef}` });
+      else if (holds) add({ key: p.id, name: p.name, role: p.title, tag: "at the Single Window", href: "/simulated/bnsw" });
+      else
+        add({
+          key: p.id,
+          name: p.name,
+          role: p.title,
+          tag: "no account",
+          note: "Gets her authority by a link once Dorji gives it.",
+        });
+      continue;
+    }
     if (hasAccount(p)) {
       add({ key: p.id, name: p.name, role: p.title, persona: p.id });
       continue;

@@ -174,7 +174,7 @@ export function DemoHarness() {
   /* Everyone in the presentation, whichever part is on — the part's own
      people first — not everyone the full demo can drive as. */
   const onStage = castOnStage(
-    { people, orgInvitations },
+    { people, orgInvitations, authorityGrants },
     part !== null
       ? [...PRESENTATION_PARTS[part].cast, ...PRESENTATION_CAST.filter((id) => !PRESENTATION_PARTS[part].cast.includes(id))]
       : PRESENTATION_CAST,
@@ -282,11 +282,12 @@ export function DemoHarness() {
                         {c.name}
                         {!c.persona ? (
                           <span className="ml-1.5 text-[11px] font-normal text-faint">
-                            · {c.href ? "invited" : "not joined yet"}
+                            · {c.tag ?? (c.href ? "invited" : "not joined yet")}
                           </span>
                         ) : null}
                       </span>
                       <span className="text-[11.5px] leading-[1.35] text-muted">{c.role}</span>
+                      {c.note ? <span className="text-[11.5px] leading-[1.35] text-faint">{c.note}</span> : null}
                       {c.inviteAt ? (
                         <span className="text-[11.5px] leading-[1.35] text-faint">
                           Invite at <span className="font-mono text-[11px]">{c.inviteAt}</span>
