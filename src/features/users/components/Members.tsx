@@ -21,6 +21,7 @@ import { User } from './users-interface'
 import { getOrganizationInvitations } from '@/app/api/Invitation'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { useAppSelector } from '@/lib/hooks'
+import { useSelectedOrgRoles } from '@/lib/useOrgRoleAccess'
 
 const initialPageState = {
   pageNumber: 1,
@@ -73,13 +74,11 @@ export default function Members(): React.JSX.Element {
   const [orgUserRole, setOrgUserRole] = useState<string[]>([])
 
   const orgId = useAppSelector((state) => state.organization.orgId)
-  const orgInfo = useAppSelector((state) => state.organization.orgInfo)
+  const selectedOrgRoles = useSelectedOrgRoles()
 
   const getOrgUserRole = useCallback(() => {
-    if (orgInfo?.roles) {
-      setOrgUserRole(orgInfo.roles)
-    }
-  }, [orgInfo?.roles])
+    setOrgUserRole(selectedOrgRoles)
+  }, [selectedOrgRoles])
 
   const getAllUsers = useCallback(async () => {
     if (!orgId) {

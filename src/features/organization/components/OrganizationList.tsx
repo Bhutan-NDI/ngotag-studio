@@ -30,8 +30,16 @@ import { getOrganizations } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
 import { isBhutanndiTheme } from '@/lib/active-theme'
 import { switchOrganization } from '@/lib/switchOrganization'
+import { useCanCreateOrganization } from '@/lib/useOrgRoleAccess'
+
+// The platform's MAX_ORG_LIMIT. It counts every organisation the user belongs
+// to, invited ones included, not just the ones they own.
+const MAX_ORGANIZATIONS = 10
 
 export const OrganizationList = (): React.JSX.Element => {
+  // A mobile verifier member can switch between their organisations but not
+  // create one.
+  const canCreateOrg = useCanCreateOrganization()
   const [organizationsList, setOrganizationsList] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
@@ -49,6 +57,8 @@ export const OrganizationList = (): React.JSX.Element => {
     total: 0,
     totalCount: 0,
   })
+  const orgLimitReached = currentPage.totalCount >= MAX_ORGANIZATIONS
+  const orgLimitMessage = `You can be in at most ${MAX_ORGANIZATIONS} organizations. Leave one to create another.`
 
   const getAllOrganizations = async (): Promise<void> => {
     setLoading(true)
@@ -103,22 +113,6 @@ export const OrganizationList = (): React.JSX.Element => {
     }, 300)
   }
 
-  // Edit and Delete both open the same unified bhutanndi "Organization profile"
-  // page (CreateOrganizationModal.tsx's bhutanndi+edit-mode branch, rendering
-  // BhutanndiOrganizationProfile) — Delete just deep-links to its danger-zone
-  // panel via the #danger-zone anchor instead of the old standalone
-  // /delete-organization wizard route. (OrganizationDashboard.tsx's own
-  // handleEditOrg/handleDeleteOrg are unrelated — those back the *generic*,
-  // non-bhutanndi dashboard's Edit/Delete icon buttons and still use the two
-  // separate routes verbatim.)
-  const handleEditOrg = (orgId: string): void => {
-    hardNavigate(`/create-organization?orgId=${orgId}`)
-  }
-
-  const handleDeleteOrg = (orgId: string): void => {
-    hardNavigate(`/create-organization?orgId=${orgId}#danger-zone`)
-  }
-
   // The one real switch sequence, shared with org-switcher.tsx's
   // handleTenantSwitch — so switching from this list stays in sync with the
   // sidebar's org switcher instead of the two silently drifting apart.
@@ -141,6 +135,33 @@ export const OrganizationList = (): React.JSX.Element => {
     }
     hardNavigate('/users')
   }
+
+  // Edit and Delete both open the same unified bhutanndi "Organization profile"
+  // page (CreateOrganizationModal.tsx's bhutanndi+edit-mode branch, rendering
+  // BhutanndiOrganizationProfile) — Delete just deep-links to its danger-zone
+  // panel via the #danger-zone anchor instead of the old standalone
+  // /delete-organization wizard route. (OrganizationDashboard.tsx's own
+  // handleEditOrg/handleDeleteOrg are unrelated — those back the *generic*,
+  // non-bhutanndi dashboard's Edit/Delete icon buttons and still use the two
+  // separate routes verbatim.)
+  //
+  // That page acts on the active org, so like Members they switch into it
+  // first; what the user may do there then follows their roles in it.
+  const openOrgProfile = async (
+    org: Organization,
+    anchor = '',
+  ): Promise<void> => {
+    if (org.id !== activeOrgId) {
+      await handleSwitchOrg(org)
+    }
+    hardNavigate(`/create-organization?orgId=${org.id}${anchor}`)
+  }
+
+  const handleEditOrg = (org: Organization): Promise<void> =>
+    openOrgProfile(org)
+
+  const handleDeleteOrg = (org: Organization): Promise<void> =>
+    openOrgProfile(org, '#danger-zone')
 
   useEffect(() => {
     getAllOrganizations()
@@ -224,19 +245,26 @@ export const OrganizationList = (): React.JSX.Element => {
                 onChange={setSearchText}
                 className="w-64"
               />
-              <GradientButton
-                disabled={currentPage.totalCount >= 10 || isCreatingOrg}
-                onClick={handleCreateOrg}
-              >
-                {isCreatingOrg ? (
-                  <Loader />
-                ) : (
-                  <>
-                    <Icon name="plus" size={16} strokeWidth={2} />
-                    Create
-                  </>
-                )}
-              </GradientButton>
+              {canCreateOrg && orgLimitReached && (
+                <span className="text-bhutanndi-muted text-[12.5px]">
+                  {orgLimitMessage}
+                </span>
+              )}
+              {canCreateOrg && (
+                <GradientButton
+                  disabled={orgLimitReached || isCreatingOrg}
+                  onClick={handleCreateOrg}
+                >
+                  {isCreatingOrg ? (
+                    <Loader />
+                  ) : (
+                    <>
+                      <Icon name="plus" size={16} strokeWidth={2} />
+                      Create
+                    </>
+                  )}
+                </GradientButton>
+              )}
             </>
           }
         />
@@ -258,8 +286,8 @@ export const OrganizationList = (): React.JSX.Element => {
                 isSwitching={switchingOrgId === org.id}
                 onSwitch={() => handleSwitchOrg(org)}
                 onMembers={() => handleMembersClick(org)}
-                onEdit={() => handleEditOrg(org.id)}
-                onDelete={() => handleDeleteOrg(org.id)}
+                onEdit={() => handleEditOrg(org)}
+                onDelete={() => handleDeleteOrg(org)}
               />
             ))}
 
@@ -272,11 +300,13 @@ export const OrganizationList = (): React.JSX.Element => {
                   message={
                     searchText
                       ? 'No organizations match your search.'
-                      : 'Get started by creating a new organization.'
+                      : canCreateOrg
+                        ? 'Get started by creating a new organization.'
+                        : 'You are not part of any organization yet.'
                   }
                   tone={searchText ? 'filtered' : 'empty'}
                   action={
-                    !searchText ? (
+                    !searchText && canCreateOrg ? (
                       <GradientButton
                         disabled={isCreatingOrg}
                         onClick={handleCreateOrg}
@@ -314,20 +344,27 @@ export const OrganizationList = (): React.JSX.Element => {
             onChange={(e) => setSearchText(e.target.value)}
             className="w-64"
           />
-          <Button
-            disabled={currentPage.totalCount >= 10 || isCreatingOrg}
-            onClick={handleCreateOrg}
-            className="gap-2"
-          >
-            {isCreatingOrg ? (
-              <Loader />
-            ) : (
-              <>
-                <Plus className="h-4 w-4" />
-                Create Organization
-              </>
-            )}
-          </Button>
+          {canCreateOrg && orgLimitReached && (
+            <span className="text-muted-foreground text-sm">
+              {orgLimitMessage}
+            </span>
+          )}
+          {canCreateOrg && (
+            <Button
+              disabled={orgLimitReached || isCreatingOrg}
+              onClick={handleCreateOrg}
+              className="gap-2"
+            >
+              {isCreatingOrg ? (
+                <Loader />
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Create Organization
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 

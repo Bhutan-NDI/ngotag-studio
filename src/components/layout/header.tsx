@@ -116,6 +116,9 @@ export default function Header(): React.JSX.Element {
             id: org.id,
             name: org.name,
             logoUrl: org.logoUrl,
+            description: org.description,
+            appLaunchDetails: org.appLaunchDetails,
+            userOrgRoles: org.userOrgRoles,
           }))}
           defaultTenant={orgList.length > 0 ? orgList[0] : undefined}
           onTenantSwitch={handleSwitchTenant}

@@ -1,5 +1,6 @@
 import {
   setOrgId,
+  setOrgInfo,
   setOrgRoles,
   setSelectedOrgId,
   setTenantData,
@@ -14,6 +15,10 @@ export interface SwitchableOrg {
   id: string
   name: string
   logoUrl?: string
+  description?: string
+  appLaunchDetails?: object[]
+  // The user's roles in this organisation, from the organisation list.
+  userOrgRoles?: { orgRole: { name: string } }[]
 }
 
 /**
@@ -30,7 +35,21 @@ export async function switchOrganization(
 ): Promise<void> {
   dispatch(setOrgId(org.id))
   dispatch(setSelectedOrgId(org.id))
-  dispatch(setTenantData(org))
+  dispatch(setTenantData({ id: org.id, name: org.name, logoUrl: org.logoUrl }))
+  // Stored with the switch, so nothing goes on using the previous
+  // organisation's roles until the top bar fetches the list again.
+  if (org.userOrgRoles) {
+    dispatch(
+      setOrgInfo({
+        id: org.id,
+        name: org.name,
+        description: org.description,
+        logoUrl: org.logoUrl,
+        appLaunchDetails: org.appLaunchDetails,
+        roles: org.userOrgRoles.map((role) => role.orgRole.name),
+      }),
+    )
+  }
 
   try {
     const response = await getOrganizationRoles(org.id)
