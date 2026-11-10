@@ -97,3 +97,17 @@ export const deleteOrganization = async (
     return err?.message
   }
 }
+
+/**
+ * The response body, or the platform's own error: these wrappers return the
+ * error message as a string when a request fails, so reading `.data` from it
+ * would lose the reason.
+ */
+export const deleteResponseData = (
+  response: AxiosResponse | string,
+): AxiosResponse['data'] => {
+  if (typeof response === 'string') {
+    throw new Error(response)
+  }
+  return response?.data
+}
