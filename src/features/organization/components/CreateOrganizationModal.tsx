@@ -21,6 +21,7 @@ import {
 } from '@/app/api/organization'
 import {
   deleteOrganization,
+  deleteResponseData,
   getOrganizationReferences,
 } from '@/app/api/deleteorganization'
 import { getOrgEntitlements } from '@/app/api/marketplace'
@@ -564,8 +565,7 @@ export default function OrganizationOnboarding(): React.JSX.Element {
     setDeleteLoading(true)
     setDeleteError(null)
     try {
-      const response = await deleteOrganization(orgId)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(await deleteOrganization(orgId))
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)

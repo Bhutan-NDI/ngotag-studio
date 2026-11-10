@@ -16,6 +16,7 @@ import {
   deleteIssuanceRecords,
   deleteOrganization,
   deleteOrganizationWallet,
+  deleteResponseData,
   deleteVerificationRecords,
   getOrganizationReferences,
 } from '@/app/api/deleteorganization'
@@ -163,8 +164,9 @@ export default function DeleteOrganizationPage(): React.JSX.Element {
   const deleteVerifications = async (): Promise<void> => {
     setDeleteLoading(true)
     try {
-      const response = await deleteVerificationRecords(orgId as string)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(
+        await deleteVerificationRecords(orgId as string),
+      )
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)
@@ -186,8 +188,9 @@ export default function DeleteOrganizationPage(): React.JSX.Element {
   const deleteIssuance = async (): Promise<void> => {
     setDeleteLoading(true)
     try {
-      const response = await deleteIssuanceRecords(orgId as string)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(
+        await deleteIssuanceRecords(orgId as string),
+      )
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)
@@ -207,8 +210,9 @@ export default function DeleteOrganizationPage(): React.JSX.Element {
   const deleteConnection = async (): Promise<void> => {
     setDeleteLoading(true)
     try {
-      const response = await deleteConnectionRecords(orgId as string)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(
+        await deleteConnectionRecords(orgId as string),
+      )
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)
@@ -228,8 +232,9 @@ export default function DeleteOrganizationPage(): React.JSX.Element {
   const deleteOrgWallet = async (): Promise<void> => {
     try {
       // Assuming deleteOrganizationWallet needs orgId
-      const response = await deleteOrganizationWallet(orgId as string)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(
+        await deleteOrganizationWallet(orgId as string),
+      )
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)
         setIsWalletPresent(false)
@@ -247,8 +252,7 @@ export default function DeleteOrganizationPage(): React.JSX.Element {
 
   const deleteOrganizations = async (): Promise<void> => {
     try {
-      const response = await deleteOrganization(orgId as string)
-      const { data } = response as AxiosResponse
+      const data = deleteResponseData(await deleteOrganization(orgId as string))
 
       if (data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS) {
         toast.success(data?.message)
