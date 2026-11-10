@@ -50,10 +50,9 @@ const PageLayout: React.FC<PageLayoutProps> = ({ children }) => {
     return (
       <KBar>
         <BhutanndiAppShell>
+          <PausedBanner />
           {/* Only this theme's sidebar is filtered for mobile verifier users. */}
           <MobileVerifierRouteGuard>{children}</MobileVerifierRouteGuard>
-          <PausedBanner />
-          {children}
         </BhutanndiAppShell>
       </KBar>
     )
