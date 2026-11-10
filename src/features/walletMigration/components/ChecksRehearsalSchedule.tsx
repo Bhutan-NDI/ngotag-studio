@@ -15,13 +15,6 @@ import {
 } from '../config'
 import React, { useMemo, useState } from 'react'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   rerunPreflight,
   runRehearsal,
   scheduleMigration,
@@ -32,18 +25,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MoveConfirmDialog } from './MoveConfirmDialog'
+import { ScheduleForm } from './ScheduleForm'
 import { StepCard } from './StepCard'
 
-// Off-peak suggestions, Bhutan time (spec SCR-WM-04).
-const SLOT_TIMES = [
-  '21:00',
-  '22:00',
-  '23:00',
-  '00:00',
-  '01:00',
-  '02:00',
-  '05:00',
-]
+// Off-peak start, Bhutan time: the suggested default (spec SCR-WM-04).
+const DEFAULT_SLOT_TIME = '21:00'
 
 const DAY_MS = 86_400_000
 
@@ -82,8 +68,10 @@ export function ChecksRehearsalSchedule({
 }: Readonly<ChecksRehearsalScheduleProps>): React.JSX.Element {
   const [busy, setBusy] = useState<Busy | null>(null)
   const [date, setDate] = useState(bttDate(1))
-  const [time, setTime] = useState(SLOT_TIMES[0])
+  const [time, setTime] = useState(DEFAULT_SLOT_TIME)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  // Start now: the confirmation sends no slot, and the move starts at once.
+  const [startNow, setStartNow] = useState(false)
   const [changingSlot, setChangingSlot] = useState(false)
   const [actionError, setActionError] = useState<{
     kind: Busy
@@ -201,7 +189,7 @@ export function ChecksRehearsalSchedule({
     const result = await scheduleMigration(
       orgId,
       confirmationName,
-      scheduledFor,
+      startNow ? undefined : scheduledFor,
     )
     setBusy(null)
     setConfirmOpen(false)
@@ -410,7 +398,7 @@ export function ChecksRehearsalSchedule({
       <StepCard
         step={3}
         title="Schedule"
-        description="Pick a quiet time. Issuing and verifying pause for the length of the move."
+        description="Pick a quiet time, ideally off-peak (21:00 to 05:00 BTT). Issuing and verifying pause for the length of the move."
         state={scheduleState}
       >
         {scheduleState === 'locked' && (
@@ -433,56 +421,31 @@ export function ChecksRehearsalSchedule({
               .
             </p>
             {isOwner ? (
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="moveDate">Date</Label>
-                  <Input
-                    id="moveDate"
-                    type="date"
-                    value={date}
-                    min={bttDate(0)}
-                    max={bttDate(14)}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-44"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="moveTime">Time (BTT)</Label>
-                  <Select value={time} onValueChange={setTime}>
-                    <SelectTrigger id="moveTime" className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SLOT_TIMES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  disabled={busy !== null || slotError !== null}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  {scheduled ? 'Move to this time' : 'Schedule move'}
-                </Button>
-                {changing && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => setChangingSlot(false)}
-                  >
-                    Keep current time
-                  </Button>
-                )}
-              </div>
+              <ScheduleForm
+                date={date}
+                time={time}
+                minDate={bttDate(0)}
+                maxDate={bttDate(14)}
+                onDateChange={setDate}
+                onTimeChange={setTime}
+                slotError={slotError}
+                busy={busy !== null}
+                scheduled={scheduled}
+                changing={changing}
+                onSchedule={() => {
+                  setStartNow(false)
+                  setConfirmOpen(true)
+                }}
+                onStartNow={() => {
+                  setStartNow(true)
+                  setConfirmOpen(true)
+                }}
+                onKeepTime={() => setChangingSlot(false)}
+              />
             ) : (
               <p className="text-muted-foreground text-sm">
                 The organisation owner schedules the move.
               </p>
-            )}
-            {isOwner && slotError && (
-              <p className="text-destructive mt-2 text-sm">{slotError}</p>
             )}
           </>
         )}
@@ -492,7 +455,12 @@ export function ChecksRehearsalSchedule({
       <MoveConfirmDialog
         open={confirmOpen}
         orgName={orgName}
-        scheduledFor={scheduledFor}
+        scheduledFor={startNow ? null : scheduledFor}
+        expectedPause={
+          migration.predictedFreezeMs === null
+            ? null
+            : minutes(migration.predictedFreezeMs)
+        }
         loading={busy === 'schedule'}
         onOpenChange={setConfirmOpen}
         onConfirm={confirmSchedule}

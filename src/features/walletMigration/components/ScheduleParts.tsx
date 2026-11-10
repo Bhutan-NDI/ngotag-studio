@@ -2,7 +2,10 @@
 
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ClockTimePicker } from './ClockTimePicker'
 import { IMigration } from '../types'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import React from 'react'
 import { findMigrationError } from '../errorMessages'
 import { formatBtt } from '../config'
@@ -77,6 +80,46 @@ export function BookedSlot({
           Change time
         </Button>
       )}
+    </>
+  )
+}
+
+interface SlotFieldsProps {
+  date: string
+  time: string
+  minDate: string
+  maxDate: string
+  onDateChange: (date: string) => void
+  onTimeChange: (time: string) => void
+}
+
+/** The move's date and time, in Bhutan time. Off-peak hours are quietest. */
+export function SlotFields({
+  date,
+  time,
+  minDate,
+  maxDate,
+  onDateChange,
+  onTimeChange,
+}: Readonly<SlotFieldsProps>): React.JSX.Element {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="moveDate">Date</Label>
+        <Input
+          id="moveDate"
+          type="date"
+          value={date}
+          min={minDate}
+          max={maxDate}
+          onChange={(e) => onDateChange(e.target.value)}
+          className="w-44"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="moveTime">Time (BTT)</Label>
+        <ClockTimePicker id="moveTime" value={time} onChange={onTimeChange} />
+      </div>
     </>
   )
 }
