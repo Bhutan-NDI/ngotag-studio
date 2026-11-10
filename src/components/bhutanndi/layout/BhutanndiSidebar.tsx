@@ -194,8 +194,7 @@ export function BhutanndiSidebar({
       hrefs.push(ALL_MIGRATIONS_LINK.href)
     }
     return hrefs
-  }, [visibleNavItem])
-  }, [managedNavItem, canSeeAllMigrations])
+  }, [visibleNavItem, canSeeAllMigrations])
 
   const activeHref = useMemo(() => {
     let best: string | null = null
