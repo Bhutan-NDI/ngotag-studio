@@ -6,17 +6,33 @@ import { useScreenState } from "@/components/demo/screenState";
 import { AuthHeader } from "@/components/layout/AuthHeader";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
+import { NdiAppPhone } from "@/components/ui/NdiAppPhone";
 import { Panel } from "@/components/ui/Panel";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { WalletHandoff } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
-import { IDENTITY_MS, NOTICE_GRANT, ending, orgName as orgNameOf, statement } from "@/lib/authority";
-import { SIM_CITIZENS } from "@/lib/demoData";
+import { IDENTITY_MS, NOTICE_GRANT, ending, keyedFor, orgName as orgNameOf, statement, tasksPhrase } from "@/lib/authority";
+import { grouped } from "@/lib/bnsw";
+import { SIM_CITIZENS, shortOrgName } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
+import { namesOf } from "@/lib/sharing";
 
 import { Statement } from "./shared";
+
+/** Pema, who the phone belongs to: the story's clearing agent. */
+const PEMA = SIM_CITIZENS.find((c) => c.personId === "pema") ?? SIM_CITIZENS[0];
+/** The citizen ID's badge in the app, beside each item that comes from it. */
+const CITIZEN_ID = { mark: "ID", color: "#b5832a" };
+/** "Pelden Trading Pvt. Ltd." → "PT", for the app's logo disc. */
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w) && !/^(Pvt|Ltd)\.?$/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("");
 
 /**
  * SCR-AUT-05 — Collect your authority. FLOW-AUT-01 steps 9–16; E7–E14,
@@ -136,6 +152,10 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   const g = grantId ? authorityGrants.find((x) => x.id === grantId) : undefined;
   const orgName = g ? orgNameOf({ organizations }, g.orgId) : look?.kind === "valid" ? look.orgName : "The organisation";
   const sample = authorityGrants.find((x) => x.status === "ACTIVE") ?? authorityGrants[0];
+  /* Whose phone answers: the sample person the authority names, or Pema,
+     who stands in for whatever ID number was typed. */
+  const named = authorityGrants.find((x) => x.claimRef === claimRef);
+  const holder = (named && SIM_CITIZENS.find((c) => named.delegateIdKeyed === keyedFor(named.orgId, c.cid))) || PEMA;
 
   const identityLeft = askedAt ? IDENTITY_MS - (now - askedAt) : IDENTITY_MS;
 
@@ -284,6 +304,26 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                   status="awaiting_scan"
                   statusDetail={`Time remaining: ${mmss(identityLeft)}. For your security, the request ends after 5 minutes.`}
                   onCancel={() => setPhase("before")}
+                  phone={
+                    live ? (
+                      <NdiAppPhone
+                        owner={`${holder.name}'s phone`}
+                        from="Bhutan NDI"
+                        mark={<img src="/media/logos/ndi-mark-mint.png" alt="" width={36} height={36} className="h-9 w-9" />}
+                        markColor="#16302f"
+                        ask="share"
+                        fields={[
+                          { label: "Full Name", value: holder.name, source: CITIZEN_ID },
+                          { label: "ID Number", value: holder.cid, source: CITIZEN_ID },
+                          { label: "ID Type", value: "Citizenship", source: CITIZEN_ID },
+                        ]}
+                        answer="Share"
+                        done={{ title: "Shared", detail: `Your name and ID number went to Bhutan NDI, to check you're the person ${shortOrgName(orgName)} named.` }}
+                        onAnswer={() => share(holder.cid)}
+                        onDecline={() => setPhase("E10")}
+                      />
+                    ) : undefined
+                  }
                 />
               </>
             ) : (face === "offer" || face === "opened_again") && shown ? (
@@ -307,6 +347,29 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                   notSharing={[`${orgName}'s licence or TPN — only the licence number you act under`]}
                   status="awaiting_scan"
                   statusDetail={`Time remaining: ${mmss(offerLeft)}. For your security, the offer ends after 30 minutes.`}
+                  phone={
+                    live ? (
+                      <NdiAppPhone
+                        owner={`${holder.name}'s phone`}
+                        from={orgName}
+                        mark={initials(orgName)}
+                        markColor="#2f6f5e"
+                        ask="issue"
+                        fields={[
+                          { label: "Credential", value: "Authority to act", source: { mark: initials(orgName), color: "#2f6f5e" } },
+                          { label: "Acting for", value: orgName },
+                          { label: "You may", value: tasksPhrase(shown.tasks).replace(/^./, (c) => c.toUpperCase()) },
+                          { label: shown.licenceNumbers.length > 1 ? "Licences" : "Licence", value: namesOf(shown.licenceNumbers) },
+                          { label: "Limit", value: `Nu ${grouped(shown.valueCapNu)} per declaration` },
+                          { label: "Valid until", value: formatDate(shown.validUntil) },
+                        ]}
+                        answer="Accept"
+                        done={{ title: "Added to your wallet", detail: `Your authority to act for ${shortOrgName(orgName)} is in your Bhutan NDI app.` }}
+                        onAnswer={() => answerOffer(claimRef, "accept")}
+                        onDecline={() => answerOffer(claimRef, "decline")}
+                      />
+                    ) : undefined
+                  }
                 />
               </>
             ) : face === "finishing" ? (
@@ -340,15 +403,14 @@ export function CollectView({ claimRef }: { claimRef: string }) {
         {/* ---- The Bhutan NDI app, which the prototype can't reach ---- */}
         {live && face === "waiting_app" ? (
           <SimulatedStep
-            standsFor="the Bhutan NDI app on the phone — its identity request and consent screen"
+            standsFor="other ways the identity step could go"
             action={
               <>
-                {SIM_CITIZENS.map((c) => (
+                {SIM_CITIZENS.filter((c) => c.cid !== holder.cid).map((c) => (
                   <SimulatedAction key={c.cid} onClick={() => share(c.cid)}>
-                    Share {c.name}&rsquo;s ID
+                    {c.name} shares their ID instead
                   </SimulatedAction>
                 ))}
-                <SimulatedAction onClick={() => setPhase("E10")}>Decline in the app</SimulatedAction>
                 <SimulatedAction onClick={() => setPhase("E8")}>No Bhutan NDI app</SimulatedAction>
               </>
             }
@@ -360,12 +422,10 @@ export function CollectView({ claimRef }: { claimRef: string }) {
         ) : null}
         {live && (face === "offer" || face === "opened_again") ? (
           <SimulatedStep
-            standsFor="the Bhutan NDI app's offer screen"
+            standsFor="other ways the offer could go"
             action={
               <>
-                <SimulatedAction onClick={() => answerOffer(claimRef, "accept")}>Accept in the app</SimulatedAction>
                 <SimulatedAction onClick={() => answerOffer(claimRef, "accept_unregistered")}>Accept — the registration is slow</SimulatedAction>
-                <SimulatedAction onClick={() => answerOffer(claimRef, "decline")}>Decline in the app</SimulatedAction>
                 <SimulatedAction
                   onClick={() => {
                     answerOffer(claimRef, "expire");

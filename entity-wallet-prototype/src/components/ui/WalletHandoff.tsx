@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { QrPlaceholder } from "./QrPlaceholder";
 import { Icon } from "./icons";
@@ -98,7 +98,13 @@ export function WalletHandoff({
   sameDevice = false,
   onResend,
   cardVerb = "Continue",
+  phone,
 }: {
+  /**
+   * The person's phone, answering in the Bhutan NDI app (NdiAppPhone) —
+   * shown beside the card so the room sees what happens after the scan.
+   */
+  phone?: ReactNode;
   /**
    * The card's heading verb on a phone, as the NDI integration page words
    * it per use: "Sign up with Bhutan NDI Wallet" while setting up an
@@ -211,6 +217,10 @@ export function WalletHandoff({
             <p className="text-[12.5px] leading-[1.5] text-muted">{statusDetail ?? copy.detail}</p>
           </div>
         </div>
+
+        {phone && !settled ? (
+          <div className={`flex justify-center py-1 ${side} @min-[720px]:order-4 @min-[720px]:justify-start`}>{phone}</div>
+        ) : null}
 
         {onSimulateScan && status === "awaiting_scan" && !sameDevice ? (
           <div

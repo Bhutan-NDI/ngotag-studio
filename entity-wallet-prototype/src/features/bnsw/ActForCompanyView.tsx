@@ -7,6 +7,7 @@ import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { StatusPill } from "@/components/ui/StatusPill";
+import { NdiAppPhone } from "@/components/ui/NdiAppPhone";
 import { WalletHandoff } from "@/components/ui/WalletHandoff";
 import { Icon } from "@/components/ui/icons";
 import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/formStyles";
@@ -27,7 +28,7 @@ import {
   timeOf,
   tpnStatus,
 } from "@/lib/bnsw";
-import { PELDEN, SIM_CITIZENS, type AuthoritySession, type BnswCheck, type CounterpartyDeclaration, type DeclarationDraft } from "@/lib/demoData";
+import { PELDEN, SIM_CITIZENS, shortOrgName, type AuthoritySession, type BnswCheck, type CounterpartyDeclaration, type DeclarationDraft } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 import { namesOf } from "@/lib/sharing";
@@ -256,6 +257,7 @@ export function ActForCompanyView() {
             status="awaiting_scan"
             statusDetail={`${remaining(model.requestStartedAt, now)}. For your security, the request ends after 5 minutes.`}
             onCancel={() => (live ? bnswCancelRequest() : undefined)}
+            phone={live ? <BnswPhone share={share} /> : undefined}
           />
         </section>
       ) : null}
@@ -599,6 +601,58 @@ function DeclarationForm({
   );
 }
 
+/**
+ * The person's phone at the scan: the app's request screen, asking for the
+ * citizen ID and an authority together (SCR-AUT-08). With more than one
+ * authority held, the Authority row picks between them, by company name.
+ */
+function BnswPhone({ share }: { share: (a: Parameters<ReturnType<typeof useDemo>["bnswAnswer"]>[0]) => void }) {
+  const demo = useDemo();
+  const cid = demo.bnsw.signedInCid;
+  const held = cid ? heldAuthorities(demo, cid) : [];
+  const [chosen, setChosen] = useState<string | null>(null);
+  if (!cid || !held.length) return null;
+  const pick = held.find((g) => g.id === chosen) ?? held.find((g) => g.status === "ACTIVE") ?? held[0];
+  const citizen = citizenOf(cid);
+  const company = orgName(demo, pick.orgId);
+  const mark = company
+    .split(/\s+/)
+    .filter((w) => /^[A-Z]/.test(w) && !/^(Pvt|Ltd)\.?$/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("");
+  const id = { mark: "ID", color: "#b5832a" };
+  const auth = { mark, color: "#2f6f5e" };
+  return (
+    <NdiAppPhone
+      owner={`${citizen?.name ?? "The person"}'s phone`}
+      from="Bhutan National Single Window"
+      mark="BNSW"
+      markColor="#1f3a68"
+      ask="share"
+      fields={[
+        { label: "ID Number", value: cid, source: id },
+        { label: "ID Type", value: "Citizenship", source: id },
+        {
+          label: "Authority to act for",
+          value: company,
+          source: auth,
+          choices: held.map((g) => ({ key: g.id, value: orgName(demo, g.orgId) })),
+          onChoose: setChosen,
+        },
+        { label: "You may", value: tasksPhrase(pick.tasks).replace(/^./, (c) => c.toUpperCase()), source: auth },
+        { label: pick.licenceNumbers.length > 1 ? "Licences" : "Licence", value: namesOf(pick.licenceNumbers), source: auth },
+        { label: "Limit", value: `Nu ${grouped(pick.valueCapNu)} per declaration`, source: auth },
+        { label: "Valid until", value: formatDate(pick.validUntil), source: auth },
+      ]}
+      answer="Share"
+      done={{ title: "Shared", detail: `BNSW is checking your authority to act for ${shortOrgName(company)}.` }}
+      onAnswer={() => share({ kind: "share", grantId: pick.id, answeredBy: cid })}
+      onDecline={() => share({ kind: "decline" })}
+    />
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* SCR-AUT-08 — the Bhutan NDI app, simulated                          */
 /* ------------------------------------------------------------------ */
@@ -614,9 +668,8 @@ function AppPanel({ phase, share }: { phase: Phase; share: (a: Parameters<Return
   const demo = useDemo();
   const cid = demo.bnsw.signedInCid;
   const held = cid ? heldAuthorities(demo, cid) : [];
-  const [chosen, setChosen] = useState<string | null>(null);
   if (phase !== "waiting" || !cid) return null;
-  const pick = held.find((g) => g.id === chosen) ?? held.find((g) => g.status === "ACTIVE") ?? held[0] ?? null;
+  const pick = held.find((g) => g.status === "ACTIVE") ?? held[0] ?? null;
   const citizen = citizenOf(cid);
   /* Someone else holding an authority — for a relayed code (E15). */
   const others = SIM_CITIZENS.filter((c) => c.cid !== cid)
@@ -625,13 +678,10 @@ function AppPanel({ phase, share }: { phase: Phase; share: (a: Parameters<Return
 
   return (
     <SimulatedStep
-      standsFor={`${citizen?.name ?? "the person"}'s Bhutan NDI app — the app team's screen (SCR-AUT-08)`}
+      standsFor={held.length ? "other ways the request could go" : `${citizen?.name ?? "the person"}'s Bhutan NDI app — the app team's screen (SCR-AUT-08)`}
       action={
         <>
-          {pick ? (
-            <SimulatedAction onClick={() => share({ kind: "share", grantId: pick.id, answeredBy: cid })}>Share</SimulatedAction>
-          ) : null}
-          <SimulatedAction onClick={() => share({ kind: "decline" })}>Decline</SimulatedAction>
+          {held.length ? null : <SimulatedAction onClick={() => share({ kind: "decline" })}>Decline</SimulatedAction>}
           <SimulatedAction onClick={() => share({ kind: "timeout" })}>Let five minutes pass</SimulatedAction>
           {pick ? (
             <SimulatedAction onClick={() => share({ kind: "share", grantId: pick.id, answeredBy: cid, copied: true })}>
@@ -651,18 +701,9 @@ function AppPanel({ phase, share }: { phase: Phase; share: (a: Parameters<Return
           <span className="text-faint">Who is asking:</span> Bhutan National Single Window
         </p>
         {held.length ? (
-          <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
-            <legend className="mb-1 text-[12.5px] text-faint">Authority to share — choose one</legend>
-            {held.map((g) => (
-              <label key={g.id} className="flex items-start gap-2.5 text-[13px] leading-[1.5]">
-                <input type="radio" name="app-authority" className="mt-1" checked={pick?.id === g.id} onChange={() => setChosen(g.id)} />
-                <span>
-                  <span className="font-medium text-strong">{orgName(demo, g.orgId)}</span> — {tasksPhrase(g.tasks)}, under licence{" "}
-                  {namesOf(g.licenceNumbers)}, up to Nu {grouped(g.valueCapNu)} per declaration, until {formatDate(g.validUntil)}
-                </span>
-              </label>
-            ))}
-          </fieldset>
+          <p className="m-0 text-[13px]">
+            {citizen?.name ?? "The person"} answers on the phone above. With more than one authority, tapping the Authority row there picks another.
+          </p>
         ) : (
           <p className="m-0 text-[13px]">
             No authority to share — the app says so in its own words, and that authority comes from the company (E1). BNSW only sees the request
