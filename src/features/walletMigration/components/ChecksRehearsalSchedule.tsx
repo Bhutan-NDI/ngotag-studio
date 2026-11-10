@@ -456,7 +456,11 @@ export function ChecksRehearsalSchedule({
         open={confirmOpen}
         orgName={orgName}
         scheduledFor={startNow ? null : scheduledFor}
-        expectedPause={minutes(migration.predictedFreezeMs)}
+        expectedPause={
+          migration.predictedFreezeMs === null
+            ? null
+            : minutes(migration.predictedFreezeMs)
+        }
         loading={busy === 'schedule'}
         onOpenChange={setConfirmOpen}
         onConfirm={confirmSchedule}

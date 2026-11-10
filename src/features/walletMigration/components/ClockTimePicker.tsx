@@ -1,6 +1,18 @@
 'use client'
 
 import {
+  DIAL_CENTER,
+  DIAL_SIZE,
+  DialMode,
+  INNER_RADIUS,
+  OUTER_RADIUS,
+  dialPosition,
+  hourPosition,
+  isOffPeakHour,
+  minutePosition,
+  valueAtPoint,
+} from '../clockDial'
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -10,59 +22,26 @@ import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Clock } from 'lucide-react'
 
-// A 24-hour clock dial: hours 1-12 on the outer ring and 00, 13-23 on the
-// inner ring, then minutes, like the Android time picker.
-const SIZE = 256
-const CENTER = SIZE / 2
-const OUTER = 104
-const INNER = 70
 const OUTER_HOURS = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 const INNER_HOURS = [0, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
 const MINUTE_LABELS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
 
-type Mode = 'hours' | 'minutes'
-
 const pad = (value: number): string => String(value).padStart(2, '0')
 
-/** Where a value sits on the dial, `step` degrees apart from 12 o'clock. */
-const position = (
-  index: number,
-  radius: number,
-  step: number,
-): { x: number; y: number } => {
-  const angle = (index * step * Math.PI) / 180
-  const dx = radius * Math.sin(angle)
-  const dy = radius * Math.cos(angle)
-  return { x: CENTER + dx, y: CENTER - dy }
-}
-
-const hourPosition = (hour: number): { x: number; y: number } => {
-  const onInner = hour === 0 || hour > 12
-  return position(hour % 12, onInner ? INNER : OUTER, 30)
-}
-
-/** The hour or minute under a click or drag on the dial. */
+/** The hour or minute under a click or drag, from screen to dial units. */
 const valueAt = (
   event: React.PointerEvent<SVGSVGElement>,
-  mode: Mode,
+  mode: DialMode,
 ): number => {
   const rect = event.currentTarget.getBoundingClientRect()
-  const scale = SIZE / rect.width
-  const x = (event.clientX - rect.left) * scale
-  const y = (event.clientY - rect.top) * scale
-  const dx = x - CENTER
-  const dy = y - CENTER
-  const signedDegrees = (Math.atan2(dx, -dy) * 180) / Math.PI
-  const degrees = (signedDegrees + 360) % 360
-  if (mode === 'minutes') {
-    return Math.round(degrees / 6) % 60
-  }
-  const slot = Math.round(degrees / 30) % 12
-  const inner = Math.hypot(dx, dy) < (OUTER + INNER) / 2
-  if (inner) {
-    return slot === 0 ? 0 : slot + 12
-  }
-  return slot === 0 ? 12 : slot
+  const scale = DIAL_SIZE / rect.width
+  return valueAtPoint(
+    {
+      x: (event.clientX - rect.left) * scale,
+      y: (event.clientY - rect.top) * scale,
+    },
+    mode,
+  )
 }
 
 interface ClockTimePickerProps {
@@ -79,7 +58,7 @@ export function ClockTimePicker({
   onChange,
 }: Readonly<ClockTimePickerProps>): React.JSX.Element {
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<Mode>('hours')
+  const [mode, setMode] = useState<DialMode>('hours')
   const [hour, setHour] = useState(0)
   const [minute, setMinute] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -102,28 +81,32 @@ export function ClockTimePicker({
     }
   }
 
-  const hand =
-    mode === 'hours' ? hourPosition(hour) : position(minute, OUTER, 6)
+  const hand = mode === 'hours' ? hourPosition(hour) : minutePosition(minute)
+  const endDrag = (): void => setDragging(false)
 
   const label = (
     text: string,
     x: number,
     y: number,
     selected: boolean,
-    small = false,
+    { small = false, offPeak = false } = {},
   ): React.JSX.Element => (
-    <text
-      key={`${text}-${x}`}
-      x={x}
-      y={y}
-      textAnchor="middle"
-      dominantBaseline="central"
-      className={`pointer-events-none select-none ${small ? 'text-[13px]' : 'text-[15px]'} ${
-        selected ? 'fill-primary-foreground font-semibold' : 'fill-foreground'
-      }`}
-    >
-      {text}
-    </text>
+    <g key={`${text}-${x}`} className="pointer-events-none select-none">
+      {offPeak && !selected && (
+        <circle cx={x} cy={y} r={small ? 13 : 15} className="fill-primary/10" />
+      )}
+      <text
+        x={x}
+        y={y}
+        textAnchor="middle"
+        dominantBaseline="central"
+        className={`${small ? 'text-[13px]' : 'text-[15px]'} ${
+          selected ? 'fill-primary-foreground font-semibold' : 'fill-foreground'
+        }`}
+      >
+        {text}
+      </text>
+    </g>
   )
 
   return (
@@ -142,7 +125,7 @@ export function ClockTimePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-4" align="start">
         <div className="mb-3 flex items-center justify-center gap-1.5 text-xl font-semibold">
-          {(['hours', 'minutes'] as Mode[]).map((part, i) => (
+          {(['hours', 'minutes'] as DialMode[]).map((part, i) => (
             <React.Fragment key={part}>
               {i === 1 && <span aria-hidden>:</span>}
               <button
@@ -176,9 +159,9 @@ export function ClockTimePicker({
         </div>
 
         <svg
-          width={SIZE}
-          height={SIZE}
-          viewBox={`0 0 ${SIZE} ${SIZE}`}
+          width={DIAL_SIZE}
+          height={DIAL_SIZE}
+          viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
           className="bg-muted/40 touch-none rounded-full"
           role="img"
           aria-label={mode === 'hours' ? 'Hour dial' : 'Minute dial'}
@@ -193,41 +176,64 @@ export function ClockTimePicker({
             }
           }}
           onPointerUp={() => {
-            setDragging(false)
-            // Like Android: picking the hour moves on to the minutes.
-            if (mode === 'hours') {
+            // Like Android: picking the hour moves on to the minutes. A drag
+            // the browser cancelled hasn't picked anything, so it stays.
+            if (dragging && mode === 'hours') {
               setMode('minutes')
             }
+            endDrag()
           }}
+          onPointerCancel={endDrag}
+          onLostPointerCapture={endDrag}
         >
           <line
-            x1={CENTER}
-            y1={CENTER}
+            x1={DIAL_CENTER}
+            y1={DIAL_CENTER}
             x2={hand.x}
             y2={hand.y}
             className="stroke-primary"
             strokeWidth={2}
           />
-          <circle cx={CENTER} cy={CENTER} r={3} className="fill-primary" />
+          <circle
+            cx={DIAL_CENTER}
+            cy={DIAL_CENTER}
+            r={3}
+            className="fill-primary"
+          />
           <circle cx={hand.x} cy={hand.y} r={17} className="fill-primary" />
           {mode === 'hours' && (
             <>
               {OUTER_HOURS.map((h, i) => {
-                const p = position(i, OUTER, 30)
-                return label(String(h), p.x, p.y, h === hour)
+                const p = dialPosition(i, OUTER_RADIUS, 30)
+                return label(String(h), p.x, p.y, h === hour, {
+                  offPeak: isOffPeakHour(h),
+                })
               })}
               {INNER_HOURS.map((h, i) => {
-                const p = position(i, INNER, 30)
-                return label(pad(h), p.x, p.y, h === hour, true)
+                const p = dialPosition(i, INNER_RADIUS, 30)
+                return label(pad(h), p.x, p.y, h === hour, {
+                  small: true,
+                  offPeak: isOffPeakHour(h),
+                })
               })}
             </>
           )}
           {mode === 'minutes' &&
             MINUTE_LABELS.map((m, i) => {
-              const p = position(i, OUTER, 30)
+              const p = dialPosition(i, OUTER_RADIUS, 30)
               return label(pad(m), p.x, p.y, m === minute)
             })}
         </svg>
+
+        {mode === 'hours' && (
+          <p className="text-muted-foreground mt-2 flex items-center justify-center gap-1.5 text-xs">
+            <span
+              aria-hidden
+              className="bg-primary/20 h-2.5 w-2.5 rounded-full"
+            />
+            Off-peak (21:00 to 05:00 BTT)
+          </p>
+        )}
 
         <div className="mt-3 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={() => setOpen(false)}>

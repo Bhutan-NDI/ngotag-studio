@@ -21,8 +21,8 @@ interface MoveConfirmDialogProps {
   orgName: string
   /** Null when the move starts at once ("Start now"). */
   scheduledFor: string | null
-  /** The rehearsal's predicted pause, e.g. "12 minutes". */
-  expectedPause: string
+  /** The rehearsal's predicted pause, e.g. "12 minutes"; null without one. */
+  expectedPause: string | null
   loading: boolean
   onOpenChange: (open: boolean) => void
   /** Called with what the owner typed; the platform checks it again. */
@@ -72,7 +72,7 @@ export function MoveConfirmDialog({
           <DialogDescription>
             {scheduledFor
               ? `Scheduled for ${formatBtt(scheduledFor)}.`
-              : 'Starts now.'}
+              : 'Starts once the final checks pass.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -81,9 +81,10 @@ export function MoveConfirmDialog({
             role="alert"
             className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300"
           >
-            The move starts within a minute. Issuing and verifying pause
-            straight away, for about {expectedPause}. Don&apos;t restart your
-            dedicated agent until the move finishes.
+            The move starts within a minute once the final checks pass. Issuing
+            and verifying then pause
+            {expectedPause ? `, for about ${expectedPause}` : ''}. Don&apos;t
+            restart your dedicated agent until the move finishes.
           </p>
         )}
 
