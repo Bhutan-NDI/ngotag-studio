@@ -272,7 +272,15 @@ export default function MigrationWizard(): React.JSX.Element {
         current,
       )
     ) {
-      return <MoveDashboard migration={migration} />
+      // A restored org is back on the shared agent and can try again.
+      const canStartOver =
+        current === 'DISASTER_RESTORED' && isOwner && agentType === 'shared'
+      return (
+        <MoveDashboard
+          migration={migration}
+          onStartNewMove={canStartOver ? startNew : undefined}
+        />
+      )
     }
     return (
       <ChecksRehearsalSchedule
