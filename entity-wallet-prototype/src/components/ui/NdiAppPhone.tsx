@@ -173,6 +173,160 @@ export function NdiAppPhone({
   );
 }
 
+/** One credential in the app's list. */
+export interface WalletCard {
+  key: string;
+  title: string;
+  /** "Self Attested", or who it's for. */
+  subtitle?: string;
+  /** Issued and verified (dark card, shield) or self-attested (teal card, NDI mark). */
+  verified: boolean;
+  /** The logo disc; self-attested cards use NDI's mark. */
+  mark?: ReactNode;
+  markColor?: string;
+  /** Just arrived: marked, and drawn in. */
+  isNew?: boolean;
+}
+
+/**
+ * The Bhutan NDI app's Credentials tab ("Creds-All" in the New Bhutan NDI
+ * App design file), on the same phone: what the person holds once they
+ * have accepted something. Read-only — it shows where the credential went.
+ */
+export function NdiWalletPhone({ owner, cards, note }: { owner: string; cards: WalletCard[]; note?: string }) {
+  const sorted = [...cards].sort((a, b) => a.title.localeCompare(b.title));
+  return (
+    <figure className="m-0 flex flex-col items-center gap-2.5">
+      <div
+        className="relative w-[288px] rounded-[44px] p-[10px] shadow-[0_18px_40px_rgb(0_0_0/0.22)]"
+        style={{ background: "#16191b" }}
+        aria-label={`${owner}: the Bhutan NDI app's credentials, simulated`}
+        role="group"
+      >
+        <div
+          className="relative flex h-[560px] flex-col overflow-hidden rounded-[34px]"
+          style={{ background: APP.paper, color: APP.ink, fontFamily: "var(--font-sans, ui-sans-serif, system-ui)" }}
+        >
+          <style>{PHONE_MOTION}</style>
+          <StatusBar />
+          {/* Search, the title, add */}
+          <div className="flex flex-none items-center justify-between px-4 pb-2 pt-1">
+            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke={APP.mint} strokeWidth="2.4" strokeLinecap="round">
+              <circle cx="8.5" cy="8.5" r="6" />
+              <path d="m13 13 5 5" />
+            </svg>
+            <span className="text-[15px] font-bold" style={{ color: "#1d1d1d" }}>
+              Credentials
+            </span>
+            <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center rounded-full" style={{ background: APP.mint }}>
+              <svg viewBox="0 0 12 12" className="h-[10px] w-[10px]" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M6 1.5v9M1.5 6h9" />
+              </svg>
+            </span>
+          </div>
+          {/* Filters */}
+          <div aria-hidden="true" className="flex flex-none gap-1.5 overflow-hidden px-4 pb-2.5">
+            {["All", "Active", "Self Attested", "Suspended", "Revoked"].map((c, i) => (
+              <span
+                key={c}
+                className="flex-none whitespace-nowrap rounded-full px-2.5 py-[3px] text-[10.5px] font-medium"
+                style={i === 0 ? { background: APP.mint, color: "#fff" } : { background: "#e2f2e9", color: "#5d6b64" }}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+          {/* The list, with the app's A–Z index beside it */}
+          <div className="relative flex min-h-0 flex-1">
+            <ul className="m-0 flex min-w-0 flex-1 list-none flex-col gap-2 overflow-y-auto py-0.5 pb-[84px] pl-3 pr-1" style={{ scrollbarWidth: "none" }}>
+              {sorted.map((c) => (
+                <li
+                  key={c.key}
+                  className={`relative flex h-[56px] flex-none items-center gap-3 rounded-[8px] px-3 ${c.isNew ? "ndi-phone-slide" : ""}`}
+                  style={{
+                    background: c.verified ? "#1b1e29" : "#16423d",
+                    boxShadow: c.isNew ? `0 0 0 2px ${APP.mint}` : undefined,
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-[36px] w-[36px] flex-none items-center justify-center overflow-hidden rounded-full text-[11px] font-bold text-white"
+                    style={{ background: c.verified ? (c.markColor ?? "#2f6f5e") : "transparent" }}
+                  >
+                    {c.verified ? c.mark : <img src="/media/logos/ndi-mark-mint.png" alt="" width={32} height={32} className="h-8 w-8" />}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[12.5px] font-semibold text-white">{c.title}</span>
+                    {c.subtitle ? <span className="truncate text-[9.5px] text-white/70">{c.subtitle}</span> : null}
+                  </span>
+                  <span aria-hidden="true" className="flex flex-none flex-col items-end gap-1">
+                    {c.verified ? (
+                      <svg viewBox="0 0 16 18" className="h-[13px] w-[12px]">
+                        <path d="M8 1 2 3.5v4.6c0 4 2.6 7.3 6 8.4 3.4-1.1 6-4.4 6-8.4V3.5Z" fill={APP.mint} />
+                        <path d="m5.3 9 1.9 1.9 3.6-3.8" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : null}
+                    <svg viewBox="0 0 20 18" className="h-[13px] w-[14px]" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round">
+                      <path d="M10 16.5S2 11.7 2 6.3A4.2 4.2 0 0 1 10 4a4.2 4.2 0 0 1 8 2.3c0 5.4-8 10.2-8 10.2Z" />
+                    </svg>
+                  </span>
+                  {c.isNew ? (
+                    <span className="absolute -top-[7px] left-3 rounded-full px-1.5 py-[1px] text-[8.5px] font-bold uppercase tracking-[0.06em] text-white" style={{ background: APP.mint }}>
+                      New
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <span aria-hidden="true" className="flex w-[14px] flex-none flex-col items-center pr-1 text-[7.5px] leading-[1.28]" style={{ color: "#5d6b64" }}>
+              {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((l) => (
+                <span key={l}>{l}</span>
+              ))}
+            </span>
+          </div>
+          {/* The app's tab bar, with Scan raised in the middle */}
+          <div aria-hidden="true" className="absolute inset-x-2.5 bottom-3 flex h-[52px] items-end justify-between rounded-[14px] px-3 pb-1.5" style={{ background: "#1d2427" }}>
+            {[
+              { label: "Home", d: "M3 9.5 10 3l7 6.5V17h-4.5v-4.5h-5V17H3Z" },
+              { label: "Credentials", d: "M2.5 5h15v10h-15Zm0 3.5h15", active: true },
+              { label: "Scan", scan: true },
+              { label: "Chat", d: "M3 4h14v9H8l-4 3.5V13H3Z" },
+              { label: "More", d: "M3 5h14M3 10h14M3 15h14" },
+            ].map((t) =>
+              t.scan ? (
+                <span key={t.label} className="relative flex w-[44px] flex-col items-center">
+                  <span className="absolute -top-[40px] flex h-[42px] w-[42px] items-center justify-center rounded-full border-[3px]" style={{ background: APP.mint, borderColor: APP.paper }}>
+                    <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
+                      <path d="M2 6V3.5A1.5 1.5 0 0 1 3.5 2H6M14 2h2.5A1.5 1.5 0 0 1 18 3.5V6M18 14v2.5a1.5 1.5 0 0 1-1.5 1.5H14M6 18H3.5A1.5 1.5 0 0 1 2 16.5V14M6 10h8" />
+                    </svg>
+                  </span>
+                  <span className="text-[8.5px] text-white">{t.label}</span>
+                </span>
+              ) : (
+                <span key={t.label} className="flex w-[44px] flex-col items-center gap-0.5">
+                  <svg viewBox="0 0 20 20" className="h-[16px] w-[16px]" fill="none" stroke={t.active ? APP.mint : "#fff"} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
+                    <path d={t.d} />
+                  </svg>
+                  <span className="text-[8.5px]" style={{ color: t.active ? APP.mint : "#fff" }}>
+                    {t.label}
+                  </span>
+                </span>
+              ),
+            )}
+          </div>
+        </div>
+      </div>
+      <figcaption className="flex max-w-[300px] flex-col items-center gap-1 text-center">
+        <span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+          <span aria-hidden="true" className="h-1.5 w-1.5 flex-none rounded-full" style={{ background: "var(--ndi-warning)" }} />
+          Prototype · {owner}
+        </span>
+        <span className="text-[11.5px] leading-[1.45] text-faint">{note ?? "The Bhutan NDI app's credentials, simulated."}</span>
+      </figcaption>
+    </figure>
+  );
+}
+
 function StatusBar() {
   return (
     <div className="flex h-[38px] flex-none items-center justify-between px-6 pt-1 text-[13px] font-semibold" style={{ color: "#111" }}>

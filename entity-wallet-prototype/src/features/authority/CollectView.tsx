@@ -6,7 +6,7 @@ import { useScreenState } from "@/components/demo/screenState";
 import { AuthHeader } from "@/components/layout/AuthHeader";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { HairlineButton } from "@/components/ui/HairlineButton";
-import { NdiAppPhone } from "@/components/ui/NdiAppPhone";
+import { NdiAppPhone, NdiWalletPhone } from "@/components/ui/NdiAppPhone";
 import { Panel } from "@/components/ui/Panel";
 import { SimulatedAction, SimulatedStep } from "@/components/ui/SimulatedStep";
 import { WalletHandoff } from "@/components/ui/WalletHandoff";
@@ -237,7 +237,7 @@ export function CollectView({ claimRef }: { claimRef: string }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <AuthHeader />
-      <main className={`mx-auto flex w-full ${face === "waiting_app" || face === "checking" || inOffer ? "max-w-[1120px]" : "max-w-[640px]"} flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6 min-[641px]:py-10`}>
+      <main className={`mx-auto flex w-full ${face === "waiting_app" || face === "checking" || inOffer ? "max-w-[1120px]" : face === "done" ? "max-w-[880px]" : "max-w-[640px]"} flex-1 flex-col gap-5 px-4 py-8 min-[641px]:px-6 min-[641px]:py-10`}>
         {/* ---- NDI's name and address, before anything else ---- */}
         <div className="flex flex-col gap-2">
           <p className="m-0 flex flex-wrap items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
@@ -375,10 +375,30 @@ export function CollectView({ claimRef }: { claimRef: string }) {
                 Almost done — we&rsquo;re finishing setting up your authority. It will work in a few minutes.
               </p>
             ) : face === "done" && shown ? (
-              <p role="status" className="m-0 flex items-start gap-2 text-[14.5px] leading-[1.6] text-body">
-                <Icon name="check" size={16} strokeWidth={2.4} className="mt-[3px] flex-none" style={{ color: "var(--ndi-success)" }} />
-                You have authority to act for {orgName} until {formatDate(shown.validUntil)}. It&rsquo;s in your Bhutan NDI app.
-              </p>
+              /* Where it went: her own app's Credentials tab, the authority
+                 beside what she already held — the same phone as before. */
+              <div className="flex flex-col gap-6 min-[720px]:flex-row min-[720px]:items-start">
+                <div className="flex flex-col gap-3 min-[720px]:order-2 min-[720px]:flex-1 min-[720px]:pt-2">
+                  <p role="status" className="m-0 flex items-start gap-2 text-[14.5px] leading-[1.6] text-body">
+                    <Icon name="check" size={16} strokeWidth={2.4} className="mt-[3px] flex-none" style={{ color: "var(--ndi-success)" }} />
+                    You have authority to act for {orgName} until {formatDate(shown.validUntil)}. It&rsquo;s in your Bhutan NDI app.
+                  </p>
+                  <p className="m-0 border-t border-grid pt-3 text-[13.5px] leading-[1.6] text-muted">{statement({ organizations }, shown, "delegate")}</p>
+                </div>
+                <div className="flex justify-center min-[720px]:order-1">
+                  <NdiWalletPhone
+                    owner={`${holder.name}'s phone`}
+                    note="Her Bhutan NDI app's credentials, simulated — the authority beside what she already held."
+                    cards={[
+                      { key: "authority", title: "Authority to act", subtitle: orgName, verified: true, mark: initials(orgName), markColor: "#2f6f5e", isNew: true },
+                      { key: "fid", title: "Foundational ID", verified: true, mark: "ID", markColor: CITIZEN_ID.color },
+                      { key: "email", title: "Email", subtitle: "Self Attested", verified: false },
+                      { key: "phone", title: "Phone Number", subtitle: "Self Attested", verified: false },
+                      { key: "photo", title: "Passport Size Photo", subtitle: "Self Attested", verified: false },
+                    ]}
+                  />
+                </div>
+              </div>
             ) : (
               <>
                 <p className="m-0 text-[14.5px] leading-[1.6] text-body">Only continue if you expected authority from {ending(orgName)}</p>
