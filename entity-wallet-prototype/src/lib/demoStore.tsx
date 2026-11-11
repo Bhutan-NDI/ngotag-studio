@@ -111,7 +111,7 @@ const STORAGE_KEY = "ndi-studio-demo";
 /**
  * The simulated verifier websites FLOW-PRS-01 starts from, and what each
  * asks for (EW-FLOW7-VIG §4). Partner Bank's account form asks for the
- * registration and the TPN; the Single Window's company registration asks for the
+ * registration, the TPN and the business licence; the Single Window's company registration asks for the
  * registration, the TPN and the business licence — what EW-FLOW9-SD §4.1
  * says BNSW keeps, and what a delegate's authority is later matched to.
  * `returnPath` is where the registered address leads in the prototype.
@@ -121,9 +121,10 @@ const VERIFIER_SITES: Record<string, { asked: AskedDescriptor[]; purpose: string
     asked: [
       { id: "registration", credentialType: "Business Registration", fields: ["registered_name", "registration_number", "entity_type"] },
       { id: "tpn", credentialType: "Taxpayer Number (TPN)", fields: ["tpn"] },
+      { id: "licence", credentialType: "Business Licence", fields: ["licence_number", "licensed_activity"] },
     ],
     purpose:
-      "To open a business current account we check your company's registration against the Registrar's record, and its taxpayer number with the Department of Revenue & Customs.",
+      "To open a business current account we check your company's registration against the Registrar's record, its taxpayer number with the Department of Revenue & Customs, and its business licence with the Ministry of Industry, Commerce & Employment.",
     returnUrlId: "ekyb-return",
     returnPath: "/simulated/bank/return",
   },

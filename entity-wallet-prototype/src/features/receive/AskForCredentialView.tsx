@@ -331,11 +331,20 @@ export function AskForCredentialView({ offeringId }: { offeringId: string }) {
                   <p className="m-0 text-[12px] text-faint">Not in your wallet yet</p>
                 </div>
                 <p className="m-0 text-[13px] leading-[1.5] text-muted">
-                  {issuerShort(issuer)} fills it in. It will look like this:
+                  {issuerShort(issuer)} fills these in from its own records:
                 </p>
-                {/* The offering's own examples, so the rows read like the
-                    ones opposite rather than a list of names. */}
-                <DetailRows rows={offering.fields.map((f) => ({ label: f.label, value: f.example ? `e.g. ${f.example}` : "—" }))} quiet />
+                {/* What it will hold, by name only. Values here would be a
+                    guess at what the office hasn't decided yet — and in the
+                    demo, the very values it then sends. They are checked on
+                    the offer, before accepting (SCR-CRD-02 shows the
+                    credential and issuer; SCR-CRD-04 the values). */}
+                <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                  {offering.fields.map((f) => (
+                    <li key={f.name}className="rounded-full border border-grid px-2.5 py-1 text-[12px] text-muted">
+                      {f.label}
+                    </li>
+                  ))}
+                </ul>
                 <p className="m-0 flex items-center gap-1.5 pt-1 text-[12.5px] text-muted">
                   <Icon name="info" size={14} strokeWidth={2} className="flex-none text-accent" />
                   It arrives as an offer — you choose whether to accept it.

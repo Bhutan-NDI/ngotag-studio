@@ -65,7 +65,9 @@ export function GetCredentialView() {
   const offered = offerings.filter((o) => o.status === "ACTIVE" && o.covered && o.eligibleKinds.includes(holder.kind));
   const listed = issuerId ? offered.filter((o) => o.issuerOrgId === issuerId) : offered;
   /* Every organisation on NDI that issues, but not this business itself or
-     NDI — the ones that offer something to businesses like this first. */
+     NDI. The ones that offer something to businesses like this come first,
+     in the order of what they offer — the ministry's licence before the tax
+     office's TPN, which needs it — then the rest by name. */
   const issuers = organizations
     .filter((o) => o.capabilities.includes("issuer") && o.id !== NDI_ORG && o.id !== holder.orgId)
     .map((o) => {
@@ -73,9 +75,10 @@ export function GetCredentialView() {
       /* Searched by what it is and what it issues, not only its name:
          someone looking for "tax" means the Department of Revenue & Customs. */
       const words = [o.name, o.legalName ?? "", o.description ?? "", ...theirs.map((x) => x.credential)].join(" ").toLowerCase();
-      return { id: o.id, name: o.name, count: theirs.length, words };
+      const first = offered.findIndex((x) => x.issuerOrgId === o.id);
+      return { id: o.id, name: o.name, count: theirs.length, words, first: first < 0 ? Infinity : first };
     })
-    .sort((a, b) => Number(b.count > 0) - Number(a.count > 0) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.first - b.first || a.name.localeCompare(b.name));
   const q = query.trim().toLowerCase();
   const found = q ? issuers.filter((i) => i.words.includes(q)) : issuers;
   const chosen = issuers.find((i) => i.id === issuerId);

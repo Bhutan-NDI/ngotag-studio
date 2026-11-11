@@ -75,7 +75,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 0,
     title: "One company's story",
     happening:
-      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden Trading is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden Trading. Pelden Trading receives its taxpayer number from the Department of Revenue & Customs, then shares its registration and TPN with Partner Bank. Finally Pelden Trading gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
+      "We follow Pelden Trading Pvt. Ltd., a private limited company in Thimphu, through seven flows. Its director, Dorji Wangchuk, gets an account. Pelden Trading is verified by the authority that registered it, and Dorji invites a colleague, Ugyen. Dorji appoints Ugyen to act for Pelden Trading. Pelden Trading receives its business licence from the Ministry of Industry, Commerce & Employment and its taxpayer number from the Department of Revenue & Customs, then shares its registration, TPN and licence with Partner Bank. Finally Pelden Trading gives its clearing agent, Pema, authority to declare its imports, and she uses it at the Bhutan National Single Window.",
     doThis: "Press **Next**.",
     route: "/sign-up",
     match: "^/sign-up$",
@@ -187,7 +187,7 @@ export const PRESENTATION_STEPS: GuideStep[] = [
     chapter: 8,
     title: "That's the Entity Wallet",
     happening:
-      "Dorji got an account as a person. Pelden Trading was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden Trading received its business licence from the ministry and its TPN from the tax office, shared its registration and TPN with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
+      "Dorji got an account as a person. Pelden Trading was verified by its registrar and brought on a colleague, and Dorji appointed that colleague to act, with only the powers Dorji chose. Pelden Trading received its business licence from the ministry and its TPN from the tax office, shared its registration, TPN and licence with its bank, gave its clearing agent authority she carries in her own app, and the Single Window checked that authority at every declaration. Not shown today: setting up NDI's own administrators, NDI approving organisations to verify or issue, and designating an authority. Approvals that need several signatories, suspending and revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13) haven't been designed yet.",
     doThis:
       "Press **Finish**. To run any part again, use **Demo controls → Walk a flow**. The **Prototype · data simulated** chip lists what's simulated.",
   },
