@@ -19,6 +19,8 @@ export interface RequestProof {
   autoAcceptProof: string
   createDateTime: string
   isVerified?: boolean
+  /** Set when the holder ended the request; "request-expired: …" means it ran out. */
+  errorMessage?: string | null
 }
 
 interface UserDataItem {

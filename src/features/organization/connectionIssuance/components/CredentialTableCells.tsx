@@ -9,6 +9,7 @@ import {
 import DateTooltip from '@/components/DateTooltip'
 import { dateConversion } from '@/utils/DateConversion'
 import { hardNavigate } from '@/utils/navigation'
+import { isExpiredProofRequest } from '@/features/verification/proofRequestExpiry'
 
 export const ConnectionIdCell = ({
   connectionId,
@@ -110,7 +111,13 @@ export const ConnectionDetail = ({
   <span className="text-sm">{connectionId ?? 'Not Available'}</span>
 )
 
-export const ProofState = ({ state }: { state: string }): React.JSX.Element => {
+export const ProofState = ({
+  state,
+  errorMessage,
+}: {
+  state: string
+  errorMessage?: string | null
+}): React.JSX.Element => {
   let badgeClass = ''
   let userText: string = state
 
@@ -128,8 +135,14 @@ export const ProofState = ({ state }: { state: string }): React.JSX.Element => {
       userText = ProofRequestStateUserText.done
       break
     case ProofRequestState.abandoned:
-      badgeClass = 'badges-error'
-      userText = ProofRequestStateUserText.abandoned
+      // An expired request is not a refusal: never label it "Declined".
+      if (isExpiredProofRequest(state, errorMessage)) {
+        badgeClass = 'badges-secondary'
+        userText = ProofRequestStateUserText.expired
+      } else {
+        badgeClass = 'badges-error'
+        userText = ProofRequestStateUserText.abandoned
+      }
       break
     case ProofRequestState.presentationReceived:
       badgeClass = 'badges-secondary'

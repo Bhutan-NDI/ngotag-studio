@@ -69,8 +69,17 @@ export enum ProofRequestStateUserText {
   requestReceived = 'Received',
   done = 'Verified',
   abandoned = 'Declined',
+  expired = 'Expired',
   presentationReceived = 'Presentation Received',
 }
+
+/**
+ * Problem-report code the holder's wallet sends when a proof request runs out
+ * unanswered. It reaches us as the record's errorMessage ("request-expired: …"),
+ * which is what tells an expired request from a genuine decline: both end as
+ * abandoned.
+ */
+export const REQUEST_EXPIRED_PROBLEM_CODE = 'request-expired'
 
 export enum DidMethod {
   INDY = 'did:indy',
