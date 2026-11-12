@@ -5,6 +5,7 @@ import {
   isMobileVerifierOnly,
   isMobileVerifierOnlyPath,
   mobileVerifierHome,
+  orgLandingPage,
 } from '@/lib/orgRoleRules'
 import { selectSelectedOrgRoles, setIsPlatformAdmin } from '@/lib/orgSlice'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
@@ -22,6 +23,7 @@ export {
   isMobileVerifierOnly,
   isMobileVerifierOnlyPath,
   mobileVerifierHome,
+  orgLandingPage,
 }
 
 // One shared empty list, so the selector returns the same value while no

@@ -15,12 +15,17 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { SwitchableOrg, switchOrganization } from '@/lib/switchOrganization'
+import {
+  orgLandingPage,
+  useCanCreateOrganization,
+  useIsPlatformAdmin,
+} from '@/lib/useOrgRoleAccess'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import React from 'react'
 import { RootState } from '@/lib/store'
 import { hardNavigate } from '@/utils/navigation'
-import { useCanCreateOrganization } from '@/lib/useOrgRoleAccess'
+import { useRouter } from 'next/navigation'
 
 type Tenant = SwitchableOrg
 
@@ -38,6 +43,8 @@ const OrgSwitcherInner = ({
     null
 
   const dispatch = useAppDispatch()
+  const router = useRouter()
+  const isPlatformAdmin = useIsPlatformAdmin() === true
   const selectedOrgId = useAppSelector((state) => state.organization.orgId)
   // A mobile verifier member can switch organisations but not create one.
   const canCreateOrg = useCanCreateOrganization()
@@ -59,9 +66,16 @@ const OrgSwitcherInner = ({
       : currentTenant
 
   const handleTenantSwitch = (tenant: Tenant): void => {
+    const changed = tenant.id !== selectedOrgId
     switchOrganization(dispatch, tenant)
     if (onTenantSwitch) {
       onTenantSwitch(tenant.id)
+    }
+    // Don't leave the user on a page that belonged to the previous
+    // organisation: land where the new organisation's roles allow.
+    if (changed) {
+      const roles = tenant.userOrgRoles?.map((role) => role.orgRole.name) ?? []
+      router.push(orgLandingPage(roles, isPlatformAdmin))
     }
   }
 
