@@ -76,8 +76,14 @@ const VerifierRoleFormDialog = ({
 
         <div className="space-y-4 pt-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Role Name *</label>
+            <label
+              htmlFor="verifier-role-role-name"
+              className="text-sm font-medium"
+            >
+              Role Name *
+            </label>
             <input
+              id="verifier-role-role-name"
               type="text"
               value={role}
               onChange={(e) => setRole(e.target.value)}

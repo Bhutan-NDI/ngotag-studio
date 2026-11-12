@@ -133,8 +133,12 @@ export const getVerifierUserColumnData = ({
     cell: ({ row }) => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <MoreVertical className="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Actions for ${row.original.email}`}
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden />
           </Button>
         </DropdownMenuTrigger>
 

@@ -11,6 +11,7 @@ import DifSchemaPicker, { DifPayloadEntry } from './DifSchemaPicker'
 
 import { AlertComponent } from '@/components/AlertComponent'
 import { JSX } from 'react'
+import { MultiSelect } from '@/components/ui/multi-select'
 
 interface VerifierRoleOption {
   id: string
@@ -119,8 +120,14 @@ const ProofTemplateFormDialog = ({
 
         <div className="space-y-4 pt-2">
           <div className="space-y-1">
-            <label className="text-sm font-medium">Template ID *</label>
+            <label
+              htmlFor="proof-template-template-id"
+              className="text-sm font-medium"
+            >
+              Template ID *
+            </label>
             <input
+              id="proof-template-template-id"
               type="text"
               value={templateId}
               disabled={isEdit}
@@ -131,8 +138,14 @@ const ProofTemplateFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Name *</label>
+            <label
+              htmlFor="proof-template-name"
+              className="text-sm font-medium"
+            >
+              Name *
+            </label>
             <input
+              id="proof-template-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -143,10 +156,14 @@ const ProofTemplateFormDialog = ({
 
           <div className="space-y-1">
             {/* required on create (the API rejects an empty one); optional on update */}
-            <label className="text-sm font-medium">
+            <label
+              htmlFor="proof-template-description"
+              className="text-sm font-medium"
+            >
               Description{isEdit ? '' : ' *'}
             </label>
             <textarea
+              id="proof-template-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
@@ -155,8 +172,14 @@ const ProofTemplateFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Version *</label>
+            <label
+              htmlFor="proof-template-version"
+              className="text-sm font-medium"
+            >
+              Version *
+            </label>
             <input
+              id="proof-template-version"
               type="text"
               value={version}
               onChange={(e) => setVersion(e.target.value)}
@@ -175,40 +198,58 @@ const ProofTemplateFormDialog = ({
             </div>
           ) : (
             <div className="space-y-1">
-              <label className="text-sm font-medium">Verifier Roles</label>
-              <div className="flex flex-wrap gap-3 rounded-md border p-2">
-                {availableRoles.length === 0 && (
-                  <span className="text-muted-foreground text-sm">
-                    No verifier roles yet — create one first.
-                  </span>
-                )}
-                {availableRoles.map((r) => (
-                  <label
-                    key={r.id}
-                    className="flex items-center gap-1.5 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={verifierRoleIds.includes(r.id)}
-                      onChange={() => toggleVerifierRoleId(r.id)}
-                    />
-                    {r.role}
-                  </label>
-                ))}
-              </div>
+              <label
+                htmlFor="proof-template-verifier-roles"
+                className="text-sm font-medium"
+              >
+                Verifier Roles
+              </label>
+              {availableRoles.length === 0 ? (
+                <p className="text-muted-foreground rounded-md border p-2 text-sm">
+                  No verifier roles yet — create one first.
+                </p>
+              ) : (
+                <MultiSelect
+                  id="proof-template-verifier-roles"
+                  options={availableRoles.map((r) => ({
+                    value: r.id,
+                    label: r.role,
+                  }))}
+                  selected={verifierRoleIds}
+                  onChange={(next) => {
+                    // One role is added or removed per change.
+                    const changed =
+                      next.find((id) => !verifierRoleIds.includes(id)) ??
+                      verifierRoleIds.find((id) => !next.includes(id))
+                    if (changed) {
+                      toggleVerifierRoleId(changed)
+                    }
+                  }}
+                  placeholder="Select roles"
+                  searchPlaceholder="Search roles"
+                  emptyText="No roles match."
+                />
+              )}
               {isEdit && (
                 <p className="text-muted-foreground text-xs">
                   Saving replaces this template&apos;s role assignments with the
-                  roles ticked above.
+                  roles selected above.
                 </p>
               )}
             </div>
           )}
 
-          <div className="space-y-1">
-            <label className="text-sm font-medium">
+          <div
+            role="group"
+            aria-labelledby="proof-template-schemas-label"
+            className="space-y-1"
+          >
+            <span
+              id="proof-template-schemas-label"
+              className="text-sm font-medium"
+            >
               Proof Request Schemas & Attributes *
-            </label>
+            </span>
             <DifSchemaPicker value={payloadData} onChange={setPayloadData} />
           </div>
 

@@ -131,8 +131,14 @@ const VerifierUserFormDialog = ({
         <div className="space-y-4 pt-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium">First Name *</label>
+              <label
+                htmlFor="verifier-user-first-name"
+                className="text-sm font-medium"
+              >
+                First Name *
+              </label>
               <input
+                id="verifier-user-first-name"
                 type="text"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
@@ -142,8 +148,14 @@ const VerifierUserFormDialog = ({
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Last Name *</label>
+              <label
+                htmlFor="verifier-user-last-name"
+                className="text-sm font-medium"
+              >
+                Last Name *
+              </label>
               <input
+                id="verifier-user-last-name"
                 type="text"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
@@ -154,8 +166,14 @@ const VerifierUserFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">User ID *</label>
+            <label
+              htmlFor="verifier-user-user-id"
+              className="text-sm font-medium"
+            >
+              User ID *
+            </label>
             <input
+              id="verifier-user-user-id"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -165,8 +183,14 @@ const VerifierUserFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Foundation ID *</label>
+            <label
+              htmlFor="verifier-user-foundation-id"
+              className="text-sm font-medium"
+            >
+              Foundation ID *
+            </label>
             <input
+              id="verifier-user-foundation-id"
               type="text"
               value={foundationID}
               onChange={(e) => setFoundationID(e.target.value)}
@@ -176,8 +200,14 @@ const VerifierUserFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Email *</label>
+            <label
+              htmlFor="verifier-user-email"
+              className="text-sm font-medium"
+            >
+              Email *
+            </label>
             <input
+              id="verifier-user-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -187,9 +217,14 @@ const VerifierUserFormDialog = ({
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium">Role *</label>
+            <label htmlFor="verifier-user-role" className="text-sm font-medium">
+              Role *
+            </label>
             <Select value={verifierRoleId} onValueChange={setVerifierRoleId}>
-              <SelectTrigger className="w-full rounded-md border px-3 py-2 text-sm">
+              <SelectTrigger
+                id="verifier-user-role"
+                className="w-full rounded-md border px-3 py-2 text-sm"
+              >
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>

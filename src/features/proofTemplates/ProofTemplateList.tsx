@@ -438,6 +438,7 @@ const ProofTemplateList = (): JSX.Element => {
 
         <div className="flex items-center gap-2">
           <select
+            aria-label="Filter by role"
             value={selectedRoleId}
             onChange={(e) => {
               setSelectedRoleId(e.target.value)
