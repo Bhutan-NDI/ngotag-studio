@@ -218,8 +218,8 @@ const CopyDid = ({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={`flex items-center gap-2 ${className}`}>
-          <span className="truncate font-mono">{value}</span>
+        <div className={`flex min-w-0 items-center gap-2 ${className}`}>
+          <span className="min-w-0 font-mono break-all">{value}</span>
           <Button
             type="button"
             variant="ghost"
@@ -919,18 +919,22 @@ const DIDListComponent = ({ orgId }: { orgId: string }): React.JSX.Element => {
         ) : (
           <>
             {didList.map((item: IDidListData, index: number) => (
-              <div key={item.id} className="grid h-20 items-center p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex gap-4">
-                    <span className="w-16 shrink-0">DID {index + 1}</span>
-                    <span>:</span>
-                    {item?.did ? (
-                      <CopyDid value={item.did} className="flex-1 font-mono" />
-                    ) : (
-                      <span className="flex-1 font-mono">Not available</span>
-                    )}
+              <div key={item.id} className="space-y-1.5 p-4">
+                {/* A DID is one long unbroken string, so it wraps instead of
+                    pushing the row wider than the screen. */}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                  <div className="flex min-w-0 flex-1 gap-2 sm:gap-4">
+                    <span className="shrink-0 sm:w-16">DID {index + 1}</span>
+                    <span className="shrink-0">:</span>
+                    <div className="min-w-0 flex-1">
+                      {item?.did ? (
+                        <CopyDid value={item.did} />
+                      ) : (
+                        <span className="font-mono">Not available</span>
+                      )}
+                    </div>
                   </div>
-                  <div className={item.isPrimaryDid ? 'grow' : ''}>
+                  <div className="shrink-0">
                     {item.isPrimaryDid ? (
                       <Badge
                         variant="default"
