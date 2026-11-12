@@ -112,9 +112,11 @@ export default function UserProfile(): React.JSX.Element {
     <Sheet open={isEditProfileOpen} onOpenChange={toggleEditProfile}>
       <SheetContent
         side="right"
-        // Above the bhutanndi top bar (z-60); h-dvh follows the visible
-        // height, which shrinks when the phone keyboard opens.
+        // Above the bhutanndi top bar (z-60), the backdrop too, so the top
+        // bar dims with the page instead of looking usable; h-dvh follows the
+        // visible height, which shrinks when the phone keyboard opens.
         className="z-[70] h-dvh w-full gap-0 overflow-hidden p-0 sm:w-[600px] sm:max-w-[600px]"
+        overlayClassName="z-[70]"
       >
         <SheetHeader className="border-border shrink-0 border-b px-4 pt-6 pb-4 sm:px-6">
           <SheetTitle>Edit Profile</SheetTitle>
