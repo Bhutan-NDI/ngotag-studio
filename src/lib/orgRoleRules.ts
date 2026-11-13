@@ -69,3 +69,18 @@ export const mobileVerifierHome = (roles: string[]): string => {
   }
   return '/mobile-verifier/verifier-users'
 }
+
+/**
+ * Where to land after switching organisation, from the user's roles in the
+ * organisation switched to: a mobile-verifier-only user goes to the mobile
+ * verifier, everyone else (a platform admin included) to the Dashboard.
+ */
+export const orgLandingPage = (
+  roles: string[],
+  isPlatformAdmin = false,
+): string => {
+  if (!isPlatformAdmin && isMobileVerifierOnly(roles)) {
+    return mobileVerifierHome(roles)
+  }
+  return '/dashboard'
+}

@@ -15,29 +15,34 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { SwitchableOrg, switchOrganization } from '@/lib/switchOrganization'
+import {
+  orgLandingPage,
+  useCanCreateOrganization,
+  useIsPlatformAdmin,
+} from '@/lib/useOrgRoleAccess'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks'
 
 import React from 'react'
 import { RootState } from '@/lib/store'
 import { hardNavigate } from '@/utils/navigation'
-import { useCanCreateOrganization } from '@/lib/useOrgRoleAccess'
+import { useRouter } from 'next/navigation'
 
 type Tenant = SwitchableOrg
 
 const OrgSwitcherInner = ({
   tenants,
   defaultTenant,
-  onTenantSwitch,
 }: {
   tenants: Tenant[]
   defaultTenant?: Tenant
-  onTenantSwitch?: (tenantId: string) => void
 }): React.ReactElement => {
   const selectedTenantFromState =
     useAppSelector((state: RootState) => state.organization.selectedTenant) ??
     null
 
   const dispatch = useAppDispatch()
+  const router = useRouter()
+  const isPlatformAdmin = useIsPlatformAdmin() === true
   const selectedOrgId = useAppSelector((state) => state.organization.orgId)
   // A mobile verifier member can switch organisations but not create one.
   const canCreateOrg = useCanCreateOrganization()
@@ -59,9 +64,13 @@ const OrgSwitcherInner = ({
       : currentTenant
 
   const handleTenantSwitch = (tenant: Tenant): void => {
+    const changed = tenant.id !== selectedOrgId
     switchOrganization(dispatch, tenant)
-    if (onTenantSwitch) {
-      onTenantSwitch(tenant.id)
+    // Don't leave the user on a page that belonged to the previous
+    // organisation: land where the new organisation's roles allow.
+    if (changed) {
+      const roles = tenant.userOrgRoles?.map((role) => role.orgRole.name) ?? []
+      router.push(orgLandingPage(roles, isPlatformAdmin))
     }
   }
 
@@ -75,16 +84,16 @@ const OrgSwitcherInner = ({
   }
 
   return (
-    <SidebarMenu className="w-fit">
-      <SidebarMenuItem className="w-fit">
+    <SidebarMenu className="w-fit min-w-0">
+      <SidebarMenuItem className="w-fit min-w-0">
         <DropdownMenu>
           <DropdownMenuTrigger
             asChild
-            className="focus:ring-ring bg-card hover:bg-card mx-2 my-2 h-9 rounded-xl border p-2 shadow outline-none hover:text-inherit focus:ring-1!"
+            className="focus:ring-ring bg-card hover:bg-card mx-0 my-2 h-9 rounded-xl border p-2 shadow outline-none hover:text-inherit focus:ring-1! sm:mx-2"
           >
             <SidebarMenuButton
               size="lg"
-              className="border-ring w-[200px] justify-start gap-2 border"
+              className="border-ring w-[150px] justify-start gap-2 border sm:w-[200px]"
             >
               {tenants.length > 0 && (
                 <div className="bg-popover border-muted flex size-6 min-w-6 items-center justify-center overflow-hidden rounded-full">

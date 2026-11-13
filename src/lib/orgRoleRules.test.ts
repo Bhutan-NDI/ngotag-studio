@@ -5,6 +5,7 @@ import {
   isMobileVerifierOnly,
   isMobileVerifierOnlyPath,
   mobileVerifierHome,
+  orgLandingPage,
 } from './orgRoleRules'
 
 const MMV = 'ALLOW_VERIFIER'
@@ -102,5 +103,28 @@ describe('mobileVerifierHome', () => {
     expect(mobileVerifierHome(['member', MMV])).toBe(
       '/mobile-verifier/verifier-users',
     )
+  })
+})
+
+describe('orgLandingPage', () => {
+  it('sends a mobile verifier admin or member to their mobile verifier home', () => {
+    expect(orgLandingPage(['admin', MMV, PROOF])).toBe(
+      '/mobile-verifier/proof-templates',
+    )
+    expect(orgLandingPage(['member', MMV])).toBe(
+      '/mobile-verifier/verifier-users',
+    )
+  })
+
+  it('sends everyone else to the Dashboard', () => {
+    expect(orgLandingPage(['owner'])).toBe('/dashboard')
+    expect(orgLandingPage(['admin'])).toBe('/dashboard')
+    expect(orgLandingPage(['owner', MMV])).toBe('/dashboard')
+    expect(orgLandingPage(['issuer', MMV])).toBe('/dashboard')
+    expect(orgLandingPage([])).toBe('/dashboard')
+  })
+
+  it('sends a platform admin to the Dashboard whatever their roles', () => {
+    expect(orgLandingPage(['member', MMV], true)).toBe('/dashboard')
   })
 })

@@ -245,9 +245,12 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
 
       <div className="max-w-xl space-y-4 rounded-md border p-4">
         <div className="space-y-1">
-          <label className="text-sm font-medium">Webhook ID *</label>
+          <label htmlFor="webhook-webhook-id" className="text-sm font-medium">
+            Webhook ID *
+          </label>
           <div className="flex gap-2">
             <input
+              id="webhook-webhook-id"
               type="text"
               value={webhookId}
               onChange={(e) => setWebhookId(e.target.value)}
@@ -266,8 +269,11 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Webhook URL *</label>
+          <label htmlFor="webhook-webhook-url" className="text-sm font-medium">
+            Webhook URL *
+          </label>
           <input
+            id="webhook-webhook-url"
             type="text"
             value={webhookURL}
             onChange={(e) => setWebhookURL(e.target.value)}
@@ -277,8 +283,14 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Authentication</label>
+          <label
+            htmlFor="webhook-authentication"
+            className="text-sm font-medium"
+          >
+            Authentication
+          </label>
           <select
+            id="webhook-authentication"
             value={version}
             onChange={(e) => setVersion(e.target.value as 'v1' | 'v2')}
             className="w-full rounded-md border px-3 py-2 text-sm"
@@ -290,8 +302,11 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
 
         {version === 'v2' && (
           <div className="space-y-1">
-            <label className="text-sm font-medium">Token *</label>
+            <label htmlFor="webhook-token" className="text-sm font-medium">
+              Token *
+            </label>
             <input
+              id="webhook-token"
               type="password"
               value={token}
               placeholder="Enter the token (stored tokens are never shown)"
@@ -304,8 +319,14 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
         {version === 'v1' && (
           <>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Token URL *</label>
+              <label
+                htmlFor="webhook-token-url"
+                className="text-sm font-medium"
+              >
+                Token URL *
+              </label>
               <input
+                id="webhook-token-url"
                 type="text"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -313,8 +334,14 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Grant Type</label>
+              <label
+                htmlFor="webhook-grant-type"
+                className="text-sm font-medium"
+              >
+                Grant Type
+              </label>
               <input
+                id="webhook-grant-type"
                 type="text"
                 value={grantType}
                 onChange={(e) => setGrantType(e.target.value)}
@@ -322,8 +349,14 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Client ID *</label>
+              <label
+                htmlFor="webhook-client-id"
+                className="text-sm font-medium"
+              >
+                Client ID *
+              </label>
               <input
+                id="webhook-client-id"
                 type="text"
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
@@ -331,8 +364,14 @@ const MobileVerifierWebhookConfig = (): JSX.Element => {
               />
             </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Client Secret *</label>
+              <label
+                htmlFor="webhook-client-secret"
+                className="text-sm font-medium"
+              >
+                Client Secret *
+              </label>
               <input
+                id="webhook-client-secret"
                 type="password"
                 value={clientSecret}
                 placeholder="Enter the secret (stored secrets are never shown)"

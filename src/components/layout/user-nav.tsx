@@ -11,11 +11,10 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 
 import { AvatarBadge } from '@/components/bhutanndi/ui/AvatarBadge'
 import { Button } from '@/components/ui/button'
-import { IUserProfile } from '../profile/interfaces'
 import { apiRoutes } from '@/config/apiRoutes'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { getUserProfile } from '@/app/api/Auth'
@@ -31,7 +30,9 @@ import { useDispatch } from 'react-redux'
 export function UserNav(): React.JSX.Element | null {
   const dispatch = useDispatch()
 
-  const [userProfile, setUserProfile] = useState<IUserProfile | null>(null)
+  // Shared with the Profile page, which updates it on save, so the avatar and
+  // name here change straight away without a reload.
+  const userProfile = useAppSelector((state) => state.user.userInfo)
   const token = useAppSelector((state) => state.auth.token)
   const sessionId = useAppSelector((state) => state.auth.sessionId)
 
@@ -46,7 +47,6 @@ export function UserNav(): React.JSX.Element | null {
           typeof response !== 'string' &&
           response?.data?.statusCode === apiStatusCodes.API_STATUS_SUCCESS
         ) {
-          setUserProfile(response.data.data)
           dispatch(setUserProfileDetails(response.data.data))
         }
       } catch (error) {
@@ -97,7 +97,7 @@ export function UserNav(): React.JSX.Element | null {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
           {isBhutanndiTheme() ? (
             <AvatarBadge
               src={userProfile?.profileImg}

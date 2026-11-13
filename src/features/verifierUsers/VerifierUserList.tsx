@@ -13,7 +13,7 @@ import {
   isMobileVerifierError,
 } from '@/lib/mobileVerifierResponse'
 import { Plus, RefreshCw } from 'lucide-react'
-import React, { JSX, useEffect, useState } from 'react'
+import React, { JSX, useEffect, useMemo, useState } from 'react'
 import {
   VerifierUser,
   getVerifierUserColumnData,
@@ -45,6 +45,7 @@ import { apiStatusCodes } from '@/config/CommonConstant'
 import { getVerifierRoles } from '@/app/api/verifierRoles'
 import { toast } from 'sonner'
 import { useAppSelector } from '@/lib/hooks'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 interface PaginationState {
   pageIndex: number
@@ -393,19 +394,26 @@ const VerifierUserList = (): JSX.Element => {
     }
   }
 
-  const columnData = getVerifierUserColumnData({
-    invitingId,
-    issuingId,
-    canManage,
-    onInvite: handleInvite,
-    onIssue: handleSendIssuance,
-    onEdit: openEdit,
-    onStatus: openStatusDialog,
-  })
-
-  const metadata: ITableMetadata = { enableSelection: false }
-  const tableStyling: TableStyling = { metadata, columnData }
-  const column = getColumns<VerifierUser>(tableStyling)
+  // Rebuilt only when what the cells show changes, so the rows don't remount
+  // (and drop keyboard focus) every time the list re-renders.
+  const onInvite = useCallbackRef(handleInvite)
+  const onIssue = useCallbackRef(handleSendIssuance)
+  const onEdit = useCallbackRef(openEdit)
+  const onStatus = useCallbackRef(openStatusDialog)
+  const column = useMemo(() => {
+    const columnData = getVerifierUserColumnData({
+      invitingId,
+      issuingId,
+      canManage,
+      onInvite,
+      onIssue,
+      onEdit,
+      onStatus,
+    })
+    const metadata: ITableMetadata = { enableSelection: false }
+    const tableStyling: TableStyling = { metadata, columnData }
+    return getColumns<VerifierUser>(tableStyling)
+  }, [invitingId, issuingId, canManage, onInvite, onIssue, onEdit, onStatus])
 
   const formState: VerifierUserFormState = {
     firstName,

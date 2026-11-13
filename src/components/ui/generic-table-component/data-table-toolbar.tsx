@@ -56,6 +56,9 @@ export function DataTableToolbar<TData>({
         {!hideSearch && (
           <Input
             placeholder={searchPlaceholder}
+            // The placeholder disappears once something is typed, so it
+            // also names the field for screen readers.
+            aria-label={searchPlaceholder || 'Search'}
             value={localValue}
             onChange={(e) => {
               setLocalValue(e.target.value)

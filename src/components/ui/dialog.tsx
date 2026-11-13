@@ -46,11 +46,52 @@ function DialogOverlay({
   )
 }
 
+// The last element that had focus. A dialog opened from a dropdown menu item
+// opens after the menu has closed and focus has dropped to the page body.
+let lastFocused: Element | null = null
+if (typeof document !== 'undefined') {
+  document.addEventListener(
+    'focusin',
+    (event) => {
+      lastFocused = event.target as Element
+    },
+    true,
+  )
+}
+
+/**
+ * Where focus goes back to when a dialog closes: the element that had focus
+ * when it opened. A dialog opened from a dropdown menu item goes back to the
+ * menu's button, since the item itself is gone by then.
+ */
+function focusReturnTarget(element: Element | null): HTMLElement | null {
+  if (!(element instanceof HTMLElement) || element === document.body) {
+    return null
+  }
+  const triggerId = element
+    .closest('[role="menu"]')
+    ?.getAttribute('aria-labelledby')
+  if (triggerId) {
+    return document.getElementById(triggerId)
+  }
+  return element
+}
+
 function DialogContent({
   className,
   children,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  // Radix returns focus only to a DialogTrigger. Most dialogs here open from
+  // state instead, which left focus on the page body after closing, so a
+  // keyboard user had to start again from the top of the page.
+  // Noted as each opening starts, before focus moves into the dialog. (This
+  // component stays mounted while closed, so a mount effect would only see
+  // the page load.)
+  const openerRef = React.useRef<HTMLElement | null>(null)
+
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />
@@ -60,6 +101,21 @@ function DialogContent({
           'bg-card data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg p-6 shadow-xl duration-200 sm:max-w-lg',
           className,
         )}
+        onOpenAutoFocus={(event) => {
+          const active = document.activeElement
+          openerRef.current = focusReturnTarget(
+            active && active !== document.body ? active : lastFocused,
+          )
+          onOpenAutoFocus?.(event)
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event)
+          const opener = openerRef.current
+          if (!event.defaultPrevented && opener?.isConnected) {
+            event.preventDefault()
+            opener.focus()
+          }
+        }}
         {...props}
       >
         {children}

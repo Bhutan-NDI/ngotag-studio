@@ -17,9 +17,12 @@ import { Button } from '@/components/ui/button'
 import { GradientButton } from '@/components/bhutanndi/ui/GradientButton'
 import { HairlineButton } from '@/components/bhutanndi/ui/HairlineButton'
 import type { IUserProfile } from '@/components/profile/interfaces'
+import { ImageUp } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import Loader from '@/components/Loader'
 import { isBhutanndiTheme } from '@/lib/active-theme'
+import { toast } from 'sonner'
 import { updateUserProfile } from '@/app/api/Auth'
 
 interface Values {
@@ -147,14 +150,30 @@ export default function EditUserProfile({
       if (typeof response !== 'string' && response?.data?.statusCode === 200) {
         updateProfile(updatedData)
         toggleEditProfile()
+        toast.success(response.data?.message || 'Profile updated')
       } else {
-        console.error('Failed to update profile')
+        // The API wrapper returns the error message as a string.
+        toast.error(
+          (typeof response === 'string' && response) ||
+            'Failed to update profile. Please try again.',
+        )
       }
     } catch (err) {
       console.error('Error updating profile:', err)
+      toast.error('Failed to update profile. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // On phones the keyboard opens after focus; wait for it, then bring the
+  // field into view.
+  const scrollFocusedFieldIntoView = (e: React.FocusEvent): void => {
+    const target = e.target as HTMLElement
+    if (target.tagName !== 'INPUT') {
+      return
+    }
+    setTimeout(() => target.scrollIntoView({ block: 'center' }), 300)
   }
 
   const handleCancel = (): void => {
@@ -168,8 +187,8 @@ export default function EditUserProfile({
   }
 
   return (
-    <div className="p-4">
-      <div className="rounded-lg p-6">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <Formik
           initialValues={{
             profileImg: userProfileInfo.profileImg || '',
@@ -182,117 +201,130 @@ export default function EditUserProfile({
           enableReinitialize={true}
         >
           {(formik) => (
-            <Form className="space-y-6">
-              <div className="flex flex-wrap gap-6">
-                <div>
-                  <div>
-                    <span className="mb-2 block text-sm font-medium">
-                      Profile Image
-                    </span>
-                    <div className="flex items-center space-x-4">
-                      {bhutanndi ? (
-                        <AvatarBadge
-                          src={logoImage.imagePreviewUrl as string}
-                          name={
-                            `${userProfileInfo?.firstName ?? ''} ${
-                              userProfileInfo?.lastName ?? ''
-                            }`.trim() || userProfileInfo?.email
-                          }
-                          size={96}
-                        />
-                      ) : logoImage.imagePreviewUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={logoImage.imagePreviewUrl as string}
-                          alt="Profile Preview"
-                          className="h-24 w-24 rounded-full object-cover"
-                        />
-                      ) : (
-                        <Avatar className="h-24 w-24">
-                          <AvatarImage
-                            src=""
-                            alt={userProfileInfo?.email || 'Unknown'}
-                          />
-                          <AvatarFallback>
-                            {userProfileInfo?.firstName?.[0]?.toUpperCase() ||
-                              userProfileInfo?.lastName?.[0]?.toUpperCase() ||
-                              '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                      <div>
-                        <label
-                          htmlFor="profileImg"
-                          className="border-input text-foreground flex cursor-pointer items-center gap-4 rounded-md border p-2 text-base text-sm hover:bg-gray-50"
-                        >
-                          Upload Profile Image
-                        </label>
-                        <Input
-                          id="profileImg"
-                          name="profileImg"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="hidden"
-                        />
-                        {imgError && (
-                          <p className="text-destructive mt-1 text-sm">
-                            {imgError}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+            <Form className="flex min-h-0 flex-1 flex-col">
+              {/* Only this part scrolls, so the buttons below never cover a
+                  field, including when the phone keyboard is open. */}
+              <div
+                className="min-h-0 flex-1 space-y-8 overflow-y-auto px-4 pt-4 pb-6 sm:px-6"
+                onFocus={scrollFocusedFieldIntoView}
+              >
+                {/* Photo: preview, change button and the accepted formats. */}
+                <section className="flex flex-col items-center gap-4 text-center sm:flex-row sm:gap-6 sm:text-left">
+                  {bhutanndi ? (
+                    <AvatarBadge
+                      src={logoImage.imagePreviewUrl as string}
+                      name={
+                        `${userProfileInfo?.firstName ?? ''} ${
+                          userProfileInfo?.lastName ?? ''
+                        }`.trim() || userProfileInfo?.email
+                      }
+                      size={96}
+                    />
+                  ) : logoImage.imagePreviewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={logoImage.imagePreviewUrl as string}
+                      alt="Profile Preview"
+                      className="h-24 w-24 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <Avatar className="h-24 w-24 shrink-0">
+                      <AvatarImage
+                        src=""
+                        alt={userProfileInfo?.email || 'Unknown'}
+                      />
+                      <AvatarFallback>
+                        {userProfileInfo?.firstName?.[0]?.toUpperCase() ||
+                          userProfileInfo?.lastName?.[0]?.toUpperCase() ||
+                          '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
+
+                  <div className="flex min-w-0 flex-col items-center gap-2 sm:items-start">
+                    <span className="text-sm font-medium">Profile photo</span>
+                    <label
+                      htmlFor="profileImg"
+                      className="border-input text-foreground hover:bg-muted inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition-colors"
+                    >
+                      <ImageUp className="h-4 w-4" aria-hidden />
+                      {logoImage.imagePreviewUrl
+                        ? 'Change photo'
+                        : 'Upload photo'}
+                    </label>
+                    <Input
+                      id="profileImg"
+                      name="profileImg"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      JPG or PNG, up to {imageSizeAccepted} MB.
+                    </p>
+                    {imgError && (
+                      <p className="text-destructive text-sm" role="alert">
+                        {imgError}
+                      </p>
+                    )}
                   </div>
-                </div>
-                <div className="flex flex-1 flex-col gap-4">
-                  <div>
-                    <span className="mb-2 block text-sm font-medium">
+                </section>
+
+                <div className="border-border border-t" />
+
+                {/* Name fields: full width, stacked. */}
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">
                       First Name <span className="text-destructive">*</span>
-                    </span>
+                    </Label>
                     <Field
                       as={Input}
                       innerref={firstNameInputRef}
+                      id="firstName"
                       name="firstName"
                       type="text"
                       value={formik.values.firstName}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
-                      className="w-full rounded-md p-2"
+                      className="w-full"
                       disabled={loading}
                     />
                     {formik.errors.firstName && formik.touched.firstName && (
-                      <div className="text-destructive mt-1 text-sm">
+                      <p className="text-destructive text-sm">
                         {formik.errors.firstName}
-                      </div>
+                      </p>
                     )}
                   </div>
 
-                  <div>
-                    <span className="mb-2 block text-sm font-medium">
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">
                       Last Name <span className="text-destructive">*</span>
-                    </span>
+                    </Label>
                     <Field
                       as={Input}
+                      id="lastName"
                       name="lastName"
                       type="text"
                       value={formik.values.lastName}
                       onChange={formik.handleChange}
                       onBlur={formik.handleBlur}
-                      className="w-full rounded-md p-2"
+                      className="w-full"
                       disabled={loading}
                     />
                     {formik.errors.lastName && formik.touched.lastName && (
-                      <div className="text-destructive mt-1 text-sm">
+                      <p className="text-destructive text-sm">
                         {formik.errors.lastName}
-                      </div>
+                      </p>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Sticky footer for Save/Cancel */}
+              {/* Save/Cancel: a normal footer row under the scrolling area. */}
 
-              <div className="bg-background absolute bottom-0 left-0 flex w-full flex-col gap-2 space-y-2 border-t px-6 py-4">
+              <div className="bg-background flex shrink-0 flex-col gap-3 border-t px-4 py-4 sm:px-6">
                 {bhutanndi ? (
                   <>
                     <GradientButton

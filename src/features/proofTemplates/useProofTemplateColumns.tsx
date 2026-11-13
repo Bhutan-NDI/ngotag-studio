@@ -10,11 +10,12 @@ import {
   TableStyling,
   getColumns,
 } from '@/components/ui/generic-table-component/columns'
+import { JSX, useMemo } from 'react'
 import { MoreVertical, Pencil } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ColumnDef } from '@tanstack/react-table'
-import { JSX } from 'react'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 export interface ProofTemplateRow {
   id: string
@@ -42,91 +43,100 @@ export const useProofTemplateColumns = (
   canManage: boolean,
   showRoles = true,
 ): ColumnDef<ProofTemplateRow>[] => {
-  const actionCell = ({
-    row,
-  }: {
-    row: { original: ProofTemplateRow }
-  }): JSX.Element => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
+  // Built once per canManage and showRoles, so the rows don't remount (and
+  // drop keyboard focus) every time the list re-renders.
+  const edit = useCallbackRef(onEdit)
+  return useMemo(() => {
+    const actionCell = ({
+      row,
+    }: {
+      row: { original: ProofTemplateRow }
+    }): JSX.Element => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Actions for ${row.original.name}`}
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem
-          disabled={!canManage}
-          onClick={() => onEdit(row.original)}
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Update
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem
+            disabled={!canManage}
+            onClick={() => edit(row.original)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Update
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
 
-  const columnData: IColumnData[] = [
-    {
-      id: 'templateId',
-      title: 'Template ID',
-      accessorKey: 'templateId',
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.templateId}</span>
-      ),
-      columnFunction: [],
-    },
-    {
-      id: 'name',
-      title: 'Name',
-      accessorKey: 'name',
-      cell: ({ row }) => <span>{row.original.name}</span>,
-      columnFunction: [],
-    },
-    {
-      id: 'roles',
-      title: 'Roles',
-      accessorKey: 'verifierRoleToProofTemplates',
-      cell: ({ row }): JSX.Element => (
-        <span>{roleNamesOf(row.original).join(', ') || '-'}</span>
-      ),
-      columnFunction: [],
-    },
-    {
-      id: 'version',
-      title: 'Version',
-      accessorKey: 'version',
-      cell: ({ row }) => <span>{row.original.version}</span>,
-      columnFunction: [],
-    },
-    {
-      id: 'createdAt',
-      title: 'Created On',
-      accessorKey: 'createdAt',
-      cell: ({ row }) => (
-        <span>
-          {row.original.createdAt
-            ? new Date(row.original.createdAt).toLocaleDateString()
-            : 'NA'}
-        </span>
-      ),
-      columnFunction: [],
-    },
-    {
-      id: 'actions',
-      title: 'Actions',
-      accessorKey: 'actions',
-      cell: actionCell,
-      columnFunction: [],
-    },
-  ]
+    const columnData: IColumnData[] = [
+      {
+        id: 'templateId',
+        title: 'Template ID',
+        accessorKey: 'templateId',
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.templateId}</span>
+        ),
+        columnFunction: [],
+      },
+      {
+        id: 'name',
+        title: 'Name',
+        accessorKey: 'name',
+        cell: ({ row }) => <span>{row.original.name}</span>,
+        columnFunction: [],
+      },
+      {
+        id: 'roles',
+        title: 'Roles',
+        accessorKey: 'verifierRoleToProofTemplates',
+        cell: ({ row }): JSX.Element => (
+          <span>{roleNamesOf(row.original).join(', ') || '-'}</span>
+        ),
+        columnFunction: [],
+      },
+      {
+        id: 'version',
+        title: 'Version',
+        accessorKey: 'version',
+        cell: ({ row }) => <span>{row.original.version}</span>,
+        columnFunction: [],
+      },
+      {
+        id: 'createdAt',
+        title: 'Created On',
+        accessorKey: 'createdAt',
+        cell: ({ row }) => (
+          <span>
+            {row.original.createdAt
+              ? new Date(row.original.createdAt).toLocaleDateString()
+              : 'NA'}
+          </span>
+        ),
+        columnFunction: [],
+      },
+      {
+        id: 'actions',
+        title: 'Actions',
+        accessorKey: 'actions',
+        cell: actionCell,
+        columnFunction: [],
+      },
+    ]
 
-  const metadata: ITableMetadata = { enableSelection: false }
-  const tableStyling: TableStyling = {
-    metadata,
-    columnData: columnData.filter(
-      (column) => showRoles || column.id !== 'roles',
-    ),
-  }
-  return getColumns<ProofTemplateRow>(tableStyling)
+    const metadata: ITableMetadata = { enableSelection: false }
+    const tableStyling: TableStyling = {
+      metadata,
+      columnData: columnData.filter(
+        (column) => showRoles || column.id !== 'roles',
+      ),
+    }
+    return getColumns<ProofTemplateRow>(tableStyling)
+  }, [canManage, showRoles, edit])
 }

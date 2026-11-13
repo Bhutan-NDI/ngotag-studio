@@ -133,6 +133,7 @@ const DifSchemaPicker = ({
               >
                 <button
                   type="button"
+                  aria-expanded={open}
                   onClick={() =>
                     setExpanded(open ? null : schema.schemaLedgerId)
                   }

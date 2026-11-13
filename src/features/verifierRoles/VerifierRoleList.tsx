@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/generic-table-component/columns'
 import { MOBILE_VERIFIER_ROLES, useHasOrgRole } from '@/lib/useOrgRoleAccess'
 import { MoreVertical, Pencil, Plus, RefreshCw } from 'lucide-react'
-import React, { JSX, useEffect, useState } from 'react'
+import React, { JSX, useEffect, useMemo, useState } from 'react'
 import VerifierRoleFormDialog, {
   VerifierRoleFormHandlers,
   VerifierRoleFormState,
@@ -39,6 +39,7 @@ import { DataTable } from '@/components/ui/generic-table-component/data-table'
 import PageContainer from '@/components/layout/page-container'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { useAppSelector } from '@/lib/hooks'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 interface VerifierRole {
   id: string
@@ -225,59 +226,68 @@ const VerifierRoleList = (): JSX.Element => {
     }
   }
 
-  const actionCell = ({
-    row,
-  }: {
-    row: { original: VerifierRole }
-  }): JSX.Element => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreVertical className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
+  // Built once per canManage, so the rows don't remount (and drop keyboard
+  // focus) every time the list re-renders, e.g. when a dialog opens.
+  const onEdit = useCallbackRef(openEdit)
+  const column = useMemo(() => {
+    const actionCell = ({
+      row,
+    }: {
+      row: { original: VerifierRole }
+    }): JSX.Element => (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Actions for ${row.original.role}`}
+          >
+            <MoreVertical className="h-4 w-4" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuItem
-          disabled={!canManage}
-          onClick={() => openEdit(row.original)}
-        >
-          <Pencil className="mr-2 h-4 w-4" />
-          Update
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
+        <DropdownMenuContent align="end" className="w-40">
+          <DropdownMenuItem
+            disabled={!canManage}
+            onClick={() => onEdit(row.original)}
+          >
+            <Pencil className="mr-2 h-4 w-4" />
+            Update
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
 
-  const columnData: IColumnData[] = [
-    {
-      id: 'id',
-      title: 'Role ID',
-      accessorKey: 'id',
-      cell: ({ row }) => <span>{row.original.id || 'NA'}</span>,
-      columnFunction: [],
-    },
-    {
-      id: 'role',
-      title: 'Role',
-      accessorKey: 'role',
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.role || 'NA'}</span>
-      ),
-      columnFunction: [],
-    },
-    {
-      id: 'actions',
-      title: 'Actions',
-      accessorKey: 'actions',
-      cell: actionCell,
-      columnFunction: [],
-    },
-  ]
+    const columnData: IColumnData[] = [
+      {
+        id: 'id',
+        title: 'Role ID',
+        accessorKey: 'id',
+        cell: ({ row }) => <span>{row.original.id || 'NA'}</span>,
+        columnFunction: [],
+      },
+      {
+        id: 'role',
+        title: 'Role',
+        accessorKey: 'role',
+        cell: ({ row }) => (
+          <span className="font-medium">{row.original.role || 'NA'}</span>
+        ),
+        columnFunction: [],
+      },
+      {
+        id: 'actions',
+        title: 'Actions',
+        accessorKey: 'actions',
+        cell: actionCell,
+        columnFunction: [],
+      },
+    ]
 
-  const metadata: ITableMetadata = { enableSelection: false }
-  const tableStyling: TableStyling = { metadata, columnData }
-  const column = getColumns<VerifierRole>(tableStyling)
+    const metadata: ITableMetadata = { enableSelection: false }
+    const tableStyling: TableStyling = { metadata, columnData }
+    return getColumns<VerifierRole>(tableStyling)
+  }, [canManage, onEdit])
 
   const formState: VerifierRoleFormState = {
     role,
