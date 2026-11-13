@@ -71,7 +71,9 @@ export function MultiSelect({
 
   return (
     <div className={cn('space-y-2', className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      {/* Modal so the list takes its own scroll lock: inside a modal Dialog the
+          portaled list would otherwise ignore the mouse wheel. */}
+      <Popover modal open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             id={id}
@@ -112,7 +114,6 @@ export function MultiSelect({
                       value={option.value}
                       keywords={[option.label]}
                       onSelect={() => toggle(option.value)}
-                      aria-selected={isSelected}
                     >
                       <span
                         className={cn(
@@ -128,6 +129,11 @@ export function MultiSelect({
                         )}
                       </span>
                       {option.label}
+                      {/* cmdk owns aria-selected (it marks the highlighted
+                          item), so the chosen state goes in the name. */}
+                      {isSelected && (
+                        <span className="sr-only">, selected</span>
+                      )}
                     </CommandItem>
                   )
                 })}
