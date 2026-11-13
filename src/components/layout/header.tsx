@@ -18,14 +18,11 @@ import { Organisation } from '@/features/dashboard/type/organization'
 import { SidebarTrigger } from '../ui/sidebar'
 import { UserNav } from './user-nav'
 import { getOrganizations } from '@/app/api/organization'
-import { pathRoutes } from '@/config/pathRoutes'
-import { useRouter } from 'next/navigation'
 
 const enableAppLauncher = process.env.NEXT_PUBLIC_ENABLE_APP_LAUNCHER === 'true'
 
 export default function Header(): React.JSX.Element {
   const dispatch = useAppDispatch()
-  const router = useRouter()
   const [orgList, setOrgList] = useState<Organisation[]>([])
   const tenantId = useAppSelector((state) => state.organization.orgId)
 
@@ -79,34 +76,6 @@ export default function Header(): React.JSX.Element {
     fetchOrganizations()
   }, [dispatch, tenantId])
 
-  const handleSwitchTenant = (orgId: string): void => {
-    const selected = orgList.find((org) => org.id === orgId)
-    if (selected) {
-      dispatch(setOrgId(selected.id))
-      dispatch(setSelectedOrgId(selected.id))
-      dispatch(
-        setTenantData({
-          id: selected.id,
-          name: selected.name,
-          logoUrl: selected.logoUrl,
-        }),
-      )
-      dispatch(
-        setOrgInfo({
-          id: selected.id,
-          name: selected.name,
-          description: selected.description,
-          logoUrl: selected.logoUrl,
-          roles:
-            selected.userOrgRoles?.map(
-              (role: { orgRole: { name: string } }) => role?.orgRole?.name,
-            ) || [],
-        }),
-      )
-      router.push(pathRoutes.users.dashboard)
-    }
-  }
-
   return (
     <header className="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
       <div className="flex items-center gap-2 px-4">
@@ -121,7 +90,6 @@ export default function Header(): React.JSX.Element {
             userOrgRoles: org.userOrgRoles,
           }))}
           defaultTenant={orgList.length > 0 ? orgList[0] : undefined}
-          onTenantSwitch={handleSwitchTenant}
         />
         <Breadcrumbs />
       </div>

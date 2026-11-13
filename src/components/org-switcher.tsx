@@ -32,11 +32,9 @@ type Tenant = SwitchableOrg
 const OrgSwitcherInner = ({
   tenants,
   defaultTenant,
-  onTenantSwitch,
 }: {
   tenants: Tenant[]
   defaultTenant?: Tenant
-  onTenantSwitch?: (tenantId: string) => void
 }): React.ReactElement => {
   const selectedTenantFromState =
     useAppSelector((state: RootState) => state.organization.selectedTenant) ??
@@ -68,9 +66,6 @@ const OrgSwitcherInner = ({
   const handleTenantSwitch = (tenant: Tenant): void => {
     const changed = tenant.id !== selectedOrgId
     switchOrganization(dispatch, tenant)
-    if (onTenantSwitch) {
-      onTenantSwitch(tenant.id)
-    }
     // Don't leave the user on a page that belonged to the previous
     // organisation: land where the new organisation's roles allow.
     if (changed) {
