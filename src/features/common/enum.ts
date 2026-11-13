@@ -74,12 +74,13 @@ export enum ProofRequestStateUserText {
 }
 
 /**
- * Problem-report code the holder's wallet sends when a proof request runs out
- * unanswered. It reaches us as the record's errorMessage ("request-expired: …"),
- * which is what tells an expired request from a genuine decline: both end as
- * abandoned.
+ * How an expired proof request reaches us as the record's errorMessage. The
+ * holder's wallet sends a problem report with description "request-expired",
+ * but Credo always sets its code to "abandoned", and the verifier's agent
+ * stores `${code}: ${description}`. This prefix is what tells an expired
+ * request from a genuine decline: both end in state abandoned.
  */
-export const REQUEST_EXPIRED_PROBLEM_CODE = 'request-expired'
+export const REQUEST_EXPIRED_ERROR_PREFIX = 'abandoned: request-expired'
 
 export enum DidMethod {
   INDY = 'did:indy',
