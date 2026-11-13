@@ -51,6 +51,7 @@ interface PaginationState {
 
 interface ProofStateCellProps {
   state: string
+  errorMessage?: string | null
 }
 
 const VerificationCredentialList = (): JSX.Element => {
@@ -189,8 +190,11 @@ const VerificationCredentialList = (): JSX.Element => {
     }
   }
 
-  const ProofStateCell = ({ state }: ProofStateCellProps): JSX.Element => (
-    <ProofState state={state} />
+  const ProofStateCell = ({
+    state,
+    errorMessage,
+  }: ProofStateCellProps): JSX.Element => (
+    <ProofState state={state} errorMessage={errorMessage} />
   )
 
   const presentProofById = async (id: string): Promise<void> => {
@@ -304,7 +308,10 @@ const VerificationCredentialList = (): JSX.Element => {
                   {
                     label: 'Status',
                     value: row.original.state ? (
-                      <ProofState state={row.original.state} />
+                      <ProofState
+                        state={row.original.state}
+                        errorMessage={row.original.errorMessage}
+                      />
                     ) : (
                       'Not Available'
                     ),
@@ -368,8 +375,13 @@ const VerificationCredentialList = (): JSX.Element => {
       cell: ({
         row,
       }: {
-        row: { original: { state: string } }
-      }): JSX.Element => <ProofStateCell state={row.original.state} />,
+        row: { original: { state: string; errorMessage?: string | null } }
+      }): JSX.Element => (
+        <ProofStateCell
+          state={row.original.state}
+          errorMessage={row.original.errorMessage}
+        />
+      ),
     },
     {
       id: 'action',
