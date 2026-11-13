@@ -39,7 +39,7 @@ import { DataTable } from '@/components/ui/generic-table-component/data-table'
 import PageContainer from '@/components/layout/page-container'
 import { apiStatusCodes } from '@/config/CommonConstant'
 import { useAppSelector } from '@/lib/hooks'
-import { useEventCallback } from '@/lib/useEventCallback'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 interface VerifierRole {
   id: string
@@ -228,7 +228,7 @@ const VerifierRoleList = (): JSX.Element => {
 
   // Built once per canManage, so the rows don't remount (and drop keyboard
   // focus) every time the list re-renders, e.g. when a dialog opens.
-  const onEdit = useEventCallback(openEdit)
+  const onEdit = useCallbackRef(openEdit)
   const column = useMemo(() => {
     const actionCell = ({
       row,

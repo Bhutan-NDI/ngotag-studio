@@ -45,7 +45,7 @@ import { apiStatusCodes } from '@/config/CommonConstant'
 import { getVerifierRoles } from '@/app/api/verifierRoles'
 import { toast } from 'sonner'
 import { useAppSelector } from '@/lib/hooks'
-import { useEventCallback } from '@/lib/useEventCallback'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 interface PaginationState {
   pageIndex: number
@@ -396,10 +396,10 @@ const VerifierUserList = (): JSX.Element => {
 
   // Rebuilt only when what the cells show changes, so the rows don't remount
   // (and drop keyboard focus) every time the list re-renders.
-  const onInvite = useEventCallback(handleInvite)
-  const onIssue = useEventCallback(handleSendIssuance)
-  const onEdit = useEventCallback(openEdit)
-  const onStatus = useEventCallback(openStatusDialog)
+  const onInvite = useCallbackRef(handleInvite)
+  const onIssue = useCallbackRef(handleSendIssuance)
+  const onEdit = useCallbackRef(openEdit)
+  const onStatus = useCallbackRef(openStatusDialog)
   const column = useMemo(() => {
     const columnData = getVerifierUserColumnData({
       invitingId,

@@ -15,7 +15,7 @@ import { MoreVertical, Pencil } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ColumnDef } from '@tanstack/react-table'
-import { useEventCallback } from '@/lib/useEventCallback'
+import { useCallbackRef } from '@/hooks/use-callback-ref'
 
 export interface ProofTemplateRow {
   id: string
@@ -45,7 +45,7 @@ export const useProofTemplateColumns = (
 ): ColumnDef<ProofTemplateRow>[] => {
   // Built once per canManage and showRoles, so the rows don't remount (and
   // drop keyboard focus) every time the list re-renders.
-  const edit = useEventCallback(onEdit)
+  const edit = useCallbackRef(onEdit)
   return useMemo(() => {
     const actionCell = ({
       row,
