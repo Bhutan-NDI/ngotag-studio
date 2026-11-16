@@ -68,6 +68,11 @@ export interface IRotationProgress {
   job: { status: string; startedAt?: string; completedAt?: string }
   /** total, pending, retrying, failed, waiting, stale, refused, updated */
   counts: Record<string, number>
+  /**
+   * Seconds without an answer before a connection counts as stale (inactive).
+   * Set per dedicated agent; missing on older moves and agents (means 30 days).
+   */
+  staleAfterSeconds?: number
   polledAt: string
   /** Since when the number of connections still waiting hasn't changed. */
   stalledSince?: string
