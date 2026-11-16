@@ -237,6 +237,8 @@ export interface PresentationPart extends Pick<FlowEntry, "persona" | "route" | 
    * too, and reached by her link or at the Single Window.
    */
   cast: PersonaId[];
+  /** The heading the part sits under, in a list long enough to need them. */
+  section?: string;
 }
 
 export const PRESENTATION_PARTS: PresentationPart[] = [
@@ -313,6 +315,159 @@ export const PRESENTATION_PARTS: PresentationPart[] = [
     ],
   },
 ];
+
+/**
+ * The internal presentation: everything built, for the team's own managers.
+ *
+ * The client presentation is one company's story and leaves out what a
+ * first audience doesn't need. Inside, the question is what we have, so
+ * this list is the full guide's ground as jumps: NDI setting up its own
+ * platform, the company coming on, NDI approving organisations to verify
+ * and designating an authority, credentials received and presented, an
+ * issuer's system answering by itself, authority given and used — and the
+ * paths that need an approver, which only exist three months on. The parts
+ * the client saw are the same parts, so the two can't drift apart.
+ */
+const client = (title: string): PresentationPart => {
+  const p = PRESENTATION_PARTS.find((x) => x.title === title);
+  if (!p) throw new Error(`No presentation part "${title}"`);
+  return p;
+};
+
+export const INTERNAL_PARTS: PresentationPart[] = [
+  /* ---- NDI sets up its platform ---- */
+  {
+    section: "NDI sets up its platform",
+    title: "Root admin onboarding",
+    shows: "NDI's root administrator signs in to NDI's own organisation",
+    persona: null,
+    route: "/sign-in",
+    start: "dayZero",
+    cast: ["root"],
+  },
+  {
+    section: "NDI sets up its platform",
+    title: "Platform admin onboarding",
+    shows: "Root invites two named admins by email; each sets up from the link — root itself approves nothing",
+    persona: "root",
+    route: "/admin/team",
+    start: "dayZero",
+    cast: ["root", "tshering", "tshendu"],
+  },
+
+  /* ---- A company comes on ---- */
+  { ...client("Entity Wallet user onboarding"), section: "A company comes on" },
+  { ...client("Entity onboarding"), section: "A company comes on" },
+  { ...client("Appointing a controller"), section: "A company comes on" },
+
+  /* ---- NDI approves and designates ---- */
+  {
+    section: "NDI approves and designates",
+    title: "Recognising a bank already verifying",
+    shows: "Partner Bank has been verifying without approval; Kinzang proposes asking for less, Tshendu approves, the bank accepts",
+    persona: "tshering",
+    route: "/admin/accreditations",
+    start: "teamReady",
+    cast: ["tshering", "tshendu", "yeshey"],
+    switchTo: [
+      { label: "Tshendu · NDI", persona: "tshendu", route: "/admin/accreditations" },
+      { label: "Yeshey · Partner Bank", persona: "yeshey", route: "/dashboard" },
+    ],
+  },
+  {
+    section: "NDI approves and designates",
+    title: "A business asks to verify",
+    shows: "Pelden Trading asks to verify customers; one admin reviews, a second decides",
+    persona: "dorji",
+    route: "/organisation",
+    start: "teamReady",
+    cast: ["dorji", "tshering", "tshendu"],
+    switchTo: [
+      { label: "Kinzang · NDI", persona: "tshering", route: "/admin/accreditations" },
+      { label: "Tshendu · NDI", persona: "tshendu", route: "/admin/accreditations" },
+      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/verify-or-issue" },
+    ],
+  },
+  {
+    section: "NDI approves and designates",
+    title: "Designating an authority",
+    shows: "The ministry becomes the authority for sole proprietorships, and agrees what people are asked in its name",
+    persona: "tshering",
+    route: "/admin/designations",
+    start: "platformReady",
+    cast: ["tshering", "tshendu", "kesang"],
+    switchTo: [
+      { label: "Tshendu · NDI", persona: "tshendu", route: "/admin/designations" },
+      { label: "Kesang · accepts for the ministry", persona: "kesang", route: "/dashboard" },
+      { label: "Kinzang · NDI", persona: "tshering", route: "/admin/designations" },
+      { label: "Kesang · what people are asked", persona: "kesang", route: "/authority" },
+    ],
+  },
+
+  /* ---- Credentials ---- */
+  { ...client("Receiving credentials"), section: "Credentials" },
+  {
+    section: "Credentials",
+    title: "An issuer connects its system",
+    shows: "Deki connects the tax office's system; Pelden Trading's bonded-warehouse request is answered without an officer",
+    persona: "deki",
+    route: "/issuer/integration",
+    start: "tpnHeld",
+    cast: ["deki", "dorji"],
+    switchTo: [
+      { label: "Dorji · Pelden Trading", persona: "dorji", route: "/wallet/get" },
+      { label: "Deki · tax office", persona: "deki", route: "/issuer/integration" },
+    ],
+  },
+  { ...client("Presenting credentials"), section: "Credentials" },
+  {
+    section: "Credentials",
+    title: "Sharing that needs an approver",
+    shows: "Three months on: Rinzin answers the bank under her appointment, and Dorji approves before anything goes",
+    persona: "rinzin",
+    route: "/wallet/sharing",
+    start: "livedIn",
+    cast: ["rinzin", "dorji"],
+    switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/approvals" }],
+  },
+
+  /* ---- Authority to act ---- */
+  { ...client("Issuing authority credentials"), section: "Authority to act" },
+  {
+    section: "Authority to act",
+    title: "Authority that needs an approver",
+    shows: "Three months on: Rinzin gives a clearing agent authority, and Dorji approves it first",
+    persona: "rinzin",
+    route: "/authority-to-act/give",
+    start: "livedIn",
+    cast: ["rinzin", "dorji"],
+    switchTo: [{ label: "Dorji · Pelden Trading", persona: "dorji", route: "/approvals" }],
+  },
+  { ...client("Acting at BNSW"), section: "Authority to act" },
+  {
+    section: "Authority to act",
+    title: "Registering with BNSW again",
+    shows: "Three months on: Dorji re-registers Pelden Trading at the Single Window from the Entity Wallet",
+    persona: "dorji",
+    route: "/simulated/bnsw/register",
+    start: "livedIn",
+    cast: ["dorji"],
+  },
+
+  /* ---- Three months on ---- */
+  {
+    section: "Three months on",
+    title: "Pelden Trading, lived in",
+    shows: "Controllers appointed, approvals waiting, authority given to agents, and the audit log",
+    persona: "dorji",
+    route: "/dashboard",
+    start: "livedIn",
+    cast: ["dorji", "rinzin", "ugyen", "pema"],
+  },
+];
+
+/** Everyone the internal presentation needs. */
+export const INTERNAL_CAST: PersonaId[] = [...new Set(INTERNAL_PARTS.flatMap((p) => p.cast))];
 
 /** Who is acting on screen, as the handover card names them. */
 export interface Actor {
@@ -514,7 +669,8 @@ export function castOnStage(
     chips.push(c);
   };
   const hasAccount = (p: { id: string; hasAccount?: boolean }) => p.hasAccount !== false || p.id === current || p.id === lead;
-  const open = s.orgInvitations.filter((i) => i.kind === "M" && i.state === "PENDING");
+  /* Members, and NDI's platform admins (Kind A), both join from a link. */
+  const open = s.orgInvitations.filter((i) => (i.kind === "M" || i.kind === "A") && i.state === "PENDING");
   const inviteFor = (email: string) => open.find((i) => i.email.toLowerCase() === email.toLowerCase());
 
   for (const id of ids) {

@@ -11,6 +11,8 @@ import { PERSONAS, type PersonaId } from "@/lib/demoData";
 import { findMail } from "@/lib/demoMail";
 import {
   castOnStage,
+  INTERNAL_CAST,
+  INTERNAL_PARTS,
   PRESENTATION_CAST,
   PRESENTATION_PARTS,
   presentationActor,
@@ -36,6 +38,14 @@ import { useScreenRegistry } from "./screenState";
  * Collapsed by default. The marker stays visible either way — that part is
  * not a control, it is a disclosure, and it does not get to be dismissed.
  */
+/** The two presentations: one company's story for a client, and everything
+ *  built for the team's own managers (demoPresentation.ts). */
+type Deck = "presentation" | "internal";
+const DECKS = {
+  presentation: { label: "Presentation", parts: PRESENTATION_PARTS, cast: PRESENTATION_CAST },
+  internal: { label: "Internal presentation", parts: INTERNAL_PARTS, cast: INTERNAL_CAST },
+} as const;
+
 export function DemoHarness() {
   const router = useRouter();
   const pathname = usePathname();
@@ -95,13 +105,18 @@ export function DemoHarness() {
   const guiding = (harness.guideStep ?? null) !== null;
   const presenting = guiding && harness.guide === "presentation";
   const { registered } = useScreenRegistry();
-  /* One panel at a time: the demo controls, or the presentation's list. */
-  const [panel, setPanel] = useState<"controls" | "presentation" | null>(null);
+  /* One panel at a time: the demo controls, or one of the presentations'
+     lists — the client's, or the internal one with everything built. */
+  const [panel, setPanel] = useState<"controls" | Deck | null>(null);
   const open = panel === "controls";
   const setOpen = (o: boolean) => setPanel(o ? "controls" : null);
-  /* Which part of the presentation is on screen, so the list shows where
+  /* Which part of which presentation is on screen, so the list shows where
      the presenter is. Not persisted: a reload is a new run. */
   const [part, setPart] = useState<number | null>(null);
+  const [deck, setDeck] = useState<Deck>("presentation");
+  const onPart = part !== null ? DECKS[deck].parts[part] : null;
+  /* The list open now, or the one a part was last started from. */
+  const listed: Deck = panel === "presentation" || panel === "internal" ? panel : deck;
 
   /* The auth screens are pre-sign-in and have no persona. Showing a switcher
      there would suggest the choice matters before anyone is signed in.
@@ -158,9 +173,10 @@ export function DemoHarness() {
 
   /* A part of the presentation is a jump like any other, with no guide card:
      the client sees the product, not the presenter's notes. */
-  const present = (i: number) => {
-    walk(PRESENTATION_PARTS[i]);
+  const present = (d: Deck, i: number) => {
+    walk(DECKS[d].parts[i]);
     setGuideStep(null);
+    setDeck(d);
     setPart(i);
     setSeenActor(null);
     setPanel(null);
@@ -173,13 +189,14 @@ export function DemoHarness() {
   const toCollect = waitingToCollect({ organizations, authorityGrants });
   /* Everyone in the presentation, whichever part is on — the part's own
      people first — not everyone the full demo can drive as. */
+  /* The internal list's cast is everyone the platform has — too many to
+     list before a part is chosen — so it shows only the part's people. */
+  const listCast = listed === "internal" ? [] : DECKS[listed].cast;
   const onStage = castOnStage(
     { people, orgInvitations, authorityGrants },
-    part !== null
-      ? [...PRESENTATION_PARTS[part].cast, ...PRESENTATION_CAST.filter((id) => !PRESENTATION_PARTS[part].cast.includes(id))]
-      : PRESENTATION_CAST,
+    onPart ? [...onPart.cast, ...listCast.filter((id) => !onPart.cast.includes(id))] : listCast,
     harness.persona,
-    part !== null ? PRESENTATION_PARTS[part].persona : null,
+    onPart ? onPart.persona : null,
   );
   const currentName = people.find((p) => p.id === harness.persona)?.name ?? "them";
   const openWaiting = (w: WaitingItem) => {
@@ -263,7 +280,7 @@ export function DemoHarness() {
        list of routes that would rot. */
     <div ref={harnessRef} className="ndi-demo-harness pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-start gap-2 p-3 min-[641px]:p-4">
       <GuideCard />
-      {panel === "presentation" && hydrated ? (
+      {(panel === "presentation" || panel === "internal") && hydrated ? (
         <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[440px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
           {/* ---- Who you are driving as, and what waits for them ----
               Switching never resets: whatever was sent is still waiting,
@@ -382,19 +399,24 @@ export function DemoHarness() {
                 </>
               ) : null}
           </div>
-          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">Presentation</p>
+          <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">{DECKS[panel].label}</p>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
+            {panel === "internal" ? "Everything we have built, in the order it happens. " : ""}
             Each one opens on its first screen as if the parts before it were done, so any can be shown on its own.
           </p>
           <ol className="mt-2.5 flex flex-col gap-1.5">
-            {PRESENTATION_PARTS.map((p, i) => (
+            {DECKS[panel].parts.map((p, i, all) => (
               <li key={p.title}>
+                {/* A heading where a section starts, in a list long enough to need them. */}
+                {p.section && p.section !== all[i - 1]?.section ? (
+                  <p className={`mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.12em] text-faint ${i > 0 ? "mt-2" : ""}`}>{p.section}</p>
+                ) : null}
                 <button
                   type="button"
-                  onClick={() => present(i)}
-                  aria-current={part === i ? "step" : undefined}
+                  onClick={() => present(panel, i)}
+                  aria-current={deck === panel && part === i ? "step" : undefined}
                   className="ndi-navrow flex w-full items-center justify-between gap-3 rounded-[10px] border border-grid px-3 py-2.5 text-left"
-                  data-active={part === i ? "1" : "0"}
+                  data-active={deck === panel && part === i ? "1" : "0"}
                 >
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="font-display text-[13.5px] font-semibold text-body">{p.title}</span>
@@ -402,7 +424,7 @@ export function DemoHarness() {
                   </span>
                   <Icon name="arrowRight" size={14} strokeWidth={2} className="flex-none opacity-60" />
                 </button>
-                {part === i && p.switchTo ? (
+                {deck === panel && part === i && p.switchTo ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-3">
                     <span className="text-[12px] text-faint">Switch to</span>
                     {p.switchTo.map((s) => (
@@ -420,21 +442,31 @@ export function DemoHarness() {
               </li>
             ))}
           </ol>
+          {/* What isn't built, said where the team will ask. */}
+          {panel === "internal" ? (
+            <p className="mt-3 rounded-[12px] border border-grid px-3.5 py-3 text-[12.5px] leading-[1.5] text-muted">
+              <span className="font-semibold text-body">Not designed yet:</span> approvals that need several signatories, suspending and
+              revoking, changing who controls a company, and recovering from a lost phone (Flows 10 to 13).
+            </p>
+          ) : null}
           {/* Practising belongs beside the list it rehearses, not only in
               the demo controls where nobody preparing would look. */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-dashed border-grid px-3.5 py-3">
             <p className="min-w-0 flex-1 text-[12.5px] leading-[1.5] text-muted">
-              Preparing? The guide walks the same parts and says what to press and what to say.
+              {panel === "internal"
+                ? "Preparing? The guided demo walks all of this in order and says what to press."
+                : "Preparing? The guide walks the same parts and says what to press and what to say."}
             </p>
             <button
               type="button"
               onClick={() => {
-                startPresentation();
+                if (panel === "internal") startGuide();
+                else startPresentation();
                 setPanel(null);
               }}
               className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] border border-[var(--ndi-mint-40)] px-3.5 font-display text-[13px] font-semibold text-accent"
             >
-              Practise with the guide
+              {panel === "internal" ? "Start the guided demo" : "Practise with the guide"}
             </button>
           </div>
         </div>
@@ -705,6 +737,25 @@ export function DemoHarness() {
               strokeWidth={2}
               className="transition-transform duration-200 ease-ndi"
               style={{ transform: `rotate(${panel === "presentation" ? 0 : 180}deg)` }}
+            />
+          </button>
+        ) : null}
+
+        {/* Everything built, for the team's own managers. */}
+        {hydrated ? (
+          <button
+            type="button"
+            onClick={() => setPanel((p) => (p === "internal" ? null : "internal"))}
+            aria-expanded={panel === "internal"}
+            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ndi-mint-40)] bg-[var(--chrome-fill-strong)] px-3.5 font-display text-[12px] font-semibold text-accent backdrop-blur-[20px]"
+          >
+            {panel === "internal" ? "Hide" : "Internal presentation"}
+            <Icon
+              name="chevronDown"
+              size={13}
+              strokeWidth={2}
+              className="transition-transform duration-200 ease-ndi"
+              style={{ transform: `rotate(${panel === "internal" ? 0 : 180}deg)` }}
             />
           </button>
         ) : null}
