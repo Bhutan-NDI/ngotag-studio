@@ -13,9 +13,10 @@ const plural = (count: number, unit: string): string =>
  * it counts as inactive, in words ("30 days", "12 hours", "20 minutes").
  * Uses the largest unit that divides it exactly, falling back to minutes.
  *
- * The limit is set per dedicated agent. Moves polled before it was reported,
- * completed moves and agents on an older image don't carry it, so a missing
- * or unusable value means the 30-day default.
+ * The limit is set per dedicated agent. Moves last polled before it was
+ * reported (including moves that completed before then) and agents on an
+ * older image don't carry it, so a missing or unusable value means the
+ * 30-day default.
  */
 export const staleLimitText = (staleAfterSeconds?: number | null): string => {
   const seconds =
