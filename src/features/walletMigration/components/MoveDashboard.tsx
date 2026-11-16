@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { IMigration } from '../types'
 import React from 'react'
+import { staleLimitText } from '../staleLimit'
 
 const Segment = ({
   label,
@@ -134,6 +135,7 @@ export function MoveDashboard({
 }: Readonly<MoveDashboardProps>): React.JSX.Element {
   const { status, error } = migration
   const counts = connectionCounts(migration.rotation?.counts)
+  const staleLimit = staleLimitText(migration.rotation?.staleAfterSeconds)
   const problem = describeAfterSwitch(error, webhookUrlFor(migration.orgId))
   const windowEnded =
     migration.stabilisationEndsAt !== null &&
@@ -309,7 +311,9 @@ export function MoveDashboard({
                   <dd className="font-medium">{counts.refused}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Inactive (30 days)</dt>
+                  <dt className="text-muted-foreground">
+                    Inactive ({staleLimit})
+                  </dt>
                   <dd className="font-medium">{counts.inactive}</dd>
                 </div>
               </dl>
@@ -334,10 +338,10 @@ export function MoveDashboard({
               )}
               {counts.inactive > 0 && (
                 <p className="text-muted-foreground text-sm">
-                  {counts.inactive} connections haven&apos;t responded in 30
-                  days. These citizens may be offline, or may have removed the
-                  connection or the app. Their connections keep working through
-                  message forwarding.
+                  {counts.inactive} connections haven&apos;t responded in{' '}
+                  {staleLimit}. These citizens may be offline, or may have
+                  removed the connection or the app. Their connections keep
+                  working through message forwarding.
                 </p>
               )}
             </>
