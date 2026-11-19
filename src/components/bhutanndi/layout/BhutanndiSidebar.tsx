@@ -4,8 +4,7 @@
 import { Icon, type IconName } from '@/components/bhutanndi/ui/icons'
 import { NavItem } from '../../../../types'
 import { Organization } from '@/features/dashboard/type/organization'
-import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
-import { getOrganizations } from '@/app/api/organization'
+import { getAllOrganizations } from '@/app/api/organization'
 import { mobileVerifierNavItem, navItems } from '@/constants/data'
 import { useCanSeeAllMigrations } from '@/features/walletMigration/useCanSeeAllMigrations'
 import {
@@ -88,9 +87,6 @@ export function BhutanndiSidebar({
   const dispatch = useAppDispatch()
   const canSeeAllMigrations = useCanSeeAllMigrations()
 
-  const [currentPage] = useState(currentPageNumber)
-  const [pageSize] = useState(itemPerPage)
-  const [searchTerm] = useState('')
   // Bhutanndi-only: the reference places "Organizations" (a real, already-shipped
   // route — src/app/organizations/page.tsx — that has no menu entry in the
   // shared navItems today) right after Dashboard, and Edit/Delete were moved
@@ -212,12 +208,7 @@ export function BhutanndiSidebar({
   useEffect(() => {
     const fetchOrganizations = async (): Promise<void> => {
       try {
-        const response = await getOrganizations(
-          currentPage,
-          pageSize,
-          searchTerm,
-          '',
-        )
+        const response = await getAllOrganizations()
         if (
           typeof response !== 'string' &&
           response?.data?.data?.organizations
@@ -266,7 +257,7 @@ export function BhutanndiSidebar({
     }
 
     fetchOrganizations()
-  }, [dispatch, currentPage, pageSize, searchTerm, selectedOrgId])
+  }, [dispatch, selectedOrgId])
 
   useEffect(() => {
     if (ecosystemEnableStatus) {

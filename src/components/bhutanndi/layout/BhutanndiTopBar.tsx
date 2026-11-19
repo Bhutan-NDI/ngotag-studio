@@ -8,8 +8,7 @@ import { OrgSwitcher } from '@/components/org-switcher'
 import { SidebarContext, SidebarContextProps } from '@/components/ui/sidebar'
 import { UserNav } from '@/components/layout/user-nav'
 import { Organisation } from '@/features/dashboard/type/organization'
-import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
-import { getOrganizations } from '@/app/api/organization'
+import { getAllOrganizations } from '@/app/api/organization'
 import {
   setOrgId,
   setOrgInfo,
@@ -68,7 +67,7 @@ export function BhutanndiTopBar({
   useEffect(() => {
     const fetchOrganizations = async (): Promise<void> => {
       try {
-        const response = await getOrganizations(currentPageNumber, itemPerPage)
+        const response = await getAllOrganizations()
         if (
           typeof response !== 'string' &&
           response?.data?.data?.organizations

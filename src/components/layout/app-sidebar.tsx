@@ -25,8 +25,6 @@ import {
   appLogoAltText,
   appLogoDarkPath,
   appLogoPath,
-  currentPageNumber,
-  itemPerPage,
 } from '@/config/CommonConstant'
 import {
   resetOrgState,
@@ -49,7 +47,7 @@ import Link from 'next/link'
 import { NavItem } from '../../../types'
 import { Organization } from '@/features/dashboard/type/organization'
 import { getActiveFaviconPath } from '@/lib/active-theme'
-import { getOrganizations } from '@/app/api/organization'
+import { getAllOrganizations } from '@/app/api/organization'
 import { hardNavigate } from '@/utils/navigation'
 import { navItems } from '@/constants/data'
 import { setSidebarCollapsed } from '@/lib/sidebarSlice'
@@ -76,9 +74,6 @@ export default function AppSidebar(): React.JSX.Element {
     mounted && resolvedTheme === 'dark' ? APP_CONFIG.logoDark : APP_CONFIG.logo
   const collapsedLogoImageSrc = APP_CONFIG.collapsedLogo
 
-  const [currentPage] = useState(currentPageNumber)
-  const [pageSize] = useState(itemPerPage)
-  const [searchTerm] = useState('')
   const [managedNavItem, setManagedNavItem] = useState<NavItem[]>(navItems)
 
   const selectedOrgId = useAppSelector((state) => state.organization.orgId)
@@ -94,12 +89,7 @@ export default function AppSidebar(): React.JSX.Element {
   useEffect(() => {
     const fetchOrganizations = async (): Promise<void> => {
       try {
-        const response = await getOrganizations(
-          currentPage,
-          pageSize,
-          searchTerm,
-          '',
-        )
+        const response = await getAllOrganizations()
         if (
           typeof response !== 'string' &&
           response?.data?.data?.organizations
@@ -148,7 +138,7 @@ export default function AppSidebar(): React.JSX.Element {
     }
 
     fetchOrganizations()
-  }, [dispatch, currentPage, pageSize, searchTerm, selectedOrgId])
+  }, [dispatch, selectedOrgId])
 
   useEffect(() => {
     if (ecosystemEnableStatus) {

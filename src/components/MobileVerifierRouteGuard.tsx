@@ -1,7 +1,6 @@
 'use client'
 
 import React, { ReactNode, useEffect, useState } from 'react'
-import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
 import {
   isMobileVerifierAdmin,
   isMobileVerifierOnly,
@@ -11,7 +10,7 @@ import {
 } from '@/lib/useOrgRoleAccess'
 import { usePathname, useRouter } from 'next/navigation'
 
-import { getOrganizations } from '@/app/api/organization'
+import { getAllOrganizations } from '@/app/api/organization'
 import { selectSelectedOrgRoles } from '@/lib/orgSlice'
 import { useAppSelector } from '@/lib/hooks'
 
@@ -54,7 +53,7 @@ export function MobileVerifierRouteGuard({
     let cancelled = false
     const lookUp = async (): Promise<string[]> => {
       try {
-        const response = await getOrganizations(currentPageNumber, itemPerPage)
+        const response = await getAllOrganizations()
         if (typeof response === 'string') {
           return []
         }
