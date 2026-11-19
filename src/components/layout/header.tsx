@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { currentPageNumber, itemPerPage } from '@/config/CommonConstant'
 import {
   setOrgId,
   setOrgInfo,
@@ -17,7 +16,7 @@ import { OrgSwitcher } from '../org-switcher'
 import { Organisation } from '@/features/dashboard/type/organization'
 import { SidebarTrigger } from '../ui/sidebar'
 import { UserNav } from './user-nav'
-import { getOrganizations } from '@/app/api/organization'
+import { getAllOrganizations } from '@/app/api/organization'
 
 const enableAppLauncher = process.env.NEXT_PUBLIC_ENABLE_APP_LAUNCHER === 'true'
 
@@ -29,7 +28,7 @@ export default function Header(): React.JSX.Element {
   useEffect(() => {
     const fetchOrganizations = async (): Promise<void> => {
       try {
-        const response = await getOrganizations(currentPageNumber, itemPerPage)
+        const response = await getAllOrganizations()
         if (
           typeof response !== 'string' &&
           response?.data?.data?.organizations

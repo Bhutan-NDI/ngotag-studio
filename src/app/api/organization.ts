@@ -8,6 +8,7 @@ import {
 
 import { AxiosResponse } from 'axios'
 import { apiRoutes } from '@/config/apiRoutes'
+import { collectAllOrganizations } from '@/lib/allOrganizations'
 import { getHeaderConfigs } from '@/config/GetHeaderConfigs'
 
 export interface ApiErrorResult {
@@ -90,6 +91,16 @@ export const getOrganizations = async (
     return err?.message
   }
 }
+
+/**
+ * All of the user's organisations, across every page, shaped like one
+ * getOrganizations() page. Use it wherever the full list matters, such as the
+ * organisation switcher: the first page alone hides the 11th organisation on.
+ */
+export const getAllOrganizations = (): Promise<AxiosResponse | string> =>
+  collectAllOrganizations((pageNumber, pageSize) =>
+    getOrganizations(pageNumber, pageSize),
+  )
 
 export const getOrganizationById = async (
   orgId: string,
