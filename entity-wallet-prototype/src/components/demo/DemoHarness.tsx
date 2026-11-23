@@ -19,6 +19,7 @@ import {
   waitingFor,
   waitingToCollect,
   type Actor,
+  type PartPerson,
   type WaitingItem,
 } from "@/lib/demoPresentation";
 
@@ -198,6 +199,14 @@ export function DemoHarness() {
     harness.persona,
     onPart ? onPart.persona : null,
   );
+  /* The internal part's people, while that part is the one on. */
+  const partPeople = deck === "internal" && onPart?.people ? onPart.people : null;
+  const goAs = (pp: PartPerson) => {
+    if (pp.persona) setPersona(pp.persona);
+    if (pp.orgId) setActiveOrg(pp.orgId);
+    setPanel(null);
+    router.push(pp.route);
+  };
   const currentName = people.find((p) => p.id === harness.persona)?.name ?? "them";
   const openWaiting = (w: WaitingItem) => {
     if (w.orgId) setActiveOrg(w.orgId);
@@ -291,7 +300,41 @@ export function DemoHarness() {
               presenter can always see who is in the story and switch. */}
           <div className="mb-3 flex flex-col gap-2 rounded-[12px] border border-grid px-3 py-2.5">
               <p className="font-display text-[11.5px] font-semibold uppercase tracking-[0.08em] text-faint">Driving as</p>
-              <div className="flex flex-col gap-1">
+              {/* The internal presentation: the part's people, each with
+                  their role, and one press puts you on their screen for
+                  this part — in their organisation, or NDI's console. */}
+              {panel === "internal" ? (
+                partPeople ? (
+                  <div className="flex flex-col gap-1">
+                    {partPeople.map((pp) => {
+                      const person = pp.persona ? people.find((p) => p.id === pp.persona) : undefined;
+                      const on = pp.persona ? harness.persona === pp.persona : pathname.startsWith(pp.route);
+                      return (
+                        <button
+                          key={`${pp.persona ?? pp.name}-${pp.route}`}
+                          type="button"
+                          onClick={() => goAs(pp)}
+                          aria-pressed={on}
+                          className={`ndi-navrow flex w-full items-center justify-between gap-3 rounded-[9px] px-2.5 py-1.5 text-left ${pp.persona ? "" : "border border-dashed border-grid"}`}
+                          data-active={on ? "1" : "0"}
+                        >
+                          <span className="flex min-w-0 flex-col gap-0.5">
+                            <span className="font-display text-[13px] font-semibold">
+                              {person?.name ?? pp.name}
+                              {!pp.persona ? <span className="ml-1.5 text-[11px] font-normal text-faint">· no account</span> : null}
+                            </span>
+                            <span className="text-[11.5px] leading-[1.35] text-muted">{pp.role}</span>
+                          </span>
+                          <Icon name="arrowRight" size={12} strokeWidth={2.2} className="flex-none opacity-50" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="m-0 text-[12.5px] leading-[1.45] text-muted">Choose a flow below — its people appear here, each a press away.</p>
+                )
+              ) : null}
+              <div className={`flex flex-col gap-1 ${panel === "internal" ? "hidden" : ""}`}>
                 {onStage.map((c) => {
                   const who = (
                     <span className="flex min-w-0 flex-col gap-0.5">
@@ -401,8 +444,9 @@ export function DemoHarness() {
           </div>
           <p className="font-display text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">{DECKS[panel].label}</p>
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
-            {panel === "internal" ? "Everything we have built, in the order it happens. " : ""}
-            Each one opens on its first screen as if the parts before it were done, so any can be shown on its own.
+            {panel === "internal"
+              ? "Every flow we have built, in the order it happens. Each opens on its key screen with the story already there, so any can be shown on its own."
+              : "Each one opens on its first screen as if the parts before it were done, so any can be shown on its own."}
           </p>
           <ol className="mt-2.5 flex flex-col gap-1.5">
             {DECKS[panel].parts.map((p, i, all) => (
@@ -421,6 +465,12 @@ export function DemoHarness() {
                   <span className="flex min-w-0 flex-col gap-0.5">
                     <span className="font-display text-[13.5px] font-semibold text-body">{p.title}</span>
                     <span className="text-[12px] leading-[1.45] text-muted">{p.shows}</span>
+                    {/* Who is in it, by role, before it is chosen. */}
+                    {p.people ? (
+                      <span className="text-[11.5px] leading-[1.45] text-faint">
+                        {p.people.map((pp) => `${people.find((x) => x.id === pp.persona)?.name ?? pp.name} (${pp.role.split(" · ")[0]})`).join(" · ")}
+                      </span>
+                    ) : null}
                   </span>
                   <Icon name="arrowRight" size={14} strokeWidth={2} className="flex-none opacity-60" />
                 </button>
