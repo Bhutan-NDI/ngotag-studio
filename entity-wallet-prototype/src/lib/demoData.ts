@@ -2706,6 +2706,14 @@ export interface HarnessState {
    * missing, so a save from before the presentation still loads.
    */
   guide?: GuideId;
+  /**
+   * The developers' list is on: the first build phase, NDI's own side only.
+   * Screens leave out what that phase doesn't build — a verifier's list of
+   * what it may ask people for, which depends on published credentials —
+   * so the flows can be built without it. Off everywhere else: the guided
+   * demo and the presentations show everything.
+   */
+  developer?: boolean;
 }
 
 /** The guided demo's two scripts. */

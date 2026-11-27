@@ -2313,6 +2313,8 @@ interface DemoActions {
   setStateOverride: (screen: string, state: string | null) => void;
   /** The deployment's self-service sign-up setting, switched for the demo. */
   setSelfServiceSignup: (on: boolean) => void;
+  /** The developers' list on or off (DemoHarness: harness.developer). */
+  setDeveloperMode: (on: boolean) => void;
   /** Move the guided demo to a step, or stop it with null. A `guide`
    *  switches which script it reads; left out, the script stays. */
   setGuideStep: (step: number | null, guide?: GuideId) => void;
@@ -4998,7 +5000,11 @@ export function DemoProvider({ children }: { children: ReactNode }) {
           !input.orgName.trim() ||
           !input.purpose.trim() ||
           !input.agreementRef.trim() ||
-          (input.capability === "verifier" ? !input.ask.length : !input.issue.length || !input.legalBasis.trim())
+          /* The developers' phase builds approval to verify without the
+             list of what may be asked (harness.developer). */
+          (input.capability === "verifier"
+            ? !input.ask.length && !s0.harness.developer
+            : !input.issue.length || !input.legalBasis.trim())
         )
           return { ok: false, error: "invalid" };
         /* E12 (FLOW-ONB-02 P7): a proposal needs a second named admin to
@@ -6954,6 +6960,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
       setSelfServiceSignup: (selfServiceSignup) =>
         setState((s) => ({ ...s, harness: { ...s.harness, selfServiceSignup } })),
+
+      setDeveloperMode: (developer) => setState((s) => ({ ...s, harness: { ...s.harness, developer } })),
 
 
       setStateOverride: (screen, override) =>

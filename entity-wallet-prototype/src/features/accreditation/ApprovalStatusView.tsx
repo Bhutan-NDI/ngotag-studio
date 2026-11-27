@@ -18,7 +18,7 @@ import { accInProgress, accSeenByOrg, accStopped, inOrg, roleIn, type AccCapabil
 import { useDemo } from "@/lib/demoStore";
 import { WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, accPill, asSentence, capApproved, capVerb, inline, sampleAccreditation } from "./shared";
+import { ScopeList, accPill, asSentence, capApproved, capVerb, inline, sampleAccreditation, useAsksHidden } from "./shared";
 
 /**
  * SCR-ACC-04 — Approval status. FLOW-ACC-01 steps 8–11; FLOW-ACC-02 steps
@@ -102,6 +102,7 @@ const FORCED: Partial<Record<Face, Partial<Accreditation>>> = {
 };
 
 export function ApprovalStatusView() {
+  const asksHidden = useAsksHidden();
   const router = useRouter();
   const { accreditations, organizations, relations, activeOrgId, currentPerson, harness, personById, completeListing, resignAccreditation, withdrawRequest, hydrated } =
     useDemo();
@@ -391,13 +392,15 @@ export function ApprovalStatusView() {
                       This asks for more. Your current approval keeps working until the new one replaces it.
                     </p>
                   ) : null}
-                  <div className="flex flex-col gap-2">
-                    <p className="m-0 text-[12.5px] text-muted">
-                      {a.capability === "verifier" ? "What you can ask people for" : "What you can issue"}
-                      {a.state === "ACTIVE" ? "" : a.door === "REQUEST" ? " — as you asked" : " — as proposed"}
-                    </p>
-                    <ScopeList capability={a.capability} ask={a.ask} issue={a.issue} />
-                  </div>
+                  {a.capability === "verifier" && asksHidden ? null : (
+                    <div className="flex flex-col gap-2">
+                      <p className="m-0 text-[12.5px] text-muted">
+                        {a.capability === "verifier" ? "What you can ask people for" : "What you can issue"}
+                        {a.state === "ACTIVE" ? "" : a.door === "REQUEST" ? " — as you asked" : " — as proposed"}
+                      </p>
+                      <ScopeList capability={a.capability} ask={a.ask} issue={a.issue} />
+                    </div>
+                  )}
                   {a.state === "ACTIVE" && a.publicIdentity ? (
                     <p className="m-0 text-[13px] leading-[1.6] text-muted">
                       Your organisation&rsquo;s public identity is{" "}

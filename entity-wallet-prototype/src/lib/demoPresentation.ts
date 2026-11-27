@@ -516,6 +516,98 @@ export const INTERNAL_PARTS: PresentationPart[] = [
 /** Everyone the internal presentation needs. */
 export const INTERNAL_CAST: PersonaId[] = [...new Set(INTERNAL_PARTS.flatMap((p) => p.cast))];
 
+/**
+ * For developers: what to build first.
+ *
+ * The build goes phase by phase, and the first phase is NDI's own side of
+ * the platform — no Entity Wallet yet. So this list keeps every flow that
+ * phase needs and none of the Entity Wallet's (a company signing up, its
+ * members, appointing, receiving, sharing, authority to act, BNSW): root,
+ * platform admins, foundational issuers invited and designated, and issuers
+ * and verifiers invited and approved. A business asking NDI to verify is
+ * left out too — the business in the story is an Entity Wallet company.
+ *
+ * Each part opens on the flow's first screen, not its result: developers
+ * are building the flow, not reviewing it. And while one is on, screens
+ * leave out what a verifier may ask people for (harness.developer), which
+ * depends on published credentials this phase doesn't build. The guided
+ * demo still shows everything.
+ */
+export const DEVELOPER_PARTS: PresentationPart[] = [
+  /* ---- NDI sets up its platform ---- */
+  {
+    section: "NDI sets up its platform",
+    title: "Root admin onboarding",
+    shows: "Root signs in to NDI's own organisation, ready on day zero",
+    persona: null,
+    route: "/sign-in",
+    start: "dayZero",
+    cast: ["root"],
+  },
+  {
+    section: "NDI sets up its platform",
+    title: "Platform admin onboarding",
+    shows: "Root invites two named admins by email; each sets up from the link",
+    persona: "root",
+    route: "/admin/team",
+    start: "dayZero",
+    cast: ["root", "tshering", "tshendu"],
+  },
+
+  /* ---- Foundational issuers ---- */
+  {
+    section: "Foundational issuers",
+    title: "Inviting a foundational issuer",
+    shows: "Kinzang invites an authority that registers organisations; Tshendu approves before it's sent",
+    persona: "tshering",
+    route: "/admin/invitations/new",
+    start: "platformReady",
+    cast: ["tshering", "tshendu"],
+    switchTo: [{ label: "Tshendu · approves", persona: "tshendu", route: "/admin/approvals" }],
+  },
+  {
+    section: "Foundational issuers",
+    title: "Designating a foundational issuer",
+    shows: "The ministry made the authority for sole proprietorships, and agreeing what people are asked in its name",
+    persona: "tshering",
+    route: "/admin/designations",
+    start: "platformReady",
+    cast: ["tshering", "tshendu", "kesang"],
+    switchTo: [
+      { label: "Tshendu · approves", persona: "tshendu", route: "/admin/designations" },
+      { label: "Kesang · accepts for the ministry", persona: "kesang", route: "/dashboard" },
+    ],
+  },
+
+  /* ---- Issuers and verifiers ---- */
+  {
+    section: "Issuers and verifiers",
+    title: "Inviting a new issuer or verifier",
+    shows: "Kinzang proposes an organisation not on NDI yet; Tshendu approves; its officer is invited to register",
+    persona: "tshering",
+    route: "/admin/accreditations/new",
+    start: "platformReady",
+    cast: ["tshering", "tshendu"],
+    switchTo: [{ label: "Tshendu · approves", persona: "tshendu", route: "/admin/accreditations" }],
+  },
+  {
+    section: "Issuers and verifiers",
+    title: "Approving an organisation already on NDI",
+    shows: "Partner Bank has been verifying without approval; Kinzang proposes, Tshendu approves, the bank accepts",
+    persona: "tshering",
+    route: "/admin/accreditations",
+    start: "platformReady",
+    cast: ["tshering", "tshendu", "yeshey"],
+    switchTo: [
+      { label: "Tshendu · approves", persona: "tshendu", route: "/admin/accreditations" },
+      { label: "Yeshey · accepts for the bank", persona: "yeshey", route: "/dashboard" },
+    ],
+  },
+];
+
+/** Everyone the developers' list needs. */
+export const DEVELOPER_CAST: PersonaId[] = [...new Set(DEVELOPER_PARTS.flatMap((p) => p.cast))];
+
 /** Who is acting on screen, as the handover card names them. */
 export interface Actor {
   key: string;

@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { OBSERVED_OPERATORS, type Accreditation, type Organization } from "@/lib/demoData";
 
-import { legalBasisText } from "./shared";
+import { legalBasisText, useAsksHidden } from "./shared";
 
 /**
  * NDI's interim criteria, each beside the evidence an administrator looks
@@ -31,7 +31,8 @@ export function Criteria({
   org: Organization | undefined;
   overlaps: { type: string; others: string[] }[];
 }) {
-  const rows: { criterion: string; evidence: string }[] = [
+  const asksHidden = useAsksHidden();
+  const rows: { criterion: string; evidence: string; hidden?: boolean }[] = [
     {
       criterion: "It's an identifiable body under Bhutanese law",
       evidence:
@@ -54,6 +55,8 @@ export function Criteria({
       evidence: acc.agreementRef || (acc.door === "REQUEST" ? "Not given — may follow approval" : "Not given"),
     },
     {
+      /* Not checked in the developers' phase: no list of what may be asked. */
+      hidden: acc.capability === "verifier" && asksHidden,
       criterion: "It asks for no more than its purpose needs",
       evidence:
         acc.capability === "verifier"
@@ -79,7 +82,7 @@ export function Criteria({
   }
   return (
     <dl className="m-0 flex flex-col gap-3">
-      {rows.map((r) => (
+      {rows.filter((r) => !r.hidden).map((r) => (
         <div key={r.criterion} className="flex flex-col gap-0.5 min-[761px]:grid min-[761px]:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] min-[761px]:gap-4">
           <dt className="flex items-start gap-2 text-[13.5px] leading-[1.55] text-body">
             <Icon name="info" size={14} strokeWidth={2} className="mt-[4px] flex-none text-faint" />

@@ -28,7 +28,7 @@ import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { issueOverlaps } from "./Criteria";
-import { IssueTypesEditor, ItemChooser, LegalBasisFields, inline, sameItem, scopeSentence } from "./shared";
+import { IssueTypesEditor, ItemChooser, LegalBasisFields, inline, sameItem, scopeSentence, useAsksHidden } from "./shared";
 
 /**
  * SCR-ACC-01 — Propose an accreditation. FLOW-ACC-01 step 1.
@@ -231,10 +231,12 @@ export function ProposeAccreditationView() {
   const existingMatch =
     onPlatform ?? (face === "existing_org" ? { orgId: "org-bob", orgName: organizations.find((o) => o.id === "org-bob")?.legalName ?? "Partner Bank Ltd." } : null);
 
+  /* The developers' phase: no list of what may be asked (shared.tsx). */
+  const asksHidden = useAsksHidden();
   const ready =
     (draft.kind === "EXISTING" ? Boolean(draft.orgId) : Boolean(draft.legalName.trim() && /\S+@\S+\.\S+/.test(draft.officerEmail))) &&
     Boolean(draft.purpose.trim()) &&
-    (draft.capability === "verifier" ? draft.ask.length > 0 : draft.issue.length > 0 && Boolean(draft.legalBasis.trim()));
+    (draft.capability === "verifier" ? asksHidden || draft.ask.length > 0 : draft.issue.length > 0 && Boolean(draft.legalBasis.trim()));
 
   const propose = () => {
     /* P4: a proposal carries an agreement reference, and without one it is
@@ -263,7 +265,7 @@ export function ProposeAccreditationView() {
         legalBasis: draft.capability === "issuer" ? draft.legalBasis : "",
         legalBasisRef: draft.capability === "issuer" ? draft.legalBasisRef : "",
         agreementRef: draft.agreementRef,
-        ask: draft.capability === "verifier" ? draft.ask : [],
+        ask: draft.capability === "verifier" && !asksHidden ? draft.ask : [],
         issue: draft.capability === "issuer" ? draft.issue : [],
         replaces,
       });
@@ -365,7 +367,7 @@ export function ProposeAccreditationView() {
           </p>
         ) : null}
 
-        {isRecognition && observed ? (
+        {isRecognition && observed && !(asksHidden && observed.capability === "verifier") ? (
           <p
             className="m-0 max-w-[80ch] rounded-[12px] border border-grid px-4 py-3 text-[13.5px] leading-[1.6] text-body"
             style={{ background: "rgb(var(--tint) / 0.04)" }}
@@ -509,10 +511,12 @@ export function ProposeAccreditationView() {
               </label>
 
               {draft.capability === "verifier" ? (
+                asksHidden ? null : (
                 <div className={FIELD_BLOCK_CLASS}>
                   <span className={LABEL_CLASS}>What it can ask people for</span>
                   <ItemChooser value={draft.ask} onChange={(v) => set("ask", v)} observed={isRecognition ? observed?.ask : undefined} />
                 </div>
+                )
               ) : (
                 <div className={FIELD_BLOCK_CLASS}>
                   <span className={LABEL_CLASS}>What it can issue</span>
@@ -566,8 +570,14 @@ export function ProposeAccreditationView() {
                 </p>
               ) : error === "invalid" ? (
                 <p role="alert" className="m-0 text-[13.5px] text-body">
-                  Something&rsquo;s missing: the organisation, its purpose, the agreement reference, and at least one thing it can{" "}
-                  {draft.capability === "verifier" ? "ask for" : "issue, with its legal basis"}.
+                  {draft.capability === "verifier" && asksHidden ? (
+                    "Something\u2019s missing: the organisation, its purpose and the agreement reference."
+                  ) : (
+                    <>
+                      Something&rsquo;s missing: the organisation, its purpose, the agreement reference, and at least one thing it can{" "}
+                      {draft.capability === "verifier" ? "ask for" : "issue, with its legal basis"}.
+                    </>
+                  )}
                 </p>
               ) : null}
 
@@ -601,9 +611,11 @@ export function ProposeAccreditationView() {
             <div className="relative z-[4] flex flex-col gap-3" aria-live="polite">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">What this will mean</h2>
               <p className="m-0 text-[13.5px] leading-[1.6] text-body">
-                {scopeSentence(orgName, draft.capability, draft.ask, draft.issue)}
+                {draft.capability === "verifier" && asksHidden
+                  ? `${orgName} will be able to verify people's credentials, for the purpose stated.`
+                  : scopeSentence(orgName, draft.capability, draft.ask, draft.issue)}
               </p>
-              {isRecognition && observed && draft.capability === "verifier" ? (
+              {isRecognition && observed && draft.capability === "verifier" && !asksHidden ? (
                 <p className="m-0 text-[13px] leading-[1.6] text-muted">
                   {observed.ask.filter((o) => !draft.ask.some((a) => sameItem(a, o))).length
                     ? `Removed from what it was seen asking for: ${observed.ask

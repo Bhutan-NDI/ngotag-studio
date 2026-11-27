@@ -27,7 +27,7 @@ import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
-import { ScopeList, accPill, asSentence, capVerb, daysUntil, inline, legalBasisText, sampleAccreditation } from "./shared";
+import { ScopeList, accPill, asSentence, capVerb, daysUntil, inline, legalBasisText, sampleAccreditation, useAsksHidden } from "./shared";
 
 /**
  * SCR-ACC-02 — Approve an accreditation. FLOW-ACC-01 step 2; FLOW-ACC-02
@@ -87,6 +87,7 @@ const DECIDE_REFUSALS: Record<"E1" | "E5" | "E11" | "not_admin" | "invalid", str
 };
 
 export function ApproveAccreditationView({ id }: { id: string }) {
+  const asksHidden = useAsksHidden();
   const router = useRouter();
   const { accreditations, organizations, people, harness, currentPerson, personById, decideAccreditation, withdrawApproval, hydrated } =
     useDemo();
@@ -394,6 +395,8 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 asks for too much, decline and say what to remove.
               </p>
             ) : null}
+            {/* The developers' phase: no list of what may be asked (shared.tsx). */}
+            {acc.capability === "verifier" && asksHidden ? null : (
             <div className="flex flex-col gap-2">
               <h2 className="m-0 font-display text-[15px] font-semibold text-strong">
                 {acc.capability === "verifier" ? "What it can ask people for" : "What it can issue"}
@@ -409,7 +412,8 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 </p>
               ))}
             </div>
-            {acc.observed ? (
+            )}
+            {acc.observed && !(acc.capability === "verifier" && asksHidden) ? (
               <p className="m-0 max-w-[66ch] text-[13px] leading-[1.6] text-muted">
                 Seen since {formatDate(acc.observed.since)}:{" "}
                 {acc.capability === "verifier"

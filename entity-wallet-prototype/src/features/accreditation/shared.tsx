@@ -13,6 +13,15 @@ import {
   type AskItem,
   type IssueType,
 } from "@/lib/demoData";
+import { useDemo } from "@/lib/demoStore";
+
+/**
+ * The developers' phase leaves out what a verifier may ask people for: it
+ * depends on the published credentials and their items, which come later.
+ * Approval to verify is built without it. The guided demo and the
+ * presentations show it as before (harness.developer).
+ */
+export const useAsksHidden = () => useDemo().harness.developer === true;
 
 /**
  * What every accreditation screen shares — so that what was proposed, what
@@ -149,6 +158,8 @@ export function ScopeList({
   issue: IssueType[];
   observed?: AskItem[];
 }) {
+  const asksHidden = useAsksHidden();
+  if (capability === "verifier" && asksHidden) return null;
   if (capability === "issuer") {
     return (
       <ul className="m-0 flex list-none flex-col gap-2 p-0">

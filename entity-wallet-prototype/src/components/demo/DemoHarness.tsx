@@ -11,6 +11,8 @@ import { PERSONAS, type PersonaId } from "@/lib/demoData";
 import { findMail } from "@/lib/demoMail";
 import {
   castOnStage,
+  DEVELOPER_CAST,
+  DEVELOPER_PARTS,
   INTERNAL_CAST,
   INTERNAL_PARTS,
   PRESENTATION_CAST,
@@ -41,10 +43,11 @@ import { useScreenRegistry } from "./screenState";
  */
 /** The two presentations: one company's story for a client, and everything
  *  built for the team's own managers (demoPresentation.ts). */
-type Deck = "presentation" | "internal";
+type Deck = "presentation" | "internal" | "developer";
 const DECKS = {
   presentation: { label: "Presentation", parts: PRESENTATION_PARTS, cast: PRESENTATION_CAST },
   internal: { label: "Internal presentation", parts: INTERNAL_PARTS, cast: INTERNAL_CAST },
+  developer: { label: "For developers", parts: DEVELOPER_PARTS, cast: DEVELOPER_CAST },
 } as const;
 
 export function DemoHarness() {
@@ -59,6 +62,7 @@ export function DemoHarness() {
     resetDemo,
     restoreStoryState,
     setSelfServiceSignup,
+    setDeveloperMode,
     setGuideStep,
     startDayZero,
     startPlatformReady,
@@ -117,7 +121,7 @@ export function DemoHarness() {
   const [deck, setDeck] = useState<Deck>("presentation");
   const onPart = part !== null ? DECKS[deck].parts[part] : null;
   /* The list open now, or the one a part was last started from. */
-  const listed: Deck = panel === "presentation" || panel === "internal" ? panel : deck;
+  const listed: Deck = panel && panel !== "controls" ? panel : deck;
 
   /* The auth screens are pre-sign-in and have no persona. Showing a switcher
      there would suggest the choice matters before anyone is signed in.
@@ -150,7 +154,10 @@ export function DemoHarness() {
       .map((person) => ({ id: person.id, person })),
   ];
 
-  const walk = (f: Pick<FlowEntry, "persona" | "route" | "selfService" | "start">) => {
+  /* `developer` is on only for the developers' list: screens then leave
+     out what that build phase doesn't need (harness.developer). Set every
+     time, because the three-months-on state keeps the harness it found. */
+  const walk = (f: Pick<FlowEntry, "persona" | "route" | "selfService" | "start">, developer = false) => {
     resetDemo();
     if (f.start === "dayZero") startDayZero();
     else if (f.start === "platformReady") startPlatformReady();
@@ -165,6 +172,7 @@ export function DemoHarness() {
       if (f.start === "authorityGiven") storyAuthorityGiven();
     }
     else restoreStoryState();
+    setDeveloperMode(developer);
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
     setOpen(false);
@@ -175,7 +183,7 @@ export function DemoHarness() {
   /* A part of the presentation is a jump like any other, with no guide card:
      the client sees the product, not the presenter's notes. */
   const present = (d: Deck, i: number) => {
-    walk(DECKS[d].parts[i]);
+    walk(DECKS[d].parts[i], d === "developer");
     setGuideStep(null);
     setDeck(d);
     setPart(i);
@@ -289,7 +297,7 @@ export function DemoHarness() {
        list of routes that would rot. */
     <div ref={harnessRef} className="ndi-demo-harness pointer-events-none fixed inset-x-0 bottom-0 z-[70] flex flex-col items-start gap-2 p-3 min-[641px]:p-4">
       <GuideCard />
-      {(panel === "presentation" || panel === "internal") && hydrated ? (
+      {panel && panel !== "controls" && hydrated ? (
         <div className="pointer-events-auto max-h-[calc(100dvh-80px)] w-full max-w-[440px] overflow-y-auto rounded-2xl border border-grid bg-[var(--chrome-fill-strong)] p-3.5 shadow-[var(--shadow-card)] backdrop-blur-[20px] backdrop-saturate-[140%]">
           {/* ---- Who you are driving as, and what waits for them ----
               Switching never resets: whatever was sent is still waiting,
@@ -446,7 +454,9 @@ export function DemoHarness() {
           <p className="mt-1 text-[12.5px] leading-[1.5] text-muted">
             {panel === "internal"
               ? "Every flow we have built, in the order it happens. Each opens on its key screen with the story already there, so any can be shown on its own."
-              : "Each one opens on its first screen as if the parts before it were done, so any can be shown on its own."}
+              : panel === "developer"
+                ? "What to build first: NDI's own side of the platform, before any Entity Wallet flow. Each opens on the flow's first screen. While one is on, what a verifier may ask people for is left out."
+                : "Each one opens on its first screen as if the parts before it were done, so any can be shown on its own."}
           </p>
           <ol className="mt-2.5 flex flex-col gap-1.5">
             {DECKS[panel].parts.map((p, i, all) => (
@@ -492,6 +502,14 @@ export function DemoHarness() {
               </li>
             ))}
           </ol>
+          {/* What this phase leaves for later, said where developers will ask. */}
+          {panel === "developer" ? (
+            <p className="mt-3 rounded-[12px] border border-grid px-3.5 py-3 text-[12.5px] leading-[1.5] text-muted">
+              <span className="font-semibold text-body">Later phases:</span> the Entity Wallet&rsquo;s flows — a company signing up, its
+              members, appointing someone, receiving and sharing credentials, authority to act — and what a verifier may ask people for.
+              The guided demo still shows all of it.
+            </p>
+          ) : null}
           {/* What isn't built, said where the team will ask. */}
           {panel === "internal" ? (
             <p className="mt-3 rounded-[12px] border border-grid px-3.5 py-3 text-[12.5px] leading-[1.5] text-muted">
@@ -503,20 +521,20 @@ export function DemoHarness() {
               the demo controls where nobody preparing would look. */}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-dashed border-grid px-3.5 py-3">
             <p className="min-w-0 flex-1 text-[12.5px] leading-[1.5] text-muted">
-              {panel === "internal"
+              {panel === "internal" || panel === "developer"
                 ? "Preparing? The guided demo walks all of this in order and says what to press."
                 : "Preparing? The guide walks the same parts and says what to press and what to say."}
             </p>
             <button
               type="button"
               onClick={() => {
-                if (panel === "internal") startGuide();
+                if (panel === "internal" || panel === "developer") startGuide();
                 else startPresentation();
                 setPanel(null);
               }}
               className="ndi-hairline-btn inline-flex h-9 flex-none items-center gap-1.5 rounded-[10px] border border-[var(--ndi-mint-40)] px-3.5 font-display text-[13px] font-semibold text-accent"
             >
-              {panel === "internal" ? "Start the guided demo" : "Practise with the guide"}
+              {panel === "internal" || panel === "developer" ? "Start the guided demo" : "Practise with the guide"}
             </button>
           </div>
         </div>
@@ -806,6 +824,25 @@ export function DemoHarness() {
               strokeWidth={2}
               className="transition-transform duration-200 ease-ndi"
               style={{ transform: `rotate(${panel === "internal" ? 0 : 180}deg)` }}
+            />
+          </button>
+        ) : null}
+
+        {/* What to build first, for developers. */}
+        {hydrated ? (
+          <button
+            type="button"
+            onClick={() => setPanel((p) => (p === "developer" ? null : "developer"))}
+            aria-expanded={panel === "developer"}
+            className="ndi-hairline-btn inline-flex h-8 items-center gap-1.5 rounded-full border border-[var(--ndi-mint-40)] bg-[var(--chrome-fill-strong)] px-3.5 font-display text-[12px] font-semibold text-accent backdrop-blur-[20px]"
+          >
+            {panel === "developer" ? "Hide" : "For developers"}
+            <Icon
+              name="chevronDown"
+              size={13}
+              strokeWidth={2}
+              className="transition-transform duration-200 ease-ndi"
+              style={{ transform: `rotate(${panel === "developer" ? 0 : 180}deg)` }}
             />
           </button>
         ) : null}

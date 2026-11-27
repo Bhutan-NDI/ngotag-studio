@@ -23,7 +23,7 @@ import {
 } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
 
-import { accPill, capVerb, daysUntil } from "./shared";
+import { accPill, capVerb, daysUntil, useAsksHidden } from "./shared";
 
 /**
  * Accreditations — NDI's administrator console for Flow 4.
@@ -51,6 +51,7 @@ import { accPill, capVerb, daysUntil } from "./shared";
  */
 
 export function AccreditationsAdminView() {
+  const asksHidden = useAsksHidden();
   const router = useRouter();
   const { accreditations, organizations, personById, harness, hydrated } = useDemo();
   const forced = useScreenState("SCR-ACC-ADMIN", ["live", "loading", "empty", "offline"]);
@@ -209,10 +210,12 @@ export function AccreditationsAdminView() {
                         {orgName(o.orgId)} · {o.capability === "verifier" ? "Verifying" : "Issuing"}
                       </span>
                       <span className="text-[12.5px] text-faint">
-                        Seen since {formatDate(o.since)} ·{" "}
+                        Seen since {formatDate(o.since)}
                         {o.capability === "verifier"
-                          ? `asks for ${o.ask.length} item${o.ask.length === 1 ? "" : "s"}`
-                          : o.issue.map((t) => t.name).join(", ")}
+                          ? asksHidden
+                            ? ""
+                            : ` · asks for ${o.ask.length} item${o.ask.length === 1 ? "" : "s"}`
+                          : ` · ${o.issue.map((t) => t.name).join(", ")}`}
                       </span>
                     </span>
                     <HairlineButton

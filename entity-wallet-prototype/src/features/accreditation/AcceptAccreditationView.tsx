@@ -18,7 +18,7 @@ import { ENFORCEMENT_DATE, VERIFICATION_ORG_NAME, roleIn, type Accreditation } f
 import { useDemo } from "@/lib/demoStore";
 import { LOCAL_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
-import { ScopeList, asSentence, inline, legalBasisText, sampleAccreditation } from "./shared";
+import { ScopeList, asSentence, inline, legalBasisText, sampleAccreditation, useAsksHidden } from "./shared";
 
 /**
  * SCR-ACC-03 — What you're being approved for. FLOW-ACC-01 steps 4–7.
@@ -83,6 +83,7 @@ const ACCEPT_REFUSALS: Record<"not_owner" | "invalid", string> = {
 };
 
 export function AcceptAccreditationView({ id }: { id: string }) {
+  const asksHidden = useAsksHidden();
   const router = useRouter();
   const {
     accreditations,
@@ -239,9 +240,14 @@ export function AcceptAccreditationView({ id }: { id: string }) {
               {a.capability === "verifier" ? (
                 <>
                   NDI is approving {short} to ask people to share information from their NDI wallet, for:{" "}
-                  {a.purpose.charAt(0).toLowerCase() + a.purpose.slice(1)}. You&rsquo;ll be able to ask for:{" "}
-                  {a.ask.map((x) => inline(x.item)).join(", ")}. Anything else will be refused before it
-                  reaches anyone.
+                  {a.purpose.charAt(0).toLowerCase() + a.purpose.slice(1)}.
+                  {asksHidden ? null : (
+                    <>
+                      {" "}
+                      You&rsquo;ll be able to ask for: {a.ask.map((x) => inline(x.item)).join(", ")}. Anything else will be
+                      refused before it reaches anyone.
+                    </>
+                  )}
                 </>
               ) : (
                 <>
@@ -254,17 +260,19 @@ export function AcceptAccreditationView({ id }: { id: string }) {
               <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-body">
                 You&rsquo;re already doing this. Accepting keeps it running after {formatDate(ENFORCEMENT_DATE)}, when
                 organisations that haven&rsquo;t been approved stop.
-                {a.observed
+                {a.observed && !asksHidden
                   ? ` NDI has seen ${short} asking for ${a.observed.ask.length} things since ${formatDate(a.observed.since)}; this approval covers ${a.ask.length}.`
                   : ""}
               </p>
             ) : null}
-            <div className="flex flex-col gap-2">
-              <h2 className="m-0 font-display text-[15px] font-semibold text-strong">
-                {a.capability === "verifier" ? "What you'll be able to ask for" : "What you'll be able to issue"}
-              </h2>
-              <ScopeList capability={a.capability} ask={a.ask} issue={a.issue} />
-            </div>
+            {a.capability === "verifier" && asksHidden ? null : (
+              <div className="flex flex-col gap-2">
+                <h2 className="m-0 font-display text-[15px] font-semibold text-strong">
+                  {a.capability === "verifier" ? "What you'll be able to ask for" : "What you'll be able to issue"}
+                </h2>
+                <ScopeList capability={a.capability} ask={a.ask} issue={a.issue} />
+              </div>
+            )}
           </div>
         </Panel>
 
