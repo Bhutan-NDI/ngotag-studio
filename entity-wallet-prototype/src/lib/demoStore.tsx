@@ -1654,6 +1654,9 @@ interface DemoActions {
    * §7.3: "at appointment, not here"). The register's answer is a fixture.
    */
   confirmIdentity: (personId: string) => void;
+  /** The developers' phase: these people were on the platform before
+   *  identity confirmation shipped, so none of them is confirmed yet. */
+  markUnconfirmed: (personIds: string[]) => void;
   /** Refused (left unchanged) until the controller's identity is confirmed. */
   acceptRelation: (id: string) => void;
 
@@ -2913,6 +2916,9 @@ export function DemoProvider({ children }: { children: ReactNode }) {
 
       confirmIdentity: (personId) =>
         setState((s) => ({ ...s, people: s.people.map((p) => (p.id === personId ? anchored(p) : p)) })),
+
+      markUnconfirmed: (personIds) =>
+        setState((s) => ({ ...s, people: s.people.map((p) => (personIds.includes(p.id) ? { ...p, cidVerified: false } : p)) })),
 
       acceptRelation: (id) =>
         setState((s) => {

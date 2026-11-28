@@ -63,6 +63,7 @@ export function DemoHarness() {
     restoreStoryState,
     setSelfServiceSignup,
     setDeveloperMode,
+    markUnconfirmed,
     setGuideStep,
     startDayZero,
     startPlatformReady,
@@ -173,6 +174,11 @@ export function DemoHarness() {
     }
     else restoreStoryState();
     setDeveloperMode(developer);
+    /* The first release ships into a platform that already has its
+       administrators and organisations, none of whom has confirmed it's
+       them yet (ADR-001 Amendment 1). Each confirms at their first
+       protected action. New admins confirm as they accept. */
+    if (developer && f.start === "platformReady") markUnconfirmed(["tshering", "tshendu", "yeshey", "kesang"]);
     if (f.persona) setPersona(f.persona);
     if (f.selfService !== undefined) setSelfServiceSignup(f.selfService);
     setOpen(false);
@@ -455,7 +461,7 @@ export function DemoHarness() {
             {panel === "internal"
               ? "Every flow we have built, in the order it happens. Each opens on its key screen with the story already there, so any can be shown on its own."
               : panel === "developer"
-                ? "What to build first: NDI's own side of the platform, before any Entity Wallet flow. Each opens on the flow's first screen. While one is on, what a verifier may ask people for is left out."
+                ? "What to build first: NDI's own side of the platform, before any Entity Wallet flow. Each opens on the flow's first screen. While one is on, what a verifier may ask people for is left out, and identity is confirmed as ADR-001 Amendment 1 sets out: no scan at sign-up, but admins and officials confirm their identity at their first protected action — proposing, approving or sending an invitation, an accreditation or a designation, or accepting one."
                 : "Each one opens on its first screen as if the parts before it were done, so any can be shown on its own."}
           </p>
           <ol className="mt-2.5 flex flex-col gap-1.5">

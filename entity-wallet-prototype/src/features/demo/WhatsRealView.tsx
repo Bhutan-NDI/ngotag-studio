@@ -135,6 +135,13 @@ const SIMULATED: { area: string; icon: IconName; rows: Row[] }[] = [
         needs: "The NDI verification organisation's proof request, a keyed hash of the CID held in a KMS under a unique constraint, and the updated flow and UX specifications.",
       },
       {
+        /* The developers' list follows the amendment, not the accepted ADR. */
+        shown: "For developers: Confirm your identity at the first protected action, not at sign-up",
+        reality:
+          "Only while a part from the For developers list is on. It follows ADR-001 Amendment 1, which is still in review (docs PR #14), as revised on review: no scan at sign-up; an administrator confirms before sending or approving an agency or admin invitation and before proposing or approving an accreditation or a designation, an invitee before accepting one, and an organisation's officer before accepting an accreditation or a designation. Its copy is SCR-ONB-06's (docs PR #16). The step appears beside the button pressed and carries on with the action once confirmed; every way it can fail — declined, timed out, no wallet, ID already used by another account, offline, verification service down — is a dashed button, and leaves the task where it was. The admins and officials already on the platform start unconfirmed in those parts. Nothing is checked server-side; the screens decide.",
+        needs: "Amendment 1 accepted, FLOW-ONB-01, FLOW-ONB-02, FLOW-ACC-01, FLOW-ORG-02 and UX-EW-01 updated to match, and the checks enforced server-side.",
+      },
+      {
         /* Not simulated so much as not specified. Kind A was here too until
            FLOW-ONB-02 v0.6 specified it; Kind W still isn't. Listed so nobody
            at the showcase takes it as the spec. */

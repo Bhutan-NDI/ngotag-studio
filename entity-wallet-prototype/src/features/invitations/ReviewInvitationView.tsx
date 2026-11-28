@@ -17,6 +17,7 @@ import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
 import { AccountSetupForm } from "@/features/account/AccountSetupForm";
 import { IdentityScan } from "@/features/account/IdentityScan";
+import { ConfirmItsYouStep } from "@/features/account/ConfirmItsYou";
 import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
 
 type Face =
@@ -80,6 +81,8 @@ export function ReviewInvitationView({ id }: { id: string }) {
     signIn,
     currentPerson,
     hydrated,
+    harness,
+    anchorSignup,
   } = useDemo();
 
   const forced = useScreenState("SCR-INV-04", [
@@ -99,6 +102,10 @@ export function ReviewInvitationView({ id }: { id: string }) {
 
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Face | null>(null);
+  /* ADR-001 Amendment 1, developers' phase: the account was made with no
+     scan, and an agency invitation is accepted only by a confirmed person —
+     so Accept asks for it here, then carries on accepting. */
+  const [confirmingAccept, setConfirmingAccept] = useState(false);
 
   const inv = orgInvitations.find((i) => i.id === id);
   const inviter = inv ? personById(inv.invitedBy) : null;
@@ -366,7 +373,26 @@ export function ReviewInvitationView({ id }: { id: string }) {
 
             {face === "default" || face === "offline" ? (
               <div className="flex flex-col gap-2.5">
-                <GradientButton block onClick={accept} disabled={loading}>
+                {confirmingAccept ? (
+                  <ConfirmItsYouStep
+                    task="accept this invitation"
+                    waiting="Your invitation is still waiting. Nothing has been accepted."
+                    verifiedName={account?.name || answeredAs}
+                    onConfirmed={(name) => {
+                      anchorSignup(name);
+                      setConfirmingAccept(false);
+                      accept();
+                    }}
+                    onCancel={() => setConfirmingAccept(false)}
+                  />
+                ) : null}
+                <GradientButton
+                  block
+                  onClick={() =>
+                    harness.developer && inv?.kind === "O" && account && !account.anchoredName ? setConfirmingAccept(true) : accept()
+                  }
+                  disabled={loading || confirmingAccept}
+                >
                   {loading ? "Accepting…" : "Accept"}
                 </GradientButton>
                 {/* Plainly findable and full-size — equal weight is not

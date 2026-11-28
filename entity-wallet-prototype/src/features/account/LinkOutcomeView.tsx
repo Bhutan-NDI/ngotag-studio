@@ -43,7 +43,10 @@ type Outcome = "loading" | "success" | "expired" | "used" | "offline" | "unknown
  */
 export function LinkOutcomeView() {
   const router = useRouter();
-  const { signup, consumeSignupLink, resendSignupMail, hydrated } = useDemo();
+  const { signup, consumeSignupLink, resendSignupMail, hydrated, harness } = useDemo();
+  /* ADR-001 Amendment 1, developers' phase: the set-up scan is deferred, so
+     confirming the email leads straight to the password. */
+  const deferScan = harness.developer === true;
 
   const forced = useScreenState("SCR-ONB-03", [
     "live",
@@ -116,9 +119,11 @@ export function LinkOutcomeView() {
           <AuthCardHeader title="Your email is confirmed" />
           <div className="relative z-[4] flex flex-col gap-4">
             <p role="status" className="m-0 text-center text-[14px] leading-[1.6] text-muted">
-              Next, confirm it&rsquo;s you with your Bhutan NDI Wallet, then choose a password.
+              {deferScan
+                ? "Next, choose a password."
+                : "Next, confirm it\u2019s you with your Bhutan NDI Wallet, then choose a password."}
             </p>
-            <GradientButton block onClick={() => router.push("/sign-up/confirm-identity")}>
+            <GradientButton block onClick={() => router.push(deferScan ? "/sign-up/password" : "/sign-up/confirm-identity")}>
               Continue
               <Icon name="arrowRight" size={16} strokeWidth={2} />
             </GradientButton>
@@ -159,7 +164,9 @@ export function LinkOutcomeView() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(signup.anchoredName || signup.anchorSkipped ? "/sign-up/password" : "/sign-up/confirm-identity")
+                  router.push(
+                    deferScan || signup.anchoredName || signup.anchorSkipped ? "/sign-up/password" : "/sign-up/confirm-identity",
+                  )
                 }
                 className="ndi-plainlink text-center text-[13px] font-medium text-accent"
               >

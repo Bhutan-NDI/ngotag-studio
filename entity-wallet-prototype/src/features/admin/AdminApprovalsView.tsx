@@ -16,6 +16,8 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { useDemo } from "@/lib/demoStore";
 
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
+
 /**
  * SCR-INV-02 — Approvals. FLOW-ONB-02 step 2: dual control for bringing on
  * a root of trust.
@@ -60,6 +62,10 @@ export function AdminApprovalsView() {
 
   const [confirming, setConfirming] = useState<{ id: string; action: "approve" | "refuse" } | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /* ADR-001 Amendment 1: the second administrator confirms it's them before
+     approving (developers' phase only), beside the invitation they pressed. */
+  const gate = useIdentityGate("approve this invitation", "It's still waiting for approval. Nothing has been sent.");
+  const [gateFor, setGateFor] = useState<string | null>(null);
 
   const waiting = forced === "empty" ? [] : orgInvitations.filter((i) => i.state === "PENDING_APPROVAL");
   const target = confirming ? orgInvitations.find((i) => i.id === confirming.id) : null;
@@ -181,10 +187,14 @@ export function AdminApprovalsView() {
                       <p className="text-[13px] leading-[1.6] text-muted">
                         Approving sends the invitation. Refusing means it is never sent.
                       </p>
+                      {gateFor === inv.id ? gate.panel : null}
                       <div className="flex flex-wrap gap-2.5">
                         <GradientButton
-                          onClick={() => setConfirming({ id: inv.id, action: "approve" })}
-                          disabled={offline}
+                          onClick={() => {
+                            setGateFor(inv.id);
+                            gate.guard(() => setConfirming({ id: inv.id, action: "approve" }));
+                          }}
+                          disabled={offline || (gate.open && gateFor === inv.id)}
                         >
                           <Icon name="check" size={15} strokeWidth={2.2} />
                           Approve

@@ -18,6 +18,8 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { roleIn, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindsInWords, scopePairs } from "./shared";
@@ -88,6 +90,10 @@ const reachedAuthority = (d: Designation) =>
           : true;
 
 export function AcceptDesignationView({ id }: { id: string }) {
+  /* The review of ADR-001 Amendment 1, item 1: the authority's officer is
+     already on the platform and accepts with no invitation, so they confirm
+     it's them first (developers' phase only). */
+  const gate = useIdentityGate("accept this designation", "The designation is still waiting for you. Nothing has been accepted.");
   const router = useRouter();
   const { designations, organizations, currentPerson, personById, acceptDesignation, grantNdiAccess, declineDesignation, hydrated } = useDemo();
   const forced = useScreenState("SCR-DSG-03", ["live", "default", "grant", "loading", "empty", "error", "success", "offline", "no_permission"]) as Face;
@@ -346,8 +352,9 @@ export function AcceptDesignationView({ id }: { id: string }) {
               </p>
             ) : null}
 
+            {granting ? null : gate.panel}
             <div className="flex flex-wrap gap-2.5 border-t border-subtle pt-4">
-              <GradientButton onClick={accept} disabled={readOnly || busy}>
+              <GradientButton onClick={() => (granting ? accept() : gate.guard(accept))} disabled={readOnly || busy || gate.open}>
                 {busy ? "Recording…" : granting ? "Grant NDI’s access" : "Accept"}
               </GradientButton>
               {granting ? null : (

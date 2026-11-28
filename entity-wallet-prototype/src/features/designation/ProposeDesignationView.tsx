@@ -15,6 +15,8 @@ import { FIELD_BLOCK_CLASS, FIELD_CLASS, LABEL_CLASS } from "@/components/ui/for
 import { Icon } from "@/components/ui/icons";
 import { NDI_ORG, PELDEN, isNamedAdmin, type OrgKind } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { kindPlural, kindSingular, scopePair } from "./shared";
@@ -61,6 +63,9 @@ export function ProposeDesignationView() {
   const router = useRouter();
   const { organizations, designations, currentPerson, proposeDesignation, hydrated } = useDemo();
   const forced = useScreenState("SCR-DSG-01", ["live", "default", "loading", "error", "success", "offline", "no_permission"]) as Face;
+  /* ADR-001 Amendment 1, Decision 2: the proposing administrator confirms
+     their identity first (developers' phase only). */
+  const gate = useIdentityGate("propose this designation", "Nothing has been proposed — the form is just as you left it.");
 
   const [draft, setDraft] = useState<Draft>(BLANK);
   const [errors, setErrors] = useState<Partial<Record<"org" | "kinds" | "basis" | "form", string>>>({});
@@ -204,7 +209,7 @@ export function ProposeDesignationView() {
             className="relative z-[4] flex flex-col gap-5"
             onSubmit={(e) => {
               e.preventDefault();
-              submit();
+              gate.guard(submit);
             }}
             noValidate
           >
@@ -298,8 +303,9 @@ export function ProposeDesignationView() {
               </p>
             ) : null}
 
+            {gate.panel}
             <div className="flex flex-wrap items-center gap-2.5">
-              <GradientButton type="submit" disabled={busy}>
+              <GradientButton type="submit" disabled={busy || gate.open}>
                 {busy ? "Proposing…" : "Propose"}
               </GradientButton>
               <HairlineButton

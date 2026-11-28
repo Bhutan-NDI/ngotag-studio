@@ -25,6 +25,8 @@ import {
   type IssueType,
 } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { issueOverlaps } from "./Criteria";
@@ -233,6 +235,10 @@ export function ProposeAccreditationView() {
 
   /* The developers' phase: no list of what may be asked (shared.tsx). */
   const asksHidden = useAsksHidden();
+  /* ADR-001 Amendment 1, Decision 2: the proposing administrator confirms
+     their identity first — every door, recognition included (developers'
+     phase only). */
+  const gate = useIdentityGate("propose this accreditation", "Nothing has been proposed — the form is just as you left it.");
   const ready =
     (draft.kind === "EXISTING" ? Boolean(draft.orgId) : Boolean(draft.legalName.trim() && /\S+@\S+\.\S+/.test(draft.officerEmail))) &&
     Boolean(draft.purpose.trim()) &&
@@ -386,7 +392,10 @@ export function ProposeAccreditationView() {
               className="relative z-[4] flex flex-col gap-5"
               onSubmit={(e) => {
                 e.preventDefault();
-                if (ready && !busy) propose();
+                if (ready && !busy) {
+                  if (draft.agreementRef.trim()) gate.guard(propose);
+                  else propose();
+                }
               }}
             >
               {!isRecognition ? (
@@ -581,8 +590,9 @@ export function ProposeAccreditationView() {
                 </p>
               ) : null}
 
+              {gate.panel}
               <div className="flex flex-wrap items-center gap-2.5">
-                <GradientButton type="submit" disabled={!ready || busy || showE10 || Boolean(existingMatch)}>
+                <GradientButton type="submit" disabled={!ready || busy || showE10 || Boolean(existingMatch) || gate.open}>
                   {busy ? "Proposing…" : "Propose"}
                 </GradientButton>
                 <HairlineButton

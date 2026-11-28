@@ -16,6 +16,8 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { ENFORCEMENT_DATE, VERIFICATION_ORG_NAME, roleIn, type Accreditation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS, WALLET_HANDOFF_MS } from "@/lib/demoTiming";
 
 import { ScopeList, asSentence, inline, legalBasisText, sampleAccreditation, useAsksHidden } from "./shared";
@@ -84,6 +86,10 @@ const ACCEPT_REFUSALS: Record<"not_owner" | "invalid", string> = {
 
 export function AcceptAccreditationView({ id }: { id: string }) {
   const asksHidden = useAsksHidden();
+  /* The review of ADR-001 Amendment 1, item 1: an officer already on the
+     platform accepts with no invitation, so they confirm it's them here
+     first (developers' phase only). Acceptance then checks against it. */
+  const gate = useIdentityGate("accept this approval", "The approval is still waiting for you. Nothing has been accepted.");
   const router = useRouter();
   const {
     accreditations,
@@ -355,7 +361,13 @@ export function AcceptAccreditationView({ id }: { id: string }) {
             <WalletHandoff
               value={`ndi-accept-${a.id}`}
               title={`${VERIFICATION_ORG_NAME} is asking who you are`}
-              purpose="Approve in your NDI wallet. This confirms who you are and records your acceptance — including the public identity above — in one step."
+              purpose={
+                /* The developers' phase (ADR-001 Amendment 1): the identity
+                   was confirmed first, and acceptance only checks against it. */
+                asksHidden
+                  ? "Approve in your NDI wallet to record your acceptance — including the public identity above. It's checked against the identity you confirmed."
+                  : "Approve in your NDI wallet. This confirms who you are and records your acceptance — including the public identity above — in one step."
+              }
               sharing={["Your identity, from your citizen credential"]}
               notSharing={["Anything else in your wallet"]}
               status={scan}
@@ -397,10 +409,11 @@ export function AcceptAccreditationView({ id }: { id: string }) {
           </p>
         ) : null}
 
+        {gate.panel}
         {face !== "waiting_wallet" && face !== "setting_up" && face !== "set_up_failed" && face !== "not_set_up" ? (
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2.5">
-              <GradientButton onClick={accept} disabled={readOnly || busy}>
+              <GradientButton onClick={() => gate.guard(accept)} disabled={readOnly || busy || gate.open}>
                 <Icon name="wallet" size={15} strokeWidth={2} />
                 {busy ? "Checking…" : face === "not_confirmed" ? "Try again" : "Accept with your NDI wallet"}
               </GradientButton>

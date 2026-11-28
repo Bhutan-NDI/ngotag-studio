@@ -19,6 +19,8 @@ import { Icon } from "@/components/ui/icons";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { dsgReminderSent, isNamedAdmin, type Designation } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { SAMPLE_DESIGNATION, daysLeft, dsgPill, kindSingular, kindsInWords, scopePairs } from "./shared";
@@ -70,6 +72,9 @@ type Face =
 
 export function ApproveDesignationView({ id }: { id: string }) {
   const router = useRouter();
+  /* ADR-001 Amendment 1, Decision 2: the approving administrator confirms
+     their identity first (developers' phase only). */
+  const gate = useIdentityGate("approve this designation", "It's still waiting for your decision. Nothing has changed.");
   const {
     designations,
     organizations,
@@ -394,8 +399,9 @@ export function ApproveDesignationView({ id }: { id: string }) {
                     Approving asks {d.orgName} to accept. Refusing means it is never asked. Asking for more
                     information changes nothing — the proposal stays here, and its days keep counting.
                   </p>
+                  {gate.panel}
                   <div className="flex flex-wrap gap-2.5">
-                    <GradientButton onClick={() => setConfirming("approve")} disabled={!canAct}>
+                    <GradientButton onClick={() => gate.guard(() => setConfirming("approve"))} disabled={!canAct || gate.open}>
                       <Icon name="check" size={15} strokeWidth={2.2} />
                       Approve
                     </GradientButton>

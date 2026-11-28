@@ -19,6 +19,8 @@ import { INVITATION_DAYS } from "@/lib/deployment";
 import { roleIn, shortOrgName } from "@/lib/demoData";
 import { mailboxOf } from "@/lib/demoMail";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 type Sent = { kind: "sent" | "queued"; email: string; id?: string };
@@ -72,6 +74,9 @@ export function InviteView({ kind }: { kind: "M" | "O" }) {
   const [legalIdentity, setLegalIdentity] = useState("");
   const [purpose, setPurpose] = useState<"foundational" | "business">("foundational");
   const [purposeDetail, setPurposeDetail] = useState("");
+  /* ADR-001 Amendment 1: an administrator confirms it's them before sending
+     an agency invitation (developers' phase only). */
+  const gate = useIdentityGate("send this invitation", "Nothing has been sent — the form is just as you left it.");
   const selfService = harness.selfServiceSignup;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -410,8 +415,9 @@ export function InviteView({ kind }: { kind: "M" | "O" }) {
                   </>
                 )}
 
+                {kind === "O" ? gate.panel : null}
                 <div className="flex flex-wrap items-center gap-2.5 border-t border-subtle pt-4">
-                  <GradientButton onClick={send} disabled={loading}>
+                  <GradientButton onClick={() => (kind === "O" && valid ? gate.guard(send) : send())} disabled={loading || gate.open}>
                     <Icon name="send" size={15} strokeWidth={2} />
                     {loading
                       ? "Sending…"

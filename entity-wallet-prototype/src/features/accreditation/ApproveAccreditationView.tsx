@@ -24,6 +24,8 @@ import {
   type Accreditation,
 } from "@/lib/demoData";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 import { Criteria, issueOverlaps } from "./Criteria";
@@ -88,6 +90,9 @@ const DECIDE_REFUSALS: Record<"E1" | "E5" | "E11" | "not_admin" | "invalid", str
 
 export function ApproveAccreditationView({ id }: { id: string }) {
   const asksHidden = useAsksHidden();
+  /* ADR-001 Amendment 1, Decision 2: the approving administrator confirms
+     their identity first, whatever the door (developers' phase only). */
+  const gate = useIdentityGate("approve this accreditation", "It's still waiting for your decision. Nothing has changed.");
   const router = useRouter();
   const { accreditations, organizations, people, harness, currentPerson, personById, decideAccreditation, withdrawApproval, hydrated } =
     useDemo();
@@ -525,15 +530,21 @@ export function ApproveAccreditationView({ id }: { id: string }) {
                 <p className="m-0 text-[12.5px] text-muted">{acc.orgName} is told {reviewer}&rsquo;s reason, word for word.</p>
               </>
             ) : (
-              <div className="flex flex-wrap gap-2.5">
-                <GradientButton onClick={() => decide(true)} disabled={!canAct || busy}>
-                  <Icon name="check" size={15} strokeWidth={2.2} />
-                  {busy ? "Recording…" : "Approve"}
-                </GradientButton>
-                <HairlineButton onClick={() => setDeclining(true)} disabled={!canAct || busy}>
-                  Decline
-                </HairlineButton>
-              </div>
+              <>
+                {gate.panel}
+                <div className="flex flex-wrap gap-2.5">
+                  <GradientButton
+                    onClick={() => gate.guard(() => decide(true))}
+                    disabled={!canAct || busy || gate.open}
+                  >
+                    <Icon name="check" size={15} strokeWidth={2.2} />
+                    {busy ? "Recording…" : "Approve"}
+                  </GradientButton>
+                  <HairlineButton onClick={() => setDeclining(true)} disabled={!canAct || busy}>
+                    Decline
+                  </HairlineButton>
+                </div>
+              </>
             )}
           </div>
         ) : null}

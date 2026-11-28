@@ -15,6 +15,7 @@ import { useDemo } from "@/lib/demoStore";
 import { ROUND_TRIP_MS } from "@/lib/demoTiming";
 
 import { AccountSetupForm } from "@/features/account/AccountSetupForm";
+import { ConfirmItsYouStep } from "@/features/account/ConfirmItsYou";
 import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
 
 import { ReviewInvitationView } from "./ReviewInvitationView";
@@ -87,6 +88,8 @@ function PlatformInvitationView({ id }: { id: string }) {
     setUpPlatformAdmin,
     currentPerson,
     signIn,
+    harness,
+    confirmIdentity,
   } = useDemo();
 
   const forced = useScreenState("SCR-INV-04-platform", [
@@ -109,6 +112,17 @@ function PlatformInvitationView({ id }: { id: string }) {
      leave the person looking at a spinner that stopped. */
   const [result, setResult] = useState<Face | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  /* ADR-001 Amendment 1, developers' phase: no scan at sign-up, but an
+     administrator's invitation is accepted only by a confirmed person. A new
+     admin confirms it's them as part of accepting, before the account is
+     made — so the name comes from the wallet — and the invitation stays
+     pending if it fails. */
+  const confirmFirst = harness.developer === true;
+  const [confirmedName, setConfirmedName] = useState<string | null>(null);
+  const [later, setLater] = useState(false);
+  /* An admin with an account already, not yet confirmed: the same step,
+     beside Accept. */
+  const [confirmingAccept, setConfirmingAccept] = useState(false);
 
   const inv = orgInvitations.find((i) => i.id === id);
   const admin = inv?.kind === "A";
@@ -178,7 +192,10 @@ function PlatformInvitationView({ id }: { id: string }) {
       const r = setUpPlatformAdmin(id, name);
       /* SCR-INV-05: confirmation that they are now a platform admin, and
          the way into the admin console — not straight to the dashboard. */
-      if (r.ok) return router.push(`/invitation/${id}/accepted`);
+      if (r.ok) {
+        if (confirmFirst && confirmedName && r.personId) confirmIdentity(r.personId);
+        return router.push(`/invitation/${id}/accepted`);
+      }
       if (r.error === "invalid") return setFormError("Enter your name.");
       setResult(faceFor(r.error));
     }, ROUND_TRIP_MS);
@@ -305,8 +322,31 @@ function PlatformInvitationView({ id }: { id: string }) {
               </p>
             ) : null}
 
-            {face === "setup" ? (
+            {face === "setup" && confirmFirst && admin && !confirmedName ? (
+              later ? (
+                <>
+                  <AuthNotice>
+                    Your invitation is still waiting. Come back to this link whenever you have your Bhutan NDI Wallet — before it
+                    expires.
+                  </AuthNotice>
+                  <GradientButton block onClick={() => setLater(false)}>
+                    Confirm your identity now
+                  </GradientButton>
+                </>
+              ) : (
+                <ConfirmItsYouStep
+                  task="accept this invitation"
+                  waiting="Your invitation is still waiting. Nothing has been accepted."
+                  verifiedName={invitee?.name ?? inv?.email.split("@")[0] ?? "you"}
+                  admin
+                  askWho={askWho}
+                  onConfirmed={(name) => setConfirmedName(name)}
+                  onCancel={() => setLater(true)}
+                />
+              )
+            ) : face === "setup" ? (
               <AccountSetupForm
+                verifiedName={confirmedName}
                 idPrefix="admin"
                 email={inv?.email ?? ""}
                 busy={busy}
@@ -345,7 +385,26 @@ function PlatformInvitationView({ id }: { id: string }) {
               </>
             ) : (
               <div className="flex flex-col gap-2.5">
-                <GradientButton block onClick={accept} disabled={busy}>
+                {confirmingAccept ? (
+                  <ConfirmItsYouStep
+                    task="accept this invitation"
+                    waiting="Your invitation is still waiting. Nothing has been accepted."
+                    verifiedName={currentPerson.name}
+                    admin
+                    askWho={askWho}
+                    onConfirmed={() => {
+                      confirmIdentity(currentPerson.id);
+                      setConfirmingAccept(false);
+                      accept();
+                    }}
+                    onCancel={() => setConfirmingAccept(false)}
+                  />
+                ) : null}
+                <GradientButton
+                  block
+                  onClick={() => (confirmFirst && admin && !currentPerson.cidVerified ? setConfirmingAccept(true) : accept())}
+                  disabled={busy || confirmingAccept}
+                >
                   {busy ? "Accepting…" : "Accept"}
                 </GradientButton>
                 <HairlineButton onClick={decline} disabled={busy}>

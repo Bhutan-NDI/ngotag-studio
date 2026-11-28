@@ -17,6 +17,8 @@ import { Icon } from "@/components/ui/icons";
 import { useReveal } from "@/components/ui/useReveal";
 import { formatDate } from "@/features/controllership/scopeModel";
 import { useDemo } from "@/lib/demoStore";
+
+import { useIdentityGate } from "@/features/account/ConfirmItsYou";
 import { LOCAL_MS } from "@/lib/demoTiming";
 
 /**
@@ -82,6 +84,9 @@ export function PlatformAdminsView() {
   const [revoking, setRevoking] = useState<string | null>(null);
   const [revokeReason, setRevokeReason] = useState("");
   const [resent, setResent] = useState<string | null>(null);
+  /* ADR-001 Amendment 1: an administrator confirms it's them before inviting
+     another (developers' phase only). Root is a role account and isn't asked. */
+  const gate = useIdentityGate("invite an administrator", "Nothing has been sent — the form is just as you left it.");
   /* The confirmation, and the way on to the invitee's side, sit under the
      form — below the fold at laptop height once the list has rows — so the
      page brings them up when they appear. */
@@ -159,7 +164,15 @@ export function PlatformAdminsView() {
 
   const form = (
     <Panel>
-      <form noValidate onSubmit={send} className="relative z-[4] flex flex-col gap-4">
+      <form
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!email.trim()) return send(e);
+          gate.guard(() => send(e));
+        }}
+        className="relative z-[4] flex flex-col gap-4"
+      >
         <div className="flex flex-col gap-1.5">
           <h2 className="m-0 font-display text-[15px] font-semibold text-strong">Invite a platform admin</h2>
           <p className="m-0 max-w-[62ch] text-[13px] leading-[1.6] text-muted">
@@ -234,8 +247,9 @@ export function PlatformAdminsView() {
           ) : null}
         </div>
         {errorText("form")}
+        {gate.panel}
         <div>
-          <GradientButton type="submit" disabled={busy || !email.trim()}>
+          <GradientButton type="submit" disabled={busy || !email.trim() || gate.open}>
             <Icon name="send" size={14} strokeWidth={2} />
             {busy ? "Sending…" : "Send invitation"}
           </GradientButton>

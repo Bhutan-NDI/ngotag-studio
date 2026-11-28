@@ -15,6 +15,7 @@ import { useDemo } from "@/lib/demoStore";
 
 import { AuthCardHeader, AuthNotice } from "@/features/auth/AuthCard";
 
+import { ConfirmItsYouStep } from "./ConfirmItsYou";
 import { IdentityScan, type IdentityScanStage } from "./IdentityScan";
 
 const STATES = ["live", "idle", "wallet", "proved", "declined", "no_wallet"];
@@ -108,7 +109,7 @@ export function SignUpConfirmIdentityView() {
  */
 export function AccountConfirmIdentityView() {
   const router = useRouter();
-  const { currentPerson, confirmIdentity, hydrated } = useDemo();
+  const { currentPerson, confirmIdentity, hydrated, harness } = useDemo();
   const forced = pinned(useScreenState("SCR-ACC-ID", STATES));
   const roleAccount = currentPerson.platformRole === "root";
   const [justProved, setJustProved] = useState(false);
@@ -138,22 +139,42 @@ export function AccountConfirmIdentityView() {
               </>
             ) : (
               <>
-                <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-muted">
-                  Until you confirm who you are, you can be a member of an organisation, but you can&rsquo;t verify one or
-                  be appointed to act for one. One scan with your Bhutan NDI Wallet does it.
-                </p>
-                <IdentityScan
-                  verifiedName={currentPerson.name}
-                  forced={forced}
-                  onProved={() => {
-                    setJustProved(true);
-                    confirmIdentity(currentPerson.id);
-                  }}
-                  onContinue={() => router.push("/profile")}
-                  cardVerb="Confirm"
-                  cancelLabel="Not now"
-                  onCancel={() => router.push("/profile")}
-                />
+                {harness.developer && !forced ? null : (
+                  <p className="m-0 max-w-[64ch] text-[13.5px] leading-[1.6] text-muted">
+                    Until you confirm who you are, you can be a member of an organisation, but you can&rsquo;t verify one or
+                    be appointed to act for one. One scan with your Bhutan NDI Wallet does it.
+                  </p>
+                )}
+                {harness.developer && !forced ? (
+                  /* The developers' phase: the same step the protected
+                     actions show, with every state. */
+                  <ConfirmItsYouStep
+                    task="confirm your account"
+                    lead="One scan with your NDI wallet, once, for this account. You need it before you propose, approve, send or accept an invitation, an accreditation or a designation — or you can do it then, when you press the button."
+                    waiting="Your account is as it was."
+                    verifiedName={currentPerson.name}
+                    admin={currentPerson.platformRole === "admin"}
+                    onConfirmed={() => {
+                      setJustProved(true);
+                      confirmIdentity(currentPerson.id);
+                      router.push(currentPerson.platformRole === "admin" ? "/dashboard" : "/profile");
+                    }}
+                    onCancel={() => router.push("/profile")}
+                  />
+                ) : (
+                  <IdentityScan
+                    verifiedName={currentPerson.name}
+                    forced={forced}
+                    onProved={() => {
+                      setJustProved(true);
+                      confirmIdentity(currentPerson.id);
+                    }}
+                    onContinue={() => router.push("/profile")}
+                    cardVerb="Confirm"
+                    cancelLabel="Not now"
+                    onCancel={() => router.push("/profile")}
+                  />
+                )}
               </>
             )}
           </div>

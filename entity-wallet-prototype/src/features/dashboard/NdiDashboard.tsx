@@ -25,7 +25,10 @@ import { useDemo } from "@/lib/demoStore";
  * the page says so rather than offering a form that would be refused.
  */
 export function NdiDashboard({ name }: { name: string }) {
-  const { people, organizations, orgInvitations, accreditations, currentPerson, firstRun, adminStatus: platformStatus } = useDemo();
+  const { people, organizations, orgInvitations, accreditations, currentPerson, firstRun, harness, adminStatus: platformStatus } = useDemo();
+  /* ADR-001 Amendment 1, developers' phase: an administrator who hasn't
+     confirmed it's them is told on arrival, not first at the Approve button. */
+  const unconfirmed = harness.developer === true && currentPerson.platformRole === "admin" && !currentPerson.cidVerified;
   const isRoot = currentPerson.platformRole === "root";
   const rootMayInvite = isRoot && platformStatus().rootBlock === null;
 
@@ -52,6 +55,21 @@ export function NdiDashboard({ name }: { name: string }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {unconfirmed ? (
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[var(--ndi-mint-40)] px-4 py-3"
+          style={{ background: "var(--ndi-mint-08)" }}
+        >
+          <p className="m-0 max-w-[70ch] text-[13.5px] leading-[1.6] text-body">
+            <span className="font-semibold text-strong">Confirm your identity before you propose, approve or send anything.</span> One
+            scan with your NDI wallet, once — or do it when you first press the button.
+          </p>
+          <Link href="/account/confirm-identity" className="ndi-plainlink text-[13px] font-semibold text-accent">
+            Confirm your identity
+          </Link>
+        </div>
+      ) : null}
       <WaveBanner
         eyebrow="— Bhutan NDI"
         title={
